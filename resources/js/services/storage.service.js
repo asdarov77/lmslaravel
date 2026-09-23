@@ -1,6 +1,5 @@
 const TOKEN_KEY = 'token'
 
-
 /**
  * Manage the how Access Tokens are being stored and retrieved from storage.
  *

@@ -55,7 +55,7 @@ export default {
     },
 
     menuItems() {
-      return [
+      const items = [
         // {
         //   icon: "mdi-home",
         //   title: this.$t("app.about"),
@@ -123,19 +123,24 @@ export default {
           contentType: "manage-users",
         },
       ]
-      .filter(menu => {
-        if (this.user.permissions.length === 0){
+      
+      // Защита от undefined user и permissions
+      if (!this.user || !this.user.permissions || !Array.isArray(this.user.permissions)) {
+        return items.filter(menu => menu.contentType === '')
+      }
+      
+      return items.filter(menu => {
+        if (this.user.permissions.length === 0) {
           return menu.contentType === ''
         }
         return this.user.permissions.some(
-          //({ content_type }) => menu.contentType === content_type || menu.contentType === ''
-          ({ slug}) => menu.contentType === slug || menu.contentType === ''
+          ({ slug }) => menu.contentType === slug || menu.contentType === ''
         )
       })
     },
 
     menuUsers() {
-      return [
+      const items = [
         {
           icon: "mdi-account-multiple-outline",
           title: this.$t("app.menu.users"),
@@ -162,13 +167,18 @@ export default {
         },
         
       ]
-      .filter(menu => {
-        if (this.user.permissions.length === 0){
+      
+      // Защита от undefined user и permissions
+      if (!this.user || !this.user.permissions || !Array.isArray(this.user.permissions)) {
+        return items.filter(menu => menu.contentType === '')
+      }
+      
+      return items.filter(menu => {
+        if (this.user.permissions.length === 0) {
           return menu.contentType === ''
         }
         return this.user.permissions.some(
-          //({ content_type }) => menu.contentType === content_type || menu.contentType === ''
-          ({ slug}) => menu.contentType === slug || menu.contentType === ''
+          ({ slug }) => menu.contentType === slug || menu.contentType === ''
         )
       })
     },

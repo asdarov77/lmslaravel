@@ -1,9 +1,33 @@
 ```
 # Dependencies
-vendor/
+node_modules/
 
-# PHP specific
-*.php~
-**/vendor/composer/installed.php
-composer.lock
+# Build artifacts
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Editors
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Temporary files
+*.tmp
+*.swp
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
 ```

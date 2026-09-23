@@ -73,93 +73,44 @@ export default {
       this.alert = false
     },
      async loginForm() {
-      //console.log('loginForm')
-      //axios.defaults.headers.common["Authorization"] = "";      
-      //localStorage.removeItem("token");
       this.errors = [];
       
-      if (!this.errors.length ) {
-        const formData = {
-          fio: this.fio,          
-          password: this.password,
-        };
-        
-        //await this.$store
-        await this.$store
-          .dispatch('Auth/login', formData          
-          // .dispatch('login', formData      
-          )
-          .then(() => {    
-           // this.$store
-          //.dispatch('Ui/login')                 
-            
-          })
-          .catch((error) => {
-            //console.error(error)
-            //console.log(error.response.status)
-            if (error.response.status === 401) {
-               this.snackbarText = "неверный пароль";              
-               this.alertType = "error";              
-            }
-            if (error.response.status === 429) {
-               this.snackbarText = "Too Many Requests";              
-               this.alertType = "error";              
-            }
-            if (error.response.status === 500) {
-               this.snackbarText = "неверный пользователь или ошибка сервера";              
-               this.alertType = "error";              
-            }
-          })
-          .finally(() => {
-            this.alert = true;
-            this.$router.push('/')
-          });
+      const formData = {
+        fio: this.fio,          
+        password: this.password,
+      };
       
-        // axios.get("/api/sanctum/csrf-cookie").then((response) => {
-        //   axios            
-        //     .post("/api/login/", formData)
-        //     .then((response) => {
-        //       //console.log(response, '   response');
-        //       //const token = response.data.auth_token
-              
-        //       // ?? const roles = response.data.roles; // массив ролей пользователей
-        //       const permissions = response.data.permissions; 
-        //       //console.log(roles, "roles");
-        //       const token = response.data.token;
-        //       this.$store.commit("setToken", token);
-        //       axios.defaults.headers.common["Authorization"] = "Token " + token;
-        //       localStorage.setItem("token", token);
-              
-        //       this.$store.state.user.isAuthenticated = true;
-        //       //console.log(this.$store.state.user.isAuthenticated);
-
-        //       //vuex передача в хранилище имени пользователя
-        //       //this.$store.state.user.name = this.fio;
-        //       //localStorage.setItem("user", this.fio);
-              
-        //       //this.$store.state.user.roles = roles;
-        //       //this.$store.state.user.permissions = permissions;
-
-        //       //localStorage.setItem("user", this.username);
-        //       this.$router.push("/my");
-        //     })
-        //     .catch((error) => {
-        //       if (error.response) {
-        //         for (const property in error.response.data) {
-        //           this.errors.push(
-        //             `${property}: ${error.response.data[property]}`
-        //           );
-        //         }
-
-        //         console.log(JSON.stringify(error.response.data));
-        //       } else if (error.message) {
-        //         this.errors.push("Something went wrong. Please try again");
-
-        //         console.log(JSON.stringify(error));
-        //       }
-        //     });
-        // });
-      }
+      await this.$store
+        .dispatch('Auth/login', formData)
+        .then(() => {    
+          this.alert = true;
+          this.snackbarText = "Успешный вход";
+          this.alertType = "success";
+          this.$router.push('/')
+        })
+        .catch((error) => {
+          console.error(error)
+          // Безопасная обработка ошибок (защита от CORS и network ошибок)
+          if (!error.response) {
+            this.snackbarText = "Ошибка сети или CORS. Проверьте подключение к серверу.";
+            this.alertType = "error";
+          } else if (error.response.status === 401) {
+             this.snackbarText = "Неверный пароль";              
+             this.alertType = "error";              
+          } else if (error.response.status === 429) {
+             this.snackbarText = "Слишком много запросов. Попробуйте позже.";              
+             this.alertType = "error";              
+          } else if (error.response.status === 500) {
+             this.snackbarText = "Ошибка сервера";              
+             this.alertType = "error";              
+          } else {
+             this.snackbarText = "Произошла ошибка: " + (error.message || "Неизвестная ошибка");
+             this.alertType = "error";
+          }
+        })
+        .finally(() => {
+          this.alert = true;
+        });
     },
   },
 };
