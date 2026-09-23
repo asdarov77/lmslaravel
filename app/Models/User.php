@@ -107,7 +107,7 @@ class User extends Authenticatable
     {
         $permissions = [];
         foreach (Permission::all() as $permission) {
-            if ($this->user()->can($permission->name)) {
+            if ($this->hasPermission($permission->slug)) {
                 $permissions[] = $permission->name;
             }
         }
