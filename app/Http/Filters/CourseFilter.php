@@ -135,29 +135,22 @@ class CourseFilter extends AbstractFilter
 
 public function categoryId(Builder $builder, $categoryId)
 {
-    $categoryCode = Category::find($categoryId)->code;
-    $categoryCode = trim($categoryCode);
+    $category = Category::find($categoryId);
+    if (!$category) {
+        return;
+    }
     
-        // // Фильтруем коллекцию по category_id из categories
-        $builder
-        ->withWhereHas('aukstructures' , function ($query) use ($categoryCode) {
-            $query-> where('categories', 'like', "%{$categoryCode}%")  
-            ->orWhere('categories', '=', '')
-            ->where('type','=' , 0);
+    $categoryCode = trim($category->code);
+    
+    $builder
+        ->withWhereHas('aukstructures', function ($query) use ($categoryCode) {
+            $query->where('categories', 'like', "%{$categoryCode}%")  
+                ->orWhere('categories', '=', '')
+                ->where('type', '=' , 0);
         })
         ->whereHas('categories', function ($query) use ($categoryId) {
             $query->where('categories.id', '=', $categoryId);
         });
-
-
-
-    // $builder->whereHas('categories', function ($query) use ($categoryId) {
-    //     $query->where('categories.id', '=', $categoryId);
-    // });
-
-    
-
-   // $builder->with(['aukstructures', 'categories']);
 }
 
     public function parentId(Builder $builder, $value)
@@ -169,22 +162,17 @@ public function categoryId(Builder $builder, $categoryId)
 
     public function courseId(Builder $builder, $value)
     {
-        // Ищем курс с указанным id
         $course = Course::where('id', $value)->with('aukstructures')->first();        
         if ($course) {
-            // Если курс найден, то возвращаем его
             $builder->where('id', $course->id)->with('aukstructures');
-            
         } else {
-            // Если курс не найден, то ищем по aukstructure.id
-            $course_auk=Aukstructure::find($value)->course_id;
-            // $builder->where('id', $course_auk)->with('aukstructures');            
-            $builder->where('id', $course_auk)->orWhereHas('aukstructures', function ($query) use ($value) {
-                $query->where('parent_id', $value);
-            })->with('aukstructures');
-        // $builder->orWhereHas('aukstructures', function ($query) use ($value) {
-        //     $query->where('parent_id', $value);
-        // })->with('aukstructures');
+            $aukstructure = Aukstructure::find($value);
+            if ($aukstructure) {
+                $course_auk = $aukstructure->course_id;
+                $builder->where('id', $course_auk)->orWhereHas('aukstructures', function ($query) use ($value) {
+                    $query->where('parent_id', $value);
+                })->with('aukstructures');
+            }
         }    
     }
 
