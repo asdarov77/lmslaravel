@@ -1,0 +1,1 @@
+import{_ as o,g as s,d as n,b as a,F as r,a as c,o as l}from"./app-COwdcWHH.js";const _={};function m(u,e){const t=c("v-select");return l(),s(r,null,[e[0]||(e[0]=n("h1",null,"About",-1)),a(t,{label:"Вид занятия",items:["Лекция","Практическое занятие","Самостоятельная подготовка"]})],64)}const f=o(_,[["render",m]]);export{f as default};
