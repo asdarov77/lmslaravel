@@ -45,7 +45,7 @@ use Illuminate\Support\Facades\Storage;
 //Route::any('*','TestController@test');
 
 //
-Route::post('/login', [AuthController::class, 'login'])->name('login');
+Route::post('/login', [AuthController::class, 'login']);
 Route::post('/api/v1/login', [AuthController::class, 'login'])->name('api.v1.login');
 
 // API v1 routes
