@@ -1,12 +1,11 @@
 <template>
-  <component :is="viewComponent"></component> 
-  <p>home</p>{{ user.role }}
+  <component :is="viewComponent"></component>
 </template>
 
 <script>
 import UserPage from "./User/UserPage.vue";
 import MyAccount from "./MyAccount.vue";
-import {mapGetters, mapState} from "vuex";
+import { mapState } from "vuex";
 
 const roleComponentMapping = {
   'Обучаемый': UserPage,
@@ -15,22 +14,13 @@ const roleComponentMapping = {
 }
 
 export default {
-    data() {
-      return {
-        // viewComponent: roleComponentMapping[this.$store.Auth.state.user.role]
-        viewComponent: roleComponentMapping[this.us],
-        us: "",
-      }
-    },
-    mounted() {
-      const us = this.user.role
-    },
-
     computed: {
-    ...mapGetters("Auth", ["loggedIn","user"]),    
-    ...mapState("Ui", ["menudrawler", "language"]),
-    ...mapState("Auth", ["user"])
-  },
-
+      // Защита от undefined: если пользователь ещё не загружен, используем пустой объект
+      ...mapState("Auth", { authUser: (state) => state.user || {} }),
+      viewComponent() {
+        const role = this.authUser?.role;
+        return roleComponentMapping[role] || null;
+      },
+    },
 }
 </script>
