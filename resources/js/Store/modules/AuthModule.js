@@ -5,10 +5,10 @@ import { login } from "../../api/auth.api";
 // Безопасное получение пользователя из LocalStorage
 const getInitialUser = () => {
     try {
-        const userStr = UserService.getUser();
-        return userStr ? JSON.parse(userStr) : {};
+        const user = UserService.getUser();
+        return user || {};
     } catch (e) {
-        console.error("Ошибка парсинга user из LocalStorage", e);
+        console.error("Ошибка получения user из LocalStorage", e);
         return {};
     }
 };
@@ -51,7 +51,7 @@ const AuthModule = {
                 const response = await login(formData);
 
                 TokenService.saveToken(response.data.token);
-                UserService.saveUser(JSON.stringify(response.data.user));
+                UserService.saveUser(response.data.user);
 
                 commit("LOGIN_SUCCESS", response.data.token);
                 commit("SET_USER", response.data.user);

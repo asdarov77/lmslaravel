@@ -1,3 +1,6 @@
+const USER_KEY = 'user'
+const TOKEN_KEY = 'token'
+
 const UserService = {
   getUser() {
     const userStr = localStorage.getItem(USER_KEY)
@@ -9,6 +12,7 @@ const UserService = {
       return JSON.parse(userStr)
     } catch (e) {
       console.error('Ошибка парсинга user из LocalStorage:', e)
+      localStorage.removeItem(USER_KEY)
       return null
     }
   },
@@ -24,4 +28,4 @@ const UserService = {
   }
 }
 
-export { UserService }
+export { UserService, USER_KEY }
