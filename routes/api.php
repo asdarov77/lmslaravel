@@ -122,8 +122,7 @@ Route::get('/classess/{air}', [CourseController::class, 'showauks']);
 Route::post('/classes/', [AircraftController::class, 'storeclasses']);
 
 
-//
-Route::apiResource('categories', CategoryController::class)->middleware('auth:sanctum');
+
 //
 Route::apiResource('permissions', PermissionController::class);
 //
