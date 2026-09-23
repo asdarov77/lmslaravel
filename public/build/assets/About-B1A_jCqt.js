@@ -1,0 +1,1 @@
+import{_ as o,c as s,d as n,g as a,f as c,F as r,o as l}from"./app-tfkZ8itt.js";const _={};function m(f,e){const t=c("v-select");return l(),s(r,null,[e[0]||(e[0]=n("h1",null,"About",-1)),a(t,{label:"Вид занятия",items:["Лекция","Практическое занятие","Самостоятельная подготовка"]})],64)}const d=o(_,[["render",m]]);export{d as default};

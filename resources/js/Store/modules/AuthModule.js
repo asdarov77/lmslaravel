@@ -50,11 +50,14 @@ const AuthModule = {
             try {
                 const response = await login(formData);
 
-                TokenService.saveToken(response.data.token);
-                UserService.saveUser(response.data.user);
+                // API оборачивает ответы в envelope {success, data, error, meta}
+                const payload = response.data?.data ?? response.data;
 
-                commit("LOGIN_SUCCESS", response.data.token);
-                commit("SET_USER", response.data.user);
+                TokenService.saveToken(payload.token);
+                UserService.saveUser(payload.user);
+
+                commit("LOGIN_SUCCESS", payload.token);
+                commit("SET_USER", payload.user);
 
                 return response;
             } catch (error) {

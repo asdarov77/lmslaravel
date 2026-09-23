@@ -16,7 +16,7 @@ router.beforeEach((to , from, next) => {
         //console.log(to.name , 'куда');
         //console.log(from.name, 'откуда');
         //console.log(token);
-        if(!token) {                                    
+        if(!token || token === 'undefined') {                                    
             if(to.name === 'login' || to.name === 'regist') // если не авторизован,то открываем доступ для регистрации и авторизации
             {            
                 return next()
