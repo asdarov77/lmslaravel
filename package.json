@@ -36,19 +36,19 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
-    "@vitejs/plugin-vue": "^6.0.9",
+    "@vitejs/plugin-vue": "^5.2.4",
     "@vue/test-utils": "^2.5.1",
     "axios": "^1.12",
     "install": "^0.13.0",
     "jsdom": "^29.1.1",
-    "laravel-vite-plugin": "^2.0.1",
+    "laravel-vite-plugin": "^1.2.0",
     "lodash": "^4.17.21",
     "npx": "^10.2.2",
     "playwright": "^1.55.1",
     "postcss": "^8.5.6",
-    "vite": "^7.1.9",
+    "vite": "^5.4.19",
     "vite-plugin-env-compatible": "^2.0.1",
-    "vitest": "^4.1.11",
+    "vitest": "^2.1.9",
     "vue-cli-plugin-vuetify": "~2.5.8",
     "vue-loader": "^17.4.2"
   }

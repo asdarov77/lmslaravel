@@ -1,0 +1,547 @@
+{
+  "_ButtonGroup-wSQIom9F.js": {
+    "file": "assets/ButtonGroup-wSQIom9F.js",
+    "name": "ButtonGroup",
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "_PermissionWrapper-Dqh8lrUV.js": {
+    "file": "assets/PermissionWrapper-Dqh8lrUV.js",
+    "name": "PermissionWrapper",
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "_Popup-C8k191ZU.js": {
+    "file": "assets/Popup-C8k191ZU.js",
+    "name": "Popup",
+    "imports": [
+      "resources/js/app.js"
+    ],
+    "css": [
+      "assets/Popup-DLVQboPA.css"
+    ]
+  },
+  "_Popup-DLVQboPA.css": {
+    "file": "assets/Popup-DLVQboPA.css",
+    "src": "_Popup-DLVQboPA.css"
+  },
+  "_VProgressCircular-C41n1nay.js": {
+    "file": "assets/VProgressCircular-C41n1nay.js",
+    "name": "VProgressCircular",
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "node_modules/@mdi/font/fonts/materialdesignicons-webfont.eot": {
+    "file": "assets/materialdesignicons-webfont-CSr8KVlo.eot",
+    "src": "node_modules/@mdi/font/fonts/materialdesignicons-webfont.eot"
+  },
+  "node_modules/@mdi/font/fonts/materialdesignicons-webfont.ttf": {
+    "file": "assets/materialdesignicons-webfont-B7mPwVP_.ttf",
+    "src": "node_modules/@mdi/font/fonts/materialdesignicons-webfont.ttf"
+  },
+  "node_modules/@mdi/font/fonts/materialdesignicons-webfont.woff": {
+    "file": "assets/materialdesignicons-webfont-PXm3-2wK.woff",
+    "src": "node_modules/@mdi/font/fonts/materialdesignicons-webfont.woff"
+  },
+  "node_modules/@mdi/font/fonts/materialdesignicons-webfont.woff2": {
+    "file": "assets/materialdesignicons-webfont-Dp5v-WZN.woff2",
+    "src": "node_modules/@mdi/font/fonts/materialdesignicons-webfont.woff2"
+  },
+  "resources/js/Pages/About.vue": {
+    "file": "assets/About-DTzTzsSP.js",
+    "name": "About",
+    "src": "resources/js/Pages/About.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/Calendar/FormPicker.vue": {
+    "file": "assets/FormPicker-BSrM1APL.js",
+    "name": "FormPicker",
+    "src": "resources/js/Pages/Calendar/FormPicker.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/Category/CategoryList.vue": {
+    "file": "assets/CategoryList-CSjKKR6A.js",
+    "name": "CategoryList",
+    "src": "resources/js/Pages/Category/CategoryList.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ],
+    "css": [
+      "assets/CategoryList-CCUnUGnR.css"
+    ]
+  },
+  "resources/js/Pages/Category/RegisterCategory.vue": {
+    "file": "assets/RegisterCategory-DKc-Ik68.js",
+    "name": "RegisterCategory",
+    "src": "resources/js/Pages/Category/RegisterCategory.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js",
+      "_ButtonGroup-wSQIom9F.js"
+    ]
+  },
+  "resources/js/Pages/Category/UpdateCategory.vue": {
+    "file": "assets/UpdateCategory-DYnCVaGj.js",
+    "name": "UpdateCategory",
+    "src": "resources/js/Pages/Category/UpdateCategory.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js",
+      "_ButtonGroup-wSQIom9F.js"
+    ]
+  },
+  "resources/js/Pages/Contacts.vue": {
+    "file": "assets/Contacts-Cs8-ZrTM.js",
+    "name": "Contacts",
+    "src": "resources/js/Pages/Contacts.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/Course/AddClass.vue": {
+    "file": "assets/AddClass-BL9_ImEJ.js",
+    "name": "AddClass",
+    "src": "resources/js/Pages/Course/AddClass.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js",
+      "_ButtonGroup-wSQIom9F.js"
+    ],
+    "css": [
+      "assets/AddClass-C1UH73ku.css"
+    ]
+  },
+  "resources/js/Pages/Course/RegisterCourse.vue": {
+    "file": "assets/RegisterCourse-CY2ci3wt.js",
+    "name": "RegisterCourse",
+    "src": "resources/js/Pages/Course/RegisterCourse.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js",
+      "resources/js/Pages/FileLoadSimple.vue"
+    ]
+  },
+  "resources/js/Pages/Course/UpdateCourse.vue": {
+    "file": "assets/UpdateCourse-Cxco3mtr.js",
+    "name": "UpdateCourse",
+    "src": "resources/js/Pages/Course/UpdateCourse.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/CourseItem.vue": {
+    "file": "assets/CourseItem-D0d_4Hvz.js",
+    "name": "CourseItem",
+    "src": "resources/js/Pages/CourseItem.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/CourseManifest.vue": {
+    "file": "assets/CourseManifest-BIgyGqDR.js",
+    "name": "CourseManifest",
+    "src": "resources/js/Pages/CourseManifest.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js",
+      "_Popup-C8k191ZU.js"
+    ],
+    "css": [
+      "assets/CourseManifest-DCbthDXn.css"
+    ]
+  },
+  "resources/js/Pages/CourseTest.vue": {
+    "file": "assets/CourseTest-Da4m88gP.js",
+    "name": "CourseTest",
+    "src": "resources/js/Pages/CourseTest.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/Courses.vue": {
+    "file": "assets/Courses-E5DS2arR.js",
+    "name": "Courses",
+    "src": "resources/js/Pages/Courses.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ],
+    "css": [
+      "assets/Courses-oTTSVYoJ.css"
+    ]
+  },
+  "resources/js/Pages/Errors/_403.vue": {
+    "file": "assets/_403-BViMhkxK.js",
+    "name": "_403",
+    "src": "resources/js/Pages/Errors/_403.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/Errors/_404.vue": {
+    "file": "assets/_404-BiaI042Z.js",
+    "name": "_404",
+    "src": "resources/js/Pages/Errors/_404.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/Errors/_500.vue": {
+    "file": "assets/_500-CyJel4lw.js",
+    "name": "_500",
+    "src": "resources/js/Pages/Errors/_500.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/EventCalendar.vue": {
+    "file": "assets/EventCalendar-CiIaoB8N.js",
+    "name": "EventCalendar",
+    "src": "resources/js/Pages/EventCalendar.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ],
+    "css": [
+      "assets/EventCalendar-D3nrzJea.css"
+    ]
+  },
+  "resources/js/Pages/FileLoadSimple.vue": {
+    "file": "assets/FileLoadSimple-BVmk_wED.js",
+    "name": "FileLoadSimple",
+    "src": "resources/js/Pages/FileLoadSimple.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/Filemanager/FileManager.vue": {
+    "file": "assets/FileManager-Bom3wBTy.js",
+    "name": "FileManager",
+    "src": "resources/js/Pages/Filemanager/FileManager.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/Gift/ExamineItem.vue": {
+    "file": "assets/ExamineItem-1EchCdgx.js",
+    "name": "ExamineItem",
+    "src": "resources/js/Pages/Gift/ExamineItem.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js",
+      "_VProgressCircular-C41n1nay.js"
+    ],
+    "css": [
+      "assets/ExamineItem-BvcNYooQ.css"
+    ]
+  },
+  "resources/js/Pages/Gift/ExamineMain.vue": {
+    "file": "assets/ExamineMain-DDmM26Wd.js",
+    "name": "ExamineMain",
+    "src": "resources/js/Pages/Gift/ExamineMain.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js",
+      "_VProgressCircular-C41n1nay.js"
+    ],
+    "css": [
+      "assets/ExamineMain-JFnBdUhL.css"
+    ]
+  },
+  "resources/js/Pages/Gift/GiftImportForm.vue": {
+    "file": "assets/GiftImportForm-By3kpHBy.js",
+    "name": "GiftImportForm",
+    "src": "resources/js/Pages/Gift/GiftImportForm.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/Gift/QuestionEdit.vue": {
+    "file": "assets/QuestionEdit-D1j-QAHh.js",
+    "name": "QuestionEdit",
+    "src": "resources/js/Pages/Gift/QuestionEdit.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js",
+      "_Popup-C8k191ZU.js"
+    ]
+  },
+  "resources/js/Pages/Gift/QuestionItem.vue": {
+    "file": "assets/QuestionItem-Bp9vBdn6.js",
+    "name": "QuestionItem",
+    "src": "resources/js/Pages/Gift/QuestionItem.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ],
+    "css": [
+      "assets/QuestionItem-DKIhlNmk.css"
+    ]
+  },
+  "resources/js/Pages/Gift/QuestionNew.vue": {
+    "file": "assets/QuestionNew-Dd9Ylw5m.js",
+    "name": "QuestionNew",
+    "src": "resources/js/Pages/Gift/QuestionNew.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js",
+      "_Popup-C8k191ZU.js"
+    ]
+  },
+  "resources/js/Pages/Group/CreateGroup.vue": {
+    "file": "assets/CreateGroup-Jmh7_nzp.js",
+    "name": "CreateGroup",
+    "src": "resources/js/Pages/Group/CreateGroup.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/Group/GroupItemEdit.vue": {
+    "file": "assets/GroupItemEdit-riEPVMQz.js",
+    "name": "GroupItemEdit",
+    "src": "resources/js/Pages/Group/GroupItemEdit.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js",
+      "_ButtonGroup-wSQIom9F.js"
+    ]
+  },
+  "resources/js/Pages/Group/GroupLearning.vue": {
+    "file": "assets/GroupLearning-Cv9oLN-9.js",
+    "name": "GroupLearning",
+    "src": "resources/js/Pages/Group/GroupLearning.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_PermissionWrapper-Dqh8lrUV.js",
+      "_Popup-C8k191ZU.js",
+      "resources/js/app.js",
+      "_ButtonGroup-wSQIom9F.js"
+    ],
+    "css": [
+      "assets/GroupLearning-D306TInV.css"
+    ]
+  },
+  "resources/js/Pages/GroupList.vue": {
+    "file": "assets/GroupList-B-7LsjdG.js",
+    "name": "GroupList",
+    "src": "resources/js/Pages/GroupList.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ],
+    "css": [
+      "assets/GroupList-BTUIKLN7.css"
+    ]
+  },
+  "resources/js/Pages/Home.vue": {
+    "file": "assets/Home--QNWvj0C.js",
+    "name": "Home",
+    "src": "resources/js/Pages/Home.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/Pages/User/UserPage.vue",
+      "resources/js/Pages/MyAccount.vue",
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/Login.vue": {
+    "file": "assets/Login-BW72cUG-.js",
+    "name": "Login",
+    "src": "resources/js/Pages/Login.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js",
+      "_Popup-C8k191ZU.js"
+    ],
+    "css": [
+      "assets/Login-CT8G6yfm.css"
+    ],
+    "assets": [
+      "assets/flag_en-5gNLbL8w.svg",
+      "assets/flag_ru-WaOFKH-a.svg"
+    ]
+  },
+  "resources/js/Pages/MyAccount.vue": {
+    "file": "assets/MyAccount-CG6LIuep.js",
+    "name": "MyAccount",
+    "src": "resources/js/Pages/MyAccount.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/Register.vue": {
+    "file": "assets/Register-CqdBDRk6.js",
+    "name": "Register",
+    "src": "resources/js/Pages/Register.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_Popup-C8k191ZU.js",
+      "_ButtonGroup-wSQIom9F.js",
+      "resources/js/app.js"
+    ],
+    "css": [
+      "assets/Register-Behi8Bne.css"
+    ]
+  },
+  "resources/js/Pages/Settings/AllSettings.vue": {
+    "file": "assets/AllSettings-UXPnUcjQ.js",
+    "name": "AllSettings",
+    "src": "resources/js/Pages/Settings/AllSettings.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/Pages/Settings/GradeSettings.vue",
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/Settings/GradeSettings.vue": {
+    "file": "assets/GradeSettings-C2cg3UaA.js",
+    "name": "GradeSettings",
+    "src": "resources/js/Pages/Settings/GradeSettings.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/User/UserChpass.vue": {
+    "file": "assets/UserChpass-dbvR9ZaJ.js",
+    "name": "UserChpass",
+    "src": "resources/js/Pages/User/UserChpass.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_Popup-C8k191ZU.js",
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/User/UserCourse.vue": {
+    "file": "assets/UserCourse-ojd5WfRQ.js",
+    "name": "UserCourse",
+    "src": "resources/js/Pages/User/UserCourse.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ],
+    "css": [
+      "assets/UserCourse-ludosoVh.css"
+    ]
+  },
+  "resources/js/Pages/User/UserItemEdit.vue": {
+    "file": "assets/UserItemEdit-Bi2MH6lX.js",
+    "name": "UserItemEdit",
+    "src": "resources/js/Pages/User/UserItemEdit.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js",
+      "_ButtonGroup-wSQIom9F.js"
+    ],
+    "css": [
+      "assets/UserItemEdit-D5qGCqrK.css"
+    ]
+  },
+  "resources/js/Pages/User/UserPage.vue": {
+    "file": "assets/UserPage-C6tX7CMO.js",
+    "name": "UserPage",
+    "src": "resources/js/Pages/User/UserPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/UserList.vue": {
+    "file": "assets/UserList-C-O0REOE.js",
+    "name": "UserList",
+    "src": "resources/js/Pages/UserList.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_PermissionWrapper-Dqh8lrUV.js",
+      "_Popup-C8k191ZU.js",
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-RKrmMqVO.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true,
+    "dynamicImports": [
+      "resources/js/Pages/Home.vue",
+      "resources/js/Pages/Login.vue",
+      "resources/js/Pages/Register.vue",
+      "resources/js/Pages/About.vue",
+      "resources/js/Pages/Contacts.vue",
+      "resources/js/Pages/MyAccount.vue",
+      "resources/js/Pages/UserList.vue",
+      "resources/js/Pages/User/UserItemEdit.vue",
+      "resources/js/Pages/User/UserChpass.vue",
+      "resources/js/Pages/GroupList.vue",
+      "resources/js/Pages/Group/CreateGroup.vue",
+      "resources/js/Pages/Group/GroupItemEdit.vue",
+      "resources/js/Pages/Courses.vue",
+      "resources/js/Pages/CourseTest.vue",
+      "resources/js/Pages/CourseManifest.vue",
+      "resources/js/Pages/CourseItem.vue",
+      "resources/js/Pages/Course/RegisterCourse.vue",
+      "resources/js/Pages/Course/UpdateCourse.vue",
+      "resources/js/Pages/Course/AddClass.vue",
+      "resources/js/Pages/Category/CategoryList.vue",
+      "resources/js/Pages/Category/RegisterCategory.vue",
+      "resources/js/Pages/Category/UpdateCategory.vue",
+      "resources/js/Pages/FileLoadSimple.vue",
+      "resources/js/Pages/EventCalendar.vue",
+      "resources/js/Pages/Group/GroupLearning.vue",
+      "resources/js/Pages/User/UserPage.vue",
+      "resources/js/Pages/Gift/GiftImportForm.vue",
+      "resources/js/Pages/Gift/ExamineItem.vue",
+      "resources/js/Pages/Gift/ExamineMain.vue",
+      "resources/js/Pages/Gift/QuestionEdit.vue",
+      "resources/js/Pages/Gift/QuestionItem.vue",
+      "resources/js/Pages/Gift/QuestionNew.vue",
+      "resources/js/Pages/Filemanager/FileManager.vue",
+      "resources/js/Pages/Calendar/FormPicker.vue",
+      "resources/js/Pages/User/UserCourse.vue",
+      "resources/js/Pages/Settings/GradeSettings.vue",
+      "resources/js/Pages/Settings/AllSettings.vue",
+      "resources/js/Pages/Errors/_403.vue",
+      "resources/js/Pages/Errors/_404.vue",
+      "resources/js/Pages/Errors/_500.vue"
+    ],
+    "css": [
+      "assets/app-DOzEAaEG.css"
+    ],
+    "assets": [
+      "assets/materialdesignicons-webfont-CSr8KVlo.eot",
+      "assets/materialdesignicons-webfont-Dp5v-WZN.woff2",
+      "assets/materialdesignicons-webfont-PXm3-2wK.woff",
+      "assets/materialdesignicons-webfont-B7mPwVP_.ttf"
+    ]
+  },
+  "resources/js/locales/icons/flag_en.svg": {
+    "file": "assets/flag_en-5gNLbL8w.svg",
+    "src": "resources/js/locales/icons/flag_en.svg"
+  },
+  "resources/js/locales/icons/flag_ru.svg": {
+    "file": "assets/flag_ru-WaOFKH-a.svg",
+    "src": "resources/js/locales/icons/flag_ru.svg"
+  }
+}
