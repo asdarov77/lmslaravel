@@ -1,1 +1,0 @@
-import{_ as e,c as o,d as n,o as s}from"./app-RKrmMqVO.js";const a={name:"contacts"};function c(r,t,p,l,d,_){return s(),o("div",null,[...t[0]||(t[0]=[n("h2",null," Contacts page ",-1)])])}const u=e(a,[["render",c]]);export{u as default};
