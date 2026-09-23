@@ -1,13 +1,9 @@
 const USER_KEY = 'user'
-const TOKEN_KEY = 'token'
 
 const UserService = {
   getUser() {
     const userStr = localStorage.getItem(USER_KEY)
-    // Возвращаем null если значение отсутствует или равно "undefined"
-    if (!userStr || userStr === 'undefined') {
-      return null
-    }
+    if (!userStr || userStr === 'undefined') return null
     try {
       return JSON.parse(userStr)
     } catch (e) {
@@ -16,13 +12,9 @@ const UserService = {
       return null
     }
   },
-
   saveUser(user) {
-    if (user) {
-      localStorage.setItem(USER_KEY, JSON.stringify(user))
-    }
+    if (user) localStorage.setItem(USER_KEY, JSON.stringify(user))
   },
-
   removeUser() {
     localStorage.removeItem(USER_KEY)
   }
