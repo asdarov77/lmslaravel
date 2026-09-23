@@ -182,7 +182,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 //---------------------блок работы с вопросами ---------------
 //Route::post('/upload-gift/', 'GiftController@search');
 Route::apiResource('gift', GiftController::class);
-Route::delete('/gift-clear', 'GiftController@truncate');
+Route::delete('/gift-clear', [GiftController::class, 'truncate']);
 Route::apiResource('questions', QuestionsController::class);
 
 //---------------------блок настроек и вспомогательных таблиц ---------------
