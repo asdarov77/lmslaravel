@@ -1,0 +1,98 @@
+openapi: 3.0.3
+info:
+  title: LMS API
+  version: 1.0.0
+servers:
+  - url: /api/v1
+paths:
+  /login:
+    post:
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fio:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeAuth'
+  /course:
+    get:
+      summary: List courses
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnvelopeCourseList'
+components:
+  schemas:
+    Envelope:
+      type: object
+      properties:
+        success: { type: boolean }
+        data: {}
+        error:
+          type: object
+          nullable: true
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: {}
+        meta:
+          type: object
+          nullable: true
+    EnvelopeAuth:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                token: { type: string }
+                user: { $ref: '#/components/schemas/User' }
+    EnvelopeCourseList:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: '#/components/schemas/Course' }
+            meta:
+              type: object
+              properties:
+                pagination:
+                  type: object
+                  properties:
+                    page: { type: integer }
+                    perPage: { type: integer }
+                    total: { type: integer }
+                    totalPages: { type: integer }
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        fio: { type: string }
+        role: { type: string }
+    Course:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        status: { type: string }
+        updated_at: { type: string, format: date-time }
+
+

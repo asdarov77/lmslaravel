@@ -1,0 +1,196 @@
+{
+  "app": {
+    "title": "Learning management system",
+    "homee": "Home",
+    "about": "About us",
+    "contacts": "Contacts",
+    "files": "Files",
+    "categories": "Categories",
+    "calendar": "Calendar",
+    "users": "Users",
+    "groups": "Groups",
+    "reguser": "reguser",
+    "courses": "Courses",
+    "menu": {
+      "home": "Home",
+      "about": "About us",
+      "contacts": "Contacts",
+      "files": "Files",
+      "categories": "Categories",
+      "calendar": "Calendar",
+      "users": "Users",
+      "groups": "Groups",
+      "reguser": "reguser",
+      "courses": "Courses",
+      "classes": "Classes",      
+      "logout": "Logout"
+    },
+    "buttons": {
+      "cancel": "cancel",
+      "save": "save"
+    },
+    "home": {
+      "overhaul-request-create-card": {
+        "title": "Overhaul request creation",
+        "add-button": "Add request"
+      },
+      "overhaul-request-card": {
+        "title": "Overhaul request confirmation",
+        "codename": "Request number",
+        "date": "Request date",
+        "rotors": "Tail rotors"
+      },
+      "acceptance-act-card": {
+        "title": "Acceptance acts",
+        "add-button": "Add",
+        "codename": "Act number",
+        "date": "Date",
+        "cipher": "Product",
+        "rotor-codename": "Tail rotor number",
+        "status": "Status",
+        "consumer": "Client"
+      },
+      "disassembly-card": {
+        "title": "Tail rotor parts entry after disassembly",
+        "codename": "Tail rotor number",
+        "cipher": "Product",
+        "productionDate": "production date",
+        "series": "Series",
+        "status": "Status",
+        "consumer": "Client"
+      },
+      "defectation-card": {
+        "title": "Defectation registers",
+        "codename": "Tail rotor number",
+        "cipher": "Product",
+        "productionDate": "production date",
+        "series": "Series",
+        "status": "Status",
+        "consumer": "Client"
+      },
+      "production-requests": {
+        "title": "Part production requests",
+        "codename": "Request number",
+        "created": "Request date",
+        "status": "Status",
+        "actions": "Actions",
+        "button": "Add request"
+      },
+      "replacement-lists": {
+        "title": "Lists of parts (assemblies) replaced during the repair",
+        "codename": "Tail rotor number",
+        "cipher": "Product",
+        "status": "Status"
+      },
+      "dispatch-card": {
+        "title": "Tail rotors ready to go into service",
+        "codename": "Tail rotor number",
+        "cipher": "Product"
+      },
+      "waybill-card": {
+        "title": "Waybills"
+      },
+      "measurement-card": {
+        "title": "Measurement cards"
+      },
+      "passport-detail": {
+        "title": "Passports"
+      }
+    }
+  },
+  "login": {
+    "formTitle": "Login",
+    "submitBtn": "Login",
+    "usernameLabel": "Username",
+    "passwordLabel": "Password",
+    "usernameErrorMsg": "Username is required",
+    "passwordErrorMsg": "Password is required",
+    "closeBtn": "Close",
+    "errorMessages": "Your username or password is incorrect",
+    "enterCardTitle": "Login with electronic card",
+    "formCardTitle": "Unique card identifier"
+  },
+  "status": {
+    "rotor": {
+      "UNDEFINED": "Undefined",
+      "DISASSEMBLY": "On disassembly",
+      "DEFECTATION": "Fault detection is carried out",
+      "REPAIR": "Under repair",
+      "ASSEMBLY": "On assembly",
+      "OPERATION": "In operation",
+      "DESTROYED": "Destroyed",
+      "STORE": "On temporary storage"
+    },
+    "part": {
+      "UNDEFINED": "Undefined",
+      "DISASSEMBLY": "Removed during disassembly of RP",
+      "DEFECTATION": "Fault detection is carried out",
+      "REPAIR": "Under repair",
+      "ASSEMBLY": "On assembly",
+      "OPERATION": "In operation as part of RP",
+      "STORE": "In warehouse",
+      "DESTROYED": "Destroyed",
+      "REPLACED": "Replaced"
+    },
+    "document-m": {
+      "PROCESSING": "Processing",
+      "COMPLETED": "Ready to signing",
+      "SIGNED": "Signed",
+      "AGREED": "Agreed",
+      "APPROVED": "Approved",
+      "FILED": "Filed"
+    },
+    "document-f": {
+      "PROCESSING": "Processing",
+      "COMPLETED": "Ready to signing",
+      "SIGNED": "Signed",
+      "AGREED": "Agreed",
+      "APPROVED": "Approved",
+      "FILED": "Filed"
+    },
+    "package-condition": {
+      "SATISFIED": "Satisfactory",
+      "UNSATISFIED": "Unsatisfactory"
+    },
+    "request": {
+      "PROCESSING": "Processing",
+      "ACCEPTED": "Accepted",
+      "REJECTED": "Rejected"
+    }
+  },
+  "signature": {
+    "button-caption": {
+      "SIGNED": "Sign",
+      "AGREED": "Agree",
+      "APPROVED": "Approve"
+    },
+    "status": {
+      "SIGNED": "Signed",
+      "AGREED": "Agreed",
+      "APPROVED": "Approved"
+    }
+  },
+  "document-types": {
+    "acceptanceact": "Acceptance act",
+    "assembly": "Control of product assembly operations",
+    "casefile": "Case file",
+    "defectationregister": "Defectation register",
+    "disassembly": "List of parts and assemblies to be defected",
+    "tailrotordispatchtooperator": "Tail rotor dispatch to operator",
+    "repairtechnologicalpassport": "Repair technological passport",
+    "partreplacementlist": "Part replacement list",
+    "partproductionrequest": "Part production request",
+    "rejection": "Technical report on the results of the defect of the product received for repair",
+    "rejectedtag": "Tag for nonconforming products"
+  },
+  "type-of-repair-choices": {
+    "1": "O1",
+    "2": "O2",
+    "3": "O3",
+    "4": "O4",
+    "5": "O5",
+    "6": "O6",
+    "7": "O7",
+    "8": "Renewal"
+  }
+}

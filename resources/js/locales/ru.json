@@ -1,0 +1,196 @@
+{
+  "app": {
+    "homee": "Главная страница",
+    "title": "Система управления обучением",    
+    "about": "О нас",
+    "contacts": "Контакты",
+    "files": "Файлы",
+    "categories": "Категории",
+    "calendar": "Календарь",
+    "users": "Пользователи",
+    "groups": "Группы",
+    "reguser": "Новый пользователь",
+    "courses": "Курсы",
+    "menu": {
+      "home": "Главная страница",
+      "about": "О нас",
+      "contacts": "Контакты",
+      "files": "Файлы",
+      "categories": "Категории",
+      "calendar": "Календарь",
+      "users": "Пользователи",
+      "groups": "Группы",
+      "reguser": "Новый пользователь",
+      "courses": "Курсы",
+      "classes": "Классы",      
+      "logout": "Выйти из системы"      
+    },
+    "buttons": {
+      "cancel": "отмена",
+      "save": "сохранить"
+    },
+    "home": {
+      "overhaul-request-create-card": {
+        "title": "Внесение заявки на капитальный ремонт",
+        "add-button": "Внести заявку"
+      },
+      "overhaul-request-card": {
+        "title": "Принятие решения по заявкам",
+        "codename": "Входящий номер заявки",
+        "date": "Дата подачи заявки",
+        "rotors": "Рулевые винты"
+      },
+      "acceptance-act-card": {
+        "title": "Приёмные акты",
+        "add-button": "Добавить приёмный акт",
+        "codename": "Номер приёмного акта",
+        "date": "Дата",
+        "cipher": "Изделие",
+        "rotor-codename": "Номер рулевого винта",
+        "status": "Статус",
+        "consumer": "Потребитель"
+      },
+      "disassembly-card": {
+        "title": "Указание состава деталей втулки рулевого винта после разборки",
+        "codename": "Номер рулевого винта",
+        "cipher": "Изделие",
+        "productionDate": "Дата изготовления",
+        "series": "Серия",
+        "status": "Статус",
+        "consumer": "Потребитель"
+      },
+      "defectation-card": {
+        "title": "Ведомости дефектации",
+        "codename": "Номер рулевого винта",
+        "cipher": "Изделие",
+        "productionDate": "Дата изготовления",
+        "series": "Серия",
+        "status": "Статус",
+        "consumer": "Потребитель"
+      },
+      "production-requests": {
+        "title": "Заявки на изготовление ДСЕ 1 категории",
+        "codename": "Номер заявки",
+        "created": "Дата создания документа",
+        "status": "Статус",
+        "actions": "Действия",
+        "button": "Добавить заявку"
+      },
+      "replacement-lists": {
+        "title": "Перечни деталей (узлов), заменяемых в процессе ремонта",
+        "codename": "Номер рулевого винта",
+        "cipher": "Изделие",
+        "status": "Статус"
+      },
+      "dispatch-card": {
+        "title": "Рулевые винты, готовые к отправке в эксплуатацию",
+        "codename": "Номер рулевого винта",
+        "cipher": "Изделие"
+      },
+      "waybill-card": {
+        "title": "Накладные"
+      },
+      "measurement-card": {
+        "title": "Карты микрометрического обмера"
+      },
+      "passport-detail": {
+        "title": "Паспорта"
+      }
+    }
+  },
+  "login": {
+    "formTitle": "Авторизация",
+    "submitBtn": "Войти",
+    "usernameLabel": "Имя пользователя",
+    "passwordLabel": "Пароль",
+    "usernameErrorMsg": "Укажите имя пользователя",
+    "passwordErrorMsg": "Укажите пароль",
+    "closeBtn": "Закрыть",
+    "errorMessages": "Неверное имя пользователя или пароль",
+    "enterCardTitle": "Вход с помощью электронной карты",
+    "formCardTitle": "Уникальный идентификатор карты"
+  },
+  "status": {
+    "rotor": {
+      "UNDEFINED": "Не определен",
+      "DISASSEMBLY": "На разборке",
+      "DEFECTATION": "Проводится дефектация",
+      "REPAIR": "В ремонте",
+      "ASSEMBLY": "На сборке",
+      "OPERATION": "В эксплуатации",
+      "DESTROYED": "Утилизирован",
+      "STORE": "На временном хранении"
+    },
+    "part": {
+      "UNDEFINED": "Не определен",
+      "DISASSEMBLY": "Снята при разборке РВ",
+      "DEFECTATION": "Проводится дефектация",
+      "REPAIR": "В ремонте",
+      "ASSEMBLY": "На сборке",
+      "OPERATION": "В эксплуатации в составе РВ",
+      "STORE": "На складе",
+      "DESTROYED": "Утилизирована",
+      "REPLACED": "Заменена"
+    },
+    "document-m": {
+      "PROCESSING": "В процессе оформления",
+      "COMPLETED": "Готов к подписанию",
+      "SIGNED": "Подписан",
+      "AGREED": "Согласован",
+      "APPROVED": "Утверждён",
+      "FILED": "Полностью подписан"
+    },
+    "document-f": {
+      "PROCESSING": "В процессе оформления",
+      "COMPLETED": "Готова к подписанию",
+      "SIGNED": "Подписана",
+      "AGREED": "Согласована",
+      "APPROVED": "Утверждена",
+      "FILED": "Полностью подписана"
+    },
+    "package-condition": {
+      "SATISFIED": "удовлетворительное",
+      "UNSATISFIED": "неудовлетворительное"
+    },
+    "request": {
+      "PROCESSING": "В обработке",
+      "ACCEPTED": "Принята",
+      "REJECTED": "Отклонена"
+    }
+  },
+  "signature": {
+    "button-caption": {
+      "SIGNED": "Подписать",
+      "AGREED": "Согласовать",
+      "APPROVED": "Утвердить"
+    },
+    "status": {
+      "SIGNED": "Подписано",
+      "AGREED": "Согласовано",
+      "APPROVED": "Утверждено"
+    }
+  },
+  "document-types": {
+    "acceptanceact": "Приёмный акт",
+    "assembly": "Контрольные операции сборки изделия",
+    "casefile": "Дело ремонта",
+    "defectationregister": "Ведомость дефектации",
+    "disassembly": "Перечень деталей и узлов подлежащих дефектации",
+    "tailrotordispatchtooperator": "Отметка отправки РВ эксплуатанту",
+    "repairtechnologicalpassport": "Технологический паспорт на ремонт детали",
+    "partreplacementlist": "Перечень деталей (узлов), заменяемых в процессе ремонта",
+    "partproductionrequest": "Заявка на изготовление ДСЕ",
+    "rejection": "Технический акт по результатам дефектации изделия, поступившего в ремонт",
+    "rejectedtag": "Бирка на несоотвествующую продукцию"
+  },
+  "type-of-repair-choices": {
+    "1": "КР1",
+    "2": "КР2",
+    "3": "КР3",
+    "4": "КР4",
+    "5": "КР5",
+    "6": "КР6",
+    "7": "КР7",
+    "8": "ВР"
+  }
+}

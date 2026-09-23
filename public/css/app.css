@@ -1,0 +1,35 @@
+.course-table {
+    width: 80%;
+    margin: 0 auto;
+    border: 1px solid #DCDCDC;
+}
+.h1-title {
+    font-weight: normal;
+    text-align: center;
+    margin-bottom: 20px;
+}
+.next-lesson {
+    background-color: #B0E0E6;
+    width: -moz-max-content;
+    width: max-content;
+    padding: 5px 10px;
+    border-radius: 10px;
+    margin: 20px auto;
+}
+.th-table {
+    background-color: #DCDCDC;
+    border: 1px solid #DCDCDC;
+    font-size: 25px !important;
+    font-weight: 400 !important;
+    color: rgba(112, 107, 107, 0.75);
+}
+.topic-name {
+    background-color: #f5f5f5;
+    font-size: 18px !important;
+    font-weight: 400 !important;
+    color: rgb(112, 107, 107);
+    text-align: center;
+}
+td, tr {
+    border: 1px solid #DCDCDC;
+}

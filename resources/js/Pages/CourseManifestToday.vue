@@ -1,0 +1,811 @@
+<template>
+   <v-progress-linear
+  v-if="isLoading"
+  color="primary"
+  indeterminate
+></v-progress-linear>
+  {{ idEdit }}--{{ idCategory }}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css" />
+
+  {{ link }}
+  {{ searchTerm }}--
+  {{ isLoading }}
+
+  <v-card color="#f5f5f5">
+    <v-row dense no-gutters>
+      <v-col cols="3">
+        <!-- <v-sheet rounded elevation="4" class="flex-child text-subtitle-1 pa-2 mt-1"> -->
+        <v-sheet class="my-sheet pa-2 mt-1" color="#f5f5f5" :style="{ overflow: 'auto', 'overflow-y': 'auto' }">
+          <!-- кнопки для поиска в тексте,добавления в избранное -->
+          <v-sheet class="mx-auto mt-0 mb-3" elevation=4 rounded=lg>
+            <div class="text-center" :style="{ fontSize: '20px' }">{{ titleauk.toUpperCase() }}</div>
+          </v-sheet>
+          <v-row no-gutters align="center ">
+            <v-col cols="1" class="row-with-line"></v-col>
+            <v-col cols="4" class="d-flex align-center">
+              <v-icon size="x-large" class=" icon-list" :class="{ active: showItems }" @click="toggleList">{{ showItems ?
+                'mdi-view-list' : 'mdi-view-list-outline'
+              }}</v-icon>
+              <v-icon size="x-large" class="icon-favorite" :class="{ active: isFavorite }" @click="toggleFavorite">{{
+                isFavorite ? 'mdi-heart' : 'mdi-heart-outline' }}</v-icon>
+              <v-icon size="x-large" class="icon-search" :class="{ active: showSearch }" @click="toggleSearch">{{
+                showSearch ? 'mdi-magnify-minus-outline' : 'mdi-magnify' }}</v-icon>
+            </v-col>
+            <v-col cols="6" class="row-with-line "></v-col>
+            <v-col cols="1" class="d-flex align-center">
+              <v-icon size="x-large" @click="addToFavorites(activeId)" icon="mdi-playlist-star" class="addToFav"></v-icon>
+            </v-col>
+          </v-row>
+
+          <v-row v-if="isFavorite" class="ml-1 mr-1">
+            <ul>
+              <li v-for="item in favorites" :key="item.id">
+                {{ item.title }}
+                <font-awesome-icon icon="times" @click="removeFavorite(item.course_id)" />
+              </li>
+            </ul>
+          </v-row>
+
+          <v-row v-if="showSearch">
+            <v-text-field class="ml-5 mr-5" :loading="loading" density="compact" v-model="searchTerm" variant="outlined"
+              rounded append-inner-icon="mdi-magnify" label="Поиск" @click:append-inner="search" @keyup.enter="search"
+              hint="Введи искомый текст для поиска" clearable single-line>
+            </v-text-field>
+
+            <!-- ------------------------------------------------ -->
+            <!-- результаты поиска -->
+
+<!--                                            рабочий вариант                           -->
+            <!-- <div>
+              <ul v-if="matchingFiles.length > 0" class=" ml-2 mr-2 search-files__total-results">Всего найдено: {{
+                matchingFiles.length }}
+                <v-btn-group>
+                  <v-btn @click="scrollToPrev"><span>&#9650;</span></v-btn>
+                  <v-btn @click="scrollToNext"><span>&#9660;</span></v-btn>
+                </v-btn-group>
+                <v-divider></v-divider>
+                <li v-for="result in matchingFiles" :key="result.file" style="white-space: nowrap;">
+                  <v-btn @click="loadContent(result.itemId, result.highlightedNodes )" class="text-truncate"
+                    :style="{ 'max-width': '100%', 'overflow': 'hidden', 'text-overflow': 'ellipsis' }">{{ result.title
+                    }}</v-btn>   
+                </li>
+              </ul>
+              <p v-else class="ml-5 mr-5 mt-1 search-files__no-results">Нет результатов</p>
+            </div> -->
+<!--                                            рабочий вариант                           -->
+
+<!--                                            рабочий эксперимент                           -->
+<div>
+              <ul v-if="matchingFiles.length > 0" class=" ml-2 mr-2 search-files__total-results">Всего найдено: {{
+                matchingFiles.length }}
+                <v-btn-group>
+                  <v-btn @click="scrollToPrev"><span>&#9650;</span></v-btn>
+                  <v-btn @click="scrollToNext"><span>&#9660;</span></v-btn>
+                </v-btn-group>
+                <v-divider></v-divider>
+                <li v-for="result in matchingFiles" :key="result.file" style="white-space: nowrap;">
+                  <v-btn @click="loadContent(result.itemId, result.highlightedNodes )" class="text-truncate"
+                    :style="{ 'max-width': '100%', 'overflow': 'hidden', 'text-overflow': 'ellipsis' }">{{ result.title
+                    }}</v-btn>   
+                </li>
+              </ul>
+              <p v-else class="ml-5 mr-5 mt-1 search-files__no-results">Нет результатов</p>
+            </div>
+<!--                                            рабочий эксперимент                           -->
+
+
+
+            <!-- ------------------------------------------------ -->
+            <!-- результаты поиска -->
+
+
+
+          </v-row>
+          <!-- <div v-if="showItems" v-for="(item, index) in filterByCategoryAukstructures" :key="item.parent_id"> -->
+          <div v-if="showItems" v-for="(item, index) in aukstructures" :key="item.parent_id">
+            <div class="mt-1 mx-3" :style="[
+              item.type !== 3
+                ? {
+                  cursor: 'default',
+                  opacity: '.7',
+                  color: 'green',
+                }
+                : {
+                  cursor: 'pointer',
+                  //border: '2px solid firebrick',
+                },
+              {
+                fontSize: `${-5 * item.type + 30}px`,
+                //transform: `translate(${item.type * 20}px)`,
+                paddingLeft: `${(item.type - 1) * 10}px`,
+                display: 'inline-block',
+                wordWrap: 'break-word',
+              },
+            ]">
+              <div @mouseover="item.type === 3 ? showthumb(item.id) : ''" @mouseleave="hidethumb(item.id)" :id="item.id"
+                @click="item.type === 3 ? getlink(item.id) : ''" v-if="index !== 0">
+                {{ item.title }}
+                <!-- {{ item.id }}--{{ item.title }} -->
+              </div>
+            </div>
+          </div>
+        </v-sheet>
+      </v-col>
+
+<!-- ------------------------------------правый iframe ----------------------------------------------------------->
+
+      <v-col cols="9">
+        <v-sheet rounded elevation="5" class="my-sheet pa-2 mt-2 mr-2"
+          :style="{ 'border-radius': '8px', overflow: 'auto', 'overflow-y': 'auto' }">
+          <div id="iframe-container" :style="{ 'border-radius': '8px', overflow: 'auto', 'overflow-y': 'auto' }">
+
+            <iframe class="hello px-5" :src="link"
+              onload="this.style.height=(this.contentWindow.document.body.scrollHeight+20)+'px';" :style="contentStyleObj"
+              width="100%" name="iframe_a"  ref="myIframe">
+            </iframe>
+
+            <!-- <iframe class="hello px-5" :src="link" ref="myIframe" name="iframe_a" @load="updateDocHeight"  @load="onIframeLoaded" 
+              :style="contentStyleObj" width="100%">
+            </iframe> -->
+
+          </div>
+        </v-sheet>
+      </v-col>
+    </v-row>
+  </v-card>
+  <popup :alert="alert" :alertType="alertType" :snackbarText="snackbarText" :overlay="alert" :alertFalse="alertFalse">
+  </popup>
+</template>
+
+<!-- <script> -->
+<script export default>
+
+const apiUrl = import.meta.env.VITE_APP_URL;
+import $api from "../api/httpClient";
+import popup from "./Popup.vue";
+import { mapState, mapGetters } from "vuex";
+import { library } from '@fortawesome/fontawesome-svg-core';
+import { faTimes } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+library.add(faTimes);
+
+export default {
+  components: {
+    popup, FontAwesomeIcon
+
+  },
+
+  props: {
+    idEdit: {
+      type: Number,
+      required: true,
+    },
+    idCategory: {
+      type: Number,
+      required: true,
+    },
+    treeData: Object,
+  },
+
+
+  data() {
+
+    return {
+
+      titleauk: "",
+      aukstructures: [],
+      filterByCategoryAukstructures: [],
+      categories: {},
+      link: "",
+      firstId: '',
+      // contentStyleObj: {
+      //   height: "",
+      // },
+      activeId: this.firstId,
+      curAuk: this.item,
+
+      showItems: true,
+      showSearch: false,
+      isFavorite: false, // добавить в избранное
+      //---------------- блок имитации загрузки--------
+      loaded: false,
+      loading: false,
+      //----------- конец блока имитации загрузки--------
+      //------------блок поиска---------------
+      searchTerm: '',
+      matchingFiles: [],
+      aircraftTitle: '', //передавать в контроллер 
+      //------------конец блока поиска---------------
+      path: '',
+      aircraft: '',
+      //
+      error: '',
+      //---- for popup
+      isLoading: false,
+      alert: false,
+      alertType: "",
+      overlay: false,
+      snackbarText: "",
+      //
+      // избранное
+      favorites: [],
+      // загрузка iframe
+      highlighted: [],
+      currentHighlight: 0,
+      iframe: null,  //удалить для подсветки
+      IframeisLoaded : false,
+      
+    };
+  },  
+
+
+  async mounted() {
+    this.$refs.myIframe.addEventListener('load', this.onIframeLoaded);
+    // this.$refs.myIframe.addEventListener('load', () => {
+    //   this.loadContent(item, hlHtml);
+    // });
+    // this.$refs.myIframe.addEventListener('load', () => {
+    //   this.loadContent(itemId, highlightedNodes);
+    // });
+ 
+  //this.iframe = this.$refs.myIframe.contentWindow.document  //Зарегистрируем ref в mounted:
+  //this.iframeDoc = this.$refs.myIframe.contentDocument
+
+    //----------------достучаться до iframe--------------
+    //    const iframe = this.$refs.myIframe;    
+
+    this.getFavorites(); // загружаем избранное
+
+    //this.$store.dispatch("Course/fetchCourse",  { courseId: this.idEdit, categoryId: this.category_id });    
+    if (!this.aircrafts) {
+      await this.$store.dispatch("Course/fetchAircrafts");
+    }
+    this.$store.dispatch("Course/fetchCourse", this.idEdit);
+    this.$store.dispatch("Course/fetchCategory", this.idCategory);
+    this.$store.dispatch("Course/fetchCategories");
+    this.$store.dispatch("Course/fetchAircrafts");
+    this.$store.dispatch("Course/fetchAircraft", this.aircraft);
+
+    // --------------------------------загрузка левого меню-------------------------------
+    //this.$store.dispatch("Course/fetchCourse", { course_id: this.idEdit, category_id: this.idCategory })
+    $api
+      .get(apiUrl + "/api/course?course_id=" + this.idEdit + "&&category_id=" + this.idCategory)
+      .then((response) => {
+        //console.log(response.data[0].aircraft_id, "air");
+        this.titleauk = response.data[0].title;
+        //console.log(response[0].title, "response");
+        this.aukstructures = response.data[0].aukstructures; // получаем с backEnd все aukstruct для построения меню левого       
+
+
+        // фильтруем по категориям
+
+        this.filterByCategoryAukstructures = this.aukstructures.filter((aukstructure) => {
+          return aukstructure.categories ? aukstructure.categories.includes(this.categoryCode.toString().trim()) : true;
+        }).sort((a, b) => a.id - b.id);
+
+        //this.getfirstauk(this.idEdit);
+        //удалить возможно
+        this.path = response.data[0].path; // папка с АУК        
+        this.aircraft = response.data[0].aircraft_id;
+      })
+      .catch((err) => {
+        console.error(err);
+      });
+  },
+
+
+  // beforeDestroy() {
+  // this.$refs.myIframe.removeEventListener('load', this.onIframeLoaded);
+  //this.isLoading===false;
+//},
+
+  watch: {
+
+
+    link(newLink, oldLink) {
+      console.log('Link has changed:', oldLink, '->', newLink);
+      // Вызов метода loadContent для загрузки нового контента
+    },
+
+  
+    activeId(newVal, oldVal) {
+      //console.log("active",this.activeId)
+    },
+    getFirstAukId: function (newVal, oldVal) {
+      // вызываем метод getlink с новым значением
+      if (newVal) {
+        this.getlink(newVal);
+      }
+    }
+  },
+  computed: {
+    ...mapState("Course", ["course", "category", "totalCourses", "aircrafts", "aircraft"]),
+    ...mapGetters("Course", ["categories", "courses"]),
+
+    idEditComputed() {
+      return this.idEdit;
+    },
+    idCategoryComputed() {
+      return this.idCategory;
+    },
+    // возвращаем из vuex category categoryCode по id
+    categoryCode() {
+      return this.category ? this.category.code : null;
+    },
+    getFirstAukId() {
+      // Используем метод find() для поиска первого элемента, у которого type равен 3
+      const firstAuk = this.aukstructures.find((item) => item.type === 3);
+      // Если элемент найден, то возвращаем его id, иначе возвращаем null      
+      if (firstAuk) this.getlink(firstAuk.id);
+      return firstAuk ? firstAuk.id : null;
+    },
+  },
+
+  methods: {
+    // updateDocHeight() {
+    //   console.log("updateDocHeight onIframeLoad ")
+    //   const myIframe = this.$refs.myIframe;
+    //   myIframe.style.height = `${myIframe.contentWindow.document.body.scrollHeight + 20}px`;
+    // },
+
+    // restoreContent() {
+    //   //       console.log("restore content")
+    //   this.searchTerm = '';
+    // },
+    
+
+
+
+    ////---------------------------------------------------------------------------------------------------
+//     loadContent(item, hlHtml,orHtml) {
+//       this.getlink(item); // загружаем в iframe содержимое файла статического html
+//       console.log(hlHtml, "подсвеченный")      
+//       console.log(orHtml, "ориг")
+//       //console.log(this.iframeDoc.querySelector(orHtml[0].query) , 'this.iframeDoc.')
+       
+//       const iframeDoc = this.$refs.myIframe.contentDocument;
+//       //const dom = new DOMParser().parseFromString(iframeDoc.body.innerHTML, 'text/html');
+//       const dom = iframeDoc.documentElement.cloneNode(true);
+      
+// console.log(dom, "dom");
+//       try {    
+//         orHtml.forEach((original, i) => {       
+//   //const node = dom.evaluate(original.xpath, dom, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+//   const node = iframeDoc.evaluate(original.xpath, iframeDoc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+//   console.log(original.xpath, 'or path');
+  
+//   if(node === null) {
+//     console.log(`Не удалось найти узел по xpath ${original.xpath}`)   
+//   } else {
+//     node.outerHTML = hlHtml[i].node;   
+//     console.log(node,'node')
+//   }
+// })   
+//   } catch(e) {      
+//     console.log(e)
+//   }
+  
+//    //iframeDoc.body.innerHTML = dom.body.innerHTML;   
+//    iframeDoc.body.innerHTML = iframeDoc.body.innerHTML.replace(orHtml[i].node, hlHtml[i].node)
+   
+// //console.log(iframeDoc.body.innerHTML, 'iframeDoc.body.innerHTML')
+
+
+//   // orHtml.forEach(({xpath}, i) => {   
+//   //   const node = iframeDoc.evaluate(
+//   //        xpath, 
+//   //        iframeDoc, 
+//   //        null, 
+//   //        XPathResult.FIRST_ORDERED_NODE_TYPE, 
+//   //        null
+//   //     ).singleNodeValue;
+//   //     //console.log(hlHtml[i].node);
+//   //     console.log(node.innerHTML, 'node.innerHTML');
+//   //  // node.innerHTML = hlHtml[i].node;   
+//   // })
+
+//   // //Перезагружаем iframe, чтобы изменения вступили в силу  
+//   // this.$refs.myIframe.src = this.$refs.myIframe.src;
+
+//     },
+////---------------------------------------------------------------------------------------------------
+replaceNodeContent(node, replacement) {
+  const temp = document.createElement('div');
+  temp.innerHTML = replacement;
+  const newContent = temp.firstChild;
+  const attrs = node.attributes;
+
+  // Copy attributes from old node to new node
+  for (let i = attrs.length - 1; i >= 0; i--) {
+    const name = attrs.item(i).nodeName;
+    const value = attrs.item(i).nodeValue;
+
+    // Handle double-escaped values
+    const parsedValue = JSON.parse('"' + value + '"');
+
+    newContent.setAttribute(name, parsedValue);
+  }
+
+  // Replace old node with new node
+  node.parentNode.replaceChild(newContent, node);
+ // console.log(node.parentNode.replaceChild(newContent, node), 'replace')
+},
+
+//-----------------не очень рабочий
+
+// loadContent(item, hlHtml) {
+//   this.getlink(item); // загружаем в iframe содержимое файла статического html
+//   console.log(hlHtml, "подсвеченный");
+//   console.log(orHtml, "оригинал");
+
+//   const iframeDoc = this.$refs.myIframe.contentDocument;
+//   const dom = new DOMParser().parseFromString(iframeDoc.body.innerHTML, 'text/html');
+
+//   console.log(dom, "dom");
+//   console.log(orHtml[0].node);
+//   console.log(orHtml[0].xpath);
+//   console.log(dom.evaluate(orHtml[0].xpath, dom, null, XPathResult.ANY_TYPE, null), "eval");
+
+//   try {
+//     orHtml.forEach((original, i) => {
+//       const node = dom.evaluate(original.xpath, dom, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+
+//       console.log(original.xpath, 'оригинальный xpath');
+
+//       if (node === null) {
+//         console.log(`Не удалось найти узел по xpath ${original.xpath}`);
+//       } else {      
+//         //node.singleNodeValue.style.background = 'pink'; 
+//         node.innerHTML = hlHtml[i].node;
+//        // node.outerHTML = `<span class='highlighted' data-id='${hlHtml[i].id}'>${hlHtml[i].text}</span>`;
+        
+//         console.log(node, 'обновленный узел');
+//       }
+//     });
+//   } catch (e) {
+//     console.log(e);
+//   }
+
+//   iframeDoc.body.innerHTML = dom.body.innerHTML;
+//   this.$refs.myIframe.src = this.$refs.myIframe.src;
+// },
+//-----------------не очень рабочий
+
+
+onIframeLoaded() { 
+  console.log('Iframe loaded')
+  this.isLoading = false;
+  this.IframeisLoaded = true;
+
+  this.loadContent(item, hlHtml)
+
+  //this.$refs.myIframe.height = this.$refs.myIframe.contentWindow.document.body.scrollHeight + 20 
+} ,
+
+
+// onIframeLoad() {
+// this.$refs.myIframe.height = this.$refs.myIframe.contentWindow.document.body.scrollHeight + 20;
+// },
+
+
+
+loadContent(item, hlHtml) {
+
+
+  this.getlink(item); // загружаем в iframe содержимое файла статического html
+  //console.log(hlHtml, "подсвеченный");
+  // if (!this.IframeisLoaded) {
+  //    return; // Если isLoading равно true, прекратить выполнение функции
+  //  }
+  
+  const iframeDoc = this.$refs.myIframe.contentDocument;
+  const dom = new DOMParser().parseFromString(iframeDoc.body.innerHTML, 'text/html');
+
+  //console.log(dom, "dom");
+  
+  try {
+    hlHtml.forEach((highlighted) => {
+      const nodeToReplace = dom.evaluate(highlighted.originalXpath, dom, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+      console.log(nodeToReplace, 'node')
+  //     console.log(highlighted.originalXpath, 'оригинальный xpath');
+if(nodeToReplace){
+  const parentNode = nodeToReplace.parentNode;
+  const highlightedTextCon = document.createElement('span');
+  highlightedTextCon.style.backgroundColor = 'yellow';
+  //console.log(highlighted.highlightedText, 'highlighted.highlightedText')
+  
+  //highlightedTextCon.innerHTML = highlighted.highlightedText
+  
+  //highlightedTextCon.textContent = highlighted.highlightedText
+  ////parentNode.replaceChild(highlightedTextCon, nodeToReplace);
+
+  //nodeToReplace.innerHTML = nodeToReplace.innerHTML.replace(highlighted.originalText, highlighted.highlightedText)
+
+  parentNode.innerHTML = highlighted.highlightedText;
+  // console.log(parentNode.innerHTML,'parentNode.innerHTML')  
+       }
+     });
+  } catch (e) {
+    console.log(e);
+  }
+ // iframeDoc.body.innerHTML = dom.body.innerHTML;
+//  this.$refs.myIframe.src = this.$refs.myIframe.src;
+
+iframeDoc.body.innerHTML = dom.documentElement.innerHTML;
+//console.log('iframe');
+//console.log(iframeDoc.body.innerHTML);
+},
+
+
+
+
+    ///-------------------------------------------скроллинг --------------------------------------------------------------
+    highlightNodes(iframe) {
+  const nodesToHighlight = iframe.querySelectorAll('.highlight') 
+  console.log(nodesToHighlight, 'nodesToHighlight')
+  nodesToHighlight.forEach(node => {
+    node.style.backgroundColor = 'yellow'
+  })
+},
+
+    scrollToHighlight(highlight) {
+      let iframe = this.$refs.myIframe;
+      let topOffset = highlight.getBoundingClientRect().top + iframe.contentWindow.pageYOffset - iframe.contentDocument.documentElement.clientTop;
+      iframe.contentWindow.scrollTo({
+        top: topOffset,
+        behavior: 'smooth'
+      });
+    },
+
+    scrollToNext() {
+      if (this.highlighted.length > 0) {
+        console.log("к следующему")
+        this.currentHighlight = (this.currentHighlight + 1) % this.highlighted.length;
+        this.scrollToHighlight(this.highlighted[this.currentHighlight]);
+      } else {
+        this.currentHighlight = 0;
+      }
+    },
+    scrollToPrev() {
+      if (this.highlighted.length > 0) {
+        console.log("к предыдующему")
+        this.currentHighlight = (this.currentHighlight - 1 + this.highlighted.length) % this.highlighted.length;
+        this.scrollToHighlight(this.highlighted[this.currentHighlight]);
+      } else {
+        this.currentHighlight = 0;
+      }
+    },
+    ///-----------------------------------конец-скроллинг--------------------------------------------------------------
+
+
+    showthumb(item_id) {
+      // console.log(item_id)
+      document.getElementById(item_id).style.border = "2px doted grey ";
+      document.getElementById(item_id).style.borderRadius = "4px";
+      if (item_id !== this.activeId)
+        document.getElementById(item_id).style.background = "#D3D3D3";
+
+      document.getElementById(item_id).style.transform = "scale(1.03)";
+    },
+    hidethumb(item_id) {
+      //console.log(item_id, 'вышел')
+      document.getElementById(item_id).style.border = "none";
+      if (item_id !== this.activeId)
+        document.getElementById(item_id).style.background = "none";
+
+      document.getElementById(item_id).style.transform = "scale(1.0)";
+    },
+    async getlink(item_id) {
+      this.isLoading = true;
+      this.activeId = item_id;
+
+      // $api
+      //   .get(apiUrl + "/api/getlink/" + item_id)
+      //   .then((response) => {
+      //     //console.log(item_id, "itemid");
+      //     this.link = response.data;
+      //     //console.log(response.data, "response.data")
+      //   });
+      try {
+    const response = await $api.get(apiUrl + "/api/getlink/" + item_id);
+    this.link = response.data;
+  } catch (error) {
+    console.log(error);
+  } finally {
+    //this.isLoading = false; // Установить isLoading в false после завершения загрузки
+  }
+
+    },
+
+    getfirstauk: function (course_id) {
+      $api
+        .get(apiUrl + "/api/getfirstauk/" + course_id)
+        .then((response) => {
+          this.firstId = response.data;
+          //console.log(this.firstId,"this.firstId")
+          this.getlink(this.firstId);
+        });
+    },
+    // добавить в избранное
+    toggleFavorite() {
+      this.isFavorite = !this.isFavorite;
+      this.showItems = false;
+      this.showSearch = false;
+      if (this.isFavorite == false) this.showItems = true;
+    },
+    toggleList() {
+    //this.clearContent();
+      this.showItems = !this.showItems;
+      this.isFavorite = false;
+      this.showSearch = false;
+    },
+    toggleSearch() {
+      this.showSearch = !this.showSearch;
+      this.isFavorite = false;
+      this.showItems = false;
+      if (this.showSearch == false) this.showItems = true;
+    },
+    // onClickSearch() {
+    //   this.loading = true
+
+    //   setTimeout(() => {
+    //     this.loading = false
+    //     this.loaded = true
+    //   }, 100)
+    // },
+
+    addToFavorites(course_id) {
+      const activeTitle = this.aukstructures.find(item => item.id === course_id)?.title;
+      // console.log(activeTitle, "activeTitle")
+      $api
+        .post(apiUrl + '/api/favorites/add', { course_id: course_id, title: activeTitle })
+        .then(response => {
+          // Обработка успешного добавления в избранное
+          this.getFavorites(); // загружаем избранное
+        })
+        .catch(error => {
+          // Обработка ошибки
+        });
+    },
+
+    getFavorites() {
+      $api.get(apiUrl + '/api/favorites/').then((response) => {
+        this.favorites = response.data.favorites;
+      });
+    },
+    removeFavorite(id) {
+      $api
+        .delete(apiUrl + `/api/favorites/${id}`).then(() => {
+          this.getFavorites();
+        });
+    },
+
+
+
+    alertFalse() {
+      this.alert = false;
+    },
+    async search() {
+      const formData = {
+        //  query: this.searchTerm, path: this.path, aircraft: this.aircraft
+        query: this.searchTerm, path: this.path, aircraft: this.aircraft
+
+      }
+      if (this.searchTerm.length < 3) {
+        this.snackbarText = "..не меньше трех символов";
+        this.alertType = "error";
+        this.alert = true;
+        return;
+      }
+
+      $api.post(apiUrl + `/api/search-files/`, formData)
+
+        .then(response => {
+          this.matchingFiles = response.data;
+          //         console.log(response, "кол-во")
+        })
+        .catch(error => {
+          console.log(error);
+        }).finally(() => {
+          // this.alert = true;
+        });
+    },
+
+  },
+};
+</script>
+
+
+<style>
+.highlighted {
+  background-color: yellow !important;
+  display: inline-block;
+}
+
+
+.v-card {
+  border: 1px solid lightgrey;
+}
+
+.my-sheet {
+
+  height: 800px;
+  /* Установите высоту для v-sheet, чтобы прокрутка сработала */
+}
+
+.icon-list::before {
+  /* border-radius: 10%; */
+  opacity: 0.5;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.icon-list:hover::before {
+  opacity: 1;
+}
+
+/* .icon-favorite {
+  position: relative;  
+} */
+
+.icon-favorite::before {
+  /* border-radius: 10%; */
+  opacity: 0.5;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.icon-favorite:hover::before {
+  opacity: 1;
+}
+
+.icon-search::before {
+  opacity: 0.5;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.icon-search:hover::before {
+  opacity: 1;
+}
+
+.row-with-line {
+  border-bottom: 2px solid green;
+  margin-bottom: -31px;
+}
+
+.row-with-line .active {
+  border-bottom: none !important;
+}
+
+.icon-list,
+.icon-favorite,
+.icon-search {
+
+  border-bottom: 2px solid green;
+  width: 130px;
+  /* position: relative; */
+
+}
+
+.addToFav {
+  /* width: 70px; */
+  border-bottom: 2px solid green;
+  border-top: 1px solid green;
+  border-left: 1px solid green;
+  border-right: 1px solid green;
+  border-top-left-radius: 50%;
+  border-top-right-radius: 10%;
+}
+
+.active {
+  border-bottom: none;
+  border-top: 2px solid green;
+  border-left: 2px solid green;
+  border-right: 2px solid green;
+  border-top-left-radius: 15%;
+  border-top-right-radius: 15%;
+}
+
+.search-files__total-results {
+  font-size: 14px;
+  color: #666;
+}
+</style>
