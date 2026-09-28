@@ -77,13 +77,27 @@ class CategoryController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $category = Category::find($id);
-        $category->title = request('title');
-        $category->description = request('description');  
-        
-        $category->save();        
-        
-        return response($category,201);   
+        $validated = $request->validate([
+            'title' => 'sometimes|required|string|max:255',
+            'description' => 'nullable|string',
+            'code' => 'nullable|string|max:50',
+            'aircraft_id' => 'nullable|integer|exists:aircrafts,id',
+        ]);
+
+        $category = Category::findOrFail($id);
+        // поддержка алиаса name (используется во фронтенде и части тестов)
+        if ($request->has('name') && !$request->has('title')) {
+            $validated['title'] = $request->input('name');
+        }
+        $category->fill($validated);
+        $category->save();
+
+        return response()->json([
+            'success' => true,
+            'data' => $category->fresh(),
+            'error' => null,
+            'meta' => null,
+        ], 200);
     }
 
     /**
@@ -96,6 +110,11 @@ class CategoryController extends Controller
     {
         $category = Category::findOrFail($id);
         $category->delete();
-        return response()->json(null, 204);
+        return response()->json([
+            'success' => true,
+            'data' => null,
+            'error' => null,
+            'meta' => null,
+        ], 200);
     }
 }

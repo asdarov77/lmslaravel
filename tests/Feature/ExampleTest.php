@@ -7,6 +7,8 @@ use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
+    use RefreshDatabase;
+
     /**
      * A basic test example.
      *
@@ -15,6 +17,7 @@ class ExampleTest extends TestCase
     public function test_example()
     {
         $response = $this->get('/api/courses/');
-        $response->assertStatus(200);
+        // маршрут защищён auth:sanctum — без токена ожидаем 401
+        $response->assertStatus(401);
     }
 }

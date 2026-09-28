@@ -46,7 +46,7 @@ use Illuminate\Support\Facades\Storage;
 
 //
 Route::post('/login', [AuthController::class, 'login']);
-Route::post('/api/v1/login', [AuthController::class, 'login'])->name('api.v1.login');
+Route::post('/v1/login', [AuthController::class, 'login'])->name('api.v1.login');
 
 // API v1 routes
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
@@ -62,11 +62,17 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     
     // Versioned CRUD routes
     Route::apiResource('categories', CategoryController::class);
-    Route::apiResource('users', AuthController::class)->except(['destroy']);
+    Route::get('/users', [AuthController::class, 'index']);
+    Route::post('/users', [AuthController::class, 'store']);
+    Route::put('/users/{user}', [AuthController::class, 'update']);
+    Route::patch('/users/{user}', [AuthController::class, 'update']);
     Route::delete('/users/{user}', [AuthController::class, 'destroy']);
+    Route::get('/users/{user}', [AuthController::class, 'show']);
     Route::apiResource('courses', CourseController::class);
 });
 //Route::post('login', ['before' => 'throttle:2,5', 'uses' => 'AuthController@login']);
+// Категории без версионирования (используется фронтендом и тестами)
+Route::apiResource('categories', CategoryController::class)->only(['index', 'show']);
 Route::post('/register', [AuthController::class, 'register']);
 //
 // блок пользователей
@@ -106,7 +112,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 //
 // блок курсов старый
 //
-Route::get('/courses/', [CoursesListController::class, 'getCourses']);    // вывод всех курсов
+Route::get('/courses/', [CoursesListController::class, 'getCourses'])->middleware('auth:sanctum');    // вывод всех курсов
 Route::get('/courses/cat/', [CategoryListController::class, 'getCatCourses']);
 Route::get('/courses/cat/{id}/', [CategoryListController::class, 'getCatCoursesId']);  // вывод курсов для конкретной категории, с флагом видимости
 // блок курсов и категорий новый

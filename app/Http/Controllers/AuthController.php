@@ -84,6 +84,55 @@ class AuthController extends Controller
         ], 200);
     }
 
+    // ---------- v1 CRUD (apiResource('users', AuthController)) ----------
+
+    public function index()
+    {
+        $users = User::orderBy('id')->get();
+        return response()->json([
+            'success' => true,
+            'data' => $users,
+            'error' => null,
+            'meta' => null,
+        ], 200);
+    }
+
+    public function show($id)
+    {
+        $user = User::findOrFail($id);
+        $user->permissions;
+        return response()->json([
+            'success' => true,
+            'data' => $user,
+            'error' => null,
+            'meta' => null,
+        ], 200);
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'fio' => 'required|string|max:255',
+            'password' => 'required|string|min:6',
+            'role' => 'nullable|string',
+            'group_id' => 'nullable|integer|exists:groups,id',
+        ]);
+
+        $user = User::create([
+            'fio' => $validated['fio'],
+            'password' => bcrypt($validated['password']),
+            'role' => $validated['role'] ?? null,
+            'group_id' => $validated['group_id'] ?? null,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => $user,
+            'error' => null,
+            'meta' => null,
+        ], 201);
+    }
+
     public function destroy($id)
     {
         if ($id != 1) {

@@ -26,6 +26,14 @@ class User extends Authenticatable
         'password',
         'role',
         'group_id',
+        'phonenumber',
+        'city',
+        'country',
+        'organization',
+        'position',
+        'rank',
+        'spfere',
+        'specialization',
     ];
 
     /**
