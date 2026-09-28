@@ -101,10 +101,8 @@ const CourseModule = {
   }),
   mutations: {
 
-
-
     RESET(state) {
-      const newState = initialState()
+      const newState = CourseModule.state()
       Object.keys(newState).forEach(key => {
         state[key] = newState[key]
       })
@@ -159,16 +157,14 @@ const CourseModule = {
       })
     },
     DELETE_COURSE(state, payload) {
-      const itemIdx = state.courses.findIndex(item => item.id === payload.id)
-      Object.keys(payload).forEach(key => {
-        state.courses[itemIdx][key] = payload[key]
-      })
+      const id = payload && typeof payload === 'object' ? payload.id : payload
+      const itemIdx = state.courses.findIndex(item => item.id === id)
+      if (itemIdx !== -1) state.courses.splice(itemIdx, 1)
     },
     DELETE_CATEGORY(state, payload) {
-      const itemIdx = state.categories.findIndex(item => item.id === payload.id)
-      Object.keys(payload).forEach(key => {
-        state.categories[itemIdx][key] = payload[key]
-      })
+      const id = payload && typeof payload === 'object' ? payload.id : payload
+      const itemIdx = state.categories.findIndex(item => item.id === id)
+      if (itemIdx !== -1) state.categories.splice(itemIdx, 1)
     },
     // DELETE_GROUP(state, id) {
     //   const group_id = state.allGroups.findIndex(g => g.id === id)
@@ -188,8 +184,10 @@ const CourseModule = {
       state.group2learnings = group2learnings
     },
     
-    DELETE_GROUP_2_LEARNINGS(state, group2learnings) {
-      state.group2learnings = group2learnings
+    DELETE_GROUP_2_LEARNINGS(state, payload) {
+      const id = payload && typeof payload === 'object' ? payload.id : payload
+      const itemIdx = state.group2learnings.findIndex(item => item.id === id)
+      if (itemIdx !== -1) state.group2learnings.splice(itemIdx, 1)
     },
     SET_ALL_LESSONS(state, categories) {
       state.categories = categories.sort((a, b) => parseFloat(a.id) - parseFloat(b.id))
@@ -460,7 +458,7 @@ const CourseModule = {
   },
   getters: {
     aircrafts(state) {
-      return state.aircrafts.map(course => {
+      return state.aircrafts.map(aircraft => {
         return {
           id: aircraft.id,
           title: aircraft.title,
@@ -497,8 +495,14 @@ const CourseModule = {
           //permissions_id: group.permissions_id
         }
       })
-    }
-
+    },
+    // защита от отсутствующего элемента: вместо падения возвращаем null
+    courseById: (state) => (id) => {
+      return state.courses.find(course => course.id === id) ?? null
+    },
+    categoryById: (state) => (id) => {
+      return state.categories.find(category => category.id === id) ?? null
+    },
 
   }
 }

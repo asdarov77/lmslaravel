@@ -20,8 +20,32 @@ class Course extends Model
         'long_description',
         'path',
         'visible',
+        'status',
+        'category_id',
         'aircraft_id',
     ];
+
+    public function category()
+    {
+        return $this->belongsTo(Category::class);
+    }
+
+    // Инструкторы курса — пользователи с ролью «Инструктор» из групп, набранных на курс
+    public function instructors()
+    {
+        return $this->belongsToMany(User::class, 'group2learnings', 'course_id', 'group_id')
+            ->withPivot(['id', 'teacher', 'typeOfLesson', 'study_from', 'study_to'])
+            ->where('users.role', 'Инструктор');
+    }
+
+    // Обучаемые курса — пользователи, состоящие в группах, набранных на курс
+    public function students()
+    {
+        return $this->belongsToMany(User::class, 'group2learnings', 'course_id', 'group_id')
+            ->withPivot(['id', 'teacher', 'typeOfLesson', 'study_from', 'study_to'])
+            ->where('users.role', 'Обучаемый');
+    }
+
     // public function categories() {
     //        return $this->belongsToMany(Category::class,
     //        'category_course',

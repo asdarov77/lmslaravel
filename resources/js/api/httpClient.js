@@ -1,5 +1,5 @@
 import axios from 'axios'
-//import router from '../Router';
+import router from '../Router'
 import { TokenService } from '../services/storage.service'
 
 import { UserService } from '../services/user.service'
@@ -27,8 +27,13 @@ httpClient.interceptors.request.use(authInterceptor)
 //console.log(baseURL, "baseURL");
 // interceptor to catch errors
 const errorInterceptor = error => {
+  // сетевые сбои / таймауты: у ошибки нет response — не падаем, просто отклоняем промис
+  if (!error.response) {
+    console.error('Network error:', error.message)
+    return Promise.reject(error)
+  }
+
   // all the error responses
-  //console.log(error.response.data)
   switch (error.response.status) {
     case 400:
       console.error(error.response.status, error.message)
@@ -47,11 +52,11 @@ const errorInterceptor = error => {
 
     case 500: // service unavailable
       console.error(error.response.status, error.message)
-      if (error.response.data.includes('ECONNREFUSED')) router.push({ name: '500' }).catch(err => err)
+      router.push({ name: '500' }).catch(err => err)
       break
 
-    case 502: // internal server error
-    case 503: // bad gateway
+    case 502: // bad gateway
+    case 503: // internal server error / service unavailable
       console.error(error.response.status, error.message)
       router.push({ name: '500' }).catch(err => err)
       break
@@ -62,11 +67,11 @@ const errorInterceptor = error => {
   return Promise.reject(error)
 }
 
- // Interceptor for responses
- const responseInterceptor = response => {
-   return response
- }
+// Interceptor for responses
+const responseInterceptor = response => {
+  return response
+}
 
-// httpClient.interceptors.response.use(responseInterceptor, errorInterceptor)
+httpClient.interceptors.response.use(responseInterceptor, errorInterceptor)
 
 export default httpClient

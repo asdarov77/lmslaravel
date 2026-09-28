@@ -24,7 +24,8 @@ class User extends Authenticatable
     protected $fillable = [
         'fio',
         'password',
-
+        'role',
+        'group_id',
     ];
 
     /**
@@ -86,22 +87,29 @@ class User extends Authenticatable
     // }
 
     //----------------------------------------------
-    // из связанной таблицы Role (если) для текущего пользователя проверить есть ли имя роли равное инструктору или администратору
-    // public function isAdmin()
-    // {
-    //     //return $this->where('role', 'Администратор')->exists();
-    //     return $this->roles()->where('rolename', 'Администратор')->exists();
-    // }
-    // public function isInstructor()
-    // {
-    //     //return $this->where('role', 'Инструктор')->exists();
-    //     return $this->roles()->where('rolename', 'Инструктор')->exists();
-    // }
-    // public function isStudent()
-    // {
-    //     //return $this->where('role', 'Обучаемый')->exists();
-    //     return $this->roles()->where('rolename', 'Обучаемый')->exists();
-    // }
+    // Проверка роли по атрибуту `role` таблицы users.
+    // Поддерживаются как русские названия ('Администратор', 'Инструктор', 'Обучаемый'),
+    // так и англоязычные слаги ('admin', 'instructor', 'trainee'/'student').
+    public function isAdmin(): bool
+    {
+        return in_array($this->role, ['Администратор', 'admin'], true);
+    }
+
+    public function isInstructor(): bool
+    {
+        return in_array($this->role, ['Инструктор', 'instructor'], true);
+    }
+
+    public function isStudent(): bool
+    {
+        return in_array($this->role, ['Обучаемый', 'trainee', 'student'], true);
+    }
+
+    // Алиас для isStudent() (используется в тестах/API)
+    public function isTrainee(): bool
+    {
+        return $this->isStudent();
+    }
     //----------------------------------------------
     public function getAllPermissionsAttribute()
     {
