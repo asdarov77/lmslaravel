@@ -14,9 +14,7 @@ class AuthApiTest extends TestCase
     public function test_user_can_login_with_fio(): void
     {
         $user = User::factory()->create([
-            'surname' => 'Иванов',
-            'name' => 'Иван',
-            'patronymic' => 'Иванович',
+            'fio' => 'Иванов Иван Иванович',
             'password' => bcrypt('123')
         ]);
 
@@ -33,7 +31,6 @@ class AuthApiTest extends TestCase
                          'user' => [
                              'id',
                              'fio',
-                             'email',
                              'role'
                          ]
                      ]

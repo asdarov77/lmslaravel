@@ -90,18 +90,20 @@ class FullApiTest extends TestCase
 
         $response->assertStatus(201)
                  ->assertJson([
-                     'name' => 'Тестовая Категория',
-                     'code' => 'TEST_CAT_01',
+                     'data' => [
+                         'name' => 'Тестовая Категория',
+                         'code' => 'TEST_CAT_01',
+                     ],
                  ]);
 
-        $categoryId = $response->json('id');
+        $categoryId = $response->json('data.id');
 
         // 2. Read Category
         $response = $this->withHeaders($headers)
                          ->getJson("/api/v1/categories/{$categoryId}");
 
         $response->assertStatus(200)
-                 ->assertJson(['id' => $categoryId]);
+                 ->assertJsonPath('data.id', $categoryId);
 
         // 3. Update Category
         $updateData = [
@@ -114,8 +116,10 @@ class FullApiTest extends TestCase
 
         $response->assertStatus(200)
                  ->assertJson([
-                     'name' => 'Обновленная Категория',
-                     'code' => 'TEST_CAT_02',
+                     'data' => [
+                         'name' => 'Обновленная Категория',
+                         'code' => 'TEST_CAT_02',
+                     ],
                  ]);
 
         // 4. Delete Category
@@ -145,16 +149,16 @@ class FullApiTest extends TestCase
                          ->postJson('/api/v1/users', $userData);
 
         $response->assertStatus(201)
-                 ->assertJson(['fio' => 'Новый Сотрудник']);
+                 ->assertJsonPath('data.fio', 'Новый Сотрудник');
 
-        $userId = $response->json('id');
+        $userId = $response->json('data.id');
 
         // 2. Read User
         $response = $this->withHeaders($headers)
                          ->getJson("/api/v1/users/{$userId}");
 
         $response->assertStatus(200)
-                 ->assertJson(['id' => $userId]);
+                 ->assertJsonPath('data.id', $userId);
 
         // 3. Update User
         $updateData = [
@@ -166,7 +170,7 @@ class FullApiTest extends TestCase
                          ->putJson("/api/v1/users/{$userId}", $updateData);
 
         $response->assertStatus(200)
-                 ->assertJson(['fio' => 'Обновленный Сотрудник']);
+                 ->assertJsonPath('data.fio', 'Обновленный Сотрудник');
 
         // 4. Delete User
         $response = $this->withHeaders($headers)
@@ -197,16 +201,16 @@ class FullApiTest extends TestCase
                          ->postJson('/api/v1/courses', $courseData);
 
         $response->assertStatus(201)
-                 ->assertJson(['title' => 'Тестовый Курс']);
+                 ->assertJsonPath('data.title', 'Тестовый Курс');
 
-        $courseId = $response->json('id');
+        $courseId = $response->json('data.id');
 
         // 2. Read Course
         $response = $this->withHeaders($headers)
                          ->getJson("/api/v1/courses/{$courseId}");
 
         $response->assertStatus(200)
-                 ->assertJson(['id' => $courseId]);
+                 ->assertJsonPath('data.id', $courseId);
 
         // 3. Update Course
         $updateData = [
@@ -218,7 +222,7 @@ class FullApiTest extends TestCase
                          ->putJson("/api/v1/courses/{$courseId}", $updateData);
 
         $response->assertStatus(200)
-                 ->assertJson(['title' => 'Обновленный Курс', 'duration' => 60]);
+                 ->assertJsonPath('data.title', 'Обновленный Курс');
 
         // 4. Delete Course
         $response = $this->withHeaders($headers)

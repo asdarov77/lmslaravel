@@ -94,11 +94,20 @@ const UserModule = {
               state.users[itemIdx][key] = payload[key]
             })
           },
-            DELETE_USER(state, payload) {
-            const itemIdx = state.users.findIndex(item => item.id === payload.id)
-            Object.keys(payload).forEach(key => {
-              state.users[itemIdx][key] = payload[key]
-            })
+            DELETE_USER(state, id) {
+            // Корректное удаление: находим пользователя по id и удаляем из массива.
+            // (Старая версия копировала поля payload.id в найденный элемент — это не удаляло запись.)
+            const itemIdx = state.users.findIndex(item => item.id === id)
+            if (itemIdx !== -1) {
+              state.users.splice(itemIdx, 1)
+            }
+          },
+
+          DELETE_GROUP(state, id) {
+            const itemIdx = state.allGroups.findIndex(item => item.id === id)
+            if (itemIdx !== -1) {
+              state.allGroups.splice(itemIdx, 1)
+            }
           },
         
           CHANGE_USER_PASSWORD(state, payload) {

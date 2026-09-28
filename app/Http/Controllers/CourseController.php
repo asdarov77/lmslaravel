@@ -69,10 +69,16 @@ class CourseController extends Controller
             ],
         ];
 
+        $items = collect($paginator->items())->map(function ($course) {
+            return $this->withAliases($course);
+        });
+
         return response()->json([
-            'data' => $paginator->items(),
+            'success' => true,
+            'data' => $items,
+            'error' => null,
             'meta' => $meta,
-        ]);
+        ], 200);
     }
 
     /**
@@ -83,17 +89,44 @@ class CourseController extends Controller
      */
     public function store(Request $request)
     {
-        $course = new Course();
-        $course->title = request('title');
-        $course->short_description = request('short_description');
-        $course->long_description = request('long_description');
-        $course->path = request('path');
-        $course->save();
-        $course->categories()->attach($request->category_id);
-        return response()->json($course, 201);
-        //return response($request->category_id, 201);        
-        //$course= new Course();   
-        //$course->fill($request->all())->save();
+        $validated = $request->validate([
+            'title' => 'required_without:name|string|max:255',
+            'name' => 'required_without:title|string|max:255',
+            'short_description' => 'nullable|string',
+            'long_description' => 'nullable|string',
+            'description' => 'nullable|string',
+            'path' => 'nullable|string',
+            'category_id' => 'nullable|integer|exists:categories,id',
+            'aircraft_id' => 'nullable|integer|exists:aircrafts,id',
+            'status' => "nullable|in:draft,active,archived",
+            'visible' => 'nullable|boolean',
+        ]);
+
+        // алиасы: name -> title, description -> long_description
+        if (isset($validated['name']) && !isset($validated['title'])) {
+            $validated['title'] = $validated['name'];
+        }
+        unset($validated['name']);
+        if (isset($validated['description']) && empty($validated['long_description'])) {
+            $validated['long_description'] = $validated['description'];
+        }
+        unset($validated['description']);
+
+        $categoryId = $validated['category_id'] ?? null;
+
+        $course = Course::create($validated);
+
+        if ($categoryId) {
+            // дублируем в pivot для совместимости со старыми связями
+            $course->categories()->sync([$categoryId]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $this->withAliases($course->load('categories')),
+            'error' => null,
+            'meta' => null,
+        ], 201);
     }
 
     /**
@@ -321,15 +354,64 @@ class CourseController extends Controller
 
     public function update(Request $request, $id)
     {
-        $courses = Course::find($id);
-        $courses->title = request('title');
-        $courses->short_description = request('short_description');
-        $courses->long_description = request('long_description');
-        $courses->visible = $request->visible ?? 1;
+        $validated = $request->validate([
+            'title' => 'sometimes|required|string|max:255',
+            'name' => 'sometimes|required|string|max:255',
+            'short_description' => 'nullable|string',
+            'long_description' => 'nullable|string',
+            'description' => 'nullable|string',
+            'path' => 'nullable|string',
+            'category_id' => 'nullable|integer|exists:categories,id',
+            'aircraft_id' => 'nullable|integer|exists:aircrafts,id',
+            'status' => 'nullable|in:draft,active,archived',
+            'visible' => 'nullable|boolean',
+        ]);
+
+        if (isset($validated['name']) && !isset($validated['title'])) {
+            $validated['title'] = $validated['name'];
+        }
+        unset($validated['name']);
+        if (array_key_exists('description', $validated)) {
+            $validated['long_description'] = $validated['description'];
+            unset($validated['description']);
+        }
+
+        $courses = Course::findOrFail($id);
+        $categoryId = $validated['category_id'] ?? null;
+        unset($validated['duration']);
+        $courses->fill($validated);
         $courses->save();
-        $courses->categories()->sync($request->category_id ?? []);
-        return response()->json($courses, 200);
+        if ($categoryId !== null || $request->has('category_id')) {
+            $courses->categories()->sync($request->input('category_id') ? [$request->input('category_id')] : []);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $this->withAliases($courses->fresh()),
+            'error' => null,
+            'meta' => null,
+        ], 200);
     }
+
+    /**
+     * Добавляет публичные алиасы name/description/category_id для совместимости
+     * с контрактами фронтенда и API-тестов (БД хранит title/long_description,
+     * категория также дублируется в pivot category_course).
+     */
+    private function withAliases($course): array
+    {
+        $arr = $course instanceof \Illuminate\Database\Eloquent\Collection
+            ? $course->toArray()
+            : $course->toArray();
+        $arr['name'] = $arr['title'] ?? null;
+        $arr['description'] = $arr['long_description'] ?? ($arr['short_description'] ?? null);
+        if (!array_key_exists('category_id', $arr) || $arr['category_id'] === null) {
+            $arr['category_id'] = $course->categories()->pluck('categories.id')->first();
+        }
+        return $arr;
+    }
+
+
 
 
 
@@ -416,7 +498,12 @@ class CourseController extends Controller
         if (is_dir($h_course_folder_))
             $this->recursiveRemoveDir($h_course_folder_);
         $course->delete();
-        return response()->json(null, 204);
+        return response()->json([
+            'success' => true,
+            'data' => null,
+            'error' => null,
+            'meta' => null,
+        ], 200);
     }
     //----------------------------------------------------------
 }

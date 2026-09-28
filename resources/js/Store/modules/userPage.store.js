@@ -1,5 +1,4 @@
 const initialState = () => ({
-    namespaced: true,
     courses: [
         {
             courseId: 1,
@@ -190,10 +189,9 @@ const initialState = () => ({
 const state = initialState()
 
 //export default UserPageModule;
-//export default {
-    export default {
+export default {
     namespaced: true,
-    state,
+    state: () => initialState(),
     // getters,
     // actions,
     // mutations

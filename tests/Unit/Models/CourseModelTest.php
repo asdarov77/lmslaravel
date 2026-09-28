@@ -23,20 +23,39 @@ class CourseModelTest extends TestCase
     public function test_course_has_instructors(): void
     {
         $course = Course::factory()->create();
-        $instructor = User::factory()->create(['role' => 'instructor']);
-        
-        $course->instructors()->attach($instructor);
-        
+        $group = \App\Models\Group::factory()->create();
+        $instructor = User::factory()->create(['role' => 'Инструктор', 'group_id' => $group->id]);
+
+        // назначаем группу на курс — связь course <-> users раскрывается через group2learnings
+        \App\Models\Group2learning::create([
+            'course_id' => $course->id,
+            'group_id' => $group->id,
+            'category_id' => 1,
+            'teacher' => $instructor->fio,
+            'typeOfLesson' => 'lecture',
+            'study_from' => '2026-01-01',
+            'study_to' => '2026-12-31',
+        ]);
+
         $this->assertTrue($course->instructors->contains($instructor));
     }
 
     public function test_course_has_students(): void
     {
         $course = Course::factory()->create();
-        $student = User::factory()->create(['role' => 'trainee']);
-        
-        $course->students()->attach($student);
-        
+        $group = \App\Models\Group::factory()->create();
+        $student = User::factory()->create(['role' => 'Обучаемый', 'group_id' => $group->id]);
+
+        \App\Models\Group2learning::create([
+            'course_id' => $course->id,
+            'group_id' => $group->id,
+            'category_id' => 1,
+            'teacher' => 'Иванов И.И.',
+            'typeOfLesson' => 'practice',
+            'study_from' => '2026-01-01',
+            'study_to' => '2026-12-31',
+        ]);
+
         $this->assertTrue($course->students->contains($student));
     }
 
