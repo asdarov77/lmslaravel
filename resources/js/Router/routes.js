@@ -1,6 +1,9 @@
 import store from '../Store'
 
-const hasPermission = store.getters['Auth/hasPermission']
+// Ленивый доступ к геттеру: на момент импорта модуля стор ещё может не быть
+// инициализирован (циклические зависимости Store <-> Router <-> httpClient),
+// поэтому геттер берётся только при вызове, а не при загрузке модуля.
+const hasPermission = (...args) => store.getters['Auth/hasPermission'](...args)
 
 const routes = [
 
