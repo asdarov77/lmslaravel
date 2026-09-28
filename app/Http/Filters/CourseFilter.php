@@ -135,22 +135,14 @@ class CourseFilter extends AbstractFilter
 
 public function categoryId(Builder $builder, $categoryId)
 {
-    $category = Category::find($categoryId);
-    if (!$category) {
-        return;
-    }
-    
-    $categoryCode = trim($category->code);
-    
-    $builder
-        ->withWhereHas('aukstructures', function ($query) use ($categoryCode) {
-            $query->where('categories', 'like', "%{$categoryCode}%")  
-                ->orWhere('categories', '=', '')
-                ->where('type', '=' , 0);
-        })
-        ->whereHas('categories', function ($query) use ($categoryId) {
-            $query->where('categories.id', '=', $categoryId);
-        });
+    // Фильтрация по category_id: курс относится к категории, если category_id
+    // задан напрямую на курсе либо категория прикреплена через pivot category_course.
+    $builder->where(function ($q) use ($categoryId) {
+        $q->where('courses.category_id', '=', $categoryId)
+          ->orWhereHas('categories', function ($query) use ($categoryId) {
+              $query->where('categories.id', '=', $categoryId);
+          });
+    });
 }
 
     public function parentId(Builder $builder, $value)

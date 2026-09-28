@@ -21,13 +21,6 @@ class RouteServiceProvider extends ServiceProvider
                 ->middleware('api')
                 ->group(base_path('routes/api.php'));
 
-            // Versioned API v1 mounted in parallel to avoid breaking existing clients
-            Route::prefix('api/v1')
-                ->middleware('api')
-                ->group(function () {
-                    require base_path('routes/api.php');
-                });
-
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));
         });

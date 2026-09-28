@@ -17,6 +17,7 @@ class CourseFactory extends Factory
             'long_description' => $this->faker->paragraph(),
             'path' => $this->faker->slug(),
             'visible' => true,
+            'status' => 'active',
         ];
     }
 }

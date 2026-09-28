@@ -38,7 +38,10 @@ class UserModelTest extends TestCase
     public function test_user_has_permissions(): void
     {
         $user = User::factory()->create();
-        $permission = Permission::create(['name' => 'edit_courses']);
+        $permission = Permission::factory()->create([
+            'name' => 'edit_courses',
+            'slug' => 'edit_courses',
+        ]);
         
         $user->permissions()->attach($permission);
         
@@ -47,10 +50,9 @@ class UserModelTest extends TestCase
 
     public function test_user_full_name_attribute(): void
     {
+        // В схеме БД хранится единое поле fio (ФИО целиком)
         $user = User::factory()->create([
-            'surname' => 'Иванов',
-            'name' => 'Иван',
-            'patronymic' => 'Иванович'
+            'fio' => 'Иванов Иван Иванович',
         ]);
         
         $this->assertEquals('Иванов Иван Иванович', $user->fio);

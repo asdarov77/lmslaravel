@@ -46,9 +46,8 @@ use Illuminate\Support\Facades\Storage;
 
 //
 Route::post('/login', [AuthController::class, 'login']);
-Route::post('/api/v1/login', [AuthController::class, 'login'])->name('api.v1.login');
 
-// API v1 routes
+// API v1 routes — единая защищённая группа (все /api/v1/* требуют токен Sanctum)
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', function (Request $request) {
@@ -59,14 +58,23 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             'meta' => null,
         ]);
     });
-    
+
     // Versioned CRUD routes
     Route::apiResource('categories', CategoryController::class);
-    Route::apiResource('users', AuthController::class)->except(['destroy']);
+    Route::get('/users', [AuthController::class, 'index']);
+    Route::post('/users', [AuthController::class, 'store']);
+    Route::put('/users/{user}', [AuthController::class, 'update']);
+    Route::patch('/users/{user}', [AuthController::class, 'update']);
     Route::delete('/users/{user}', [AuthController::class, 'destroy']);
-    Route::apiResource('courses', CourseController::class);
+    Route::get('/users/{user}', [AuthController::class, 'show']);
+    Route::apiResource('courses', CourseController::class)->parameters(['courses' => 'course'])->except(['index']);
+
+    // legacy list endpoints inside v1 (protected by the same group middleware)
+    Route::get('/courses/', [CoursesListController::class, 'getCourses'])->name('v1.courses.list');
 });
 //Route::post('login', ['before' => 'throttle:2,5', 'uses' => 'AuthController@login']);
+// Категории без версионирования: только чтение (используется фронтендом)
+Route::apiResource('categories', CategoryController::class)->only(['index', 'show']);
 Route::post('/register', [AuthController::class, 'register']);
 //
 // блок пользователей
@@ -94,8 +102,8 @@ Route::apiResource('role', RoleController::class);
 Route::get('/health', function () {
     return response()->json(['status' => 'ok']);
 });
-// Explicit versioned healthcheck to support /api/v1/health in test environments
-Route::get('/v1/health', function () {
+// Versioned healthcheck: /api/v1/health (protected like the rest of v1)
+Route::prefix('v1')->middleware('auth:sanctum')->get('/health', function () {
     return response()->json(['status' => 'ok'], 200, ['X-Health-Check' => 'v1']);
 })->name('v1.health');
 
@@ -106,7 +114,7 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 //
 // блок курсов старый
 //
-Route::get('/courses/', [CoursesListController::class, 'getCourses']);    // вывод всех курсов
+Route::middleware('auth:sanctum')->get('/courses/', [CoursesListController::class, 'getCourses'])->name('courses.list');    // вывод всех курсов
 Route::get('/courses/cat/', [CategoryListController::class, 'getCatCourses']);
 Route::get('/courses/cat/{id}/', [CategoryListController::class, 'getCatCoursesId']);  // вывод курсов для конкретной категории, с флагом видимости
 // блок курсов и категорий новый

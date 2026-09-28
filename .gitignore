@@ -1,18 +1,5 @@
-# PHP/Laravel specific
-/vendor/
-/node_modules/
-/public/hot
-/storage/*.key
-/.idea
-/.vscode
+# Dependencies
+node_modules/
+
+# Build artifacts and caches
 .phpunit.result.cache
-
-# Environment
-.env
-.env.local
-.env.*.local
-
-# Logs and cache
-*.log
-*.tmp
-.DS_Store
