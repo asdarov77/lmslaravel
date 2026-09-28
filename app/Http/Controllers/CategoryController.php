@@ -12,7 +12,9 @@ class CategoryController extends Controller
      */
     public function index()
     {
-        $categories = Category::all();
+        $categories = Category::all()->map(function (Category $category) {
+            return $this->withNameAlias($category);
+        });
 
         return response()->json([
             'success' => true,

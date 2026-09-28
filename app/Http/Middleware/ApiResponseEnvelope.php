@@ -27,21 +27,6 @@ class ApiResponseEnvelope
 
         if ($response instanceof JsonResponse) {
             $original = $response->getData(true);
-            // Laravel validation errors returned as ->errors() bag via parent Handler:
-            // {"message": "...", "errors": {...}} — keep shape, add success flag.
-            if (isset($original['message']) && isset($original['errors'])) {
-                $enveloped = [
-                    'success' => false,
-                    'data' => null,
-                    'error' => [
-                        'code' => (string)$status,
-                        'message' => $original['message'],
-                        'details' => $original['errors'],
-                    ],
-                    'meta' => null,
-                ];
-                return response()->json($enveloped, $status, $response->headers->all(), JSON_UNESCAPED_UNICODE);
-            }
             $status = $response->getStatusCode();
             // Laravel validation errors returned as ->errors() bag via parent Handler:
             // {"message": "...", "errors": {...}} — keep shape, add success flag.

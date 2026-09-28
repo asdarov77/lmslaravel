@@ -47,7 +47,13 @@ use Illuminate\Support\Facades\Storage;
 //
 Route::post('/login', [AuthController::class, 'login']);
 
-// API v1 routes — единая защищённая группа (все /api/v1/* требуют токен Sanctum)
+// Публичные v1-маршруты авторизации: /api/v1/login, /api/v1/register
+Route::prefix('v1')->group(function () {
+    Route::post('/login', [AuthController::class, 'login'])->name('v1.login');
+    Route::post('/register', [AuthController::class, 'register'])->name('v1.register');
+});
+
+// API v1 routes — единая защищённая группа (все остальные /api/v1/* требуют токен Sanctum)
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', function (Request $request) {
@@ -67,10 +73,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::patch('/users/{user}', [AuthController::class, 'update']);
     Route::delete('/users/{user}', [AuthController::class, 'destroy']);
     Route::get('/users/{user}', [AuthController::class, 'show']);
-    Route::apiResource('courses', CourseController::class)->parameters(['courses' => 'course'])->except(['index']);
-
-    // legacy list endpoints inside v1 (protected by the same group middleware)
-    Route::get('/courses/', [CoursesListController::class, 'getCourses'])->name('v1.courses.list');
+    Route::apiResource('courses', CourseController::class)->parameters(['courses' => 'course']);
 });
 //Route::post('login', ['before' => 'throttle:2,5', 'uses' => 'AuthController@login']);
 // Категории без версионирования: только чтение (используется фронтендом)

@@ -139,12 +139,28 @@ class AuthController extends Controller
 
     public function destroy($id)
     {
-        if ($id != 1) {
+        if ((int)$id !== 1) {
             $user = User::findOrFail($id);
             $user->delete();
-            return response()->json(null, 204);
+
+            return response()->json([
+                'success' => true,
+                'data' => null,
+                'error' => null,
+                'meta' => null,
+            ], 200);
         }
-        return response()->json('невозможно удалить супер пользователя', 500);
+
+        return response()->json([
+            'success' => false,
+            'data' => null,
+            'error' => [
+                'code' => '403',
+                'message' => 'Невозможно удалить супер-пользователя',
+                'details' => null,
+            ],
+            'meta' => null,
+        ], 403);
     }
 
     public function getUserList()
@@ -190,9 +206,16 @@ class AuthController extends Controller
         $user->specialization = request('specialization');
         $user->group_id = request('group_id');
         $user->save();
-        $user->permissions()->sync($request->permission_id);
+        if ($request->has('permission_id')) {
+            $user->permissions()->sync($request->input('permission_id', []));
+        }
 
-        return response($user, 201);
+        return response()->json([
+            'success' => true,
+            'data' => $user,
+            'error' => null,
+            'meta' => null,
+        ], 200);
     }
 
     public function chpass(Request $request, $id)

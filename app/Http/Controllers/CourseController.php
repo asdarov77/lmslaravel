@@ -69,10 +69,16 @@ class CourseController extends Controller
             ],
         ];
 
+        $items = collect($paginator->items())->map(function ($course) {
+            return $this->withAliases($course);
+        });
+
         return response()->json([
-            'data' => $paginator->items(),
+            'success' => true,
+            'data' => $items,
+            'error' => null,
             'meta' => $meta,
-        ]);
+        ], 200);
     }
 
     /**
@@ -117,7 +123,7 @@ class CourseController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $course->load('categories'),
+            'data' => $this->withAliases($course->load('categories')),
             'error' => null,
             'meta' => null,
         ], 201);
@@ -381,11 +387,30 @@ class CourseController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $courses->fresh(),
+            'data' => $this->withAliases($courses->fresh()),
             'error' => null,
             'meta' => null,
         ], 200);
     }
+
+    /**
+     * Добавляет публичные алиасы name/description/category_id для совместимости
+     * с контрактами фронтенда и API-тестов (БД хранит title/long_description,
+     * категория также дублируется в pivot category_course).
+     */
+    private function withAliases($course): array
+    {
+        $arr = $course instanceof \Illuminate\Database\Eloquent\Collection
+            ? $course->toArray()
+            : $course->toArray();
+        $arr['name'] = $arr['title'] ?? null;
+        $arr['description'] = $arr['long_description'] ?? ($arr['short_description'] ?? null);
+        if (!array_key_exists('category_id', $arr) || $arr['category_id'] === null) {
+            $arr['category_id'] = $course->categories()->pluck('categories.id')->first();
+        }
+        return $arr;
+    }
+
 
 
 

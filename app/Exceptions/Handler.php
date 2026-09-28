@@ -3,6 +3,7 @@
 namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Auth\AuthenticationException;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -36,6 +37,22 @@ class Handler extends ExceptionHandler
     {
         $this->reportable(function (Throwable $e) {
             //
+        });
+
+        // Для API-маршрутов всегда отдаём JSON 401 вместо редиректа на route('login')
+        $this->renderable(function (AuthenticationException $e, $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'data' => null,
+                    'error' => [
+                        'code' => '401',
+                        'message' => 'Unauthenticated.',
+                        'details' => null,
+                    ],
+                    'meta' => null,
+                ], 401);
+            }
         });
     }
 }
