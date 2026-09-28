@@ -191,20 +191,28 @@ class AuthController extends Controller
 
     public function update(Request $request, $id)
     {
-        // Валидация
+        // Частичное обновление: только переданные поля (без затирания fio и др. в null)
+        $request->validate([
+            'fio' => 'sometimes|string|max:255',
+            'role' => 'nullable|string',
+            'group_id' => 'nullable|integer|exists:groups,id',
+        ]);
 
         $user = User::findOrFail($id);
-        $user->fio = request('fio');
-        $user->role = request('role');
-        $user->phonenumber = request('phonenumber');
-        $user->city = request('city');
-        $user->country = request('country');
-        $user->organization = request('organization');
-        $user->position = request('position');
-        $user->rank = request('rank');
-        $user->spfere = request('spfere');
-        $user->specialization = request('specialization');
-        $user->group_id = request('group_id');
+
+        $updatable = ['role', 'phonenumber', 'city', 'country', 'organization',
+                      'position', 'rank', 'spfere', 'specialization', 'group_id'];
+        foreach ($updatable as $field) {
+            if ($request->has($field)) {
+                $user->{$field} = $request->input($field);
+            }
+        }
+        if ($request->filled('fio')) {
+            $user->fio = $request->input('fio');
+        }
+        if ($request->filled('password')) {
+            $user->password = bcrypt($request->input('password'));
+        }
         $user->save();
         if ($request->has('permission_id')) {
             $user->permissions()->sync($request->input('permission_id', []));
