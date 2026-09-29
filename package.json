@@ -27,6 +27,7 @@
     "jszip": "^3.10.1",
     "laravel-mix-merge-manifest": "^2.1.0",
     "roboto-fontface": "*",
+    "tinyrainbow": "^1.2.0",
     "vite-plugin-vuetify": "^2.1.2",
     "vue": "^3.5.22",
     "vue-i18n": "^11.1.12",

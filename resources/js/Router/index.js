@@ -13,6 +13,11 @@ const router = createRouter({
 // Защита маршрутов: авторизация + права (meta.permission).
 // Фронтенд-проверки — только UX-фильтр; реальную безопасность
 // обеспечивает бэкенд (middleware `permission:` / Gate).
+
+// Флаг «права уже синхронизированы с сервером» для текущей жизни
+// приложения (перезагрузка страницы сбрасывает его намеренно).
+let permissionsSynced = false
+
 router.beforeEach(async (to , from, next) => {
         // Раньше здесь стояло localStorage.getItem("token") напрямую:
         // при недоступном хранилище (about:blank, sandbox, приватный
@@ -39,6 +44,18 @@ router.beforeEach(async (to , from, next) => {
         // (стиль Laravel Gate): достаточно ЛЮБОГО из списка (OR),
         // как в middleware `permission:a,b` на бэкенде.
         const required = to.meta?.permission
+
+        // RBAC-синхронизация: при первом переходе после перезагрузки
+        // страницы права во фронт-сторе приходят из LocalStorage — это
+        // снимок момента логина. Если администратору/инструктору выдали
+        // новые права, а сессия (токен) живёт дольше, чем перелогин,
+        // меню остаётся «укороченным», пока не дернем GET /api/v1/me.
+        // Флаг синхронизации — на сессию жизни приложения (не в LS).
+        if (!permissionsSynced && TokenService.getToken()) {
+            permissionsSynced = true
+            await store.dispatch('Auth/fetchCurrentUser').catch(() => null)
+        }
+
         if (Array.isArray(required) && required.length > 0) {
             // Синхронизируем права с сервером (source of truth), но не
             // блокируем навигацию при сетевых сбоях — fetchCurrentUser

@@ -279,3 +279,88 @@ describe('AuthModule.logout инвалидирует токен на серве�
     expect(commit).toHaveBeenCalledWith('LOGOUT_SUCCESS')
   })
 })
+
+// ---------------------------------------------------- RBAC: права и меню
+
+describe('AuthModule.hasPermission (RBAC)', () => {
+  const check = (user, perm) => {
+    const state = { user }
+    const getters = {
+      permissionSet: AuthModule.getters.permissionSet(state, {}),
+    }
+    return AuthModule.getters.hasPermission(state, getters)(perm)
+  }
+
+  it('супер-администратор видит всё даже с пустым списком прав', () => {
+    // Именно этот кейс давал «укороченное меню» у администратора:
+    // в LocalStorage лежал снимок прав до внедрения RBAC (пустой).
+    expect(check({ role: 'Администратор', permissions: [] }, ['manage-users'])).toBe(true)
+    expect(check({ role: 'admin' }, ['users.view'])).toBe(true)
+    expect(check({ is_super_admin: true }, ['system.maintenance'])).toBe(true)
+  })
+
+  it('обычный пользователь: право по slug из списка', () => {
+    const u = { role: 'Обучаемый', permissions: [{ slug: 'exams.take' }] }
+    expect(check(u, ['exams.take'])).toBe(true)
+    expect(check(u, ['users.view'])).toBe(false)
+  })
+
+  it('legacy-алиасы работают в обе стороны', () => {
+    const old = { permissions: [{ slug: 'manage-users' }] }
+    expect(check(old, ['users.view'])).toBe(true)
+    const neu = { permissions: ['users.view'] }
+    expect(check(neu, ['manage-users'])).toBe(true)
+  })
+
+  it('пункт без требований доступен всем; пустые права = нет доступа', () => {
+    expect(check({ permissions: [] }, [])).toBe(true)
+    expect(check({ permissions: [] }, ['users.view'])).toBe(false)
+    expect(check(undefined, ['users.view'])).toBe(false)
+  })
+
+  it('OR-семантика: достаточно ЛЮБОГО совпадения (как middleware permission:a,b)', () => {
+    const u = { permissions: [{ slug: 'courses.manage' }] }
+    expect(check(u, ['users.view', 'courses.manage'])).toBe(true)
+  })
+})
+
+describe('AuthModule.fetchCurrentUser (синхронизация прав с /api/v1/me)', () => {
+  it('обновляет state и LocalStorage актуальными правами сервера', async () => {
+    const fetchMeMock = vi.fn(() =>
+      Promise.resolve({
+        data: {
+          success: true,
+          data: {
+            user: { id: 1, fio: 'Админ', role: 'Администратор' },
+            permissions: [{ id: 5, name: 'Manage users', slug: 'manage-users' }],
+          },
+        },
+      })
+    )
+    // Подменяем fetchMe в уже замокированном модуле auth.api.
+    const api = await import('../../resources/js/api/auth.api')
+    Object.defineProperty(api, 'fetchMe', { value: fetchMeMock, configurable: true, writable: true })
+
+    const commit = vi.fn()
+    const user = await AuthModule.actions.fetchCurrentUser({ commit })
+
+    expect(fetchMeMock).toHaveBeenCalled()
+    expect(commit).toHaveBeenCalledWith('SET_USER', expect.objectContaining({
+      role: 'Администратор',
+      permissions: [{ id: 5, name: 'Manage users', slug: 'manage-users' }],
+    }))
+    expect(saveUser).toHaveBeenCalled()
+    expect(user?.role).toBe('Администратор')
+  })
+
+  it('при ошибке сети не роняет приложение (возвращает null)', async () => {
+    const api = await import('../../resources/js/api/auth.api')
+    Object.defineProperty(api, 'fetchMe', {
+      value: () => Promise.reject(new Error('network down')),
+      configurable: true, writable: true,
+    })
+    const user = await AuthModule.actions.fetchCurrentUser({ commit: vi.fn() })
+    expect(user).toBeNull()
+  })
+})
+

@@ -70,7 +70,18 @@ class AuthController extends Controller
         // с legacy-алиасами) кладём ВНУТРЬ user.permissions, чтобы фронт
         // сохранял их одним объектом и не терял при перелогине.
         // Поле верхнего уровня 'permissions' оставлено для совместимости.
+        // Супер-администратор (роль «Администратор» в поле role или связи role_user)
+        // получает ВЕСЬ каталог прав + legacy-алиасы, даже если в permissions_users
+        // у него пусто — иначе фронт при логине сохранит пустой список и боковое
+        // меню отфильтруется до укороченного варианта.
         $slugs = collect($user->permissionSlugs());
+        if ($user->isSuperAdmin()) {
+            $aliasMap = \App\Support\PermissionCatalog::legacyAliases();
+            $slugs = collect(array_keys(config('permissions.permissions', [])))
+                ->merge($slugs)
+                ->merge(collect($aliasMap)->flatten())
+                ->unique();
+        }
 
         $permissions = Permission::whereIn('slug', $slugs)
             ->get(['id', 'name', 'slug'])
@@ -107,16 +118,35 @@ class AuthController extends Controller
         $user = $request->user();
         $user->loadMissing(['permissions', 'roles.permissions']);
 
+        // RBAC: единый источник истины — полный набор прав пользователя
+        // (прямые + через роли + legacy-алиасы). Супер-администратору
+        // выдаём весь каталог из config/permissions.php вместе с алиасами,
+        // иначе у «Администратора» без явных записей в permissions_users
+        // список прав пустой и боковое меню на фронте фильтруется до нуля.
+        $slugs = collect($user->permissionSlugs());
+        if ($user->isSuperAdmin()) {
+            $catalog = collect(array_keys(config('permissions.permissions', [])));
+            $aliasMap = \App\Support\PermissionCatalog::legacyAliases();
+            $aliases = collect($aliasMap)->flatten()->filter(
+                fn ($a) => Permission::where('slug', $a)->exists()
+            );
+            $slugs = $catalog->merge($slugs)->merge($aliases)->unique();
+        }
+
+        $permissions = Permission::whereIn('slug', $slugs)
+            ->get(['id', 'name', 'slug'])
+            ->map(fn (Permission $p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'slug' => $p->slug,
+            ]);
+
         return response()->json([
             'success' => true,
             'data' => [
                 'user' => $user,
-                'permissions' => $user->permissions->map(fn ($p) => [
-                    'id' => $p->id,
-                    'name' => $p->name,
-                    'slug' => $p->slug,
-                ]),
-                'permission_slugs' => $user->permissionSlugs(),
+                'permissions' => $permissions,
+                'permission_slugs' => $permissions->pluck('slug')->all(),
                 'roles' => $user->roles->map(fn ($r) => [
                     'id' => $r->id,
                     'name' => $r->rolename,
