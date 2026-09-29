@@ -57,10 +57,10 @@ router.beforeEach(async (to , from, next) => {
         }
 
         if (Array.isArray(required) && required.length > 0) {
-            // Синхронизируем права с сервером (source of truth), но не
-            // блокируем навигацию при сетевых сбоях — fetchCurrentUser
-            // сам логирует ошибку и возвращает null.
-            await store.dispatch('Auth/fetchCurrentUser').catch(() => null)
+            // Права уже синхронизированы с сервером выше (или будут
+            // синхронизированы при первом же переходе после перезагрузки).
+            // Второй вызов /api/v1/me на каждый защищённый маршрут убирался
+            // намеренно: он не добавляет актуальности, но удваивает задержку.
 
             const can = store.getters['Auth/hasPermission']
             if (!can(required)) {
