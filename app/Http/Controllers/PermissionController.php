@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
+use App\Support\PermissionCatalog;
 
 class PermissionController extends Controller
 {
@@ -28,7 +29,15 @@ class PermissionController extends Controller
      */
     public function store(Request $request)
     {
-//
+        $fields = $request->validate([
+            'name' => 'required|string|max:255',
+            'slug' => 'nullable|string|max:255|unique:permissions,slug',
+        ]);
+
+        $permission = Permission::create($fields);
+        PermissionCatalog::flushCache();
+
+        return response()->json($permission, 201);
     }
 
     /**
@@ -39,7 +48,7 @@ class PermissionController extends Controller
      */
     public function show($id)
     {
-        //
+        return Permission::findOrFail($id);
     }
 
     /**
@@ -51,7 +60,23 @@ class PermissionController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        $permission = Permission::findOrFail($id);
+
+        // Системные права нельзя переименовывать — на них завязаны
+        // middleware и legacy-алиасы каталога.
+        if (PermissionCatalog::isProtected($permission->slug)) {
+            abort(403, 'Системное право защищено от изменения');
+        }
+
+        $fields = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'slug' => 'sometimes|nullable|string|max:255|unique:permissions,slug,' . $permission->id,
+        ]);
+
+        $permission->update($fields);
+        PermissionCatalog::flushCache();
+
+        return response()->json($permission);
     }
 
     /**
@@ -62,6 +87,16 @@ class PermissionController extends Controller
      */
     public function destroy($id)
     {
-        //
+        $permission = Permission::findOrFail($id);
+
+        if (PermissionCatalog::isProtected($permission->slug)) {
+            abort(403, 'Системное право защищено от удаления');
+        }
+
+        $permission->roles()->detach();
+        $permission->delete();
+        PermissionCatalog::flushCache();
+
+        return response()->json(['success' => true]);
     }
 }

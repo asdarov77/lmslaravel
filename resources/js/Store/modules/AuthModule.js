@@ -1,8 +1,35 @@
 import { TokenService } from "../../services/storage.service";
 import { UserService } from "../../services/user.service";
-import { login, logout } from "../../api/auth.api";
+import { login, logout, fetchMe } from "../../api/auth.api";
 
-const AuthService = { login, logout };
+const AuthService = { login, logout, fetchMe };
+
+// Legacy-алиасы каталога прав (зеркало config/permissions.php на бэкенде).
+// Позволяют фронту понимать и старые slug'и (manage-users), и новые
+// (users.view) без перелогина после миграции данных.
+const PERMISSION_ALIASES = {
+    "manage-users": ["users.view"],
+    "users.view": ["manage-users"],
+    "create-tasks": ["users.courses"],
+    "users.courses": ["create-tasks"],
+    "manage-course": ["courses.manage"],
+    "edit_courses": ["courses.manage"],
+    "courses.manage": ["manage-course", "edit_courses"],
+};
+
+const expandPermission = (name) => {
+    const set = new Set([name]);
+    for (const alias of PERMISSION_ALIASES[name] || []) set.add(alias);
+    return set;
+};
+
+// Нормализация прав пользователя: массив объектов {slug,name} или строк.
+const permissionNames = (user) => {
+    const list = Array.isArray(user?.permissions) ? user.permissions : [];
+    return list
+        .map((p) => (typeof p === "string" ? p : p?.slug || p?.name))
+        .filter(Boolean);
+};
 
 // Безопасное получение пользователя из LocalStorage
 const getInitialUser = () => {
@@ -85,6 +112,33 @@ const AuthModule = {
             }
         },
 
+        /**
+         * Синхронизация профиля и прав с сервером (GET /api/v1/me).
+         * Вызывается при старте приложения и после chperm, чтобы state
+         * не расходился с БД (бэкенд — источник истины RBAC).
+         */
+        async fetchCurrentUser({ commit }) {
+            try {
+                const response = await AuthService.fetchMe();
+                const payload = response.data?.data ?? response.data;
+                if (!payload?.user) return null;
+
+                const user = payload.user;
+                user.permissions = Array.isArray(payload.permissions)
+                    ? payload.permissions
+                    : permissionNames(user);
+
+                UserService.saveUser(user);
+                commit("SET_USER", user);
+                return user;
+            } catch (error) {
+                // 401 обработает интерцептор httpClient (logout+redirect);
+                // здесь только сетевые сбои — не роняем приложение.
+                console.error("fetchCurrentUser:", error?.message);
+                return null;
+            }
+        },
+
         logout({ commit }) {
             // Сначала инвалидируем токен на сервере, иначе он остаётся
             // рабочим после выхода из приложения. Локальное состояние
@@ -99,47 +153,48 @@ const AuthModule = {
     },
 
     getters: {
-        loggedIn: (state) => {
-            // console.log убран, чтобы не спамить в консоль
-            return !!state.accessToken;
+        loggedIn: (state) => !!state.accessToken,
+
+        /**
+         * Множество имён прав пользователя (slug + name + алиасы каталога).
+         */
+        permissionSet: (state) => {
+            const set = new Set();
+            for (const name of permissionNames(state.user)) {
+                for (const expanded of expandPermission(name)) set.add(expanded);
+            }
+            return set;
         },
 
-        hasPermission: (state) => (permissions, contentType) => {
-            // Защита от падения, если user или permissions отсутствуют
-            if (!state.user || !Array.isArray(state.user.permissions))
-                return false;
+        /**
+         * hasPermission(perm, [perm...]) — единый стиль проверки:
+         * принимает строку или массив, достаточно ЛЮБОГО совпадения (OR),
+         * как на бэкенде (middleware `permission:a,b`).
+         *
+         * Совместимо со старыми вызовами hasPermission(['manage-users'], 'Manage users')
+         * — второй аргумент (contentType) игнорируется: сверка идёт по slug/name
+         * из первого аргумента, что устраняет расхождение двух стилей вызова.
+         */
+        hasPermission: (state, getters) => (perm, contentType) => {
+            const required = (Array.isArray(perm) ? perm : [perm]).filter(Boolean);
+            if (required.length === 0) return true; // пункт без требований доступен всем
 
-            // На случай, если в компонент передали одну строку вместо массива
-            const requiredPermissions = Array.isArray(permissions)
-                ? permissions
-                : [permissions];
+            // Супер-администратор — все права (как Gate::before на бэкенде).
+            if (state.user?.is_super_admin || state.user?.role === "admin" || state.user?.role === "Администратор") {
+                return true;
+            }
 
-            // Вызов вида hasPermission(['manage-users'], 'Manage users')
-            // означает «есть право с slug ИЛИ name из списка» — так
-            // совместимы оба стиля вызова в компонентах и роутере.
-            // Строгая пара (name === contentType && slug === perm) раньше
-            // никогда не срабатывала и скрывала пункты меню и целые
-            // страницы даже у администраторов.
-            const matches = requiredPermissions.some((perm) =>
-                state.user.permissions.some(
-                    (p) => p.slug === perm || p.name === perm,
-                ),
-            );
-            if (matches) return true;
+            const held = getters.permissionSet;
+            if (held.size === 0) return false;
 
-            // Второй стиль: contentType как имя права + operations как
-            // список действий (например 'User' + ['read','write']).
-            return state.user.permissions.some(
-                (p) =>
-                    p.name === contentType &&
-                    requiredPermissions.some(
-                        (op) =>
-                            op === "all" ||
-                            (Array.isArray(p.operations) &&
-                                p.operations.includes(op)),
-                    ),
-            );
+            return required.some((r) => held.has(r));
         },
+
+        /**
+         * can('users.view') — рекомендуемый новый API проверок (стиль
+         * Laravel Gate / v-can). То же, что hasPermission, но короче.
+         */
+        can: (state, getters) => (perm) => getters.hasPermission(perm),
     },
 };
 

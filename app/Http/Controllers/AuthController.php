@@ -65,15 +65,68 @@ class AuthController extends Controller
         // Находка: property_exists() для magic-relation всегда false,
         // поэтому permissions раньше всегда приходили пустым массивом.
         // Обращаемся к relation напрямую.
-        $permissions = $user->permissions()->get();
+        //
+        // RBAC: нормализуем контракт ответа — права (прямые + через роли,
+        // с legacy-алиасами) кладём ВНУТРЬ user.permissions, чтобы фронт
+        // сохранял их одним объектом и не терял при перелогине.
+        // Поле верхнего уровня 'permissions' оставлено для совместимости.
+        $slugs = collect($user->permissionSlugs());
+
+        $permissions = Permission::whereIn('slug', $slugs)
+            ->get(['id', 'name', 'slug'])
+            ->map(function (Permission $p) {
+                return [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'slug' => $p->slug,
+                    'pivot' => ['user_id' => $user->id, 'permission_id' => $p->id],
+                ];
+            });
+
+        $user->setRelation('permissions', \App\Models\Permission::hydrate(
+            $permissions->all()
+        ));
 
         $response = [
             'user' => $user,
             'token' => $token, //->plainTextToken
 
-            'permissions' => $permissions
+            'permissions' => $permissions,
+            'roles' => $user->roles->pluck('rolename'),
         ];
         return response()->json($response, 200);
+    }
+
+    /**
+     * Актуальный профиль текущего пользователя (источник истины для фронта).
+     * GET /api/v1/me — фронт вызывает при старте приложения и после
+     * изменения прав, чтобы синхронизировать state с БД.
+     */
+    public function me(Request $request)
+    {
+        $user = $request->user();
+        $user->loadMissing(['permissions', 'roles.permissions']);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'user' => $user,
+                'permissions' => $user->permissions->map(fn ($p) => [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'slug' => $p->slug,
+                ]),
+                'permission_slugs' => $user->permissionSlugs(),
+                'roles' => $user->roles->map(fn ($r) => [
+                    'id' => $r->id,
+                    'name' => $r->rolename,
+                    'slug' => $r->slug,
+                ]),
+                'is_super_admin' => $user->isSuperAdmin(),
+            ],
+            'error' => null,
+            'meta' => null,
+        ]);
     }
 
     public function logout(Request $request)
@@ -203,6 +256,14 @@ class AuthController extends Controller
 
     public function chpass(Request $request, $id)
     {
+        // Свой пароль — можно; чужой — только с правом users.update.
+        if ((int) $id !== (int) $request->user()->id
+            && !$request->user()->hasPermission('users.update')) {
+            abort(403, 'Недостаточно прав для смены пароля другого пользователя');
+        }
+
+        $request->validate(['password' => 'required|string|min:6']);
+
         $user = User::findOrFail($id);
         $user->password = bcrypt(request('password'));
         $user->save();
@@ -221,9 +282,9 @@ class AuthController extends Controller
     public function chperm(Request $request, $id)
     {
         $user = User::findOrFail($id);
-        $user->permissions()->sync($request->permission_id);
+        $user->permissions()->sync($request->input('permission_id', []));
         // json(), а не response(): иначе ответ уходит без конверта
-        return response()->json($user->fresh(), 201);
+        return response()->json($user->fresh()->load('permissions'), 201);
     }
 
     public function group2learning(Request $request)

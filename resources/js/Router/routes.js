@@ -1,6 +1,6 @@
-import store from '../Store'
-
-const hasPermission = store.getters['Auth/hasPermission']
+// RBAC: вместо снимка геттера на момент импорта модуля (права устаревали
+// после логина) маршруты декларируют требования в meta.permission,
+// а проверку выполняет глобальный guard в Router/index.js через store.
 
 const routes = [
 
@@ -30,11 +30,7 @@ const routes = [
         path: '/contacts',
         component: () => import('../Pages/Contacts.vue'),
         name: 'contacts',
-        beforeEnter(to, from, next) {
-            if (hasPermission(['manage-users'], 'Manage users')) next()
-            else next('/my')
-        }
-    },
+        meta: { permission: ['users.view', 'manage-users'] },    },
     {
         path: '/my',
         component: () => import('../Pages/MyAccount.vue'),
@@ -52,26 +48,18 @@ const routes = [
         path: '/user/list',
         component: () => import('../Pages/UserList.vue'),
         name: 'user.list',
-    },
+        meta: { permission: ['users.view', 'manage-users'] },    },
     {
         path: '/user/edit/:idEdit',
         component: () => import('../Pages/User/UserItemEdit.vue'),
         name: 'user.edit',
-        props: route => ({ idEdit: Number(route.params.idEdit) }),
-        // beforeEnter(to, from, next) {            
-        //     if (hasPermission(['manage-users'], 'Manage users')) next()
-        //     else next('/403')
-        // }
+        meta: { permission: ['users.update', 'users.view', 'manage-users'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
     },
     {
         path: '/user/chpass/:idEdit',
         component: () => import('../Pages/User/UserChpass.vue'),
         name: 'user.chpass',
-        props: true,
-        // beforeEnter(to, from, next) {
-        //     if (hasPermission(['manage-users'], 'Manage users')) next()
-        //     else next('/403')
-        // }
+        meta: { permission: ['users.update', 'manage-users'] },        props: true,
     },
     // {
     //     path: '/user/chroll',
@@ -101,20 +89,12 @@ const routes = [
         path: '/groups/add',
         component: () => import('../Pages/Group/CreateGroup.vue'),
         name: 'groups.create',
-        // beforeEnter(to, from, next) {
-        //     if (hasPermission(['manage-users','create-tasks'], 'User')) next()
-        //     else next('/403')
-        // }
-    },
+        meta: { permission: ['groups.manage', 'manage-users', 'create-tasks'] },    },
     {
         path: '/groups/edit/:idEdit',
         component: () => import('../Pages/Group/GroupItemEdit.vue'),
         name: 'groups.update',
-        props: route => ({ idEdit: Number(route.params.idEdit) }),
-        // beforeEnter(to, from, next) {
-        //     if (hasPermission(['manage-users'], 'Manage users')) next()
-        //     else next('/403')
-        // }
+        meta: { permission: ['groups.manage', 'manage-users'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
     },
     // {
     //     path: '/groups',
@@ -155,7 +135,7 @@ const routes = [
         path: '/courses/desc/:idEdit',
         component: () => import('../Pages/CourseItem.vue'),
         name: 'courses.desc',
-        props: route => ({ idEdit: Number(route.params.idEdit) }),
+        meta: { permission: ['courses.manage', 'content.manage', 'manage-users'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
         beforeEnter(to, from, next) {
             if (hasPermission(['manage-users'], 'Manage users')) next()
             else next('/403')
@@ -166,20 +146,12 @@ const routes = [
         path: '/course',
         component: () => import('../Pages/Course/RegisterCourse.vue'),
         name: 'course.store',
-        // beforeEnter(to, from, next) {
-        //     if (hasPermission(['manage-users'], 'Manage users')) next()
-        //     else next('/403')
-        // }
-    },
+        meta: { permission: ['courses.manage', 'edit_courses', 'manage-course'] },    },
     {
         path: '/course/:idEdit',
         component: () => import('../Pages/Course/UpdateCourse.vue'),
         name: 'course.update',
-        props: route => ({ idEdit: Number(route.params.idEdit) }),
-        // beforeEnter(to, from, next) {
-        //     if (hasPermission(['manage-users'], 'Manage users')) next()
-        //     else next('/403')
-        // }
+        meta: { permission: ['courses.manage', 'edit_courses', 'manage-course'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
     },
     {
         path: '/classes',
@@ -195,21 +167,17 @@ const routes = [
         path: '/categories',
         component: () => import('../Pages/Category/CategoryList.vue'),
         name: 'categories.index',
-        // beforeEnter(to, from, next) {
-        //     if (hasPermission(['manage-users'], 'Manage users')) next()
-        //     else next('/403')
-        // }
-    },
+        meta: { permission: ['courses.view', 'categories.manage', 'manage-users'] },    },
     {
         path: '/register-categories',
         component: () => import('../Pages/Category/RegisterCategory.vue'),
         name: 'categories.store',
-    },
+        meta: { permission: ['categories.manage', 'courses.manage'] },    },
     {
         path: '/categories/:idEdit',
         component: () => import('../Pages/Category/UpdateCategory.vue'),
         name: 'categories.update',
-        props: route => ({ idEdit: Number(route.params.idEdit) }),
+        meta: { permission: ['categories.manage', 'courses.manage'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
         //props: true
     },
     //
@@ -219,7 +187,7 @@ const routes = [
         path: '/files/add',
         component: () => import('../Pages/FileLoadSimple.vue'),
         name: 'files.simple',
-    },
+        meta: { permission: ['files.upload', 'courses.manage'] },    },
     {
         path: '/calendar',
         component: () => import('../Pages/EventCalendar.vue'),
@@ -230,7 +198,7 @@ const routes = [
         component: () => import('../Pages/Group/GroupLearning.vue'),
         props: route => ({ idEdit: Number(route.params.idEdit) }),
         name: 'group.learning',
-    },
+        meta: { permission: ['users.courses', 'create-tasks'] },    },
     {
         path: '/auk',
         component: () => import('../Pages/User/UserPage.vue'),
@@ -241,7 +209,7 @@ const routes = [
         path: '/upload-gift',
         component: () => import('../Pages/Gift/GiftImportForm.vue'),
         name: 'upload-gift',
-    },
+        meta: { permission: ['questions.manage'] },    },
     {
         path: '/questions',
         component: () => import('../Pages/Gift/ExamineItem.vue'),
@@ -259,13 +227,13 @@ const routes = [
             idCategory: parseInt(route.query.idCategory),
         }),
         name: 'questions.main',
-    },
+        meta: { permission: ['questions.view', 'questions.manage'] },    },
     {
         path: '/questions-main/:idEdit',
         component: () => import('../Pages/Gift/QuestionEdit.vue'),
         props: route => ({ idEdit: Number(route.params.idEdit) }),
         name: 'question.edit',
-    },
+        meta: { permission: ['questions.manage'] },    },
     // {
     //     path: '/questions-main/:idEdit?',
     //     component: () => import('../Pages/Gift/QuestionEdit.vue'),
@@ -312,7 +280,7 @@ const routes = [
             aukstructure_id: Number(route.params.aukstructure_id)
         }),
         name: 'question.new',
-    },
+        meta: { permission: ['questions.manage'] },    },
     //--------------------------- конец блок вопросов-----------------------------------
 
     // удалить
@@ -395,12 +363,12 @@ const routes = [
     {
         path: '/grade-boundary/',
         name: 'gradeBoundary',
-        component: () => import('../Pages/Settings/GradeSettings.vue'),
+        meta: { permission: ['settings.manage'] },        component: () => import('../Pages/Settings/GradeSettings.vue'),
     },
     {
         path: '/settings/',
         name: 'allSettings',
-        component: () => import('../Pages/Settings/AllSettings.vue'),
+        meta: { permission: ['settings.manage'] },        component: () => import('../Pages/Settings/AllSettings.vue'),
     },
     //
     {

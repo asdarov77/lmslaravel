@@ -10,4 +10,9 @@ const login = (formData) => httpClient.post(ENDPOINT, formData)
 // Бэкенд отдаёт GET /api/logout (Route::get('/logout') в routes/api.php).
 const logout = () => httpClient.get('/api/logout')
 
-export { login, logout }
+// Актуальный профиль + права с сервера (источник истины RBAC).
+// Фронт вызывает при старте приложения, чтобы синхронизировать
+// состояние с БД после изменения прав администратором.
+const fetchMe = () => httpClient.get('/api/v1/me')
+
+export { login, logout, fetchMe }

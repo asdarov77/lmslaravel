@@ -28,6 +28,21 @@ class AuthServiceProvider extends ServiceProvider
     {
         $this->registerPolicies();
 
+        // Супер-администратор проходит любую проверку Gate (Moodle site admin /
+        // Canvas root admin). ВАЖНО: возвращать true только для admin, иначе — null,
+        // чтобы не переопределять политики других пользователей.
+        Gate::before(function ($user, $ability) {
+            return method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()
+                ? true
+                : null;
+        });
+
+        // Каждое право из каталога (config/permissions.php) становится
+        // ability'ю Gate: $user->can('users.view'), @can('courses.manage') в Blade.
+        foreach (array_keys(config('permissions.permissions', [])) as $slug) {
+            Gate::define($slug, fn ($user) => $user->hasPermission($slug));
+        }
+
         Gate::define('view-group', [GroupPolicy::class, 'view']);
         Gate::define('delete-group', [GroupPolicy::class, 'delete']);
         
