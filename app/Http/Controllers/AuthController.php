@@ -83,9 +83,18 @@ class AuthController extends Controller
                 ->unique();
         }
 
-        $permissions = Permission::whereIn('slug', $slugs)
-            ->get(['id', 'name', 'slug'])
-            ->map(function (Permission $p) {
+        // Права могут быть назначены пользователю или роли (permissions_roles),
+        // поэтому берём ВСЕ записи из таблицы, а не только whereIn('slug').
+        // Иначе несуществующий в таблице slug (например users.view до запуска
+        // permissions:sync) терялся, а раньше здесь же падало исключение
+        // "class not found" из-за отсутствующего use App\Models\Permission —
+        // это и давало 500 на POST /api/login.
+        $allPermissions = Permission::query()->get(['id', 'name', 'slug']);
+        $wanted = $slugs->flip();
+        $permissions = $allPermissions
+            ->filter(fn (Permission $p) => $wanted->has((string) $p->slug))
+            ->values()
+            ->map(function (Permission $p) use ($user) {
                 return [
                     'id' => $p->id,
                     'name' => $p->name,
@@ -94,8 +103,20 @@ class AuthController extends Controller
                 ];
             });
 
+        // Для супер-админа гарантируем наличие ключевых legacy-прав в ответе,
+        // даже если они ещё не внесены в таблицу permissions (меню фронта
+        // завязано на slug 'manage-users').
+        if ($user->isSuperAdmin() && !$permissions->contains('slug', 'manage-users')) {
+            $permissions->prepend([
+                'id' => 0,
+                'name' => 'Управление пользователями',
+                'slug' => 'manage-users',
+                'pivot' => ['user_id' => $user->id, 'permission_id' => 0],
+            ]);
+        }
+
         $user->setRelation('permissions', \App\Models\Permission::hydrate(
-            $permissions->all()
+            $permissions->where('id', '>', 0)->all()
         ));
 
         $response = [
@@ -123,18 +144,24 @@ class AuthController extends Controller
         // выдаём весь каталог из config/permissions.php вместе с алиасами,
         // иначе у «Администратора» без явных записей в permissions_users
         // список прав пустой и боковое меню на фронте фильтруется до нуля.
+        // Таблица permissions в существующих инсталляциях содержит только
+        // legacy-записи (manage-users, create-tasks, manage-course): миграции
+        // каталога и unique-индексов ещё не прогонялись. Поэтому сравниваем
+        // slug'и с учётом алиасов на PHP — как в login(), без whereIn по БД.
         $slugs = collect($user->permissionSlugs());
         if ($user->isSuperAdmin()) {
-            $catalog = collect(array_keys(config('permissions.permissions', [])));
             $aliasMap = \App\Support\PermissionCatalog::legacyAliases();
-            $aliases = collect($aliasMap)->flatten()->filter(
-                fn ($a) => Permission::where('slug', $a)->exists()
-            );
-            $slugs = $catalog->merge($slugs)->merge($aliases)->unique();
+            $slugs = collect(array_keys(config('permissions.permissions', [])))
+                ->merge($slugs)
+                ->merge(collect($aliasMap)->flatten())
+                ->unique();
         }
 
-        $permissions = Permission::whereIn('slug', $slugs)
+        $wanted = $slugs->flip();
+        $permissions = Permission::query()
             ->get(['id', 'name', 'slug'])
+            ->filter(fn (Permission $p) => $wanted->has((string) $p->slug))
+            ->values()
             ->map(fn (Permission $p) => [
                 'id' => $p->id,
                 'name' => $p->name,

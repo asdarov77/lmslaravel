@@ -21,15 +21,27 @@ class PermissionCatalog
      */
     public static function legacyAliases(): array
     {
-        return Cache::remember(self::CACHE_KEY, self::CACHE_TTL, function () {
-            $aliases = [];
-            foreach (config('permissions.permissions', []) as $slug => $meta) {
-                foreach ($meta['legacy'] ?? [] as $legacy) {
-                    $aliases[$legacy] = $slug;
-                }
+        // Фолбэк вместо Cache::remember: в развёрнутых инсталляциях каталог
+        // storage/framework/{views,cache,data} может быть недоступен для
+        // web-процесса — запись file-кэша бросала исключение и давала 500
+        // на POST /api/login. Чтение config() дешёвое, кэш здесь не критичен.
+        try {
+            return Cache::remember(self::CACHE_KEY, self::CACHE_TTL, fn () => self::buildAliases());
+        } catch (\Throwable $e) {
+            return self::buildAliases();
+        }
+    }
+
+    private static function buildAliases(): array
+    {
+        $aliases = [];
+        foreach (config('permissions.permissions', []) as $slug => $meta) {
+            foreach ($meta['legacy'] ?? [] as $legacy) {
+                $aliases[$legacy] = $slug;
             }
-            return $aliases;
-        });
+        }
+
+        return $aliases;
     }
 
     /**

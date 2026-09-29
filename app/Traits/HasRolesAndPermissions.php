@@ -50,11 +50,21 @@ trait HasRolesAndPermissions
      */
     public function isSuperAdmin(): bool
     {
+        // Поле users.role — основной источник (ROLE_ALIASES в User).
         if (method_exists($this, 'isAdmin') && $this->isAdmin()) {
             return true;
         }
 
-        return $this->hasRole('admin', 'Администратор');
+        // Связь role_user как дополнительный сигнал. Обёрнуто в try/catch:
+        // если таблицы role_user ещё нет в схеме или отношение не инициализировано,
+        // это не должно ронять запрос (500 на /api/login).
+        try {
+            return $this->hasRole('admin', 'Администратор');
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('isSuperAdmin: role relation check failed: ' . $e->getMessage());
+
+            return false;
+        }
     }
 
     /**
@@ -63,6 +73,11 @@ trait HasRolesAndPermissions
      */
     public function hasPermissionThroughRole(string $permission): bool
     {
+        // loadMissing, а не ленивое $this->roles: при вызове из Gate::before
+        // (например через isAdmin()) реального отношения roles может не быть —
+        // обращение к несуществующему атрибуту бросало исключение => 500.
+        $this->loadMissing(['roles.permissions']);
+
         foreach ($this->roles as $role) {
             if ($role->permissions->contains('slug', $permission)) {
                 return true;
