@@ -55,11 +55,22 @@ const AuthModule = {
                 // API оборачивает ответы в envelope {success, data, error, meta}
                 const payload = response.data?.data ?? response.data;
 
+                // Бэкенд возвращает permissions отдельным полем рядом с user
+                // (см. AuthController::login), а не внутри объекта user.
+                // Склеиваем их, иначе state.user.permissions всегда пустой
+                // и боковое меню фильтруется до нуля пунктов.
+                const user = payload.user;
+                if (user && !Array.isArray(user.permissions)) {
+                    user.permissions = Array.isArray(payload.permissions)
+                        ? payload.permissions
+                        : [];
+                }
+
                 TokenService.saveToken(payload.token);
-                UserService.saveUser(payload.user);
+                UserService.saveUser(user);
 
                 commit("LOGIN_SUCCESS", payload.token);
-                commit("SET_USER", payload.user);
+                commit("SET_USER", user);
 
                 return response;
             } catch (error) {
@@ -103,11 +114,30 @@ const AuthModule = {
                 ? permissions
                 : [permissions];
 
-            // Оптимизация: используем один some вместо map().some()
-            return requiredPermissions.some((perm) =>
+            // Вызов вида hasPermission(['manage-users'], 'Manage users')
+            // означает «есть право с slug ИЛИ name из списка» — так
+            // совместимы оба стиля вызова в компонентах и роутере.
+            // Строгая пара (name === contentType && slug === perm) раньше
+            // никогда не срабатывала и скрывала пункты меню и целые
+            // страницы даже у администраторов.
+            const matches = requiredPermissions.some((perm) =>
                 state.user.permissions.some(
-                    (p) => p.name === contentType && p.slug === perm,
+                    (p) => p.slug === perm || p.name === perm,
                 ),
+            );
+            if (matches) return true;
+
+            // Второй стиль: contentType как имя права + operations как
+            // список действий (например 'User' + ['read','write']).
+            return state.user.permissions.some(
+                (p) =>
+                    p.name === contentType &&
+                    requiredPermissions.some(
+                        (op) =>
+                            op === "all" ||
+                            (Array.isArray(p.operations) &&
+                                p.operations.includes(op)),
+                    ),
             );
         },
     },

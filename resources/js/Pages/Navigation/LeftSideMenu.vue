@@ -124,19 +124,18 @@ export default {
         },
       ]
       
-      // Защита от undefined user и permissions
-      if (!this.user || !this.user.permissions || !Array.isArray(this.user.permissions)) {
-        return items.filter(menu => menu.contentType === '')
-      }
-      
-      return items.filter(menu => {
-        if (this.user.permissions.length === 0) {
-          return menu.contentType === ''
-        }
-        return this.user.permissions.some(
-          ({ slug }) => menu.contentType === slug || menu.contentType === ''
-        )
-      })
+      // Пункт виден, если он не требует права (contentType === '')
+      // либо у пользователя есть право с подходящим slug ИЛИ name
+      // (в БД slug = 'manage-users', name = 'Manage users'; раньше
+      // сравнивался только slug — защищённые пункты исчезали из меню).
+      const perms = (this.user && Array.isArray(this.user.permissions))
+        ? this.user.permissions
+        : [];
+
+      return items.filter(menu =>
+        menu.contentType === '' ||
+        perms.some(p => p.slug === menu.contentType || p.name === menu.contentType)
+      );
     },
 
     menuUsers() {
@@ -168,19 +167,18 @@ export default {
         
       ]
       
-      // Защита от undefined user и permissions
-      if (!this.user || !this.user.permissions || !Array.isArray(this.user.permissions)) {
-        return items.filter(menu => menu.contentType === '')
-      }
-      
-      return items.filter(menu => {
-        if (this.user.permissions.length === 0) {
-          return menu.contentType === ''
-        }
-        return this.user.permissions.some(
-          ({ slug }) => menu.contentType === slug || menu.contentType === ''
-        )
-      })
+      // Пункт виден, если он не требует права (contentType === '')
+      // либо у пользователя есть право с подходящим slug ИЛИ name
+      // (в БД slug = 'manage-users', name = 'Manage users'; раньше
+      // сравнивался только slug — защищённые пункты исчезали из меню).
+      const perms = (this.user && Array.isArray(this.user.permissions))
+        ? this.user.permissions
+        : [];
+
+      return items.filter(menu =>
+        menu.contentType === '' ||
+        perms.some(p => p.slug === menu.contentType || p.name === menu.contentType)
+      );
     },
   },
 };
