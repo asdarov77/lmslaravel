@@ -2,6 +2,7 @@
 import { createRouter,createWebHashHistory } from 'vue-router';
 import routes from './routes';
 import { TokenService } from '../services/storage.service';
+import store from '../Store';
 
 const router = createRouter({
 //    history: createWebHistory(),
@@ -9,17 +10,15 @@ const router = createRouter({
     routes
 })
 
-// защита от неавторизованных
-
-router.beforeEach((to , from, next) => {
+// Защита маршрутов: авторизация + права (meta.permission).
+// Фронтенд-проверки — только UX-фильтр; реальную безопасность
+// обеспечивает бэкенд (middleware `permission:` / Gate).
+router.beforeEach(async (to , from, next) => {
         // Раньше здесь стояло localStorage.getItem("token") напрямую:
         // при недоступном хранилище (about:blank, sandbox, приватный
         // режим) исключение всплывало как pageerror. TokenService
         // возвращает null вместо throw.
         const token = TokenService.getToken();
-        //console.log(to.name , 'куда');
-        //console.log(from.name, 'откуда');
-        //console.log(token);
         if(!token) {
             if(to.name === 'login' || to.name === 'regist') // если не авторизован,то открываем доступ для регистрации и авторизации
             {
@@ -30,7 +29,29 @@ router.beforeEach((to , from, next) => {
                 return next({ name : 'login' })
             }
         }
-         next()
+
+        // Публичные страницы ошибок доступны всем авторизованным
+        if (to.name === '403' || to.name === '404' || to.name === '500') {
+            return next()
+        }
+
+        // Требование прав объявлено в meta защищённых маршрутов
+        // (стиль Laravel Gate): достаточно ЛЮБОГО из списка (OR),
+        // как в middleware `permission:a,b` на бэкенде.
+        const required = to.meta?.permission
+        if (Array.isArray(required) && required.length > 0) {
+            // Синхронизируем права с сервером (source of truth), но не
+            // блокируем навигацию при сетевых сбоях — fetchCurrentUser
+            // сам логирует ошибку и возвращает null.
+            await store.dispatch('Auth/fetchCurrentUser').catch(() => null)
+
+            const can = store.getters['Auth/hasPermission']
+            if (!can(required)) {
+                return next({ name: '403' })
+            }
+        }
+
+        next()
 })
 
 

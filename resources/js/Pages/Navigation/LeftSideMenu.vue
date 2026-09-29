@@ -54,6 +54,17 @@ export default {
       return this.hasPermission(["manage-users"], "Manage users");
     },
 
+    // Единый предиктор видимости пункта меню. Логика совпадает с
+    // роутер-гардом (Router/index.js) и бэкенд-middleware: пункт без
+    // требований виден всем, иначе достаточно ОДНОГО из прав (OR).
+    // hasPermission в сторе понимает и старые slug'и (manage-users),
+    // и новые (users.view) через алиасы каталога.
+    visibleFor(contentType) {
+      if (!contentType || !contentType.trim()) return true;
+      const list = Array.isArray(contentType) ? contentType : [contentType];
+      return this.hasPermission(list);
+    },
+
     menuItems() {
       const items = [
         // {
@@ -124,18 +135,7 @@ export default {
         },
       ]
       
-      // Пункт виден, если он не требует права (contentType === '')
-      // либо у пользователя есть право с подходящим slug ИЛИ name
-      // (в БД slug = 'manage-users', name = 'Manage users'; раньше
-      // сравнивался только slug — защищённые пункты исчезали из меню).
-      const perms = (this.user && Array.isArray(this.user.permissions))
-        ? this.user.permissions
-        : [];
-
-      return items.filter(menu =>
-        menu.contentType === '' ||
-        perms.some(p => p.slug === menu.contentType || p.name === menu.contentType)
-      );
+      return items.filter(menu => this.visibleFor(menu.contentType));
     },
 
     menuUsers() {
@@ -167,18 +167,7 @@ export default {
         
       ]
       
-      // Пункт виден, если он не требует права (contentType === '')
-      // либо у пользователя есть право с подходящим slug ИЛИ name
-      // (в БД slug = 'manage-users', name = 'Manage users'; раньше
-      // сравнивался только slug — защищённые пункты исчезали из меню).
-      const perms = (this.user && Array.isArray(this.user.permissions))
-        ? this.user.permissions
-        : [];
-
-      return items.filter(menu =>
-        menu.contentType === '' ||
-        perms.some(p => p.slug === menu.contentType || p.name === menu.contentType)
-      );
+      return items.filter(menu => this.visibleFor(menu.contentType));
     },
   },
 };

@@ -67,16 +67,13 @@ const routes = [
     //     name: 'user.chroll',
     //     //props: true
     // },
-    // {
-    //     path: '/user/chperm/:idEdit',
-    //     component: () => import('../Pages/User/UserChperm.vue'),
-    //     name: 'user.chperm',
-    //     props: route => ({ idEdit: Number(route.params.idEdit)}),
-    //     beforeEnter(to, from, next) {
-    //         if (hasPermission(['manage-users'], 'Manage users')) next()
-    //         else next('/403')
-    //     }
-    // },
+    {
+        path: '/user/chperm/:idEdit',
+        component: () => import('../Pages/User/UserChperm.vue'),
+        name: 'user.chperm',
+        props: route => ({ idEdit: Number(route.params.idEdit) }),
+        meta: { permission: ['users.permissions', 'manage-users'] },
+    },
     //
     // Блок групп
     //

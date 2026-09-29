@@ -13,6 +13,8 @@ const updateGroup = (id, data) => httpClient.put(`/api/groups/${id}`, data)
 const deleteGroup = id => httpClient.delete(`/api/groups/${id}`)
 // смена пароля
 const chpassUser = (id, data) => httpClient.put(`/api/user/chpass/${id}`, data)
+// назначение прав пользователю (бэкенд: PUT /api/user/chperm/{id}, permission:users.permissions)
+const updateUserPermissions = (id, permissionIds) => httpClient.put(`/api/user/chperm/${id}`, { permission_id: permissionIds })
 
 export {
   fetchUsers,
@@ -26,5 +28,6 @@ export {
   createGroup,
   updateGroup,
   deleteGroup,
-  chpassUser
+  chpassUser,
+  updateUserPermissions
 }

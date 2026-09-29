@@ -46,4 +46,18 @@ const app = createApp(App, {
   .use(vuetify)
   .use(store)
   .use(i18n)
-  .mount('#app');
+
+// Директива v-permission="'users.view'" / v-permission="['users.view','manage-users']"
+// Скрывает элемент, если у пользователя нет ни одного из указанных прав
+// (OR — как middleware `permission:a,b` на бэкенде). При изменении прав
+// Vuex-геттер реактивен, и видимость пересчитывается автоматически.
+app.directive('permission', {
+  mounted(el, binding) {
+    const required = Array.isArray(binding.value) ? binding.value : [binding.value]
+    if (!store.getters['Auth/hasPermission'](required)) {
+      el.parentNode && el.parentNode.removeChild(el)
+    }
+  },
+})
+
+app.mount('#app');

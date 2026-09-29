@@ -1,5 +1,5 @@
 import axios from 'axios'
-//import router from '../Router';
+import router from '../Router';
 import { TokenService } from '../services/storage.service'
 
 import { UserService } from '../services/user.service'
@@ -31,11 +31,19 @@ httpClient.interceptors.request.use(authInterceptor)
 //console.log(baseURL, "baseURL");
 // interceptor to catch errors
 const errorInterceptor = error => {
-  // all the error responses
-  //console.log(error.response.data)
-  switch (error.response.status) {
+  // Сетевые сбои/CORS приходят без error.response — раньше это роняло
+  // интерцептор с TypeError на первом же обращении к error.response.status.
+  const status = error.response?.status
+  const message = error.response?.data ?? error.message
+
+  if (!status) {
+    console.error('Network error:', error.message)
+    return Promise.reject(error)
+  }
+
+  switch (status) {
     case 400:
-      console.error(error.response.status, error.message)
+      console.error(status, error.message)
       break
 
     case 401: // authentication error, logout the user
@@ -44,24 +52,28 @@ const errorInterceptor = error => {
       router.push({ name: 'login' }).catch(err => err)
       break
 
+    case 403: // прав недостаточно — бэкенд остался источником истины
+      router.push({ name: '403' }).catch(err => err)
+      break
+
     case 404: // not found
-      console.error(error.response.status, error.message)
+      console.error(status, error.message)
       router.push({ name: '404' }).catch(err => err)
       break
 
     case 500: // service unavailable
-      console.error(error.response.status, error.message)
-      if (error.response.data.includes('ECONNREFUSED')) router.push({ name: '500' }).catch(err => err)
+      console.error(status, error.message)
+      if (typeof message === 'string' && message.includes('ECONNREFUSED')) router.push({ name: '500' }).catch(err => err)
       break
 
     case 502: // internal server error
     case 503: // bad gateway
-      console.error(error.response.status, error.message)
+      console.error(status, error.message)
       router.push({ name: '500' }).catch(err => err)
       break
 
     default:
-      console.error(error.response.status, error.message)
+      console.error(status, error.message)
   }
   return Promise.reject(error)
 }
@@ -71,6 +83,8 @@ const errorInterceptor = error => {
    return response
  }
 
-// httpClient.interceptors.response.use(responseInterceptor, errorInterceptor)
+// Включён: раньше был закомментирован, поэтому 401/403 обрабатывались
+// только в местах вызова (или не обрабатывались вовсе).
+httpClient.interceptors.response.use(responseInterceptor, errorInterceptor)
 
 export default httpClient

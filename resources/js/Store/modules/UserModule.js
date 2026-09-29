@@ -4,7 +4,8 @@ import {
   fetchUser,
   fetchGroups,
   fetchGroup,
-  fetchPermissions,  
+  fetchPermissions,
+  updateUserPermissions,  
   createGroup,
   updateGroup,
   createUser,
@@ -180,6 +181,21 @@ const UserModule = {
               const response = await fetchGroup(id)
               //console.log(response, 'fetchGroup')
               commit('SET_GROUP', unwrap(response))      
+              return Promise.resolve(response)
+            } catch (error) {
+              return Promise.reject(error)
+            }
+          },
+          async updateUserPermissions({ dispatch }, { id, permissionIds }) {
+            try {
+              // import назван идентично экшну — обращаемся через импортированный модуль,
+              // иначе this.updateUserPermissions рекурсивно вызовет сам экшн.
+              const api = await import('../../api/user.api')
+              const response = await api.updateUserPermissions(id, permissionIds)
+              // Если меняли права себе — синхронизируем Auth-стор,
+              // иначе меню/гарды будут жить по устаревшему набору прав.
+              await dispatch('Auth/fetchCurrentUser', null, { root: true })
+                .catch(() => {})
               return Promise.resolve(response)
             } catch (error) {
               return Promise.reject(error)

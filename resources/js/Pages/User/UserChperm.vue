@@ -55,11 +55,28 @@ export default {
     // ...mapGetters('User', ['users', 'groups'])
   },
   methods: {
-    submitForm() {
-      this.$emit('submitForm')
+    async submitForm() {
+      // Реальный вызов API раньше был закомментирован в UserItemEdit —
+      // страница показывала форму, но сохранение не происходило.
+      try {
+        await this.$store.dispatch('User/updateUserPermissions', {
+          id: this.idEdit,
+          permissionIds: this.user.permissions || [],
+        })
+        this.$router.push('/user/list')
+      } catch (error) {
+        const data = error?.response?.data
+        if (data && typeof data === 'object') {
+          for (const key in data.errors ?? data) {
+            this.errors.push(`${key}: ${data.errors?.[key] ?? data[key]}`)
+          }
+        } else {
+          this.errors.push(error?.message || 'Не удалось сохранить разрешения')
+        }
+      }
     },
     cancelBtn() {
-      this.$emit('cancelBtn')
+      this.$router.back()
     }
   },
 };
