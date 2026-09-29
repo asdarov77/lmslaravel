@@ -48,6 +48,10 @@ use Illuminate\Support\Facades\Storage;
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/api/v1/login', [AuthController::class, 'login'])->name('api.v1.login');
 
+// Categories CRUD for the existing (unversioned) frontend, which calls /api/categories.
+// The v1-prefixed group below serves /api/v1/categories for the versioned clients.
+Route::apiResource('categories', CategoryController::class)->middleware('auth:sanctum')->whereNumber('category');
+
 // API v1 routes
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -61,10 +65,10 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     });
     
     // Versioned CRUD routes
-    Route::apiResource('categories', CategoryController::class);
-    Route::apiResource('users', AuthController::class)->except(['destroy']);
-    Route::delete('/users/{user}', [AuthController::class, 'destroy']);
-    Route::apiResource('courses', CourseController::class);
+    Route::apiResource('categories', CategoryController::class)->whereNumber('category');
+    Route::apiResource('users', AuthController::class)->except(['destroy'])->whereNumber('user');
+    Route::delete('/users/{user}', [AuthController::class, 'destroy'])->whereNumber('user');
+    Route::apiResource('courses', CourseController::class)->whereNumber('course');
 });
 //Route::post('login', ['before' => 'throttle:2,5', 'uses' => 'AuthController@login']);
 Route::post('/register', [AuthController::class, 'register']);
@@ -72,19 +76,19 @@ Route::post('/register', [AuthController::class, 'register']);
 // блок пользователей
 //
 Route::post('/user/list', [AuthController::class, 'getUserList']); // вывод всех пользователей
-Route::get('/user/list/{id}', [AuthController::class, 'getUser']); // вывод конкретного пользователя
-Route::get('user/{id}/edit', [AuthController::class, 'editData']);   // !!!!проверить
-Route::put('user/chpass/{id}', [AuthController::class, 'chpass']);   // смена пароля
-Route::delete('user/{id}', [AuthController::class, 'destroy']); //->middleware('permission:manage-users');
-Route::patch('user/{id}', [AuthController::class, 'update']);
+Route::get('/user/list/{id}', [AuthController::class, 'getUser'])->whereNumber('id'); // вывод конкретного пользователя
+Route::get('user/{id}/edit', [AuthController::class, 'editData'])->whereNumber('id');   // !!!!проверить
+Route::put('user/chpass/{id}', [AuthController::class, 'chpass'])->whereNumber('id');   // смена пароля
+Route::delete('user/{id}', [AuthController::class, 'destroy'])->whereNumber('id'); //->middleware('permission:manage-users');
+Route::patch('user/{id}', [AuthController::class, 'update'])->whereNumber('id');
 //Route::put('user/chroll/{id}', [AuthController::class, 'chroll']);
-Route::put('user/chperm/{id}', [AuthController::class, 'chperm']);
+Route::put('user/chperm/{id}', [AuthController::class, 'chperm'])->whereNumber('id');
 
 Route::post('group/learning/', [AuthController::class, 'group2learning']); // запись группы пользователей на курс
-Route::apiResource('learning', Group2learningController::class);
+Route::apiResource('learning', Group2learningController::class)->whereNumber('learning');
 Route::get('lessons/', [LessonsController::class, 'lessons']); // занятия  в иерархической структуре
-Route::apiResource('aukstructure', AukstructureController::class);
-Route::apiResource('role', RoleController::class);
+Route::apiResource('aukstructure', AukstructureController::class)->whereNumber('aukstructure');
+Route::apiResource('role', RoleController::class)->whereNumber('role');
 
 //
 //-------------------------------------------------------------------------------
@@ -106,15 +110,15 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 //
 // блок курсов старый
 //
-Route::get('/courses/', [CoursesListController::class, 'getCourses']);    // вывод всех курсов
+Route::get('/courses/', [CoursesListController::class, 'getCourses'])->middleware('auth:sanctum');    // вывод всех курсов
 Route::get('/courses/cat/', [CategoryListController::class, 'getCatCourses']);
-Route::get('/courses/cat/{id}/', [CategoryListController::class, 'getCatCoursesId']);  // вывод курсов для конкретной категории, с флагом видимости
+Route::get('/courses/cat/{id}/', [CategoryListController::class, 'getCatCoursesId'])->whereNumber('id');  // вывод курсов для конкретной категории, с флагом видимости
 // блок курсов и категорий новый
 //
-Route::apiResource('course', CourseController::class)->middleware('auth:sanctum');
-Route::get('/coursemanifest/{id}', [CourseController::class, 'showmanifest']);
-Route::get('/getlink/{id}', [CourseController::class, 'getlink']);
-Route::get('/getfirstauk/{id}', [CourseController::class, 'get_first_auk']);
+Route::apiResource('course', CourseController::class)->middleware('auth:sanctum')->whereNumber('course');
+Route::get('/coursemanifest/{id}', [CourseController::class, 'showmanifest'])->whereNumber('id');
+Route::get('/getlink/{id}', [CourseController::class, 'getlink'])->whereNumber('id');
+Route::get('/getfirstauk/{id}', [CourseController::class, 'get_first_auk'])->whereNumber('id');
 //-------------------- классы -----------------
 Route::get('/classes/', [AircraftController::class, 'indexclasses']);
 Route::get('/classesfs/', [AircraftController::class, 'showclassesfs']);
@@ -124,7 +128,7 @@ Route::post('/classes/', [AircraftController::class, 'storeclasses']);
 
 
 //
-Route::apiResource('permissions', PermissionController::class);
+Route::apiResource('permissions', PermissionController::class)->whereNumber('permission');
 //
 //--------------------БД--------------------------------
 Route::post('/clear-database', [ClearDBController::class, 'clear']);
@@ -148,7 +152,7 @@ Route::post('/city', [CityController::class, 'index']);
 // блок групп
 //
 //Route::apiResource('groups',GroupController::class)->middleware(['auth:sanctum','permission: create-tasks']);
-Route::apiResource('groups', GroupController::class)->middleware(['auth:sanctum']);
+Route::apiResource('groups', GroupController::class)->middleware(['auth:sanctum'])->whereNumber('group');
 //
 // блок // //
 //   
@@ -176,19 +180,19 @@ Route::post('/get-content/', [SearchController::class, 'get_file_content']); // 
 Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('/favorites/', [FavoriteController::class, 'index']);
     Route::post('/favorites/add', [FavoriteController::class, 'fav_add']);
-    Route::delete('/favorites/{id}', [FavoriteController::class, 'remove']);
+    Route::delete('/favorites/{id}', [FavoriteController::class, 'remove'])->whereNumber('id');
 });
 
 //---------------------блок работы с вопросами ---------------
 //Route::post('/upload-gift/', 'GiftController@search');
-Route::apiResource('gift', GiftController::class);
+Route::apiResource('gift', GiftController::class)->whereNumber('gift');
 Route::delete('/gift-clear', [GiftController::class, 'truncate']);
-Route::apiResource('questions', QuestionsController::class);
+Route::apiResource('questions', QuestionsController::class)->whereNumber('question');
 
 //---------------------блок настроек и вспомогательных таблиц ---------------
 
-Route::apiResource('grade-boundary', GradeBoundaryController::class);
-Route::apiResource('settings', SettingsController::class);
+Route::apiResource('grade-boundary', GradeBoundaryController::class)->whereNumber('grade-boundary');
+Route::apiResource('settings', SettingsController::class)->whereNumber('setting');
 //Route::post('grade-boundary', 'GradeBoundaryController@store');
 
 

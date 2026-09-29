@@ -17,6 +17,7 @@
 
 <script>
 import $api from "../api/httpClient";
+import { unwrapResponse } from "../api/envelope";
 const apiUrl = import.meta.env.VITE_APP_URL;
 // <iframe :src="'../../курсы/courses_data/'+{{course.path}}+'index.html'"> </iframe>
 import { mapState, mapGetters } from "vuex";
@@ -44,18 +45,25 @@ export default {
     $api
       .get(apiUrl+"/api/course/" + this.idEdit)
       .then((response) => {
-        const air = response.data.aircraft.path.trim();
-        const auk = response.data.path.trim();
-        const base = "api/private/" + air + "/" + auk;
+        const course = unwrapResponse(response);
+        const air = (course.aircraft ? course.aircraft.path : "").trim();
+        const auk = (course.path || "").trim();
+        // Собираем путь без пустых сегментов: при пустом air строка
+        // склеивалась в «api/private//course-15» (двойной слэш).
+        const base = "api/private/" + [air, auk].filter(Boolean).join("/");
         const url = base + "/index.html";
 
         //console.log(url);
         $api.get(url).then((response) => {
           //       $api.get("api/private/Ми-38/АУК-01/index.html")
           //       //console.log(response.data);
-          const baseurl = "<base href=" + base + "/ />";
+          const baseurl = '<base href="' + base + '/" />';
           //console.log(baseurl);
           this.content = baseurl + response.data;
+        }).catch(() => {
+          // Файлов курса может не быть на диске — раньше отклонение
+          // превращалось в unhandled rejection и роняло страницу.
+          this.content = "";
         });
       })
       .catch((err) => alert(err));

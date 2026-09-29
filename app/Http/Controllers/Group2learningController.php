@@ -93,15 +93,16 @@ class Group2learningController extends Controller
     {
     $group2learn = Group2learning::findOrFail($id);
 
-    // Обновляем поля экземпляра модели данными из запроса
-    $group2learn->course_id = $request->input('course_id');
-    $group2learn->group_id = $request->input('group_id');
-    $group2learn->category_id = $request->input('category_id');
-    $group2learn->parent_id = $request->input('parent_id');
-    $group2learn->teacher = $request->input('teacher');
-    $group2learn->typeOfLesson = $request->input('typeOfLesson');
-    $group2learn->study_from = $request->input('study_from');
-    $group2learn->study_to = $request->input('study_to');
+    // Находка: teacher/course_id/group_id/category_id — NOT NULL в БД.
+    // Если их не передать, input() вернёт null и save() упадёт в 500,
+    // затирая существующие значения. Поэтому обновляем только переданные поля.
+    $fields = $request->only([
+        'course_id', 'group_id', 'category_id',
+        'parent_id', 'teacher', 'typeOfLesson', 'study_from', 'study_to',
+    ]);
+    foreach ($fields as $key => $value) {
+        $group2learn->{$key} = $value;
+    }
 
     // Сохраняем изменения в базу данных
     $group2learn->save();

@@ -113,15 +113,15 @@
         ></v-text-field>
       </v-col>
       <v-col>
-        <v-combobox
+        <v-select
             variant="solo"
             label="Группа"
-            type="text"
             :items="allGroups"
             v-model="user.group_id"
             item-value="id"
             item-title="groupname"
-        ></v-combobox>
+            clearable
+        ></v-select>
       </v-col>
       <v-col></v-col>
     </v-row>
@@ -218,6 +218,14 @@ export default {
 
   created() {
     this.$store.dispatch('User/fetchUser', this.idEdit)
+    // Группы в выпадающем «Группа» не появлялись при прямом заходе на
+    // страницу редактирования: fetchGroups звал только ряд страниц
+    // (UserList/GroupList/MyAccount/Register), а здесь его не было вовсе,
+    // поэтому allGroups оставался пустым.
+    this.$store.dispatch('User/fetchGroups').catch(error => {
+      console.error(error)
+      this.errors.push('Не удалось загрузить список групп')
+    })
   },
   methods: {
     cancelBtnRegistration(){      
@@ -236,6 +244,16 @@ export default {
     cancelBtn(){      
       this.$store.dispatch('User/fetchUser', this.idEdit)
       this.dialog = false
+    },
+
+    // Приводит group_id к number|null. Защищает от отправки в API
+    // объекта/массива/пустой строки, что приводит к 500 на стороне БД.
+    normalizeGroupId(value) {
+      if (value === null || value === undefined || value === '') return null
+      const raw = typeof value === 'object' ? value.id : value
+      if (raw === null || raw === undefined || raw === '') return null
+      const id = Number(raw)
+      return Number.isInteger(id) && id > 0 ? id : null
     },
 
     submitForm() {
@@ -288,9 +306,17 @@ export default {
       //   };
 
 
+      // v-select отдаёт id числом, но allGroups может содержать и строки,
+      // а при очистке приходит null/"". Приводим к number|null,
+      // иначе в bigint уходит объект/строка и прилетает 500.
+      const data = {
+        ...this.user,
+        group_id: this.normalizeGroupId(this.user.group_id),
+      }
+
       this.$store
           //        .dispatch('User/updateUser', {id:this.idEdit,data:this.users})
-          .dispatch('User/updateUser', {id: this.idEdit, data: this.user})
+          .dispatch('User/updateUser', {id: this.idEdit, data: data})
           .then(() => {
           })
           .catch(error => {

@@ -158,6 +158,7 @@
 
 const apiUrl = import.meta.env.VITE_APP_URL;
 import $api from "../api/httpClient";
+import { unwrapResponse, unwrapArray, unwrapField } from "../api/envelope";
 import popup from "./Popup.vue";
 import { mapState, mapGetters } from "vuex";
 import { library } from '@fortawesome/fontawesome-svg-core';
@@ -277,12 +278,16 @@ export default {
 
     //this.$store.dispatch("Course/fetchCourse", { course_id: this.idEdit, category_id: this.idCategory })
     $api
-      .get(apiUrl + "/api/course?course_id=" + this.idEdit + "&&category_id=" + this.idCategory)
+      .get(apiUrl + "/api/course?course_id=" + this.idEdit + "&category_id=" + this.idCategory)
       .then((response) => {
         //console.log(response.data[0].aircraft_id, "air");
-        this.titleauk = response.data[0].title;
+        const course = unwrapArray(response)[0] || {};
+        // Раньше здесь был course.title без fallback: при пустом ответе
+        // titleauk становился undefined, и шаблон падал на
+        // titleauk.toUpperCase() с «Cannot read properties of undefined».
+        this.titleauk = course.title || "";
         //console.log(response[0].title, "response");
-        this.aukstructures = response.data[0].aukstructures; // получаем с backEnd все aukstruct для построения меню левого       
+        this.aukstructures = course.aukstructures || []; // получаем с backEnd все aukstruct для построения меню левого       
 
         // фильтруем по категориям
 
@@ -292,8 +297,8 @@ export default {
 
         //this.getfirstauk(this.idEdit);
         //удалить возможно
-        this.path = response.data[0].path; // папка с АУК        
-        this.aircraft = response.data[0].aircraft_id;
+        this.path = course.path; // папка с АУК        
+        this.aircraft = course.aircraft_id;
       })
       .catch((err) => {
         console.error(err);
@@ -405,7 +410,7 @@ export default {
       //console.log('getlink')      
       try {
         const response = await $api.get(apiUrl + "/api/getlink/" + item_id);
-        this.link = response.data;
+        this.link = unwrapResponse(response);
       } catch (error) {
         console.log(error);
       } finally {
@@ -562,7 +567,7 @@ export default {
       $api
         .get(apiUrl + "/api/getfirstauk/" + course_id)
         .then((response) => {
-          this.firstId = response.data;
+          this.firstId = unwrapResponse(response);
           //console.log(this.firstId,"this.firstId")
           this.getlink(this.firstId);
         });
@@ -611,7 +616,7 @@ export default {
 
     getFavorites() {
       $api.get(apiUrl + '/api/favorites/').then((response) => {
-        this.favorites = response.data.favorites;
+        this.favorites = unwrapField(response, 'favorites') || [];
       });
     },
     removeFavorite(id) {
@@ -642,7 +647,7 @@ export default {
       $api.post(apiUrl + `/api/search-files/`, formData)
 
         .then(response => {
-          this.matchingFiles = response.data;
+          this.matchingFiles = unwrapArray(response);
           //         console.log(response, "кол-во")
         })
         .catch(error => {

@@ -166,6 +166,7 @@
 import $api from "../api/httpClient";
 const apiUrl = import.meta.env.VITE_APP_URL;
 import { mapState, mapGetters } from "vuex";
+import { unwrapArray } from "../api/envelope";
 export default {
   data() {
     return {
@@ -189,7 +190,7 @@ export default {
     // --------------загрузка классов----------------
     $api.get(apiUrl+"/api/classes").then((response) => {
       //console.log(response.data, "v-chip");
-      this.tags = response.data;
+      this.tags = unwrapArray(response);
     });
     // --------------загрузка классов----------------
   },

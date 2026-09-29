@@ -38,6 +38,7 @@
 
 <script>
 import $api from "../../api/httpClient";
+import { unwrapResponse, unwrapArray } from "../../api/envelope";
 
 import { mapState } from "vuex";
 export default {
@@ -60,12 +61,12 @@ export default {
 
     .get("api/user/list/" + this.idEdit).then((response) => {
       //console.log(response.data, "пользователь");
-      this.user = response.data;
+      this.user = unwrapResponse(response);
     });
 
     $api
     .get("api/role").then((resp) => {
-      this.roles = resp.data;
+      this.roles = unwrapArray(resp);
     });
 
   },  

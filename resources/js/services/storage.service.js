@@ -1,3 +1,5 @@
+import { safeGetItem, safeSetItem, safeRemoveItem } from './storage-safe'
+
 const TOKEN_KEY = 'token'
 
 /**
@@ -8,18 +10,18 @@ const TOKEN_KEY = 'token'
  **/
 const TokenService = {
   getToken() {
-    const token = localStorage.getItem(TOKEN_KEY)
+    const token = safeGetItem(TOKEN_KEY)
     // защита от ранее записанной строки "undefined"
     return token && token !== 'undefined' ? token : null
   },
 
   saveToken(accessToken) {
-    localStorage.setItem(TOKEN_KEY, accessToken)
+    safeSetItem(TOKEN_KEY, accessToken)
     //console.log(accessToken,'accessToken')
   },
 
   removeToken() {
-    localStorage.removeItem(TOKEN_KEY)
+    safeRemoveItem(TOKEN_KEY)
   }
 }
 

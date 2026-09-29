@@ -1,7 +1,7 @@
 // playwright.config.js
-const { defineConfig, devices } = require('@playwright/test');
+import { defineConfig, devices } from '@playwright/test';
 
-module.exports = defineConfig({
+export default defineConfig({
   testDir: './tests/E2E',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
@@ -9,7 +9,7 @@ module.exports = defineConfig({
   workers: 1,
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:8080',
+    baseURL: 'http://127.0.0.1:8080',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -17,13 +17,23 @@ module.exports = defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        channel: 'chrome',
+        launchOptions: {
+          args: ['--no-sandbox', '--no-first-run', '--no-default-browser-check'],
+        },
+      },
     },
   ],
   webServer: {
-    command: 'php artisan serve --port=8080 --quiet',
-    url: 'http://localhost:8080',
-    timeout: 120 * 1000,
+    // Тесты должны быть самодостаточными и не зависеть от запущенных вручную
+    // процессов на :8000. Поэтому сначала собираем бандл с VITE_APP_URL=:8080,
+    // затем поднимаем свой сервер на :8080.
+    command:
+      'npm run build:e2e && php artisan serve --host=127.0.0.1 --port=8080 --quiet',
+    url: 'http://127.0.0.1:8080',
+    timeout: 180 * 1000,
     reuseExistingServer: true,
   },
 });

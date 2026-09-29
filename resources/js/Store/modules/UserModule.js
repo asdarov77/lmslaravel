@@ -13,9 +13,7 @@ import {
   deleteUser,
   chpassUser
 } from '../../api/user.api'
-
-
-
+import { unwrapResponse as unwrap, asArray } from '../../api/envelope'
 
 const UserModule = {
     namespaced: true,
@@ -59,7 +57,7 @@ const UserModule = {
         //   },
         
           SET_USERS(state, users) {    
-            state.users = users
+            state.users = asArray(users)
           },
           SET_USERS_PAGINATION(state, pagination) {
             state.pagination = pagination
@@ -68,34 +66,40 @@ const UserModule = {
             state.totalUsers = totalUsers
           },
           SET_ALL_GROUPS(state, allGroups) {
-            state.allGroups = allGroups
+            // Приводим к массиву: иначе .map/.sort в шаблонах упадут,
+            // если в state попал конверт { success, data, error, meta } или null
+            state.allGroups = asArray(allGroups)
           },
           SET_TOTAL_GROUPS(state, totalGroups) {
             state.totalGroups = totalGroups
           },
           SET_ALL_PERMISSIONS(state, allPermissions) {
-            state.allPermissions = allPermissions
+            state.allPermissions = asArray(allPermissions)
           },
           SET_GROUP(state, group) {
             state.group = group
           },
           SET_USER(state, user) {
-            state.user = user    
+            // Регресс: при user === null шаблон UserItemEdit падал на this.user.permissions
+            state.user = user && typeof user === 'object' ? user : { ...state.user }
           },
           UPDATE_GROUP(state, payload) {
             const itemIdx = state.allGroups.findIndex(item => item.id === payload.id)
+            if (itemIdx < 0 || !payload) return
             Object.keys(payload).forEach(key => {
               state.allGroups[itemIdx][key] = payload[key]
             })
           },
           UPDATE_USER(state, payload) {
             const itemIdx = state.users.findIndex(item => item.id === payload.id)
+            if (itemIdx < 0 || !payload) return
             Object.keys(payload).forEach(key => {
               state.users[itemIdx][key] = payload[key]
             })
           },
             DELETE_USER(state, payload) {
             const itemIdx = state.users.findIndex(item => item.id === payload.id)
+            if (itemIdx < 0 || !payload) return
             Object.keys(payload).forEach(key => {
               state.users[itemIdx][key] = payload[key]
             })
@@ -103,6 +107,7 @@ const UserModule = {
         
           CHANGE_USER_PASSWORD(state, payload) {
             const itemIdx = state.users.findIndex(item => item.id === payload.id)
+            if (itemIdx < 0 || !payload) return
             Object.keys(payload).forEach(key => {
               state.users[itemIdx][key] = payload[key]
             })
@@ -130,7 +135,7 @@ const UserModule = {
 
             try {      
               const response = await fetchUsers(params)
-              const items = response.data.data || response.data
+              const items = asArray(unwrap(response))
               const pag = (response.data.meta && response.data.meta.pagination) || state.pagination
               commit('SET_TOTAL_USERS', pag.total || items.length)      
               commit('SET_USERS_PAGINATION', pag)
@@ -147,7 +152,7 @@ const UserModule = {
               const response = await fetchUser(id)
               //console.log(response, 'fetchuser')          
               //commit('SET_TOTAL_USERS', response.data.length)      
-              commit('SET_USER', response.data)
+              commit('SET_USER', unwrap(response))
               return Promise.resolve(response)
             } catch (error) {
               return Promise.reject(error)
@@ -161,8 +166,9 @@ const UserModule = {
               //params = { ...params, exclude_by_name: 'SysAdmin' } 
               const response = await fetchGroups()
               //console.log(response, 'groups')          
-              commit('SET_TOTAL_GROUPS', response.data.length)
-              commit('SET_ALL_GROUPS', response.data)                     
+              const groups = asArray(unwrap(response))
+              commit('SET_TOTAL_GROUPS', groups.length)
+              commit('SET_ALL_GROUPS', groups)                     
               return Promise.resolve(response)
             } catch (error) {
               return Promise.reject(error)
@@ -173,7 +179,7 @@ const UserModule = {
               //params = { ...params, exclude_by_name: 'SysAdmin' } 
               const response = await fetchGroup(id)
               //console.log(response, 'fetchGroup')
-              commit('SET_GROUP', response.data)      
+              commit('SET_GROUP', unwrap(response))      
               return Promise.resolve(response)
             } catch (error) {
               return Promise.reject(error)
@@ -183,7 +189,7 @@ const UserModule = {
             try {
               const response = await fetchPermissions()
               //console.log(response)
-              commit('SET_ALL_PERMISSIONS', response.data)
+              commit('SET_ALL_PERMISSIONS', asArray(unwrap(response)))
               return Promise.resolve(response)
             } catch (error) {
               return Promise.reject(error)
@@ -191,14 +197,16 @@ const UserModule = {
           },
         
           async updateUser({ commit, state }, { id, data }) {
+            let previous = null
+            let idx = -1
             try {
-              const idx = state.users.findIndex(u => u.id === id)
-              const previous = idx >= 0 ? { ...state.users[idx] } : null
+              idx = state.users.findIndex(u => u.id === id)
+              previous = idx >= 0 ? { ...state.users[idx] } : null
               if (idx >= 0) {
                 commit('UPDATE_USER', { id, ...data })
               }
               const response = await updateUser(id, data)
-              commit('UPDATE_USER', response.data.data || response.data)
+              commit('UPDATE_USER', unwrap(response))
               return Promise.resolve(response)
             } catch (error) {
               if (previous) {
@@ -210,16 +218,18 @@ const UserModule = {
           async createUser({ commit }, data) {
             try {
               const response = await createUser(data)
-              commit('SET_USER', response.data)
+              const payload = unwrap(response)
+              commit('SET_USER', payload && payload.user ? payload.user : payload)
               return Promise.resolve(response)
             } catch (error) {
               return Promise.reject(error)
             }
           },
-          async createGroup({ commit }, data) {
+          async createGroup({ commit, state }, data) {
             try {      
               const response = await createGroup(data)      
-              commit('SET_ALL_GROUPS', response.data)      
+              const group = unwrap(response)
+              commit('SET_ALL_GROUPS', asArray(state.allGroups).concat(group ? [group] : []))
               return Promise.resolve(response)
             } catch (error) {
             //console.log('error console', error)
@@ -229,7 +239,7 @@ const UserModule = {
           async updateGroup({ commit }, { id, data }) {
             try {
               const response = await updateGroup(id, data)
-              commit('UPDATE_GROUP', response.data)
+              commit('UPDATE_GROUP', unwrap(response))
               return Promise.resolve(response)
             } catch (error) {
               return Promise.reject(error)
@@ -258,7 +268,7 @@ const UserModule = {
             try {
               const response = await chpassUser(id, data)
               //console.log(response, 'chpassUser')
-              commit('CHANGE_USER_PASSWORD', response.data)
+              commit('CHANGE_USER_PASSWORD', unwrap(response))
               return Promise.resolve(response)
             } catch (error) {
               return Promise.reject(error)

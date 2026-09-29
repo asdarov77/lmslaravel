@@ -1,6 +1,8 @@
 import { TokenService } from "../../services/storage.service";
 import { UserService } from "../../services/user.service";
-import { login } from "../../api/auth.api";
+import { login, logout } from "../../api/auth.api";
+
+const AuthService = { login, logout };
 
 // Безопасное получение пользователя из LocalStorage
 const getInitialUser = () => {
@@ -73,9 +75,15 @@ const AuthModule = {
         },
 
         logout({ commit }) {
-            UserService.removeUser();
-            TokenService.removeToken();
-            commit("LOGOUT_SUCCESS"); // Теперь это реально очистит стейт
+            // Сначала инвалидируем токен на сервере, иначе он остаётся
+            // рабочим после выхода из приложения. Локальное состояние
+            // чистим в любом случае: ошибка сети не должна мешать выйти.
+            const done = () => {
+                UserService.removeUser();
+                TokenService.removeToken();
+                commit("LOGOUT_SUCCESS");
+            };
+            return AuthService.logout().then(done).catch(done);
         },
     },
 

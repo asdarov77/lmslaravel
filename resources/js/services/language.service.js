@@ -1,3 +1,5 @@
+import { safeGetItem, safeSetItem } from './storage-safe'
+
 const LANG_KEY = 'lang'
 
 /**
@@ -8,10 +10,10 @@ const LANG_KEY = 'lang'
  **/
 const LanguageService = {
   getLanguage() {
-    return localStorage.getItem(LANG_KEY)
+    return safeGetItem(LANG_KEY)
   },
   saveLanguage(lang) {
-    localStorage.setItem(LANG_KEY, lang)
+    safeSetItem(LANG_KEY, lang)
   }
 }
 

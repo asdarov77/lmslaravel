@@ -93,8 +93,8 @@ class CategoryTest extends TestCase
             'Authorization' => 'Bearer ' . $this->token,
         ])->putJson("/api/v1/categories/{$category->id}", $data);
 
-        // Контроллер возвращает 201 статус
-        $response->assertStatus(201)
+        // REST-контракт: успешное обновление возвращает 200
+        $response->assertStatus(200)
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.title', 'Обновленная категория')
             ->assertJsonPath('data.code', 'UPDATED_CAT');
@@ -115,7 +115,7 @@ class CategoryTest extends TestCase
             'Authorization' => 'Bearer ' . $this->token,
         ])->deleteJson("/api/v1/categories/{$category->id}");
 
-        $response->assertStatus(204);
+        $response->assertStatus(200);
 
         $this->assertDatabaseMissing('categories', [
             'id' => $category->id,

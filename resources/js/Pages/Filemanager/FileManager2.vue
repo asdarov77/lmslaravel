@@ -16,6 +16,7 @@
 <script>
 
 import axios from "axios";
+import { unwrapResponse, unwrapArray, unwrapField } from "../../api/envelope";
 //import htmlImport from '../../../../public/courses_data/1/index.html'
 
 export default {
@@ -39,8 +40,12 @@ export default {
       // console.log(response.data.course_root);
       // console.log(response.data.subfolders);
       console.log(response.data);
-      this.subDirectories = response.data;
-      
+      this.subDirectories = unwrapArray(response);
+
+    }).catch(() => {
+      // api/tree2 отсутствует в routes/api.php (404). Без catch() это
+      // давало unhandled rejection — показываем пустой список.
+      this.subDirectories = [];
     });
   },
   methods: {
@@ -75,7 +80,7 @@ export default {
       
       axios.get(url).then(response => {
         console.log(response.data);
-       this.template = response.data;
+       this.template = unwrapResponse(response);
     // resolve({template: response.data})
   })
   },
@@ -90,8 +95,8 @@ export default {
       axios.post("api/tree2/list", formData).then((response) => {
         
         console.log(response.data, "ответ ");      
-        this.subDirectories = response.data.folders;
-        this.parent = response.data.fullpath;
+        this.subDirectories = unwrapField(response, 'folders') || [];
+        this.parent = unwrapField(response, 'fullpath');
         
         //console.log(this.parent, "имя parent");
         //console.log(this.prev_parent, "имя prev_parent");

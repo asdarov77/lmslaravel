@@ -50,6 +50,14 @@ export default defineConfig({
         environment: 'jsdom',
         include: ['tests/Unit/**/*.spec.js', 'resources/js/**/*.spec.js'],
         exclude: ['tests/E2E/**', 'node_modules/**', 'vendor/**'],
+        server: {
+            deps: {
+                // Vuetify тянет .css, которые Node-раннер не умеет импортировать.
+                // В тестах CSS не нужен — отдаём пустой модуль.
+                inline: [/vuetify/],
+            },
+        },
+        css: false,
     },
 
 

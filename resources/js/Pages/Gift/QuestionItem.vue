@@ -20,6 +20,7 @@
   
 <script>
 import axios from 'axios';
+import { unwrapResponse } from "../../api/envelope";
 
 export default {
   //props: ["idEdit"],
@@ -34,7 +35,7 @@ export default {
     // получение списка вопросов с сервера
     axios.get(`/api/questions/${this.idEdit}`)
       .then(response => {
-        this.question = response.data;
+        this.question = unwrapResponse(response);
       })
       .catch(error => {
         console.log(error);
@@ -47,7 +48,7 @@ export default {
       this.$router.push({ name: 'question.item', params: { idEdit: nextId } });
       axios.get(`/api/questions/${nextId}`)
         .then(response => {
-          this.question = response.data;
+          this.question = unwrapResponse(response);
         })
         .catch(error => {
           console.log(error);

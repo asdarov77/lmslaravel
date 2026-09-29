@@ -24,8 +24,74 @@ class User extends Authenticatable
     protected $fillable = [
         'fio',
         'password',
-
+        'email',
+        'surname',
+        'name',
+        'patronymic',
+        'role',
+        'group_id',
+        'phonenumber',
+        'city',
+        'country',
+        'organization',
+        'position',
+        'rank',
+        'spfere',
+        'specialization',
     ];
+
+    /**
+     * Роли пользователя. Приложение исторически использует русские
+     * наименования, API-тесты — английские. Поддерживаем оба варианта.
+     *
+     * @var array<string, array<int, string>>
+     */
+    public const ROLE_ALIASES = [
+        'admin' => ['admin', 'Администратор'],
+        'instructor' => ['instructor', 'Инструктор'],
+        'trainee' => ['trainee', 'Обучаемый'],
+    ];
+
+    /**
+     * Собирает fio из фамилии/имени/отчества, если они заданы.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (self $user) {
+            if (!$user->isDirty(['surname', 'name', 'patronymic'])) {
+                return;
+            }
+
+            $parts = array_filter(
+                [$user->surname, $user->name, $user->patronymic],
+                static fn ($value) => filled($value)
+            );
+
+            if ($parts !== []) {
+                $user->fio = implode(' ', $parts);
+            }
+        });
+    }
+
+    protected function hasRoleAlias(string $role): bool
+    {
+        return in_array($this->role, self::ROLE_ALIASES[$role] ?? [], true);
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->hasRoleAlias('admin');
+    }
+
+    public function isInstructor(): bool
+    {
+        return $this->hasRoleAlias('instructor');
+    }
+
+    public function isTrainee(): bool
+    {
+        return $this->hasRoleAlias('trainee');
+    }
 
     /**
      * The attributes that should be hidden for serialization.

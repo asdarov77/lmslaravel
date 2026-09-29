@@ -24,6 +24,7 @@
 <script>
 import { ref, onMounted } from 'vue';
 import $api from "../../api/httpClient";
+import { unwrapResponse } from "../../api/envelope";
 const apiUrl = import.meta.env.VITE_APP_URL;
 
 export default {
@@ -34,7 +35,7 @@ export default {
     const fetchSettings = async () => {
       try {
         const response = await $api.get(apiUrl + '/api/settings');
-        settings.value = response.data;
+        settings.value = unwrapResponse(response);
       } catch (error) {
         console.error(error);
       }

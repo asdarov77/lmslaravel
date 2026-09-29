@@ -3,8 +3,12 @@ import axios from 'axios'
 import { TokenService } from '../services/storage.service'
 
 import { UserService } from '../services/user.service'
+// Если VITE_APP_URL не задан (или пуст), axios использует относительные пути
+// и запросы уходят на тот же origin, что и сама страница. Это делает сборку
+// независимой от порта разработки/тестов и убирает CORS между 8000 и 8080.
+const appUrl = import.meta.env.VITE_APP_URL
 const httpClient = axios.create({
-  baseURL: `${import.meta.env.VITE_APP_URL}`,  
+  baseURL: appUrl || '',  
   timeout: 60000, // indicates, 60000ms ie. 30 seconds
   headers: {
     'Content-Type': 'application/json'

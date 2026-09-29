@@ -1,6 +1,6 @@
 <template>
     <div>
-        <h1 class="h1-title">Добро пожаловать, {{ user.fio }}</h1>
+        <h1 class="h1-title">Добро пожаловать, {{ user?.fio }}</h1>
 
         <v-table class="elevation-1">
             <thead>

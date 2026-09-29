@@ -8,6 +8,7 @@
 
 <script>
    import $api from '../services/http-common'
+  import { unwrapResponse } from '../api/envelope'
 
 export default {
   data() {
@@ -19,7 +20,7 @@ export default {
   async beforeMount() {
     let response = await $api.get("/getuser").then((response) => {
               console.log(response);
-              this.userData = response.data;
+              this.userData = unwrapResponse(response);
              });
     //  this.userData = response.data;
     //  console.log(response);

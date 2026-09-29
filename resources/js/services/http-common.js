@@ -1,4 +1,5 @@
-import axios from 'axios';
+import axios from 'axios'
+import { safeGetItem } from './storage-safe';
 
 // Put your backend url here
 export const API_URL = `http://localhost:8000/api`
@@ -10,7 +11,12 @@ const $api = axios.create({
 })
 
 $api.interceptors.request.use((config) => {    
-    config.headers.Authorization = `Bearer ${localStorage.getItem('token')}`        
+    // Раньше Bearer подставлялся даже при null-токене и без защиты от
+    // исключения доступа к localStorage.
+    const token = safeGetItem('token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
     return config;
 })
 

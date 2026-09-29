@@ -30,11 +30,22 @@ class GradeBoundaryController extends Controller
 
     public function store(Request $request)
     {
-        $index = $request->input('index'); //
+        // Фронт присылает index — порядковый номер записи в отсортированном
+        // списке. Раньше здесь стояло find($index + 1), то есть поиск по id:
+        // при несовпадении порядка find() возвращал null и страница падала в 500
+        // («Attempt to assign property "boundary" on null»).
+        $index = $request->input('index');
         $value = $request->input('value');
-        $id=$index+1;
-        // Обновление значения в базе данных
-        $gradeBoundary = GradeBoundary::find($id);
+
+        $gradeBoundary = GradeBoundary::orderBy('id')
+            ->skip($index)
+            ->take(1)
+            ->first();
+
+        if (!$gradeBoundary) {
+            return response()->json(['message' => 'Запись не найдена'], 404);
+        }
+
         $gradeBoundary->boundary = $value;
         $gradeBoundary->save();
 

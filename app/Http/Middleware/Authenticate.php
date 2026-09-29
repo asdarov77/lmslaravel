@@ -14,10 +14,12 @@ class Authenticate extends Middleware
      */
     protected function redirectTo($request)
     {
-        if (! $request->expectsJson()) {
-            // return("Not auth!");
-            return route('login');
-            // return redirect()->route('login');
-        }
+        // Named-маршрута login в проекте нет: аутентификация выполняется на
+        // фронтенде и через API. Возвращаем null, чтобы Laravel отдал 401 JSON,
+        // а не падал с "Route [login] not defined".
+        // return("Not auth!");
+        // return route('login');
+        // return redirect()->route('login');
+        return null;
     }
 }

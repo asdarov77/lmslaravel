@@ -23,10 +23,13 @@ class FilterRequest extends FormRequest
      */
     public function rules()
     {
+        // nullable: фронт шлёт пустые фильтры (category_id=), а QuestionsController::index
+        // сам вызывает array_filter($data) и рассчитан на их отбрасывание.
+        // Без nullable пустой фильтр падал в 422 и ломал страницу вопросов.
         return [
-            'aukstructure_id' => 'int',
-            'category_id' => 'int',
-            'id' => 'int',
+            'aukstructure_id' => 'nullable|int',
+            'category_id' => 'nullable|int',
+            'id' => 'nullable|int',
         ];
     }
 }

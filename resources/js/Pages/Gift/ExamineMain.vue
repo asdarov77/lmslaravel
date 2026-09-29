@@ -73,6 +73,7 @@
 <script>
 
 import $api from "../../api/httpClient";
+import { unwrapResponse, unwrapArray } from "../../api/envelope";
 const apiUrl = import.meta.env.VITE_APP_URL;
 import MyProgress from '../VProgressCircular.vue'
 import { mapState, mapGetters } from "vuex";
@@ -136,7 +137,7 @@ export default {
     //console.log(this.idCategory, "idCategory")
     $api.get(apiUrl + '/api/aukstructure')
       .then(response => {
-        this.aukstructures = response.data;
+        this.aukstructures = unwrapArray(response);
       })
       .catch(error => {
         console.log(error);
@@ -155,7 +156,7 @@ export default {
         }
       })
         .then(response => {
-          this.auk = response.data
+          this.auk = unwrapArray(response)
             .filter(question => question.category_id === this.current_category)
             .reduce((uniqueTitles, question) => {
               const { title, aukstructure_id } = question;
@@ -187,7 +188,7 @@ export default {
       })
         .then(response => {
           //console.log(this.questions,"questions")
-          this.questions = response.data;
+          this.questions = unwrapArray(response);
           this.showTable = true
           //console.log(this.showTable,"this.showTable" )         
         })

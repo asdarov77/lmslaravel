@@ -63,8 +63,14 @@ export default {
     ...mapGetters('Course', ['categories','courses']),
   },
   async mounted() {
-    //console.log("mounted",this.idEdit, "этот курс");    
-    this.$store.dispatch("Course/fetchCourse", this.idEdit)    
+    //console.log("mounted",this.idEdit, "этот курс");
+    // Раньше промис не обрабатывался: при несуществующем id API отдаёт 404,
+    // отклонение превращалось в unhandled rejection и роняло страницу.
+    try {
+      await this.$store.dispatch("Course/fetchCourse", this.idEdit)
+    } catch (e) {
+      console.warn("Курс не найден:", this.idEdit)
+    }
   },
   // methods: {
   // },

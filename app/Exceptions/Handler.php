@@ -2,6 +2,7 @@
 
 namespace App\Exceptions;
 
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Throwable;
 
@@ -37,5 +38,17 @@ class Handler extends ExceptionHandler
         $this->reportable(function (Throwable $e) {
             //
         });
+    }
+
+    /**
+     * В проекте нет named-маршрута login (аутентификация живёт на фронтенде
+     * и в API), поэтому стандартный редирект падал с "Route [login] not defined".
+     * Всегда отдаём 401 JSON.
+     */
+    protected function unauthenticated($request, AuthenticationException $exception)
+    {
+        return response()->json([
+            'message' => $exception->getMessage(),
+        ], 401);
     }
 }

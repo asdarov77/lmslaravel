@@ -39,6 +39,7 @@ import { TokenService } from '../../services/storage.service';
 import { UserService } from '../../services/user.service';
 // fix !!! login импортированный напрямую из auth.api иначе не работает
 import { login } from '../../api/auth.api';
+import { unwrapResponse as unwrap, asArray } from '../../api/envelope';
 
 const CourseModule = {
   namespaced: true,
@@ -111,7 +112,7 @@ const CourseModule = {
     },
 
     SET_COURSES(state, courses) {
-      state.courses = courses
+      state.courses = asArray(courses)
     },
     SET_COURSE(state, course) {
       state.course = course
@@ -123,13 +124,13 @@ const CourseModule = {
       state.pagination = pagination
     },
     SET_ALL_CATEGORIES(state, categories) {
-      state.categories = categories.sort((a, b) => parseFloat(a.id) - parseFloat(b.id))
+      state.categories = asArray(categories).slice().sort((a, b) => parseFloat(a.id) - parseFloat(b.id))
     },
     SET_TOTAL_CATEGORIES(state, totalCategories) {
       state.totalCategories = totalCategories
     },
     SET_AIRCRAFTS(state, aircrafts) {
-      state.aircrafts = aircrafts
+      state.aircrafts = asArray(aircrafts)
     },
     SET_AIRCRAFT(state, aircraft) {
       state.aircraft = aircraft
@@ -152,20 +153,33 @@ const CourseModule = {
     //   state.categories[itemIdx][key] = payload[key]
     // })
     // },
+    UPDATE_CATEGORY(state, payload) {
+      const itemIdx = state.categories.findIndex(item => item.id === payload.id)
+      if (itemIdx < 0) return
+      Object.keys(payload).forEach(key => {
+        state.categories[itemIdx][key] = payload[key]
+      })
+    },
+    UPDATE_CURRENT_CATEGORY(state, payload) {
+      state.category = { ...state.category, ...payload }
+    },
     UPDATE_COURSE(state, payload) {
       const itemIdx = state.courses.findIndex(item => item.id === payload.id)
+      if (itemIdx < 0 || !payload) return
       Object.keys(payload).forEach(key => {
         state.courses[itemIdx][key] = payload[key]
       })
     },
     DELETE_COURSE(state, payload) {
       const itemIdx = state.courses.findIndex(item => item.id === payload.id)
+      if (itemIdx < 0 || !payload) return
       Object.keys(payload).forEach(key => {
         state.courses[itemIdx][key] = payload[key]
       })
     },
     DELETE_CATEGORY(state, payload) {
       const itemIdx = state.categories.findIndex(item => item.id === payload.id)
+      if (itemIdx < 0 || !payload) return
       Object.keys(payload).forEach(key => {
         state.categories[itemIdx][key] = payload[key]
       })
@@ -185,11 +199,11 @@ const CourseModule = {
     //   state.allGroups[group_id].permissions_ids.splice(permIdx, 1)
     // }
     SET_GROUP_2_LEARNINGS(state, group2learnings) {
-      state.group2learnings = group2learnings
+      state.group2learnings = asArray(group2learnings)
     },
     
     DELETE_GROUP_2_LEARNINGS(state, group2learnings) {
-      state.group2learnings = group2learnings
+      state.group2learnings = asArray(group2learnings)
     },
     SET_ALL_LESSONS(state, categories) {
       state.categories = categories.sort((a, b) => parseFloat(a.id) - parseFloat(b.id))
@@ -204,8 +218,8 @@ const CourseModule = {
 
       try {
         const response = await fetchCourses(params)
-        const items = response.data.data || []
-        const meta = response.data.meta || {}
+        const items = asArray(unwrap(response))
+        const meta = (response.data && response.data.meta) || {}
         const pag = meta.pagination || state.pagination
         commit('SET_TOTAL_COURSES', pag.total || items.length)
         commit('SET_PAGINATION', pag)
@@ -220,8 +234,8 @@ const CourseModule = {
 
       try {
         const response = await fetchCoursesFilter(params)
-        const items = response.data.data || []
-        const meta = response.data.meta || {}
+        const items = asArray(unwrap(response))
+        const meta = (response.data && response.data.meta) || {}
         const pag = meta.pagination || state.pagination
         commit('SET_TOTAL_COURSES', pag.total || items.length)
         commit('SET_PAGINATION', pag)
@@ -266,7 +280,7 @@ const CourseModule = {
         }
         //const response = await fetchCourse(id)
         //console.log(response, 'fetchCourse+++')                
-        commit('SET_COURSE', response.data.data || response.data)
+        commit('SET_COURSE', unwrap(response))
         return Promise.resolve(response)
       } catch (error) {
         return Promise.reject(error)
@@ -278,8 +292,9 @@ const CourseModule = {
       try {
         const response = await fetchAircrafts()
         //console.log(response)
-        commit('SET_TOTAL_AIRCRAFTS', response.data.length)
-        commit('SET_AIRCRAFTS', response.data)
+        const aircrafts = asArray(unwrap(response))
+        commit('SET_TOTAL_AIRCRAFTS', aircrafts.length)
+        commit('SET_AIRCRAFTS', aircrafts)
         return Promise.resolve(response)
       } catch (error) {
         return Promise.reject(error)
@@ -291,7 +306,7 @@ const CourseModule = {
       try {
         const response = await fetchAircraft(id)
         //console.log(response, 'fetchCourse+++')
-        commit('SET_AIRCRAFT', response.data)
+        commit('SET_AIRCRAFT', unwrap(response))
         return Promise.resolve(response)
       } catch (error) {
         return Promise.reject(error)
@@ -318,8 +333,9 @@ const CourseModule = {
         //params = { ...params, exclude_by_name: 'SysAdmin' } 
         const response = await fetchCategories()
         //console.log(response, 'категории')          
-        commit('SET_TOTAL_CATEGORIES', response.data.length)
-        commit('SET_ALL_CATEGORIES', response.data)
+        const categories = asArray(unwrap(response))
+        commit('SET_TOTAL_CATEGORIES', categories.length)
+        commit('SET_ALL_CATEGORIES', categories)
         return Promise.resolve(response)
       } catch (error) {
         return Promise.reject(error)
@@ -330,7 +346,7 @@ const CourseModule = {
         //params = { ...params, exclude_by_name: 'SysAdmin' } 
         const response = await fetchCategory(id)
         //console.log(response, 'fetchCategory')          
-        commit('SET_CATEGORY', response.data)
+        commit('SET_CATEGORY', unwrap(response))
         return Promise.resolve(response)
       } catch (error) {
         return Promise.reject(error)
@@ -356,7 +372,7 @@ const CourseModule = {
           commit('UPDATE_COURSE', { id, ...data })
         }
         const response = await updateCourse(id, data)
-        commit('UPDATE_COURSE', response.data.data || response.data)
+        commit('UPDATE_COURSE', unwrap(response))
         return Promise.resolve(response)
       } catch (error) {
         // rollback
@@ -369,17 +385,18 @@ const CourseModule = {
     async createCourse({ commit }, data) {
       try {
         const response = await createCourse(data)
-        commit('SET_COURSE', response.data)
+        commit('SET_COURSE', unwrap(response))
         return Promise.resolve(response)
       } catch (error) {
         return Promise.reject(error)
       }
     },
-    async createCategory({ commit }, data) {
+    async createCategory({ commit, state }, data) {
       try {
         const response = await createCategory(data)
         //console.log(response,'createCategory response')
-        commit('SET_ALL_CATEGORIES', response.data)
+        const category = unwrap(response)
+        commit('SET_ALL_CATEGORIES', asArray(state.categories).concat(category ? [category] : []))
         return Promise.resolve(response)
       } catch (error) {
         console.log('error console', error)
@@ -387,15 +404,21 @@ const CourseModule = {
       }
     },
     // FIXME удалить, если не будет использоваться
-    // async updateCategory({ commit }, { id, data }) {
-    //   try {
-    //     const response = await updateCategory(id, data)
-    //     commit('UPDATE_CATEGORY', response.data)
-    //     return Promise.resolve(response)
-    //   } catch (error) {
-    //     return Promise.reject(error)
-    //   }
-    // },
+    async updateCategory({ commit }, { id, data }) {
+      try {
+        const response = await updateCategory(id, data)
+        // Синхронизируем и список, и открытую карточку: иначе после
+        // возврата на /categories таблица показывала бы старое название.
+        const saved = unwrap(response)
+        if (saved && saved.id) {
+          commit('UPDATE_CATEGORY', saved)
+          commit('UPDATE_CURRENT_CATEGORY', saved)
+        }
+        return Promise.resolve(response)
+      } catch (error) {
+        return Promise.reject(error)
+      }
+    },
     async deleteCategory({ commit }, id) {
       try {
         await deleteCategory(id)
@@ -441,7 +464,7 @@ const CourseModule = {
     async fetchGroup2learnings({ commit }, data) {
       try {
         const response = await fetchGroup2learnings(data)
-        commit('SET_GROUP_2_LEARNINGS', response.data)
+        commit('SET_GROUP_2_LEARNINGS', asArray(unwrap(response)))
         return Promise.resolve(response)
       } catch (error) {
         console.log('error console', error)

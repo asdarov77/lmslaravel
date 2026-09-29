@@ -41,7 +41,9 @@ const deleteAircraft = id => httpClient.delete(`/api/classes/${id}`)
 // AukStructure
 const fetchGroup2learnings = (data) => httpClient.post(`/api/group/learning`,data)
 
-const deleteGroup2learnings = (id) =>httpClient.delete(`api/learning/${id}`)
+// Регресс: без ведущего слэша axios склеивал baseURL и путь
+// в «http://127.0.0.1:8000api/learning/1» и запрос уходил в 404.
+const deleteGroup2learnings = (id) =>httpClient.delete(`/api/learning/${id}`)
 //const fetchLearnings = () =>httpClient.get('api/learning' ) еще не сделал
 export {
   fetchCourses,

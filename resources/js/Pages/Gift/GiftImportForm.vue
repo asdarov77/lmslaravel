@@ -15,6 +15,7 @@
   
   <script>
   import axios from 'axios';
+import { unwrapResponse } from "../../api/envelope";
   
   export default {
     data() {
@@ -40,7 +41,7 @@
           });
   
           // Обработка ответа от сервера
-          this.results = response.data;
+          this.results = unwrapResponse(response);
         } catch (error) {
           // Обработка ошибки
           console.error(error);

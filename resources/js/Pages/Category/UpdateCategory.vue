@@ -36,7 +36,6 @@
 // FIXME !! title=character(255), description=text. Разница в курсоре при клике на поле в форме редактирования
 import {mapState, mapGetters} from 'vuex'
 import ButtonGroup from "../../components/ButtonGroup.vue";
-import {updateCategory} from "../../api/course.api"
 
 export default {
   components: {
@@ -65,23 +64,35 @@ export default {
 
   methods: {
     submitForm() {
-      updateCategory(this.idEdit, this.category)
-          .then(() => {
-          })
-          .catch(error => {
-            console.error(error)
-          })
-          .finally(() => this.$router.back())
+      // Отправляем только редактируемые поля. Раньше уходил весь объект
+      // state.category вместе с appended-алиасом name и служебными полями
+      // (id/created_at/updated_at), из-за чего правка названия терялась.
+      const data = {
+        title: this.category.title,
+        description: this.category.description,
+      }
 
-
-        // this.$store
-        //     .dispatch('Course/updateCategory', {id: this.idEdit, data: this.category})
-        //     .then(() => {
-        //     })
-        //     .catch(error => {
-        //       console.error(error)
-        //     })
-        //     .finally(() => this.$router.back())
+      return this.$store
+        .dispatch('Course/updateCategory', { id: this.idEdit, data })
+        .then(() => {
+          this.errors = []
+          this.$router.back()
+        })
+        .catch(error => {
+          this.errors = []
+          const response = error && error.response
+          const validation =
+            response && response.data && response.data.errors
+              ? response.data.errors
+              : null
+          if (validation) {
+            Object.keys(validation).forEach(field => {
+              this.errors.push(`${field}: ${validation[field][0]}`)
+            })
+          } else {
+            this.errors.push('Не удалось сохранить категорию')
+          }
+        })
     },
   },
 };

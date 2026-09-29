@@ -22,6 +22,7 @@
 
 <script>
 import $api from "../../api/httpClient";
+import { unwrapArray } from "../../api/envelope";
 const apiUrl = import.meta.env.VITE_APP_URL;
 export default {
   data() {
@@ -38,7 +39,7 @@ export default {
   mounted() {
     $api.get(apiUrl + '/api/grade-boundary')
       .then(response => {
-        this.gradeBoundaries = response.data;
+        this.gradeBoundaries = unwrapArray(response);
       })
       .catch(error => {
         console.log(error);

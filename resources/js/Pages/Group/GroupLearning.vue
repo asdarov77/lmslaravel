@@ -91,6 +91,7 @@ import PermissionWrapper from "../PermissionWrapper.vue";
 import popup from "../Popup.vue";
 import { mapState, mapGetters } from "vuex";
 import $api from "../../api/httpClient";
+import { unwrapArray } from "../../api/envelope";
 import ButtonGroup from "../../components/ButtonGroup.vue";
 import Treeselect from 'vue3-treeselect';
 import 'vue3-treeselect/dist/vue3-treeselect.css';
@@ -225,7 +226,7 @@ export default {
           "&category_id=" +
           this.group.categories;
         $api.get(urlToGet).then((response) => {
-          this.courseFilter = response.data;
+          this.courseFilter = unwrapArray(response);
 
           //console.log(urlToGet);
           //console.log(this.courseFilter[0].aukstructures);

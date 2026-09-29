@@ -51,12 +51,24 @@ class GroupController extends Controller
      */
     public function store(Request $request)
     {
+        // Раньше groupdescription брался «как есть»: при отсутствии поля
+        // в БД уходил NULL, а колонка NOT NULL → 500 с утечкой SQLSTATE.
+        // Форма создания группы description не отправляет, поэтому дефект
+        // был на основном пути пользователя.
+        $data = $request->validate([
+            'groupname' => 'required|string|max:255',
+            'groupdescription' => 'nullable|string',
+        ]);
+
         $group = new Group();
-        //$group->fill($request->all());
-        $group->groupname = request('groupname');
-        $group->groupdescription = request('groupdescription');
+        $group->groupname = $data['groupname'];
+        $group->groupdescription = $data['groupdescription'] ?? '';
         $group->save();
-        return response($group, 201);
+        // Именно json(), а не response(): middleware ApiResponseEnvelope
+        // оборачивает только JsonResponse, поэтому response($group, 201)
+        // возвращал группу без конверта — в отличие от всех остальных
+        // эндпоинтов (например, POST /api/categories).
+        return response()->json($group, 201);
     }
 
     /**
@@ -82,8 +94,21 @@ class GroupController extends Controller
     {
 
         $group = Group::findOrFail($id);
-        $group->groupname = request('groupname');
-        $group->groupdescription = request('groupdescription');
+
+        // Тот же дефект, что был в store(): обновление без groupdescription
+        // писало NULL в NOT NULL-колонку → 500. Плюс name без проверки
+        // затирал значение на NULL. Теперь description опционален.
+        $data = $request->validate([
+            'groupname' => 'sometimes|required|string|max:255',
+            'groupdescription' => 'sometimes|nullable|string',
+        ]);
+
+        if (array_key_exists('groupname', $data)) {
+            $group->groupname = $data['groupname'];
+        }
+        if (array_key_exists('groupdescription', $data)) {
+            $group->groupdescription = $data['groupdescription'] ?? '';
+        }
 
         $group->save();
         return $group;

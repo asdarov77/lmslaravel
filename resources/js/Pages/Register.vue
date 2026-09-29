@@ -98,7 +98,13 @@ export default {
     ...mapGetters("User", ["groups"]),
   },
   created() {
-    this.$store.dispatch("User/fetchGroups");
+    // /api/groups закрыт авторизацией, а /reg — публичная страница.
+    // Без catch() отклонённый запрос давал unhandled rejection и ронял
+    // страницу регистрации. Пользователь всё равно может отправить форму.
+    this.$store.dispatch("User/fetchGroups").catch(() => {
+      this.snackbarText = "Список групп недоступен: войдите в систему";
+      this.alertType = "warning";
+    });
   },
   methods: {
     alertFalse() {

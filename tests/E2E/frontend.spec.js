@@ -1,5 +1,5 @@
 // @ts-check
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
 
 test.describe('LMS Frontend E2E Tests', () => {
   test('should load the main page and redirect to login', async ({ page }) => {
@@ -70,7 +70,7 @@ test.describe('LMS Frontend E2E Tests', () => {
       localStorage.setItem('user', JSON.stringify({ fio: 'Администратор', role: 'Администратор' }));
     }, token);
     
-    await page.goto('/courses');
+    await page.goto('/#/courses/list');
     await page.waitForTimeout(2000);
     
     // Проверяем что страница курсов загрузилась
@@ -160,11 +160,17 @@ test.describe('LMS Frontend E2E Tests', () => {
     if (createData.success) {
       console.log('✓ Категория создана успешно');
       
-      // Проверка что категория существует
-      const getResponse = await request.get('/api/v1/categories');
+      // Проверка что категория существует (индекс пагинирован, читаем по id)
+      const categoryId = createData.data.id;
+      const getResponse = await request.get(`/api/v1/categories/${categoryId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+      expect(getResponse.ok()).toBeTruthy();
       const getData = await getResponse.json();
-      const found = getData.data.some(cat => cat.name === categoryName);
-      expect(found).toBeTruthy();
+      expect(getData.data.name).toBe(categoryName);
       console.log('✓ Категория найдена в списке');
     } else {
       console.log('⚠ Категория не создана (возможно нет прав или валидация):', createData.error?.message);

@@ -9,6 +9,7 @@
   <script>
 
   import $api from "../api/httpClient";
+  import { unwrapField } from "../api/envelope";
   const apiUrl = import.meta.env.VITE_APP_URL;
   export default {
     data() {
@@ -38,7 +39,7 @@
           
           await $api.post(apiUrl +'/api/extract', {
             //filePath: 'TqFYliSLXKsq6mZ62x44mMqNgTuv6eJiNLbvjMZS.zip'
-            filePath: response.data.filePath
+            filePath: unwrapField(response, 'filePath')
            // response.data.filePath
           }, {
             onUploadProgress: (progressEvent) => {

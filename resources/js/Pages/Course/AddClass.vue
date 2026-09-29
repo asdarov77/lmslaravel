@@ -38,6 +38,7 @@ import FileUploader from '../../components/FileUploader.vue'
 import { mapState, mapGetters } from "vuex";
 import ButtonGroup from "../../components/ButtonGroup.vue";
 import $api from "../../api/httpClient";
+import { unwrapArray, unwrapField } from "../../api/envelope";
 import 'vuetify/dist/vuetify.min.css';
 import ProgressLinear from '../../components/ProgressLinear.vue';
 
@@ -70,7 +71,7 @@ export default {
 
     try {
       const response = await $api.get(apiUrl + "/api/classesfs");
-      this.allTags = response.data;
+      this.allTags = unwrapArray(response);
       this.tags = this.allTags;
     } catch (error) {
       console.error(error);
@@ -101,7 +102,7 @@ export default {
           },
         });
         this.tags = this.tags.filter((tag) => tag !== this.path);
-        this.auks = response.data.auks;
+        this.auks = unwrapField(response, 'auks');
       } catch (error) {
         console.error(error);
       } finally {
@@ -130,7 +131,7 @@ export default {
       };
       $api.post(apiUrl + "/api/classes", formData)
         .then((response) => {
-          this.auks = response.data.auks;
+          this.auks = unwrapField(response, 'auks');
         })
         .finally(() => {
           this.$router.go(-1);

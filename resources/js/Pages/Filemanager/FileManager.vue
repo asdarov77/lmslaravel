@@ -35,6 +35,7 @@
 <script>
 
 import axios from "axios";
+import { unwrapResponse, unwrapField } from "../../api/envelope";
 
 export default {
   name: 'filemanager',
@@ -54,8 +55,13 @@ export default {
     axios.get("api/tree").then((response) => {
       // console.log(response.data.course_root);
       // console.log(response.data.subfolders);
-      this.subDirectories = response.data.subfolders;
-      this.parent = response.data.course_root;
+      this.subDirectories = unwrapField(response, 'subfolders') || [];
+      this.parent = unwrapField(response, 'course_root');
+    }).catch(() => {
+      // Бэкенда файлового дерева (api/tree) в проекте нет: маршрут
+      // отдаёт 404. Без catch() отклонение превращалось в unhandled
+      // rejection и роняло страницу — показываем пустое дерево.
+      this.subDirectories = [];
     });
   },
   methods: {
@@ -100,8 +106,8 @@ export default {
         //console.log(response.data, "ответ ");
         //this.prev_parent = this.parent;
         this.prev_nameLyx = nameLyx;
-        this.subDirectories = response.data.folders;
-        this.parent = response.data.fullpath;
+        this.subDirectories = unwrapField(response, 'folders') || [];
+        this.parent = unwrapField(response, 'fullpath');
         
         //console.log(this.parent, "имя parent");
         //console.log(this.prev_parent, "имя prev_parent");

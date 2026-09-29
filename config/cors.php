@@ -19,7 +19,8 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['http://127.0.0.1:8000', 'http://localhost:8000', 'http://localhost:5173'],
+    // 8000/5173 — обычная разработка, 8080 — порт тестового сервера Playwright
+    'allowed_origins' => ['http://127.0.0.1:8000', 'http://localhost:8000', 'http://localhost:5173', 'http://127.0.0.1:5173', 'http://127.0.0.1:8080', 'http://localhost:8080'],
 
     'allowed_origins_patterns' => [],
 

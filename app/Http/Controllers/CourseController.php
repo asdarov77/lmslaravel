@@ -81,19 +81,83 @@ class CourseController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
+    /**
+     * Правила валидации для создания/обновления курса.
+     * `name` — алиас `title` для API v1, оба варианта равнозначны.
+     *
+     * @return array<string, mixed>
+     */
+    private function courseRules(bool $partial = false): array
+    {
+        $required = $partial ? 'sometimes' : 'required_without';
+
+        return [
+            'name' => $partial ? 'sometimes|nullable|string' : $required . ':title|nullable|string',
+            'title' => $partial ? 'sometimes|nullable|string' : $required . ':name|nullable|string',
+            'description' => 'nullable|string',
+            'short_description' => 'nullable|string',
+            'long_description' => 'nullable|string',
+            'path' => 'nullable|string',
+            'duration' => 'nullable|integer|min:0',
+            'status' => 'nullable|string|max:50',
+            'visible' => 'nullable|boolean',
+            'aircraft_id' => 'nullable|integer|exists:aircrafts,id',
+            'category_id' => 'nullable|integer|exists:categories,id',
+        ];
+    }
+
+    /**
+     * Значения, которые реально присутствуют в запросе.
+     * Это нужно, чтобы частичный PATCH не затирал незаданные колонки.
+     *
+     * @return array<string, mixed>
+     */
+    private function courseAttributes(Request $request): array
+    {
+        $attributes = [];
+
+        if ($request->filled('name') || $request->filled('title')) {
+            $attributes['title'] = $request->filled('name')
+                ? $request->input('name')
+                : $request->input('title');
+        }
+
+        foreach (['description', 'path', 'status', 'duration', 'category_id', 'aircraft_id'] as $key) {
+            if ($request->has($key)) {
+                $attributes[$key] = $request->input($key);
+            }
+        }
+
+        if ($request->has('short_description')) {
+            $attributes['short_description'] = $request->input('short_description');
+        }
+
+        if ($request->has('long_description')) {
+            $attributes['long_description'] = $request->input('long_description');
+        }
+
+        if ($request->has('visible')) {
+            $attributes['visible'] = $request->boolean('visible');
+        }
+
+        return $attributes;
+    }
+
     public function store(Request $request)
     {
+        $request->validate($this->courseRules());
+
         $course = new Course();
-        $course->title = request('title');
-        $course->short_description = request('short_description');
-        $course->long_description = request('long_description');
-        $course->path = request('path');
+        $course->fill($this->courseAttributes($request));
+        $course->visible = $course->visible ?? true;
+        $course->status = $course->status ?? 'active';
         $course->save();
-        $course->categories()->attach($request->category_id);
-        return response()->json($course, 201);
-        //return response($request->category_id, 201);        
-        //$course= new Course();   
-        //$course->fill($request->all())->save();
+
+        if ($request->filled('category_id')) {
+            $course->categories()->sync([$request->input('category_id')]);
+        }
+
+        return response()->json($course->fresh(), 201);
     }
 
     /**
@@ -143,7 +207,13 @@ class CourseController extends Controller
         );
         // $curCourse = Aukstructure::find($id)->where('type', 3)->firstOrFail();
         // $curCourseId = $curCourse->id;
-        $curCourse=Aukstructure::find($id);
+        // Находка: find() возвращает null, а обращение ->course_id давало 500.
+        $curCourse = Aukstructure::find($id);
+        if (!$curCourse) {
+            return response()->json([
+                'message' => 'Aukstructure не найден',
+            ], 404);
+        }
         $curCourseId = $curCourse->course_id;
 
         //$aukstruct = Aukstructure::find($id);
@@ -186,7 +256,14 @@ class CourseController extends Controller
 
     public function get_first_auk($auk_id)
     {
-        $cur_course_id = Aukstructure::find($auk_id)->course_id;
+        // Находка: find() возвращает null, обращение ->course_id давало 500.
+        $cur_auk = Aukstructure::find($auk_id);
+        if (!$cur_auk) {
+            return response()->json([
+                'message' => 'Aukstructure не найден',
+            ], 404);
+        }
+        $cur_course_id = $cur_auk->course_id;
         $firstAukId = Aukstructure::where([
             ['course_id', '=', $cur_course_id],
             ['type', '=', 3],
@@ -321,14 +398,19 @@ class CourseController extends Controller
 
     public function update(Request $request, $id)
     {
-        $courses = Course::find($id);
-        $courses->title = request('title');
-        $courses->short_description = request('short_description');
-        $courses->long_description = request('long_description');
-        $courses->visible = $request->visible ?? 1;
+        $request->validate($this->courseRules(partial: true));
+
+        $courses = Course::findOrFail($id);
+        $courses->fill($this->courseAttributes($request));
         $courses->save();
-        $courses->categories()->sync($request->category_id ?? []);
-        return response()->json($courses, 200);
+
+        if ($request->has('category_id')) {
+            $courses->categories()->sync(
+                $request->input('category_id') === null ? [] : [$request->input('category_id')]
+            );
+        }
+
+        return response()->json($courses->fresh(), 200);
     }
 
 
@@ -409,14 +491,21 @@ class CourseController extends Controller
     {
         $course = Course::findOrFail($id);
 
+        // Путь хранилища строим только когда хеш реально задан: иначе
+        // конфиг courses_path_hashed пуст и путь схлопывается в корень.
         $h_course = $course->path_hash;
-        $h_course_folder = Config::get('app.courses_path_hashed') . '/' . $h_course;
-        $h_course_folder_ = trim(substr($h_course_folder, 1));
-        $course->path_hash = null;
-        if (is_dir($h_course_folder_))
-            $this->recursiveRemoveDir($h_course_folder_);
+        if (filled($h_course)) {
+            $h_course_folder_ = trim(substr(
+                Config::get('app.courses_path_hashed') . '/' . $h_course, 1
+            ));
+            $course->path_hash = null;
+            if ($h_course_folder_ !== '' && is_dir($h_course_folder_)) {
+                $this->recursiveRemoveDir($h_course_folder_);
+            }
+        }
+
         $course->delete();
-        return response()->json(null, 204);
+        return response()->json(null, 200);
     }
     //----------------------------------------------------------
 }

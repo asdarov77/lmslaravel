@@ -93,6 +93,19 @@ export default {
     ...mapState("Course", ["totalCategories", "categories", "aircrafts"]),
   },
 
+  watch: {
+    // Регресс: filtredCat инициализировался пустым и заполнялся только
+    // методом filter() — то есть по клику на чекбокс «борт». При обычном
+    // заходе на страницу таблица оставалась пустой («0-0 of 0»),
+    // хотя категории в сторе уже были загружены.
+    categories: {
+      immediate: true,
+      handler(list) {
+        this.filtredCat = Array.isArray(list) ? list : [];
+      },
+    },
+  },
+
   methods: {
     async deleteCat(cat_id) {
       this.$store

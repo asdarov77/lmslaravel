@@ -102,6 +102,7 @@
   
 <script>
 import $api from "../../api/httpClient";
+import { unwrapResponse, unwrapArray } from "../../api/envelope";
 const apiUrl = import.meta.env.VITE_APP_URL;
 import MyProgress from '../VProgressCircular.vue'
 export default {
@@ -204,8 +205,8 @@ export default {
       //$api.get(apiUrl + '/api/questions')
       .then(response => {
         //this.questions = response.data.slice(0, 6);
-        this.questions = response.data;
-        this.goToQuestion(this.questions[0].id); // переходим к первому вопросу 
+        this.questions = unwrapArray(response);
+        if (this.questions[0]) this.goToQuestion(this.questions[0].id); // переходим к первому вопросу 
       })
       .catch(error => {
         console.log(error);
@@ -213,7 +214,7 @@ export default {
 
     $api.get(apiUrl + '/api/grade-boundary')
       .then(response => {
-        this.gradeBoundaries = response.data;
+        this.gradeBoundaries = unwrapArray(response);
       })
       .catch(error => {
         console.log(error);
@@ -293,7 +294,7 @@ export default {
       //this.$router.push({ name: 'question.item', params: { idEdit } });      
       $api.get(apiUrl + `/api/questions/${this.currentId}`)
         .then(response => {
-          this.question = response.data; // обернуть ответ в массив, чтобы использовать v-for
+          this.question = unwrapResponse(response); // обернуть ответ в массив, чтобы использовать v-for
         })
         .catch(error => {
           console.log(error);

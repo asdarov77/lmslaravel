@@ -108,6 +108,7 @@
 
 <script>
 import $api from "../api/httpClient";
+import { unwrapResponse, unwrapField } from "../api/envelope";
 const apiUrl = import.meta.env.VITE_APP_URL;
 import { mapState, mapGetters } from "vuex";
 export default {
@@ -135,9 +136,10 @@ export default {
     $api
       .get(apiUrl+"/api/course/" + this.idEdit)
       .then((response) => {
-        this.titleauk = response.data.title;
-        this.aukstructures = response.data.aukstructures;
-        this.getlink(this.aukstructures[0].id);
+        const course = unwrapResponse(response) || {};
+        this.titleauk = course.title;
+        this.aukstructures = course.aukstructures || [];
+        if (this.aukstructures[0]) this.getlink(this.aukstructures[0].id);
       })
       .catch((err) => alert(err));
   },
@@ -168,7 +170,7 @@ export default {
       $api
         .get(apiUrl+"/api/getlink/" + item_id)
         .then((response) => {
-          this.link = response.data;
+          this.link = unwrapField(response, 'link') !== undefined ? unwrapField(response, 'link') : unwrapResponse(response);
         });
     },
   },

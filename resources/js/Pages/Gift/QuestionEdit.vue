@@ -30,6 +30,7 @@
 
 <script>
 import $api from "../../api/httpClient";
+import { unwrapResponse } from "../../api/envelope";
 import popup from "../Popup.vue";
 export default {
   components: {
@@ -75,7 +76,7 @@ export default {
         }
       })
         .then(response => {          
-          this.editedQuestion = response.data[0]; 
+          this.editedQuestion = unwrapResponse(response); 
           //this.shuffleArray(this.editedQuestion.answers); // Перемешиваем варианты ответов
           //this.correctAnswerIndex = this.editedQuestion.answers.findIndex(answer => answer.is_correct);
           this.correctAnswerIndex = this.editedQuestion.answers.findIndex(answer => answer.is_correct); //вариант без перемешивания
