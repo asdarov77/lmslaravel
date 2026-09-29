@@ -133,10 +133,6 @@ const routes = [
         component: () => import('../Pages/CourseItem.vue'),
         name: 'courses.desc',
         meta: { permission: ['courses.manage', 'content.manage', 'manage-users'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
-        beforeEnter(to, from, next) {
-            if (hasPermission(['manage-users'], 'Manage users')) next()
-            else next('/403')
-        }
     },
     // новый (ресурсный) контроллер
     {
