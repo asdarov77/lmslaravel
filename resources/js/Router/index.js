@@ -3,6 +3,13 @@ import { createRouter,createWebHashHistory } from 'vue-router';
 import routes from './routes';
 import { TokenService } from '../services/storage.service';
 import store from '../Store';
+import { onUnauthorizedHandler } from '../api/httpClient';
+
+// Слой API не импортирует роутер (иначе возникает цикл
+// httpClient -> Router -> Store -> модули -> api -> httpClient).
+// Направление зависимости обратное: UI сообщает инфраструктуре,
+// куда уходить при 401/403/404/500.
+onUnauthorizedHandler(name => router.push({ name }).catch(err => err));
 
 const router = createRouter({
 //    history: createWebHistory(),

@@ -91,7 +91,7 @@ import PermissionWrapper from "../PermissionWrapper.vue";
 import popup from "../Popup.vue";
 import { mapState, mapGetters } from "vuex";
 import $api from "../../api/httpClient";
-import { unwrapArray } from "../../api/envelope";
+import { unwrapArray, numericQuery } from "../../api/envelope";
 import ButtonGroup from "../../components/ButtonGroup.vue";
 import Treeselect from 'vue3-treeselect';
 import 'vue3-treeselect/dist/vue3-treeselect.css';
@@ -219,13 +219,11 @@ export default {
       this.$refs["treeSelectInput"].clear();
       this.courseFilter = [];
       if (id_cat) {
-        let urlToGet =
-          "/api/course/?" +
-          "aircraft_id=" +
-          this.group.aircrafts +
-          "&category_id=" +
-          this.group.categories;
-        $api.get(urlToGet).then((response) => {
+        const courseFilter = numericQuery({
+          aircraft_id: this.group.aircrafts,
+          category_id: this.group.categories,
+        });
+        $api.get("/api/course", { params: courseFilter }).then((response) => {
           this.courseFilter = unwrapArray(response);
 
           //console.log(urlToGet);

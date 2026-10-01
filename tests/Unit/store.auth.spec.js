@@ -5,9 +5,15 @@ import UserPageModule from '../../resources/js/Store/modules/userPage.store'
 
 const loginMock = vi.fn()
 const logoutMock = vi.fn(() => Promise.resolve({ data: { success: true, data: null } }))
+// fetchMe держим как одну стабильную функцию: AuthModule деструктурирует
+// { login, logout, fetchMe } в момент импорта, поэтому подмена свойства
+// модуля через defineProperty уже не влияет на этот биндинг. Меняем
+// только реализацию (mockResolvedValue/mockRejectedValue).
+const fetchMeMock = vi.fn(() => Promise.resolve({ data: { success: true, data: null } }))
 vi.mock('../../resources/js/api/auth.api', () => ({
   login: (...a) => loginMock(...a),
   logout: (...a) => logoutMock(...a),
+  fetchMe: (...a) => fetchMeMock(...a),
 }))
 
 const saveToken = vi.fn()
@@ -129,9 +135,12 @@ describe('AuthModule: login action', () => {
     await await AuthModule.actions.login({ commit }, { fio: 'Иван', password: 'secret' })
 
     expect(saveToken).toHaveBeenCalledWith('tok-1')
-    expect(saveUser).toHaveBeenCalledWith({ id: 7, fio: 'Иван' })
+    // Права склеиваются в объект user намеренно: AuthModule кладёт
+    // payload.permissions внутрь user, иначе state.user.permissions пуст
+    // и боковое меню фильтруется до нуля пунктов.
+    expect(saveUser).toHaveBeenCalledWith(expect.objectContaining({ id: 7, fio: 'Иван' }))
     expect(commit).toHaveBeenCalledWith('LOGIN_SUCCESS', 'tok-1')
-    expect(commit).toHaveBeenCalledWith('SET_USER', { id: 7, fio: 'Иван' })
+    expect(commit).toHaveBeenCalledWith('SET_USER', expect.objectContaining({ id: 7, fio: 'Иван' }))
   })
 
   it('работает и без конверта (голый payload)', async () => {
@@ -283,10 +292,17 @@ describe('AuthModule.logout инвалидирует токен на серве�
 // ---------------------------------------------------- RBAC: права и меню
 
 describe('AuthModule.hasPermission (RBAC)', () => {
+  // state теперь хранит эффективные права в permissionSlugs
+  // (их наполняет GET /api/v1/me -> permission_slugs), а hasPermission
+  // сверяется именно с ними. Хелпер имитирует стартовую гидратацию.
   const check = (user, perm) => {
-    const state = { user }
+    const slugs = (user?.permissions ?? [])
+      .map(p => (typeof p === 'string' ? p : p?.slug || p?.name))
+      .filter(Boolean)
+    const state = { user: user ?? {}, permissionSlugs: slugs }
     const getters = {
       permissionSet: AuthModule.getters.permissionSet(state, {}),
+      isSuperAdmin: AuthModule.getters.isSuperAdmin(state, {}),
     }
     return AuthModule.getters.hasPermission(state, getters)(perm)
   }
@@ -322,11 +338,40 @@ describe('AuthModule.hasPermission (RBAC)', () => {
     const u = { permissions: [{ slug: 'courses.manage' }] }
     expect(check(u, ['users.view', 'courses.manage'])).toBe(true)
   })
+
+  it('эффективные permission_slugs из /api/v1/me имеют приоритет над строками БД', () => {
+    // Реальный кейс: в permissions_users нет строк, но бэкенд вернул
+    // эффективный набор — раньше фронт его игнорировал и прятал меню.
+    const state = {
+      user: { permissions: [] },
+      permissionSlugs: ['users.view', 'categories.manage'],
+    }
+    const getters = {
+      permissionSet: AuthModule.getters.permissionSet(state, {}),
+      isSuperAdmin: AuthModule.getters.isSuperAdmin(state, {}),
+    }
+    const has = AuthModule.getters.hasPermission(state, getters)
+    expect(has('users.view')).toBe(true)
+    expect(has('manage-users')).toBe(true)
+    expect(has('groups.manage')).toBe(false)
+  })
+
+  it('can(): массив = AND-семантика, как CheckAllPermissions', () => {
+    const state = { user: {}, permissionSlugs: ['courses.view', 'categories.manage'] }
+    const getters = {
+      permissionSet: AuthModule.getters.permissionSet(state, {}),
+      isSuperAdmin: AuthModule.getters.isSuperAdmin(state, {}),
+    }
+    const can = AuthModule.getters.can(state, getters)
+    expect(can(['courses.view', 'categories.manage'])).toBe(true)
+    expect(can(['courses.view', 'groups.manage'])).toBe(false)
+    expect(can('courses.view')).toBe(true)
+  })
 })
 
 describe('AuthModule.fetchCurrentUser (синхронизация прав с /api/v1/me)', () => {
   it('обновляет state и LocalStorage актуальными правами сервера', async () => {
-    const fetchMeMock = vi.fn(() =>
+    fetchMeMock.mockImplementation(() =>
       Promise.resolve({
         data: {
           success: true,
@@ -337,9 +382,6 @@ describe('AuthModule.fetchCurrentUser (синхронизация прав с /a
         },
       })
     )
-    // Подменяем fetchMe в уже замокированном модуле auth.api.
-    const api = await import('../../resources/js/api/auth.api')
-    Object.defineProperty(api, 'fetchMe', { value: fetchMeMock, configurable: true, writable: true })
 
     const commit = vi.fn()
     const user = await AuthModule.actions.fetchCurrentUser({ commit })
@@ -354,12 +396,10 @@ describe('AuthModule.fetchCurrentUser (синхронизация прав с /a
   })
 
   it('при ошибке сети не роняет приложение (возвращает null)', async () => {
-    const api = await import('../../resources/js/api/auth.api')
-    Object.defineProperty(api, 'fetchMe', {
-      value: () => Promise.reject(new Error('network down')),
-      configurable: true, writable: true,
-    })
+    fetchMeMock.mockImplementation(() => Promise.reject(new Error('network down')))
+
     const user = await AuthModule.actions.fetchCurrentUser({ commit: vi.fn() })
+
     expect(user).toBeNull()
   })
 })

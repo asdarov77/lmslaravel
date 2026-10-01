@@ -61,8 +61,42 @@ Route::post( 'secret', function(){
 });
 
 
-// Route::fallback(function() {
-//     return redirect('api/') ;
-// });
+// Fallback для SPA: все не-API маршруты отдают index.html,
+// чтобы роутер на фронтенде мог обработать их сам.
+// Без этого прямые переходы и обновление страниц на вложенных
+// маршрутах (/course/16, /courses/list и т.п.) давали 404.
+Route::fallback(function () {
+    if (request()->is('api/*')) {
+        // Fallback регистрируется как обычный маршрут и срабатывает на
+        // ЛЮБОЙ метод, поэтому он «съедал» 405: GET /api/city (а маршрут
+        // объявлен только POST) возвращал 404 вместо 405 и клиент не мог
+        // отличить неверный путь от неверного метода.
+        $uri = trim(request()->path(), '/');
+        $methods = collect(Route::getRoutes()->getRoutes())
+            ->filter(fn ($route) => $route->uri() === $uri)
+            ->flatMap(fn ($route) => $route->methods())
+            ->reject(fn ($method) => in_array($method, ['HEAD', 'OPTIONS'], true))
+            ->unique()
+            ->values();
+
+        if ($methods->isNotEmpty()) {
+            return response()->json([
+                'success' => false,
+                'data'    => null,
+                'error'   => 'Метод не поддерживается',
+                'meta'    => ['allowed' => $methods->all()],
+            ], 405);
+        }
+
+        return response()->json([
+            'success' => false,
+            'data'    => null,
+            'error'   => 'Маршрут не найден',
+            'meta'    => null,
+        ], 404);
+    }
+
+    return app(SinglePageController::class)->index();
+});
 
 

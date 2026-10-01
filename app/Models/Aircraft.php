@@ -10,8 +10,17 @@ use App\Models\Course;
 class Aircraft extends Model
 {
     use HasFactory;
-    //protected $guarded =[];
+
     protected $table = 'aircrafts';
+
+    /**
+     * Без $fillable вызов Aircraft::create([...]) молча отбрасывал бы поля
+     * (модель не $guarded), и импортёр создавал самолёт без title/path.
+     */
+    protected $fillable = [
+        'title',
+        'path',
+    ];
     // public function categories() {
     //        return $this->belongsToMany(Category::class,
     //        'category_course',

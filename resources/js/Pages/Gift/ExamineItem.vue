@@ -102,7 +102,7 @@
   
 <script>
 import $api from "../../api/httpClient";
-import { unwrapResponse, unwrapArray } from "../../api/envelope";
+import { unwrapResponse, unwrapArray, numericQuery } from "../../api/envelope";
 const apiUrl = import.meta.env.VITE_APP_URL;
 import MyProgress from '../VProgressCircular.vue'
 export default {
@@ -200,8 +200,17 @@ export default {
     console.log(this.idEdit, "idEdit")
     console.log(this.idCategory, "cat")
 
-    // получение списка вопросов с сервера
-    $api.get(apiUrl + "/api/questions?aukstructure_id=" + this.idEdit + "&category_id=" + this.idCategory)
+    // Получение списка вопросов с сервера.
+    // Фильтры добавляются ТОЛЬКО когда они заданы: раньше строка собиралась
+    // конкатенацией и уходила как /api/questions?aukstructure_id=NaN&category_id=NaN,
+    // потому что parseInt(undefined) даёт NaN. Бэкенд отвечал на это 422,
+    // и страница «Вопросы» сыпала ошибкой в консоль при обычном переходе.
+    const filters = numericQuery({
+      aukstructure_id: this.idEdit,
+      category_id: this.idCategory,
+    });
+
+    $api.get(apiUrl + "/api/questions", { params: filters })
       //$api.get(apiUrl + '/api/questions')
       .then(response => {
         //this.questions = response.data.slice(0, 6);

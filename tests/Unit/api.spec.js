@@ -97,13 +97,23 @@ describe('user.api: группы и права', () => {
 
 describe('course.api: курсы', () => {
   it('fetchCourses передаёт params объектом', () => {
+    // /api/courses (без 'e') — это CoursesListController::getCourses.
+    // Раньше стоял /api/course, и это apiResource-эндпоинт одного курса,
+    // поэтому список курсов в UI приходил пустым.
     courseApi.fetchCourses({ category_id: 2 })
-    expect(get).toHaveBeenCalledWith('/api/course', { params: { category_id: 2 } })
+    expect(get).toHaveBeenCalledWith('/api/courses', { params: { category_id: 2 } })
   })
 
   it('fetchCourses без аргументов шлёт пустой params', () => {
     courseApi.fetchCourses()
-    expect(get).toHaveBeenCalledWith('/api/course', { params: {} })
+    expect(get).toHaveBeenCalledWith('/api/courses', { params: {} })
+  })
+
+  it('fetchCoursesFilter шлёт параметры фильтра в /api/courses', () => {
+    courseApi.fetchCoursesFilter({ aircraft_id: 4, category_id: 2 })
+    expect(get).toHaveBeenCalledWith('/api/courses', {
+      params: { aircraft_id: 4, category_id: 2 },
+    })
   })
 
   it('fetchCourse подставляет id', () => {
@@ -116,15 +126,32 @@ describe('course.api: курсы', () => {
     expect(get).toHaveBeenCalledWith('/api/courses/cat/4')
   })
 
-  it('фильтры по курсу и категории собирают query-строку', () => {
+  // Фильтры передаются через params, а не конкатенацией в URL.
+  // Раньше строка собиралась вручную, и parseInt(undefined) давал NaN —
+  // запрос уходил как /api/course?course_id=NaN, на что бэкенд отвечал 422.
+  it('фильтры по курсу и категории передаются через params', () => {
     courseApi.fetchCourseByCourseAndCategory(1, 2)
-    expect(get).toHaveBeenCalledWith('/api/course?course_id=1&category_id=2')
+    expect(get).toHaveBeenCalledWith('/api/course', {
+      params: { course_id: 1, category_id: 2 },
+    })
 
     courseApi.fetchCourseByCourse(1)
-    expect(get).toHaveBeenCalledWith('/api/course?course_id=1')
+    expect(get).toHaveBeenCalledWith('/api/course', {
+      params: { course_id: 1 },
+    })
 
     courseApi.fetchCourseByCategory(2)
-    expect(get).toHaveBeenCalledWith('/api/course?category_id=2')
+    expect(get).toHaveBeenCalledWith('/api/course', {
+      params: { category_id: 2 },
+    })
+  })
+
+  it('нечисловые фильтры не уходят в запрос как NaN', () => {
+    courseApi.fetchCourseByCourseAndCategory(undefined, null)
+    expect(get).toHaveBeenCalledWith('/api/course', { params: {} })
+
+    courseApi.fetchCourseByCourse('не число')
+    expect(get).toHaveBeenCalledWith('/api/course', { params: { course_id: 'не число' } })
   })
 
   it('createCourse / updateCourse / deleteCourse используют верные методы', () => {

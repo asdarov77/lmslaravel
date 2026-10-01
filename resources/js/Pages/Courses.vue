@@ -34,8 +34,7 @@
                   <a 
                     v-bind:class="{ 'is-active': !activeCategory }"
                     @click="setActiveCategory({ id: 0 })"
-                    >{{ activeCategory.id }}/{{ aircraft_id }}
-                    Все категории
+                    >Все категории
                   </a>
                 </li>
                 <li
@@ -113,7 +112,7 @@
                           flat
                           :to="{
                             name: 'courses.itemmani',
-                            params: { idEdit: course.id },
+                            query: { idEdit: course.id },
                           }"  target="_blank"
                           >Открыть</v-btn
                         >
@@ -201,7 +200,9 @@ export default {
   methods: {
     setActiveCategory(_category) {
       //console.log(_category.id, "активная категория");
-      this.activeCategory = _category;
+      // «Все категории» приходит как { id: 0 }: сбрасываем выбор, иначе
+      // контроллер получил бы category_id=0 и вернул пустой список.
+      this.activeCategory = _category && _category.id ? _category : null;
       //console.log(this.activeCategory)
       this.getCourses(this.show);
     },
@@ -216,15 +217,17 @@ export default {
 
     getCourses() {
       if (this.activeCategory) {
-        //console.log(this.activeCategory, "this.activeCategory");
+        // Регресс: параметры передавались обёрнутыми в { params: {...} },
+        // а fetchCoursesFilter уже оборачивает их сам. В итоге axios
+        // отправлял ?params[category_id]=2, контроллер их не видел,
+        // и список не фильтровался.
         this.$store.dispatch("Course/fetchCoursesFilter", {
-          params: {
-            category_id: this.activeCategory.id,
-            aircraft_id: this.item,
-          },
+          category_id: this.activeCategory.id,
+          aircraft_id: this.item,
         });
       } else this.$store.dispatch("Course/fetchCourses");
     },
+
     async deleteCourse(course_id) {
       //console.log(course_id, 'текущий курс');
       this.$store
@@ -244,12 +247,13 @@ export default {
         this.aircraft_id = item_id;
       }
       //console.log(this.aircraft_id, "this.aircraft_id")
+      // Регресс: activeCategory равно null, пока категория не выбрана, и
+      // обращение к .id бросало TypeError — фильтр по самолёту не работал
+      // вообще. Пустую категорию просто не передаём.
       this.$store
         .dispatch("Course/fetchCoursesFilter", {
-          params: {
-            category_id: this.activeCategory.id,
-            aircraft_id: this.aircraft_id,
-          },
+          category_id: this.activeCategory ? this.activeCategory.id : null,
+          aircraft_id: this.aircraft_id,
         })
         .catch((error) => console.error(error));
     },

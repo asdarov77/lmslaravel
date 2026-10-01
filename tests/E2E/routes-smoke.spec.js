@@ -65,35 +65,50 @@ const ROUTES = [
   { name: 'filemanager', hash: '/filemanager', note: 'GET /api/tree → 404, функциональность не реализована' },
 ]
 
-/** Кэш реальных id на воркер, чтобы не дёргать API 5 раз на каждый маршрут. */
+/**
+ * Кэш реальных id на воркер, чтобы не дёргать API 5 раз на каждый маршрут.
+ * @type {Record<string, number|null>|null}
+ */
 let idCache = null
 
 /**
+ * Реальные id сущностей для подстановки в маршруты.
+ *
+ * Важно: если эндпоинта нет или он вернул пустой список, возвращаем null,
+ * а НЕ id=1. Прежний `?? 1` подставлял несуществующий id и ронял
+ * /courses/item/1 с 404 «404 Request failed with status code 404» —
+ * то есть тест падал из-за состояния БД, а не из-за бага приложения.
+ *
  * @param {import('@playwright/test').APIRequestContext} req
  * @param {string} token
+ * @returns {Promise<Record<string, number|null>>}
  */
 async function resolveIds(req, token) {
   if (idCache) return idCache
-  /** @type {Record<string, number>} */
+  /** @type {Record<string, number|null>} */
   const found = {}
   /** @type {[string, string][]} */
   const sources = [
-    ['/api/course', 'course'],
+    // Раньше здесь стоял '/api/course': такого GET-маршрута нет
+    // (есть только POST), поэтому course всегда был равен 1.
+    ['/api/courses/', 'course'],
     ['/api/categories', 'category'],
     ['/api/groups', 'group'],
     ['/api/questions', 'question'],
-    ['/api/user/list', 'user'],
+    // Пользователи живут под версионированным префиксом: GET /api/users
+    // в проекте нет, а /api/user/list — это POST.
+    ['/api/v1/users/', 'user'],
   ]
   for (const [url, key] of sources) {
     const r = await req.get(BASE + url, { headers: { Authorization: 'Bearer ' + token } })
     if (!r.ok()) {
-      found[key] = 1
+      found[key] = null
       continue
     }
     const body = await r.json()
     const rows = Array.isArray(body?.data) ? body.data : []
     const id = rows.map((x) => x?.id).find((x) => Number.isInteger(x) && x > 0)
-    found[key] = id ?? 1
+    found[key] = id ?? null
   }
   idCache = found
   return idCache
@@ -141,7 +156,17 @@ test.describe('Все SPA-маршруты открываются без оши�
 
       const token = await login(page)
       const ids = await resolveIds(page.request, token)
-      const hash = route.hash.replace(/\{(\w+)\}/g, (_, k) => String(ids[k] ?? 1))
+
+      // Если нужной сущности в БД нет — маршрут не проверяем, но честно
+      // говорим об этом. Подставлять выдуманный id нельзя: страница
+      // отдаст 404 и тест будет врать о приложении.
+      const required = [...route.hash.matchAll(/\{(\w+)\}/g)].map((m) => m[1])
+      const missing = required.filter((k) => !ids[k])
+      if (missing.length) {
+        test.skip(true, `в базе нет сущностей (${missing.join(', ')}) для ${route.hash}`)
+      }
+
+      const hash = route.hash.replace(/\{(\w+)\}/g, (_, k) => String(ids[k]))
 
       await page.goto(HASH + hash, { waitUntil: 'domcontentloaded' })
       await page.waitForTimeout(900)

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
+use App\Support\PrivateContent;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -96,14 +97,17 @@ class PrivateManiController extends Controller
 
   public function xmles00($aircraft, $auk)
   {
-    $path = "private/{$aircraft}/{$auk}/imsmanifest.xml";
+    $path = PrivateContent::safePath($aircraft, $auk, 'imsmanifest.xml');
     $ext = pathinfo($path)['extension'];
     $header_type = $this->get_mime_type($ext);
-    if (Storage::exists($path)) {
-      $contents = Storage::get($path);
-      // сюда вставляем функцию парсинга xml файла, $contents - string      
-      $menuxmlcontent = $this->parsemanifest($contents);
-      return response(json_encode($menuxmlcontent, JSON_FORCE_OBJECT | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), 200)->header("Content-Type", $header_type);
+
+    if (Storage::disk('private')->exists($path)) {
+      // Метод parsemanifest() в этом контроллере закомментирован, поэтому
+      // вызов падал в BadMethodCallException и маршрут отдавал 500.
+      // Манифест нужен как есть (его парсит импортёр AircraftController),
+      // а потребителей разобранного JSON во фронте нет — отдаём исходный XML.
+      $contents = Storage::disk('private')->get($path);
+      return response($contents, 200)->header("Content-Type", $header_type);
     }
     abort(404);
   }
@@ -301,11 +305,11 @@ class PrivateManiController extends Controller
   //   $ext = pathinfo($path)['extension'];
   //   $header_type = $this->get_mime_type($ext);
 
-  //   if (Storage::exists($path)) {
-  //     $contents = Storage::get($path);    
+  //   if (Storage::disk('private')->exists($path)) {
+  //     $contents = Storage::disk('private')->get($path);    
   //     return response($contents, 200)->header("Content-Type", $header_type);
   //     //return Auth::user()->role;
-  //     //$contents = Storage::get($path);    
+  //     //$contents = Storage::disk('private')->get($path);    
   //     //return $contents;   
 
   //     //return View::make('courses', ['contents' => "$contents"]); 
@@ -337,8 +341,8 @@ class PrivateManiController extends Controller
 
 
   //   //return $contents;
-  //   if (Storage::exists($path)) {
-  //     $contents = Storage::get($path);
+  //   if (Storage::disk('private')->exists($path)) {
+  //     $contents = Storage::disk('private')->get($path);
   //     return response($contents, 200)->header("Content-Type", $header_type);
   //     //return $contents;                
   //   }
@@ -364,8 +368,8 @@ class PrivateManiController extends Controller
 
 
   //   //return $contents;
-  //   if (Storage::exists($path)) {
-  //     $contents = Storage::get($path);
+  //   if (Storage::disk('private')->exists($path)) {
+  //     $contents = Storage::disk('private')->get($path);
   //     return response($contents, 200)->header("Content-Type", $header_type);
   //     // $contents-> header('Content-Type', $header_type)   ;
   //     //return $contents;                
@@ -388,8 +392,8 @@ class PrivateManiController extends Controller
 
 
   //   //return $contents;
-  //   if (Storage::exists($path)) {
-  //     $contents = Storage::get($path);
+  //   if (Storage::disk('private')->exists($path)) {
+  //     $contents = Storage::disk('private')->get($path);
   //     //return $contents;                
   //     return response($contents, 200)->header("Content-Type", $header_type);
   //   }
@@ -412,8 +416,8 @@ class PrivateManiController extends Controller
 
 
   //   //return $contents;
-  //   if (Storage::exists($path)) {
-  //     $contents = Storage::get($path);
+  //   if (Storage::disk('private')->exists($path)) {
+  //     $contents = Storage::disk('private')->get($path);
   //     return response($contents, 200)->header("Content-Type", $header_type);
   //     // return $contents;                
   //   }
@@ -436,8 +440,8 @@ class PrivateManiController extends Controller
 
 
   //   //return $contents;
-  //   if (Storage::exists($path)) {
-  //     $contents = Storage::get($path);
+  //   if (Storage::disk('private')->exists($path)) {
+  //     $contents = Storage::disk('private')->get($path);
   //     return response($contents, 200)->header("Content-Type", $header_type);
   //     // return $contents;                
   //   }
@@ -461,8 +465,8 @@ class PrivateManiController extends Controller
 
 
   //   //return $contents;
-  //   if (Storage::exists($path)) {
-  //     $contents = Storage::get($path);
+  //   if (Storage::disk('private')->exists($path)) {
+  //     $contents = Storage::disk('private')->get($path);
   //     return response($contents, 200)->header("Content-Type", $header_type);
   //     // return $contents;                
   //   }
@@ -486,8 +490,8 @@ class PrivateManiController extends Controller
 
 
   //   //return $contents;
-  //   if (Storage::exists($path)) {
-  //     $contents = Storage::get($path);
+  //   if (Storage::disk('private')->exists($path)) {
+  //     $contents = Storage::disk('private')->get($path);
   //     return response($contents, 200)->header("Content-Type", $header_type);
   //     // return $contents;                
   //   }
@@ -501,8 +505,8 @@ class PrivateManiController extends Controller
 
 
   //   //return $contents;
-  //   if (Storage::exists($path)) {
-  //     $contents = Storage::get($path);
+  //   if (Storage::disk('private')->exists($path)) {
+  //     $contents = Storage::disk('private')->get($path);
   //     //return $contents;
   //     return $contents;
 

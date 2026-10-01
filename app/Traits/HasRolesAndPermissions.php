@@ -106,6 +106,8 @@ trait HasRolesAndPermissions
         $slugs = $this->permissions->pluck('slug')
             ->merge($this->roles->flatMap->permissions->pluck('slug'))
             ->filter()
+            ->unique()
+            ->merge($this->matrixPermissionSlugs())
             ->unique();
 
         // Legacy-алиасы: если у пользователя есть старый slug
@@ -116,6 +118,65 @@ trait HasRolesAndPermissions
         })->filter();
 
         return $this->permissionSlugsCache = $slugs->merge($expanded)->values()->all();
+    }
+
+    /**
+     * Базовые права из config/permissions.php -> role_matrix.
+     *
+     * Совместимость с существующими установками: у пользователей, созданных
+     * до появления связи roles, есть только строковая колонка `role`
+     * ('admin' / 'instructor' / 'Обучаемый' и т.п.), а Role-связь пуста.
+     * Такие пользователи раньше проходили проверки прав по этой строке, и
+     * без fallback'а инструктор, например, получал 403 на /api/v1/courses.
+     *
+     * Fallback срабатывает ТОЛЬКО когда у пользователя нет ни одной роли и
+     * нет прямых прав — то есть исключительно как миграционная заплатка. Как
+     * только администратор назначит пользователю роль (или конкретные права),
+     * решение принимает явная RBAC-связь, и матрица больше не «подменяет» её.
+     * Это не даёт матрице обходить явный отзыв права у роли.
+     *
+     * @return array<int,string>
+     */
+    protected function matrixPermissionSlugs(): array
+    {
+        $hasExplicitGrants = $this->permissions->isNotEmpty()
+            || $this->roles->isNotEmpty();
+
+        if ($hasExplicitGrants) {
+            return [];
+        }
+
+        $matrix = config('permissions.role_matrix', []);
+
+        // Строка role хранится в разных вариантах записи: в UI — русские
+        // названия ('Инструктор'), в API-тестах и сид-данных — английские
+        // ('instructor'). User::ROLE_ALIASES уже описывает это соответствие,
+        // поэтому сравниваем по нему, а не по регистру.
+        $role = trim((string) ($this->attributes['role'] ?? ''));
+
+        if ($role === '') {
+            return [];
+        }
+
+        $candidates = [$role];
+        foreach (self::ROLE_ALIASES as $variants) {
+            foreach ($variants as $variant) {
+                if (mb_strtolower($variant) === mb_strtolower($role)) {
+                    $candidates = $variants;
+                    break 2;
+                }
+            }
+        }
+
+        foreach ($matrix as $roleName => $permissions) {
+            foreach ($candidates as $candidate) {
+                if (mb_strtolower((string) $roleName) === mb_strtolower($candidate)) {
+                    return array_values(array_filter((array) $permissions));
+                }
+            }
+        }
+
+        return [];
     }
 
     /**

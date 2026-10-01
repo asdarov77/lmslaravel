@@ -22,8 +22,13 @@
       "groups": "Groups",
       "reguser": "reguser",
       "courses": "Courses",
-      "classes": "Classes",      
-      "logout": "Logout"
+      "classes": "Classes",
+      "logout": "Logout",
+      "learning": "Learning plan",
+      "exams": "Exams",
+      "questionbank": "Question bank",
+      "mycourses": "My courses",
+      "userSection": "User management"
     },
     "buttons": {
       "cancel": "cancel",

@@ -1,11 +1,6 @@
 <template>
   <v-progress-linear v-if="isLoading" color="primary" indeterminate></v-progress-linear>
-  {{ idEdit }}--{{ idCategory }}
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css" />
-
-  {{ link }}
-  {{ searchTerm }}--
-  {{ isLoading }}
 
   <v-card color="#f5f5f5">
     <v-row dense no-gutters>
@@ -98,7 +93,7 @@
 
           </v-row>
           <!-- <div v-if="showItems" v-for="(item, index) in filterByCategoryAukstructures" :key="item.parent_id"> -->
-          <div v-if="showItems" v-for="(item, index) in aukstructures" :key="item.parent_id">
+          <div v-if="showItems" v-for="(item, index) in aukstructures" :key="item.id">
             <div class="mt-1 mx-3" :style="[
               item.type !== 3
                 ? {
@@ -134,8 +129,9 @@
         <v-sheet rounded elevation="5" class="my-sheet pa-2 mt-2 mr-2"
           :style="{ 'border-radius': '8px', overflow: 'auto', 'overflow-y': 'auto' }">
           <div id="iframe-container" :style="{ 'border-radius': '8px' }">
-            <iframe class="hello px-5" :src="link" ref="myIframe" name="iframe_a"
-              onload="this.style.height=(this.contentWindow.document.body.scrollHeight+20)+'px';" :style="contentStyleObj"
+            <p v-if="error" class="has-text-danger px-3 py-2">{{ error }}</p>
+            <iframe class="hello px-5" :srcdoc="contentHtml" ref="myIframe" name="iframe_a"
+              onload="try{this.style.height=(this.contentWindow.document.body.scrollHeight+20)+'px';}catch(e){}" :style="contentStyleObj"
               width="100%" scrolling="auto">
             </iframe>
 
@@ -158,7 +154,7 @@
 
 const apiUrl = import.meta.env.VITE_APP_URL;
 import $api from "../api/httpClient";
-import { unwrapResponse, unwrapArray, unwrapField } from "../api/envelope";
+import { unwrapResponse, unwrapArray, unwrapField, numericQuery } from "../api/envelope";
 import popup from "./Popup.vue";
 import { mapState, mapGetters } from "vuex";
 import { library } from '@fortawesome/fontawesome-svg-core';
@@ -194,6 +190,9 @@ export default {
       filterByCategoryAukstructures: [],
       categories: {},
       link: "",
+      // Документ материала для iframe. Раньше iframe грузил файл напрямую
+      // по ссылке, и вложенные ресурсы падали в 403 без подписи.
+      contentHtml: "",
       firstId: '',
       contentStyleObj: {
         height: "",
@@ -268,7 +267,7 @@ export default {
     if (!this.aircrafts) {
       this.$store.dispatch("Course/fetchAircrafts");
     }
-    this.$store.dispatch("Course/fetchCourse", this.idEdit);
+    this.$store.dispatch("Course/fetchCourse", { course_id: this.idEdit, category_id: this.idCategory });
     this.$store.dispatch("Course/fetchCategory", this.idCategory);
     this.$store.dispatch("Course/fetchCategories");
     this.$store.dispatch("Course/fetchAircrafts");
@@ -278,7 +277,7 @@ export default {
 
     //this.$store.dispatch("Course/fetchCourse", { course_id: this.idEdit, category_id: this.idCategory })
     $api
-      .get(apiUrl + "/api/course?course_id=" + this.idEdit + "&category_id=" + this.idCategory)
+      .get(apiUrl + "/api/course", { params: numericQuery({ course_id: this.idEdit, category_id: this.idCategory }) })
       .then((response) => {
         //console.log(response.data[0].aircraft_id, "air");
         const course = unwrapArray(response)[0] || {};
@@ -290,10 +289,18 @@ export default {
         this.aukstructures = course.aukstructures || []; // получаем с backEnd все aukstruct для построения меню левого       
 
         // фильтруем по категориям
+        // Регресс: categoryCode равен null, пока категория не загружена
+        // (в списке курсов idCategory не передаётся вовсе), а вызов
+        // .toString() на нём бросал TypeError. Из-за этого .then()
+        // прерывался до присваивания path/aircraft, и в консоль падала
+        // ошибка при каждом открытии курса.
+        const code = this.categoryCode ? String(this.categoryCode).trim() : '';
 
-        this.filterByCategoryAukstructures = this.aukstructures.filter((aukstructure) => {
-          return aukstructure.categories ? aukstructure.categories.includes(this.categoryCode.toString().trim()) : true;
-        }).sort((a, b) => a.id - b.id);
+        this.filterByCategoryAukstructures = code
+          ? this.aukstructures.filter((aukstructure) => {
+              return aukstructure.categories ? aukstructure.categories.includes(code) : true;
+            }).sort((a, b) => a.id - b.id)
+          : this.aukstructures;
 
         //this.getfirstauk(this.idEdit);
         //удалить возможно
@@ -342,9 +349,9 @@ export default {
     },
     getFirstAukId() {
       // Используем метод find() для поиска первого элемента, у которого type равен 3
+      // Побочных эффектов здесь нет намеренно: раньше computed дёргал getlink(),
+      // а на него же подписан watch — материал грузился дважды.
       const firstAuk = this.aukstructures.find((item) => item.type === 3);
-      // Если элемент найден, то возвращаем его id, иначе возвращаем null      
-      if (firstAuk) this.getlink(firstAuk.id);
       return firstAuk ? firstAuk.id : null;
     },
   },
@@ -409,10 +416,53 @@ export default {
       this.activeId = item_id;
       //console.log('getlink')      
       try {
+        // Контент курсов отдаётся по подписи, а не по auth:sanctum:
+        // вложенные ресурсы (CSS/JS/картинки) браузер запрашивает напрямую,
+        // без заголовка Authorization. Раньше здесь подставлялся «голый»
+        // путь api/private/КЛЕН/01/file.html — middleware отвечал 403,
+        // и правая панель оставалась пустой.
+        // Теперь getlink отдаёт составляющие пути, подпись получаем
+        // отдельным запросом, а документ показываем через srcdoc с
+        // <base href>: все относительные ресурсы наследуют токен
+        // из query-строки, поэтому стили и картинки тоже загружаются.
         const response = await $api.get(apiUrl + "/api/getlink/" + item_id);
-        this.link = unwrapResponse(response);
+        const target = unwrapResponse(response) || {};
+        const aircraft = (target.aircraft || "").trim();
+        const auk = (target.auk || "").trim();
+        const file = (target.file || "").trim();
+
+        if (!aircraft || !auk || !file) {
+          this.contentHtml = "";
+          this.error = "Для этого раздела не найден файл материала";
+          return;
+        }
+
+        this.error = "";
+
+        const sigResponse = await $api.get(apiUrl + "/api/private/signed-url", {
+          params: { aircraft, auk },
+        });
+        const signed = unwrapResponse(sigResponse) || {};
+        const base = signed.base || "";
+
+        if (!base) {
+          this.contentHtml = "";
+          this.error = "Не удалось получить доступ к материалу курса";
+          return;
+        }
+
+        // optional: файла может не оказаться на диске — это не ошибка API.
+        const contentResponse = await $api.get(
+          base + encodeURIComponent(file).replace(/%2F/g, "/"),
+          { optional: true }
+        );
+        const html = typeof contentResponse.data === "string" ? contentResponse.data : "";
+        this.contentHtml = html ? '<base href="' + base + '" />' + html : "";
+        this.link = this.contentHtml;
       } catch (error) {
         console.log(error);
+        this.contentHtml = "";
+        this.error = "Не удалось загрузить материал курса";
       } finally {
         this.isLoading = false; // Установить isLoading в false после завершения загрузки
       }
@@ -546,20 +596,27 @@ export default {
 
     showthumb(item_id) {
       // console.log(item_id)
-      document.getElementById(item_id).style.border = "2px doted grey ";
-      document.getElementById(item_id).style.borderRadius = "4px";
+      // У узла может не быть DOM-элемента (например, у первого элемента
+      // списка рендер скрыт условием index !== 0) — раньше это давало
+      // TypeError при наведении мыши.
+      const node = document.getElementById(item_id);
+      if (!node) return;
+      node.style.border = "2px doted grey ";
+      node.style.borderRadius = "4px";
       if (item_id !== this.activeId)
-        document.getElementById(item_id).style.background = "#D3D3D3";
+        node.style.background = "#D3D3D3";
 
-      document.getElementById(item_id).style.transform = "scale(1.03)";
+      node.style.transform = "scale(1.03)";
     },
     hidethumb(item_id) {
       //console.log(item_id, 'вышел')
-      document.getElementById(item_id).style.border = "none";
+      const node = document.getElementById(item_id);
+      if (!node) return;
+      node.style.border = "none";
       if (item_id !== this.activeId)
-        document.getElementById(item_id).style.background = "none";
+        node.style.background = "none";
 
-      document.getElementById(item_id).style.transform = "scale(1.0)";
+      node.style.transform = "scale(1.0)";
     },
 
 

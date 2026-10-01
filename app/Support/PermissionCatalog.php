@@ -58,11 +58,26 @@ class PermissionCatalog
     }
 
     /**
+     * Слаги, которые нельзя переименовать или удалить через API.
+     *
+     * ВАЖНО: сюда попадает ВЕСЬ каталог, а не только явный
+     * config('permissions.protected_slugs'). Право из каталога зашито
+     * в middleware ('permission:users.view'), в legacy-алиасы и в
+     * фильтры бокового меню — его переименование или удаление молча
+     * ломает доступ, поэтому такие операции должны возвращать 403.
+     *
+     * Кастомные права, созданные через POST /api/permissions, в каталог
+     * не входят и остаются редактируемыми.
+     *
      * @return array<int,string>
      */
     public static function protectedSlugs(): array
     {
-        return config('permissions.protected_slugs', []);
+        return array_values(array_unique(array_merge(
+            array_keys(config('permissions.permissions', [])),
+            array_keys(self::legacyAliases()),
+            (array) config('permissions.protected_slugs', [])
+        )));
     }
 
     public static function isProtected(string $slug): bool

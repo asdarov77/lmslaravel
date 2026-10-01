@@ -47,6 +47,14 @@ const AuthModule = {
     state: () => ({
         accessToken: TokenService.getToken() || null,
         user: getInitialUser(),
+        // Эффективный набор прав (slug'и) — единственный источник истины
+        // для hasPermission/can. Раньше он выводился из user.permissions,
+        // где лежали только строки таблицы permissions. Пока каталог не
+        // синхронизирован (permissions:sync), у администратора без явных
+        // записей набор был пустым, и меню фильтровалось до нуля пунктов.
+        // Первичное значение — снимок из LocalStorage; роутер при первом
+        // переходе дёргает GET /api/v1/me и заменяет его актуальным.
+        permissionSlugs: permissionNames(getInitialUser()),
         // КРИТИЧНО: Все поля должны быть объявлены здесь для реактивности
         errors: null,
         language: "ru", // или null, в зависимости от дефолта
@@ -64,10 +72,16 @@ const AuthModule = {
             // Очищаем стейт, чтобы не хранить данные в памяти после логаута
             state.accessToken = null;
             state.user = {};
+            state.permissionSlugs = [];
             state.errors = null;
         },
         SET_USER(state, user) {
             state.user = user;
+        },
+        SET_PERMISSIONS(state, slugs) {
+            state.permissionSlugs = Array.isArray(slugs)
+                ? slugs.filter(Boolean).map(String)
+                : [];
         },
         SET_LANGUAGE(state, lang) {
             state.language = lang;
@@ -98,6 +112,10 @@ const AuthModule = {
 
                 commit("LOGIN_SUCCESS", payload.token);
                 commit("SET_USER", user);
+                // login отдаёт строки таблицы permissions; полный
+                // эффективный набор приходит из GET /api/v1/me, который
+                // вызывает роутер при первом переходе.
+                commit("SET_PERMISSIONS", permissionNames({ permissions: payload.permissions }));
 
                 return response;
             } catch (error) {
@@ -128,6 +146,21 @@ const AuthModule = {
                     ? payload.permissions
                     : permissionNames(user);
 
+                // Приоритет у permission_slugs: это ЭФФЕКТИВНЫЙ набор прав
+                // (прямые + через роли + legacy-алиасы + полный каталог для
+                // суперадмина), собранный на бэкенде — источнике истины.
+                // Строки payload.permissions берём лишь как запасной вариант
+                // на случай ответа без permission_slugs.
+                const effectiveSlugs = Array.isArray(payload.permission_slugs)
+                    ? payload.permission_slugs
+                    : permissionNames({ permissions: payload.permissions });
+                if (effectiveSlugs.length > 0) {
+                    commit("SET_PERMISSIONS", effectiveSlugs);
+                }
+                if (typeof payload.is_super_admin === "boolean") {
+                    user.is_super_admin = payload.is_super_admin;
+                }
+
                 UserService.saveUser(user);
                 commit("SET_USER", user);
                 return user;
@@ -156,11 +189,23 @@ const AuthModule = {
         loggedIn: (state) => !!state.accessToken,
 
         /**
-         * Множество имён прав пользователя (slug + name + алиасы каталога).
+         * Супер-администратор: роль admin/Администратор ИЛИ флаг от
+         * бэкенда (GET /api/v1/me -> is_super_admin). Дублирует
+         * User::isSuperAdmin() и Gate::before на бэкенде.
+         */
+        isSuperAdmin: (state) =>
+            !!state.user?.is_super_admin ||
+            state.user?.role === "admin" ||
+            state.user?.role === "Администратор",
+
+        /**
+         * Множество прав пользователя (slug + алиасы каталога).
+         * Источник — state.permissionSlugs, который наполняется
+         * эффективным набором из GET /api/v1/me.
          */
         permissionSet: (state) => {
             const set = new Set();
-            for (const name of permissionNames(state.user)) {
+            for (const name of state.permissionSlugs) {
                 for (const expanded of expandPermission(name)) set.add(expanded);
             }
             return set;
@@ -176,13 +221,13 @@ const AuthModule = {
          * из первого аргумента, что устраняет расхождение двух стилей вызова.
          */
         hasPermission: (state, getters) => (perm, contentType) => {
-            const required = (Array.isArray(perm) ? perm : [perm]).filter(Boolean);
+            const required = (Array.isArray(perm) ? perm : [perm])
+                .filter(Boolean)
+                .map(String);
             if (required.length === 0) return true; // пункт без требований доступен всем
 
             // Супер-администратор — все права (как Gate::before на бэкенде).
-            if (state.user?.is_super_admin || state.user?.role === "admin" || state.user?.role === "Администратор") {
-                return true;
-            }
+            if (getters.isSuperAdmin) return true;
 
             const held = getters.permissionSet;
             if (held.size === 0) return false;
@@ -193,8 +238,18 @@ const AuthModule = {
         /**
          * can('users.view') — рекомендуемый новый API проверок (стиль
          * Laravel Gate / v-can). То же, что hasPermission, но короче.
+         * Если передан массив — все права обязательны (AND), как
+         * middleware `permission:a,b` в CheckAllPermissions.
          */
-        can: (state, getters) => (perm) => getters.hasPermission(perm),
+        can: (state, getters) => (...perms) => {
+            const required = perms.flat().filter(Boolean).map(String);
+            if (required.length === 0) return true;
+            if (getters.isSuperAdmin) return true;
+            if (Array.isArray(perms[0])) {
+                return required.every((r) => getters.permissionSet.has(r));
+            }
+            return required.some((r) => getters.permissionSet.has(r));
+        },
     },
 };
 

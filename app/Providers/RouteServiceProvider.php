@@ -21,12 +21,13 @@ class RouteServiceProvider extends ServiceProvider
                 ->middleware('api')
                 ->group(base_path('routes/api.php'));
 
-            // Versioned API v1 mounted in parallel to avoid breaking existing clients
-            Route::prefix('api/v1')
-                ->middleware('api')
-                ->group(function () {
-                    require base_path('routes/api.php');
-                });
+            // Раньше routes/api.php монтировался ещё и под префиксом 'api/v1',
+            // а внутри самого файла есть Route::prefix('v1')-группа. В итоге
+            // версионированные маршруты регистрировались дважды и часть путей
+            // становилась некорректной: /api/v1/v1/me, /api/api/v1/login и т.п.
+            // Клиентам (фронт зовёт /api/login и /api/v1/me) нужен ровно один
+            // корректный набор — он даётся единственным mount ниже, где
+            // вложенная v1-группа формирует /api/v1/*.
 
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));

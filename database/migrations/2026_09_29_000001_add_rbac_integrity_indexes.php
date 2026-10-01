@@ -17,10 +17,14 @@ return new class extends Migration
     public function up(): void
     {
         // Чистим дубликаты перед постановкой unique-индексов.
+        // Именно get(), а не each(): each() требует orderBy и без него
+        // падал с "You must specify an orderBy clause", из-за чего вся
+        // миграция (а значит и весь RefreshDatabase) не отрабатывала.
         DB::table('permissions')
             ->selectRaw('slug, MIN(id) as keep_id')
             ->groupBy('slug')
             ->havingRaw('COUNT(*) > 1')
+            ->get()
             ->each(function ($row) {
                 DB::table('permissions')
                     ->where('slug', $row->slug)

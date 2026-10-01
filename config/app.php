@@ -239,6 +239,11 @@ return [
 
     ],
 //    'courses_path' => env('COURSES_PATH', '/usr/local/share/courses'),
-    'courses_path' => env('COURSES_PATH', '/home/prynik917/repo/lmslaravel/storage/app/public/private/'),
+    // Контент курсов (АУК): storage/app/public/private по умолчанию.
+    // Раньше здесь был жёстко прописан абсолютный путь машины разработчика
+    // (/home/<user>/repo/lmslaravel/...), из-за чего на любом другом хосте
+    // и в тестах импорт и отдача контента падали с 404. Путь можно
+    // переопределить переменной COURSES_PATH (с завершающим слэшем или без).
+    'courses_path' => rtrim((string) env('COURSES_PATH', storage_path('app/public/private')), '/') . '/',
     'private_path' => env('PRIVATE_PATH', 'api/private/'),
 ];

@@ -7,8 +7,8 @@ use App\Models\Aukstructure;
 use App\Models\Category;
 use App\Models\Course;
 use App\Models\Link;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\AuthenticatesApi;
 use Tests\TestCase;
 
 /**
@@ -20,13 +20,8 @@ use Tests\TestCase;
  */
 class CourseApiTest extends TestCase
 {
+    use AuthenticatesApi;
     use RefreshDatabase;
-
-    private function auth(): void
-    {
-        $user = User::factory()->create(['role' => 'Администратор']);
-        $this->withHeader('Authorization', 'Bearer ' . $user->createToken('t')->plainTextToken);
-    }
 
     private function assertEnvelope(array $json): void
     {
@@ -39,7 +34,7 @@ class CourseApiTest extends TestCase
 
     public function test_categories_index_returns_array_in_envelope()
     {
-        $this->auth();
+        $this->admin();
         Category::factory()->count(3)->create();
 
         $json = $this->getJson('/api/categories')->json();
@@ -51,7 +46,7 @@ class CourseApiTest extends TestCase
 
     public function test_categories_index_empty_is_empty_array()
     {
-        $this->auth();
+        $this->admin();
         $this->assertSame([], $this->getJson('/api/categories')->json('data'));
     }
 
@@ -62,7 +57,7 @@ class CourseApiTest extends TestCase
 
     public function test_categories_store_creates_category()
     {
-        $this->auth();
+        $this->admin();
 
         $response = $this->postJson('/api/categories', [
             'title'       => 'Новая категория',
@@ -75,7 +70,7 @@ class CourseApiTest extends TestCase
 
     public function test_categories_store_requires_title()
     {
-        $this->auth();
+        $this->admin();
         $this->postJson('/api/categories', ['description' => 'без названия'])
              ->assertStatus(422);
     }
@@ -83,7 +78,7 @@ class CourseApiTest extends TestCase
     /** Находка: уникальности title у категорий нет — дубли создаются. */
     public function test_categories_store_allows_duplicate_title()
     {
-        $this->auth();
+        $this->admin();
         Category::factory()->create(['title' => 'Дубль']);
 
         $this->postJson('/api/categories', ['title' => 'Дубль'])->assertStatus(201);
@@ -92,7 +87,7 @@ class CourseApiTest extends TestCase
 
     public function test_categories_store_rejects_nonexistent_aircraft()
     {
-        $this->auth();
+        $this->admin();
         $this->postJson('/api/categories', [
             'title'       => 'С бортом',
             'aircraft_id' => 999999,
@@ -101,13 +96,13 @@ class CourseApiTest extends TestCase
 
     public function test_categories_show_returns_404_for_missing()
     {
-        $this->auth();
+        $this->admin();
         $this->getJson('/api/categories/999999')->assertStatus(404);
     }
 
     public function test_categories_update_changes_title()
     {
-        $this->auth();
+        $this->admin();
         $category = Category::factory()->create(['title' => 'Старое']);
 
         $this->patchJson("/api/categories/{$category->id}", ['title' => 'Новое'])
@@ -118,7 +113,7 @@ class CourseApiTest extends TestCase
 
     public function test_categories_destroy_deletes_category()
     {
-        $this->auth();
+        $this->admin();
         $category = Category::factory()->create();
 
         $this->deleteJson("/api/categories/{$category->id}")->assertStatus(200);
@@ -129,14 +124,32 @@ class CourseApiTest extends TestCase
 
     public function test_courses_list_returns_array_in_envelope()
     {
-        $this->auth();
-        Course::factory()->count(2)->create();
+        $this->admin();
+        // getCourses() отдаёт только курсы, привязанные к самолёту:
+        // placeholder-курсы без aircraft_id ломали бы ссылки на контент
+        // (api/private//index.html). Поэтому в фикстуре aircraft_id нужен.
+        $aircraft = Aircraft::create(['title' => 'КЛЕН', 'path' => 'КЛЕН']);
+        Course::factory()->count(2)->create(['aircraft_id' => $aircraft->id]);
 
         $json = $this->getJson('/api/courses')->json();
 
         $this->assertEnvelope($json);
         $this->assertIsArray($json['data']);
         $this->assertCount(2, $json['data']);
+    }
+
+    public function test_courses_list_excludes_courses_without_aircraft()
+    {
+        $this->admin();
+        $aircraft = Aircraft::create(['title' => 'КЛЕН', 'path' => 'КЛЕН']);
+        Course::factory()->create(['aircraft_id' => $aircraft->id]);
+        // Курс без самолёта — placeholder, в выдачу не попадает
+        Course::factory()->create(['aircraft_id' => null]);
+
+        $json = $this->getJson('/api/courses')->json();
+
+        $this->assertEnvelope($json);
+        $this->assertCount(1, $json['data']);
     }
 
     public function test_courses_list_requires_auth()
@@ -146,7 +159,7 @@ class CourseApiTest extends TestCase
 
     public function test_course_resource_index_returns_envelope()
     {
-        $this->auth();
+        $this->admin();
         Course::factory()->count(2)->create();
 
         $json = $this->getJson('/api/course')->json();
@@ -156,7 +169,7 @@ class CourseApiTest extends TestCase
 
     public function test_course_store_creates_course()
     {
-        $this->auth();
+        $this->admin();
         $aircraft = Aircraft::factory()->create();
         $category = Category::factory()->create();
 
@@ -173,7 +186,7 @@ class CourseApiTest extends TestCase
 
     public function test_course_show_returns_course()
     {
-        $this->auth();
+        $this->admin();
         $course = Course::factory()->create(['title' => 'Целевой']);
 
         $json = $this->getJson("/api/course/{$course->id}")->json();
@@ -184,13 +197,13 @@ class CourseApiTest extends TestCase
 
     public function test_course_show_returns_404_for_missing()
     {
-        $this->auth();
+        $this->admin();
         $this->getJson('/api/course/999999')->assertStatus(404);
     }
 
     public function test_course_update_changes_title()
     {
-        $this->auth();
+        $this->admin();
         $course = Course::factory()->create(['title' => 'Старый']);
 
         $this->patchJson("/api/course/{$course->id}", ['title' => 'Обновлённый'])
@@ -201,7 +214,7 @@ class CourseApiTest extends TestCase
 
     public function test_course_destroy_deletes_course()
     {
-        $this->auth();
+        $this->admin();
         $course = Course::factory()->create();
 
         $this->deleteJson("/api/course/{$course->id}")->assertStatus(200);
@@ -210,7 +223,7 @@ class CourseApiTest extends TestCase
 
     public function test_course_manifest_returns_data_for_existing_course()
     {
-        $this->auth();
+        $this->admin();
         $course = Course::factory()->create();
 
         $response = $this->getJson("/api/coursemanifest/{$course->id}");
@@ -221,20 +234,20 @@ class CourseApiTest extends TestCase
     /** Регресс: Aukstructure::find() → null, обращение ->course_id давало 500. */
     public function test_getlink_returns_404_instead_of_500_for_missing_aukstructure()
     {
-        $this->auth();
+        $this->admin();
         $this->getJson('/api/getlink/999999')->assertStatus(404);
     }
 
     /** Регресс: то же для getfirstauk. */
     public function test_getfirstauk_returns_404_instead_of_500_for_missing_aukstructure()
     {
-        $this->auth();
+        $this->admin();
         $this->getJson('/api/getfirstauk/999999')->assertStatus(404);
     }
 
     public function test_getlink_returns_404_for_course_id_used_as_aukstructure_id()
     {
-        $this->auth();
+        $this->admin();
         $course = Course::factory()->create();
 
         // Раньше курс без aukstructure давал 500 «Attempt to read property course_id on null»
@@ -245,7 +258,7 @@ class CourseApiTest extends TestCase
 
     public function test_classesfs_returns_array_in_envelope()
     {
-        $this->auth();
+        $this->admin();
         Aircraft::factory()->count(2)->create();
 
         $json = $this->getJson('/api/classesfs')->json();
@@ -256,7 +269,7 @@ class CourseApiTest extends TestCase
 
     public function test_classes_index_returns_envelope()
     {
-        $this->auth();
+        $this->admin();
         $json = $this->getJson('/api/classes')->json();
         $this->assertEnvelope($json);
         $this->assertIsArray($json['data']);
@@ -266,7 +279,7 @@ class CourseApiTest extends TestCase
 
     public function test_lessons_returns_envelope()
     {
-        $this->auth();
+        $this->admin();
         $json = $this->getJson('/api/lessons')->json();
         $this->assertEnvelope($json);
         $this->assertIsArray($json['data']);
@@ -276,7 +289,7 @@ class CourseApiTest extends TestCase
 
     public function test_courses_cat_returns_categories_in_envelope()
     {
-        $this->auth();
+        $this->admin();
         Category::factory()->count(2)->create();
 
         $json = $this->getJson('/api/courses/cat')->json();
@@ -288,7 +301,7 @@ class CourseApiTest extends TestCase
 
     public function test_courses_cat_by_id_returns_array()
     {
-        $this->auth();
+        $this->admin();
         $category = Category::factory()->create();
 
         $json = $this->getJson("/api/courses/cat/{$category->id}")->json();
@@ -301,6 +314,8 @@ class CourseApiTest extends TestCase
 
     public function test_aukstructure_index_returns_array()
     {
+        $this->admin();
+
         $course = Course::factory()->create();
         Aukstructure::factory()->count(2)->create(['course_id' => $course->id]);
 
@@ -313,6 +328,8 @@ class CourseApiTest extends TestCase
     /** Находка: AukstructureController::show — пустая заглушка, всегда 200. */
     public function test_aukstructure_show_is_a_stub_returning_200()
     {
+        $this->admin();
+
         $this->getJson('/api/aukstructure/999999')->assertStatus(200);
     }
 
@@ -320,7 +337,7 @@ class CourseApiTest extends TestCase
 
     public function test_city_endpoint_rejects_get_method()
     {
-        $this->auth();
+        $this->admin();
         $this->getJson('/api/city')->assertStatus(405);
     }
 }

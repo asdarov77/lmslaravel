@@ -32,12 +32,14 @@
     </v-alert>
     <v-card v-if="fileInfos.length > 0" class="mx-auto">
       <v-list>
-        <v-subheader>List of Files</v-subheader>
-        <v-list-item-group color="primary">
+        <!-- Vuetify 3: v-list-item-group переименован в v-list-group,
+             v-subheader — в v-list-subheader. -->
+        <v-list-subheader>List of Files</v-list-subheader>
+        <v-list-group color="primary">
           <v-list-item v-for="(file, index) in fileInfos" :key="index">
             <a :href="file.url">{{ file.name }}</a>
           </v-list-item>
-        </v-list-item-group>
+        </v-list-group>
       </v-list>
     </v-card>
   </div>

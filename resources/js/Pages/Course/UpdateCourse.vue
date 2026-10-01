@@ -1,5 +1,5 @@
 <template>
-  <v-flex xs12 sm8 md4>
+  <v-col cols="12" sm="8" md="4">
     <v-card class="elevation-12 mx-auto">
       <v-toolbar color="primary">
         <v-toolbar-title>Редактирование курса </v-toolbar-title>
@@ -60,7 +60,7 @@
         <v-btn v-on:click="submitForm" color="primary">Сохранить</v-btn>
       </v-card-actions> </v-card
     >
-  </v-flex>
+  </v-col>
 </template>
 
 <script>

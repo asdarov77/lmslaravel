@@ -162,7 +162,7 @@
 
 const apiUrl = import.meta.env.VITE_APP_URL;
 import $api from "../api/httpClient";
-import { unwrapResponse, unwrapArray, unwrapField } from "../api/envelope";
+import { unwrapResponse, unwrapArray, unwrapField, numericQuery } from "../api/envelope";
 import popup from "./Popup.vue";
 import { mapState, mapGetters } from "vuex";
 import { library } from '@fortawesome/fontawesome-svg-core';
@@ -270,7 +270,7 @@ export default {
     // --------------------------------загрузка левого меню-------------------------------
     //this.$store.dispatch("Course/fetchCourse", { course_id: this.idEdit, category_id: this.idCategory })
     $api
-      .get(apiUrl + "/api/course?course_id=" + this.idEdit + "&&category_id=" + this.idCategory)
+      .get(apiUrl + "/api/course", { params: numericQuery({ course_id: this.idEdit, category_id: this.idCategory }) })
       .then((response) => {
         //console.log(response.data[0].aircraft_id, "air");
         const course = unwrapArray(response)[0] || {};

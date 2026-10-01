@@ -220,7 +220,14 @@ class CourseController extends Controller
         //$auks = Course::find($aukstruct->course_id);
         $auks = Course::where('id',  $curCourse->course_id)
             ->first();        
-        $aircraft = Aircraft::find($auks->aircraft_id);        
+        // Если курс удалён, а aircraft_id остался, или самолёт не найден —
+        // раньше это давало 500 на обращении ->path у null.
+        $aircraft = $auks ? Aircraft::find($auks->aircraft_id) : null;
+        if (! $auks || ! $aircraft) {
+            return response()->json([
+                'message' => 'Курс для Aukstructure не найден',
+            ], 404);
+        }
         $airpath = $aircraft->path;
         $aukspath = trim($auks->path);
         //dd($airpath);
@@ -248,10 +255,21 @@ class CourseController extends Controller
         //     'urlfirst' => $urlfirst,
         // ];
         //return $response;
-        if($link!=null) 
-        return $url;
-        else
-        return $urlfirst;
+
+        // Раньше возвращалась только строка пути. Этого мало: контент
+        // курсов отдаётся по подписи (PrivateContentSigner), а она
+        // считается от пары aircraft|auk. Фронтенд получал «api/private/КЛЕН/01/file.html»
+        // без expires/signature, middleware отвечал 403, и iframe оставался
+        // пустым. Теперь отдаём составляющие — фронтенд сам запрашивает
+        // подпись и подставляет её в <base href> документа.
+        $file = $link != null ? $link : $firstLink;
+
+        return [
+            'aircraft' => trim($airpath),
+            'auk'      => trim($aukspath),
+            'file'     => (string) $file,
+            'url'      => $link != null ? $url : $urlfirst,
+        ];
     }
 
     public function get_first_auk($auk_id)

@@ -9,31 +9,29 @@ use App\Models\Favorite;
 use App\Models\GradeBoundary;
 use App\Models\Question;
 use App\Models\Setting;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\AuthenticatesApi;
 use Tests\TestCase;
 
 /**
  * Вопросы с ответами, настройки, границы оценок, избранное.
  *
- * Эти ресурсы в API смонтированы без auth:sanctum — тесты фиксируют
- * фактическое поведение, чтобы регресс защиты не прошёл молча.
+ * Эти ресурсы требуют авторизации: чтение — для любого авторизованного,
+ * запись — по правам questions.manage / settings.manage. Поэтому тесты
+ * авторизуются, а для проверки записи используют администратора
+ * (CheckUserPermission отдаёт суперадмину bypass).
  */
 class ContentApiTest extends TestCase
 {
+    use AuthenticatesApi;
     use RefreshDatabase;
-
-    private function auth(array $attrs = []): User
-    {
-        $user = User::factory()->create($attrs);
-        $this->withHeader('Authorization', 'Bearer ' . $user->createToken('t')->plainTextToken);
-        return $user;
-    }
 
     // -------------------------------------------------------------- QUESTIONS
 
     public function test_questions_index_returns_array()
     {
+        $this->admin();
+
         $auk = Aukstructure::factory()->create();
         Question::factory()->create(['aukstructure_id' => $auk->id]);
 
@@ -45,6 +43,8 @@ class ContentApiTest extends TestCase
 
     public function test_questions_index_includes_aukstructure_title()
     {
+        $this->admin();
+
         $auk = Aukstructure::factory()->create(['title' => 'Заголовок темы']);
         Question::factory()->create(['aukstructure_id' => $auk->id]);
 
@@ -56,6 +56,8 @@ class ContentApiTest extends TestCase
 
     public function test_questions_store_creates_question_with_answers()
     {
+        $this->admin();
+
         $this->postJson('/api/questions', [
             'category_id'     => Category::factory()->create()->id,
             'aukstructure_id' => Aukstructure::factory()->create()->id,
@@ -72,11 +74,15 @@ class ContentApiTest extends TestCase
 
     public function test_questions_show_returns_404_for_missing()
     {
+        $this->admin();
+
         $this->getJson('/api/questions/999999')->assertStatus(404);
     }
 
     public function test_questions_update_changes_text()
     {
+        $this->admin();
+
         $question = Question::factory()->create(['question_text' => 'Старый']);
 
         $this->putJson("/api/questions/{$question->id}", [
@@ -95,6 +101,8 @@ class ContentApiTest extends TestCase
      */
     public function test_questions_update_without_required_fields_returns_500()
     {
+        $this->admin();
+
         $question = Question::factory()->create();
 
         $this->putJson("/api/questions/{$question->id}", ['question_text' => 'Новый'])
@@ -103,12 +111,16 @@ class ContentApiTest extends TestCase
 
     public function test_questions_update_returns_404_for_missing()
     {
+        $this->admin();
+
         $this->putJson('/api/questions/999999', ['question_text' => 'X'])
              ->assertStatus(404);
     }
 
     public function test_questions_destroy_removes_question_and_answers()
     {
+        $this->admin();
+
         $question = Question::factory()->create();
         $question->answers()->create(['answer' => 'Да', 'is_correct' => true]);
         $answerId = $question->answers()->first()->id;
@@ -121,6 +133,8 @@ class ContentApiTest extends TestCase
 
     public function test_questions_destroy_returns_404_for_missing()
     {
+        $this->admin();
+
         $this->deleteJson('/api/questions/999999')->assertStatus(404);
     }
 
@@ -128,6 +142,8 @@ class ContentApiTest extends TestCase
 
     public function test_settings_index_returns_array()
     {
+        $this->admin();
+
         Setting::factory()->count(2)->create();
 
         $json = $this->getJson('/api/settings')->json();
@@ -143,6 +159,8 @@ class ContentApiTest extends TestCase
      */
     public function test_settings_store_method_is_missing_returns_500()
     {
+        $this->admin();
+
         $setting = Setting::factory()->create(['value' => 'old']);
 
         $this->postJson('/api/settings', [
@@ -157,12 +175,16 @@ class ContentApiTest extends TestCase
      */
     public function test_settings_update_requires_id_in_url()
     {
+        $this->admin();
+
         $this->putJson('/api/settings', [['name' => 'x', 'value' => 'y']])
              ->assertStatus(405);
     }
 
     public function test_settings_update_changes_value()
     {
+        $this->admin();
+
         $setting = Setting::factory()->create(['value' => 'old']);
 
         $this->putJson("/api/settings/{$setting->id}", [
@@ -174,6 +196,8 @@ class ContentApiTest extends TestCase
 
     public function test_settings_update_ignores_unknown_name()
     {
+        $this->admin();
+
         $this->putJson('/api/settings/1', [
             ['name' => 'нетакого', 'value' => 'x'],
         ])->assertStatus(200);
@@ -185,6 +209,8 @@ class ContentApiTest extends TestCase
 
     public function test_grade_boundary_index_sorted_by_id()
     {
+        $this->admin();
+
         GradeBoundary::factory()->count(3)->create();
 
         $json = $this->getJson('/api/grade-boundary')->json();
@@ -202,6 +228,8 @@ class ContentApiTest extends TestCase
      */
     public function test_grade_boundary_store_updates_by_ordinal_index()
     {
+        $this->admin();
+
         GradeBoundary::factory()->count(2)->create();
         $second = GradeBoundary::orderBy('id')->skip(1)->first();
 
@@ -216,6 +244,8 @@ class ContentApiTest extends TestCase
     /** Регресс: find($index+1) возвращал null → 500 «assign property on null». */
     public function test_grade_boundary_store_returns_404_for_out_of_range_index()
     {
+        $this->admin();
+
         GradeBoundary::factory()->count(2)->create();
 
         $this->postJson('/api/grade-boundary', [
@@ -233,7 +263,7 @@ class ContentApiTest extends TestCase
 
     public function test_favorites_add_creates_record_for_current_user()
     {
-        $user = $this->auth();
+        $user = $this->asUser();
 
         $this->postJson('/api/favorites/add', [
             'course_id' => 42,
@@ -248,7 +278,7 @@ class ContentApiTest extends TestCase
 
     public function test_favorites_add_twice_returns_400()
     {
-        $this->auth();
+        $this->asUser();
         $payload = ['course_id' => 42, 'title' => 'Дубль'];
 
         $this->postJson('/api/favorites/add', $payload)->assertStatus(200);
@@ -257,7 +287,7 @@ class ContentApiTest extends TestCase
 
     public function test_favorites_index_returns_favorites_key()
     {
-        $this->auth();
+        $this->asUser();
         Favorite::factory()->count(2)->create();
 
         $json = $this->getJson('/api/favorites')->json();
@@ -268,7 +298,7 @@ class ContentApiTest extends TestCase
 
     public function test_favorites_remove_deletes_record()
     {
-        $user = $this->auth();
+        $user = $this->asUser();
         Favorite::factory()->create([
             'user_id'   => $user->id,
             'course_id' => 42,
@@ -284,7 +314,7 @@ class ContentApiTest extends TestCase
 
     public function test_favorites_remove_missing_returns_400()
     {
-        $this->auth();
+        $this->asUser();
         $this->deleteJson('/api/favorites/999')->assertStatus(400);
     }
 
@@ -295,7 +325,7 @@ class ContentApiTest extends TestCase
      */
     public function test_questions_index_accepts_empty_filters()
     {
-        $this->auth();
+        $this->asUser();
 
         $this->getJson('/api/questions?category_id=')->assertStatus(200);
         $this->getJson('/api/questions?aukstructure_id=&category_id=')->assertStatus(200);
@@ -304,7 +334,7 @@ class ContentApiTest extends TestCase
 
     public function test_questions_index_still_rejects_non_numeric_filter()
     {
-        $this->auth();
+        $this->asUser();
 
         $this->getJson('/api/questions?category_id=abc')->assertStatus(422);
     }
@@ -316,7 +346,7 @@ class ContentApiTest extends TestCase
      */
     public function test_non_numeric_id_returns_404_not_500()
     {
-        $this->auth();
+        $this->asUser();
 
         foreach (['categories', 'questions', 'course', 'groups', 'gift', 'settings'] as $resource) {
             $this->getJson("/api/{$resource}/NaN")->assertStatus(404);
@@ -325,7 +355,7 @@ class ContentApiTest extends TestCase
 
     public function test_numeric_id_still_reaches_controller()
     {
-        $this->auth();
+        $this->asUser();
 
         // Валидный числовой id обязан доходить до контроллера (404 «не найдено»
         // означает, что маршрут сматчился, а не был отсечён constraint'ом).

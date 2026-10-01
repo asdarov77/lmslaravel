@@ -2,6 +2,22 @@
 // после логина) маршруты декларируют требования в meta.permission,
 // а проверку выполняет глобальный guard в Router/index.js через store.
 
+/**
+ * Безопасное приведение query-параметра к числу.
+ *
+ * Раньше здесь стоял parseInt(route.query.idEdit), и при отсутствующем
+ * параметре он давал NaN. Значение уходило в запрос как
+ * /api/questions?aukstructure_id=NaN, а бэкенд корректно отвечал 422 —
+ * страница «Вопросы» падала с ошибкой в консоли при обычном переходе.
+ * Теперь нечисловой/отсутствующий параметр становится null, а страницы
+ * не отправляют такой фильтр вовсе.
+ */
+const toIntOrNull = value => {
+    if (value === undefined || value === null || value === '') return null;
+    const n = Number.parseInt(String(value), 10);
+    return Number.isFinite(n) ? n : null;
+};
+
 const routes = [
 
     {
@@ -30,7 +46,7 @@ const routes = [
         path: '/contacts',
         component: () => import('../Pages/Contacts.vue'),
         name: 'contacts',
-        meta: { permission: ['users.view', 'manage-users'] },    },
+        meta: { permission: ['users.view'] },    },
     {
         path: '/my',
         component: () => import('../Pages/MyAccount.vue'),
@@ -48,18 +64,18 @@ const routes = [
         path: '/user/list',
         component: () => import('../Pages/UserList.vue'),
         name: 'user.list',
-        meta: { permission: ['users.view', 'manage-users'] },    },
+        meta: { permission: ['users.view'] },    },
     {
         path: '/user/edit/:idEdit',
         component: () => import('../Pages/User/UserItemEdit.vue'),
         name: 'user.edit',
-        meta: { permission: ['users.update', 'users.view', 'manage-users'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
+        meta: { permission: ['users.update', 'users.view'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
     },
     {
         path: '/user/chpass/:idEdit',
         component: () => import('../Pages/User/UserChpass.vue'),
         name: 'user.chpass',
-        meta: { permission: ['users.update', 'manage-users'] },        props: true,
+        meta: { permission: ['users.update'] },        props: true,
     },
     // {
     //     path: '/user/chroll',
@@ -72,13 +88,14 @@ const routes = [
         component: () => import('../Pages/User/UserChperm.vue'),
         name: 'user.chperm',
         props: route => ({ idEdit: Number(route.params.idEdit) }),
-        meta: { permission: ['users.permissions', 'manage-users'] },
+        meta: { permission: ['users.permissions'] },
     },
     //
     // Блок групп
     //
     {
         path: '/groups/list',
+        meta: { permission: ['groups.view', 'users.view'] },
         component: () => import('../Pages/GroupList.vue'),
         name: 'groups.index'
     },
@@ -86,12 +103,12 @@ const routes = [
         path: '/groups/add',
         component: () => import('../Pages/Group/CreateGroup.vue'),
         name: 'groups.create',
-        meta: { permission: ['groups.manage', 'manage-users', 'create-tasks'] },    },
+        meta: { permission: ['groups.manage'] },    },
     {
         path: '/groups/edit/:idEdit',
         component: () => import('../Pages/Group/GroupItemEdit.vue'),
         name: 'groups.update',
-        meta: { permission: ['groups.manage', 'manage-users'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
+        meta: { permission: ['groups.manage'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
     },
     // {
     //     path: '/groups',
@@ -104,6 +121,7 @@ const routes = [
     // старый контроллер
     {
         path: '/courses/list',
+        meta: { permission: ['courses.view'] },
         component: () => import('../Pages/Courses.vue'),
         name: 'courses.list',
         //props: true // разрешение на передачу данных через router.parms
@@ -111,6 +129,7 @@ const routes = [
     {
         // тестовый вариант открытия страницы(рабочий)
         path: '/courses/item/:idEdit',
+        meta: { permission: ['courses.view', 'content.view'] },
         component: () => import('../Pages/CourseTest.vue'),
         props: route => ({ idEdit: Number(route.params.idEdit) }),
         name: 'courses.item',
@@ -119,11 +138,12 @@ const routes = [
     {
         // тестовый вариант открытия страницы(манифест)
         path: '/courses/itemmani',
+        meta: { permission: ['courses.manage', 'content.manage'] },
         component: () => import('../Pages/CourseManifest.vue'),
         // props: route => ({ idEdit: Number(route.params.idEdit)}),
         props: (route) => ({
-            idEdit: parseInt(route.query.idEdit),
-            idCategory: parseInt(route.query.idCategory),
+            idEdit: toIntOrNull(route.query.idEdit),
+            idCategory: toIntOrNull(route.query.idCategory),
         }),
         name: 'courses.itemmani',
 
@@ -132,22 +152,23 @@ const routes = [
         path: '/courses/desc/:idEdit',
         component: () => import('../Pages/CourseItem.vue'),
         name: 'courses.desc',
-        meta: { permission: ['courses.manage', 'content.manage', 'manage-users'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
+        meta: { permission: ['courses.manage', 'content.manage'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
     },
     // новый (ресурсный) контроллер
     {
         path: '/course',
         component: () => import('../Pages/Course/RegisterCourse.vue'),
         name: 'course.store',
-        meta: { permission: ['courses.manage', 'edit_courses', 'manage-course'] },    },
+        meta: { permission: ['courses.manage'] },    },
     {
         path: '/course/:idEdit',
         component: () => import('../Pages/Course/UpdateCourse.vue'),
         name: 'course.update',
-        meta: { permission: ['courses.manage', 'edit_courses', 'manage-course'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
+        meta: { permission: ['courses.manage'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
     },
     {
         path: '/classes',
+        meta: { permission: ['content.manage'] },
         component: () => import('../Pages/Course/AddClass.vue'),
         name: 'air.store',
 
@@ -160,7 +181,7 @@ const routes = [
         path: '/categories',
         component: () => import('../Pages/Category/CategoryList.vue'),
         name: 'categories.index',
-        meta: { permission: ['courses.view', 'categories.manage', 'manage-users'] },    },
+        meta: { permission: ['courses.view', 'categories.manage'] },    },
     {
         path: '/register-categories',
         component: () => import('../Pages/Category/RegisterCategory.vue'),
@@ -183,6 +204,7 @@ const routes = [
         meta: { permission: ['files.upload', 'courses.manage'] },    },
     {
         path: '/calendar',
+        meta: { permission: ['exams.manage', 'grading.manage'] },
         component: () => import('../Pages/EventCalendar.vue'),
         name: 'calendar',
     },
@@ -191,9 +213,10 @@ const routes = [
         component: () => import('../Pages/Group/GroupLearning.vue'),
         props: route => ({ idEdit: Number(route.params.idEdit) }),
         name: 'group.learning',
-        meta: { permission: ['users.courses', 'create-tasks'] },    },
+        meta: { permission: ['users.courses'] },    },
     {
         path: '/auk',
+        meta: { permission: ['courses.view'] },
         component: () => import('../Pages/User/UserPage.vue'),
         name: 'index',
     },
@@ -205,10 +228,11 @@ const routes = [
         meta: { permission: ['questions.manage'] },    },
     {
         path: '/questions',
+        meta: { permission: ['questions.view', 'questions.manage'] },
         component: () => import('../Pages/Gift/ExamineItem.vue'),
         props: (route) => ({
-            idEdit: parseInt(route.query.idEdit),
-            idCategory: parseInt(route.query.idCategory),
+            idEdit: toIntOrNull(route.query.idEdit),
+            idCategory: toIntOrNull(route.query.idCategory),
         }),
         name: 'questions',
     },
@@ -216,8 +240,8 @@ const routes = [
         path: '/questions-main',
         component: () => import('../Pages/Gift/ExamineMain.vue'),
         props: (route) => ({
-            idEdit: parseInt(route.query.idEdit),
-            idCategory: parseInt(route.query.idCategory),
+            idEdit: toIntOrNull(route.query.idEdit),
+            idCategory: toIntOrNull(route.query.idCategory),
         }),
         name: 'questions.main',
         meta: { permission: ['questions.view', 'questions.manage'] },    },
@@ -236,11 +260,12 @@ const routes = [
     {
         //        path: '/questions/:idEdit',
         path: '/questions',
+        meta: { permission: ['questions.view', 'questions.manage'] },
         component: () => import('../Pages/Gift/QuestionItem.vue'),
         // props: route => ({ idEdit: Number(route.params.idEdit) }),
         props: (route) => ({
-            idEdit: parseInt(route.query.idEdit),
-            idCategory: parseInt(route.query.idCategory),
+            idEdit: toIntOrNull(route.query.idEdit),
+            idCategory: toIntOrNull(route.query.idCategory),
         }),
         name: 'question.item',
     },
@@ -252,8 +277,8 @@ const routes = [
     //     component: () => import('../Pages/CourseManifest.vue'),
     //     // props: route => ({ idEdit: Number(route.params.idEdit)}),
     //     props: (route) => ({
-    //         idEdit: parseInt(route.query.idEdit),
-    //         idCategory: parseInt(route.query.idCategory),
+    //         idEdit: toIntOrNull(route.query.idEdit),
+    //         idCategory: toIntOrNull(route.query.idCategory),
     //     }),
     //     name: 'courses.itemmani',
 
@@ -265,8 +290,8 @@ const routes = [
         component: () => import('../Pages/Gift/QuestionNew.vue'),
         //props: route => ({ category_id: Number(route.params.category_id), aukstructure_id: Number(route.params.aukstructure_id) }),
         // props: (route) => ({
-        //     category_id: parseInt(route.query.current_category),
-        //     aukstructure_id: parseInt(route.query.current_auk_theme),
+        //     category_id: toIntOrNull(route.query.current_category),
+        //     aukstructure_id: toIntOrNull(route.query.current_auk_theme),
         // }),
         props: (route) => ({
             category_id: Number(route.params.category_id),
@@ -299,6 +324,7 @@ const routes = [
     // пробный файловый менеджер
     {
         path: '/filemanager',
+        meta: { permission: ['files.upload', 'content.manage'] },
         component: () => import('../Pages/Filemanager/FileManager.vue'),
         //props: route => ({ nameLyx: String(route.params.filemanager) }),
         name: 'filemanager',
@@ -348,6 +374,7 @@ const routes = [
     // },
     {
         path: '/user-course/:id',
+        meta: { permission: ['users.courses'] },
         name: 'userCourse',
         component: () => import('../Pages/User/UserCourse.vue'),
         props: route => ({ id: Number(route.params.id) }),

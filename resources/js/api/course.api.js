@@ -1,21 +1,26 @@
 import httpClient from './httpClient'
+import { numericQuery } from './envelope'
 
-const fetchCourses = (params = {}) => httpClient.get('/api/course', { params })
-const fetchCoursesFilter = (params) => httpClient.get('/api/course', { params })
+const fetchCourses = (params = {}) => httpClient.get('/api/courses', { params })
+// Фильтр курсов: aircraft_id/category_id необязательны. Пустые значения
+// (null, '', 0, undefined) отбрасываются, иначе axios отправлял бы
+// ?category_id=null, а контроллер считал бы это некорректным фильтром.
+const fetchCoursesFilter = (params) =>
+  httpClient.get('/api/courses', { params: numericQuery(params || {}) });
 const fetchCourse = (id) => httpClient.get(`/api/course/${id}`)
 // const fetchCourseByAir = (id,) => httpClient.get(`/api/course/`,data)
 //-------------------------------------------------------------------
 const fetchCourseByCourseAndCategory = (course_id, category_id) => {
   //console.log(course_id,"courseId");
   //console.log(category_id,"categoryId");
-  return httpClient.get(`/api/course?course_id=${course_id}&category_id=${category_id}`);
+  return httpClient.get('/api/course', { params: numericQuery({ course_id, category_id }) });
 };
 const fetchCourseByCourse = (course_id) => {
-  return httpClient.get(`/api/course?course_id=${course_id}`);
+  return httpClient.get('/api/course', { params: numericQuery({ course_id }) });
 };
 
 const fetchCourseByCategory = (category_id) => {
-  return httpClient.get(`/api/course?category_id=${category_id}`);
+  return httpClient.get('/api/course', { params: numericQuery({ category_id }) });
 };
 
 //-------------------------------------------------------------------

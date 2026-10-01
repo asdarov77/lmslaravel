@@ -173,7 +173,13 @@ class AuthController extends Controller
             'data' => [
                 'user' => $user,
                 'permissions' => $permissions,
-                'permission_slugs' => $permissions->pluck('slug')->all(),
+                // Эффективный набор прав, а не только строки таблицы.
+                // Именно его сравнивает фронт (Auth/hasPermission) при
+                // фильтрации меню и route guards. Раньше здесь отдавались
+                // лишь записи, найденные в permissions — пока каталог не
+                // синхронизирован (permissions:sync), права вроде users.view
+                // в ответе отсутствовали, и меню у администратора пустело.
+                'permission_slugs' => $slugs->values()->all(),
                 'roles' => $user->roles->map(fn ($r) => [
                     'id' => $r->id,
                     'name' => $r->rolename,

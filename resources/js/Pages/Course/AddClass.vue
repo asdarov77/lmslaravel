@@ -1,167 +1,305 @@
-
 <template>
-  <v-flex xs12 sm8 md4>
+  <v-col xs12 sm8 md4>
     <v-card class="elevation-12 mx-auto">
       <v-toolbar color="primary">
         <v-toolbar-title>Добавление класса</v-toolbar-title>
       </v-toolbar>
       <v-card-text>
-        <v-form @submit.prevent="submitForm">
-          <v-combobox v-model="path" :items="tags" label="Выберите класс для добавления" :disabled="loading"></v-combobox>
-          <v-text-field :disabled="loading" label="Описание" type="text" v-model="title"></v-text-field>
+        <v-alert
+          v-if="errorMessage"
+          type="error"
+          variant="tonal"
+          class="mb-4"
+          :text="errorMessage"
+        ></v-alert>
+        <v-alert
+          v-if="successMessage"
+          type="success"
+          variant="tonal"
+          class="mb-4"
+          :text="successMessage"
+        ></v-alert>
+
+        <v-form ref="form" @submit.prevent="submitForm">
+          <v-combobox
+            v-model="path"
+            :items="tags"
+            label="Выберите класс для добавления"
+            :disabled="loading"
+            :rules="[rules.required]"
+          ></v-combobox>
+          <v-text-field
+            :disabled="loading"
+            label="Описание"
+            type="text"
+            v-model="title"
+            :rules="[rules.required]"
+          ></v-text-field>
 
           <div>
-            <v-progress-linear v-if="loading" :value="progress" height="5" :indeterminate="true"
-              :color="progressColor"></v-progress-linear>
+            <v-progress-linear
+              v-if="loading"
+              :value="progress"
+              height="5"
+              :indeterminate="true"
+              :color="progressColor"
+            ></v-progress-linear>
           </div>
-          <!-- компонент FileUploader для загрузки и распаковки. пока отключаем его -->
-          <!-- <div>
-            <file-uploader></file-uploader>
-            <v-progress-linear v-if="progress !== null" :value="progress" :height="10"
-              color="primary"></v-progress-linear>
-          </div> -->
         </v-form>
       </v-card-text>
       <v-card-actions class="d-flex justify-space-between">
-        <v-spacer></v-spacer>
-        <v-btn @click="clearDatabase" v-if="!loading" class="mr-auto d-flex" color="error">
-          Очиститьбазу данных
+        <v-btn @click="clearDatabase" :loading="clearing" :disabled="loading" class="mr-auto" color="error">
+          Очистить базу данных
         </v-btn>
-        <ButtonGroup class="mr-3" v-if="!loading" @submitForm="uploadData" @cancelBtn="cancelBtnHead"></ButtonGroup>
+        <ButtonGroup
+          class="mr-3"
+          v-if="!loading"
+          @submitForm="uploadData"
+          @cancelBtn="cancelBtnHead"
+        ></ButtonGroup>
       </v-card-actions>
     </v-card>
-  </v-flex>
+  </v-col>
 </template>
 
 <script>
-import FileUploader from '../../components/FileUploader.vue'
 import { mapState, mapGetters } from "vuex";
 import ButtonGroup from "../../components/ButtonGroup.vue";
 import $api from "../../api/httpClient";
-import { unwrapArray, unwrapField } from "../../api/envelope";
-import 'vuetify/dist/vuetify.min.css';
-import ProgressLinear from '../../components/ProgressLinear.vue';
+import { unwrapArray, unwrapResponse } from "../../api/envelope";
 
-const apiUrl = import.meta.env.VITE_APP_URL;
+/**
+ * Приводит значение v-combobox к строке.
+ *
+ * Vuetify в зависимости от версии отдаёт выбранный элемент строкой,
+ * объектом { text, value } либо массивом (мультивыбор). Бэкенд тоже
+ * принимает только непустую строку, поэтому пустые значения и не
+ * строковые «обёртки» приводим к null и не отправляем запрос вовсе —
+ * раньше форма уходила с path: "" и получала 422 без объяснений.
+ */
+export const toClassPath = (value) => {
+  if (typeof value === "string") {
+    return value.trim() === "" ? null : value.trim();
+  }
+
+  if (Array.isArray(value)) {
+    return value.length ? toClassPath(value[0]) : null;
+  }
+
+  if (value && typeof value === "object") {
+    return toClassPath(value.value ?? value.text ?? value.title ?? value.name ?? null);
+  }
+
+  return null;
+};
+
+/**
+ * Достаёт человекочитаемый текст ошибки из ответа axios.
+ *
+ * Раньше ошибка 422/409/500 уходила только в console.error, и пользователь
+ * видел «ничего не произошло». Теперь текст показывается в v-alert.
+ */
+export const extractApiError = (error, fallback = "Не удалось выполнить операцию") => {
+  const body = error?.response?.data;
+
+  // Конверт ApiResponseEnvelope: { success, data, error: { message } }
+  const envelopeMessage = unwrapResponse(body) ?? body?.error?.message;
+
+  if (typeof envelopeMessage === "string" && envelopeMessage.trim() !== "") {
+    return envelopeMessage;
+  }
+
+  // Ответ валидации Laravel: { message, errors: { field: [msg, ...] } }
+  if (body && typeof body === "object" && body.errors && typeof body.errors === "object") {
+    const messages = Object.values(body.errors)
+      .flat()
+      .filter((msg) => typeof msg === "string" && msg.trim() !== "");
+    if (messages.length) {
+      return messages.join(" ");
+    }
+  }
+
+  if (typeof body?.message === "string" && body.message.trim() !== "") {
+    return body.message;
+  }
+
+  if (error?.message && !/Network Error|timeout/i.test(error.message)) {
+    return error.message;
+  }
+
+  return fallback;
+};
 
 export default {
+  name: "AddClass",
   components: {
     ButtonGroup,
-    ProgressLinear,
-    FileUploader,
   },
   data() {
     return {
       allTags: [],
       tags: [],
       auks: [],
-      errors: [],
       title: "",
       path: "",
       loading: false,
+      clearing: false,
       progress: 0,
-      progressColor: 'blue',
+      progressColor: "blue",
+      errorMessage: "",
+      successMessage: "",
+      rules: {
+        required: (value) => {
+          const normalized = toClassPath(value);
+          return (normalized !== null && normalized !== "") || "Поле обязательно для заполнения";
+        },
+      },
     };
-  },
-
-
-
-  async mounted() {
-
-
-    try {
-      const response = await $api.get(apiUrl + "/api/classesfs");
-      this.allTags = unwrapArray(response);
-      this.tags = this.allTags;
-    } catch (error) {
-      console.error(error);
-    }
   },
 
   computed: {
     ...mapState("Course", ["courses", "category", "totalCourses", "course"]),
-    ...mapGetters("Course", ["categories", "courses"]),
+    ...mapGetters("Course", ["categories"]),
+
+    /** Каталог классов, отфильтрованный по уже введённому тексту. */
+    filteredTags() {
+      const search = toClassPath(this.path);
+
+      if (search === null) {
+        return this.allTags;
+      }
+
+      return this.allTags.filter((tag) => tag.toLowerCase().includes(search.toLowerCase()));
+    },
+
+    /** Кнопка сохранения активна только с заполненными полями. */
+    canSubmit() {
+      return toClassPath(this.path) !== null && this.title.trim() !== "";
+    },
+  },
+
+  async mounted() {
+    await this.loadTags();
   },
 
   methods: {
-    async uploadData() {
-      // if (!(this.path && this.title)) {
-      //   return;
-      // }
-      const data = {
-        title: this.title,
-        path: this.path,
-      };
-      this.loading = true;
+    /** Загружает список каталогов-классов с диска. */
+    async loadTags() {
       try {
-        const response = await $api.post(apiUrl + "/api/classes", data, {
-          onUploadProgress: (progressEvent) => {
-            this.progress = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            );
-          },
-        });
-        this.tags = this.tags.filter((tag) => tag !== this.path);
-        this.auks = unwrapField(response, 'auks');
+        const response = await $api.get("/api/classesfs");
+        this.allTags = unwrapArray(response);
+        this.tags = this.allTags;
       } catch (error) {
-        console.error(error);
+        this.errorMessage = extractApiError(error, "Не удалось загрузить список классов");
+      }
+    },
+
+    /**
+     * Основной обработчик кнопки «Сохранить» (ButtonGroup @submitForm).
+     *
+     * Раньше запрос уходил даже с пустыми полями и возвращал 422,
+     * а submit формы (v-form @submit) делал вторую, ни о чём не
+     * сообщавшую попытку и всегда уводил на предыдущую страницу.
+     * Теперь обе точки входа ведут в один метод с валидацией.
+     */
+    async uploadData() {
+      this.errorMessage = "";
+      this.successMessage = "";
+
+      const path = toClassPath(this.path);
+
+      if (path === null) {
+        this.errorMessage = "Выберите класс для добавления";
+        return false;
+      }
+
+      if (this.title.trim() === "") {
+        this.errorMessage = "Укажите описание класса";
+        return false;
+      }
+
+      this.loading = true;
+
+      try {
+        const response = await $api.post(
+          "/api/classes",
+          { title: this.title.trim(), path },
+          {
+            onUploadProgress: (progressEvent) => {
+              this.progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            },
+          }
+        );
+
+        const payload = unwrapResponse(response);
+        // Сводка импорта лежит в meta (см. AircraftController::storeclasses):
+        // там aircraft, courses, auk (массив импортированных АУК), gift_files_parsed.
+        // Раньше здесь читался data.auks, которого в data нет вообще, поэтому
+        // пользователю всегда показывалось «Загружено АУК: 0».
+        const summary = response?.data?.meta ?? {};
+        const imported = Array.isArray(summary.auk)
+          ? summary.auk
+          : Array.isArray(summary.auks)
+            ? summary.auks
+            : Array.isArray(payload?.auks)
+              ? payload.auks
+              : [];
+        this.auks = imported;
+        const parsed = Number.isFinite(Number(summary.gift_files_parsed))
+          ? Number(summary.gift_files_parsed)
+          : null;
+        this.tags = this.tags.filter((tag) => tag !== path);
+        this.successMessage = parsed === null
+          ? `Класс «${path}» импортирован. Загружено АУК: ${imported.length}.`
+          : `Класс «${path}» импортирован. Загружено АУК: ${imported.length} (распознано документов: ${parsed}).`;
+        this.title = "";
+        this.path = "";
+        return true;
+      } catch (error) {
+        this.errorMessage = extractApiError(error);
+        return false;
       } finally {
         this.loading = false;
         this.progress = 0;
       }
     },
 
-    async clearDatabase() {
-      try {
-        const response = await $api.post(apiUrl + "/api/clear-database");
-        console.log(response.data);
-        this.tags = this.allTags
-      } catch (error) {
-        console.error(error);
-      }
+    /** Submit формы (Enter в поле). Ведёт в тот же сценарий, что и кнопка. */
+    async submitForm() {
+      await this.uploadData();
     },
 
-    submitForm() {
-      if (!this.path || !this.title) {
-        return;
+    async clearDatabase() {
+      // Повторный клик во время запроса игнорируем: truncate необратим,
+      // две параллельные очистки бессмысленны.
+      if (this.clearing) {
+        return false;
       }
-      const formData = {
-        title: this.title,
-        path: this.path,
-      };
-      $api.post(apiUrl + "/api/classes", formData)
-        .then((response) => {
-          this.auks = unwrapField(response, 'auks');
-        })
-        .finally(() => {
-          this.$router.go(-1);
-        });
+
+      this.errorMessage = "";
+      this.successMessage = "";
+      this.clearing = true;
+
+      try {
+        await $api.post("/api/clear-database");
+        // После очистки на диске снова доступны все каталоги, поэтому
+        // список тегов возвращаем к исходному (раньше оставалась
+        // урезанная копия без только что очищенных классов).
+        this.tags = this.allTags;
+        this.successMessage = "База данных очищена";
+        await this.loadTags();
+        return true;
+      } catch (error) {
+        this.errorMessage = extractApiError(error, "Не удалось очистить базу данных");
+        return false;
+      } finally {
+        this.clearing = false;
+      }
     },
 
     cancelBtnHead() {
       this.$router.go(-1);
     },
-
-    getFilteredTags(search) {
-      if (!search) {
-        return this.allTags;
-      }
-      const regex = new RegExp(search.trim(), "i");
-      return this.allTags.filter((tag) => regex.test(tag));
-    },
-  },
-
-  watch: {
-    path(search) {
-      this.filteredTags = this.getFilteredTags(search);
-    },
-  },
-
-  computed: {
-    filteredTags() {
-      return this.getFilteredTags(this.path);
-    },
   },
 };
-</script> 
-
+</script>

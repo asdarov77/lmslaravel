@@ -73,5 +73,7 @@ class Kernel extends HttpKernel
          'custom' =>  \App\Http\Middleware\CustomAuthenticateSessionMiddleware::class,
         'abilities' => \Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
         'ability' => \Laravel\Sanctum\Http\Middleware\CheckForAnyAbility::class,
+        // Подпись приватного контента курсов (HMAC в query-строке).
+        'private.content.signature' => \App\Http\Middleware\ValidatePrivateContentSignature::class,
     ];
 }

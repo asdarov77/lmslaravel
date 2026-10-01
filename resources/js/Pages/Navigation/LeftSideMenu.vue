@@ -20,7 +20,7 @@ const { t } = useI18n({ useScope: "global" });
           <v-list-item
             v-bind="props"
             prepend-icon="mdi-account-circle"
-            title="Пользователи"
+            :title="$t('app.menu.userSection')"
           ></v-list-item>
         </template>
 
@@ -52,17 +52,6 @@ export default {
     ...mapGetters("Auth", ["hasPermission"]),
     hasEditPermission() {
       return this.hasPermission(["manage-users"], "Manage users");
-    },
-
-    // Единый предиктор видимости пункта меню. Логика совпадает с
-    // роутер-гардом (Router/index.js) и бэкенд-middleware: пункт без
-    // требований виден всем, иначе достаточно ОДНОГО из прав (OR).
-    // hasPermission в сторе понимает и старые slug'и (manage-users),
-    // и новые (users.view) через алиасы каталога.
-    visibleFor(contentType) {
-      if (!contentType || !contentType.trim()) return true;
-      const list = Array.isArray(contentType) ? contentType : [contentType];
-      return this.hasPermission(list);
     },
 
     menuItems() {
@@ -116,20 +105,24 @@ export default {
         //   contentType: "manage-users",
         // },
         {
+          // Регресс: пункт вёл на /user/learning — такого маршрута в
+          // Router/routes.js нет, клик открывал страницу 404. Теперь
+          // ведёт на существующий group.learning, а заголовок переведён
+          // в i18n вместо литерала "user learning".
           icon: "mdi-calendar",
-          title: "user learning",
-          link: "/user/learning",
+          title: this.$t("app.menu.learning"),
+          link: "/group/learning/1",
           contentType: " ",
         },
         {
           icon: "mdi-calendar",
-          title: "Экзамен",
+          title: this.$t("app.menu.exams"),
           link: "/questions",
           contentType: "manage-users",
         },
         {
           icon: "mdi-calendar",
-          title: "Банк вопросов",
+          title: this.$t("app.menu.questionbank"),
           link: "/questions-main",
           contentType: "manage-users",
         },
@@ -159,15 +152,45 @@ export default {
           contentType: "",
         },
         {
+          // Регресс: подпись была "Курсы" — такой же, как у пункта
+          // /courses/list. Оба элемента получали одинаковый id, и Vuetify
+          // ругался «Multiple nodes with the same ID». Пункт ведёт на
+          // личный кабинет (/auk), поэтому подпись «Мои курсы».
           icon: "mdi-cog-outline",
-          title: this.$t("app.menu.courses"),
-          link: "/auk/",
+          title: this.$t("app.menu.mycourses"),
+          link: "/auk",
           contentType: "",
         },
         
       ]
       
       return items.filter(menu => this.visibleFor(menu.contentType));
+    },
+  },
+
+  // ВАЖНО: это метод, а НЕ computed.
+  // Раньше visibleFor был объявлен в computed, и Vue вызывал его как
+  // getter, передавая первым аргументом сам экземпляр компонента.
+  // Внутри шло `contentType.trim()` => "TypeError: e.trim is not a function",
+  // и всё боковое меню падало (в том числе у администратора).
+  methods: {
+    /**
+     * Единый предиктор видимости пункта меню. Логика совпадает с
+     * роутер-гардом (Router/index.js) и бэкенд-middleware: пункт без
+     * требований виден всем, иначе достаточно ОДНОГО из прав (OR).
+     * hasPermission в сторе понимает и старые slug'и (manage-users),
+     * и новые (users.view) через алиасы каталога.
+     */
+    visibleFor(contentType) {
+      // Приводим к строке: в пункт меню может попасть массив slug'ов
+      // или неожиданный тип из конфигурации.
+      const raw = Array.isArray(contentType)
+        ? contentType.filter(Boolean).map(v => String(v).trim()).filter(Boolean)
+        : (contentType == null ? [] : [String(contentType).trim()]).filter(Boolean);
+
+      if (raw.length === 0) return true;
+
+      return this.hasPermission(raw);
     },
   },
 };

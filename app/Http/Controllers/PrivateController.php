@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Auth;
 
 use App\Models\Role;
+use App\Support\PrivateContent;
+use App\Support\PrivateContentSigner;
 use App\Models\User;
 use Laravel\Sanctum\NewAccessToken;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -35,14 +37,83 @@ class PrivateController extends Controller
 
   public function htmles00($aircraft, $auk)
   {
-    $path = "private/{$aircraft}/{$auk}/index.html";
+    $path = PrivateContent::safePath($aircraft, $auk, 'index.html');
     $ext = pathinfo($path)['extension'];
     $header_type = $this->get_mime_type($ext);
-    if (Storage::exists($path)) {
-      $contents = Storage::get($path);
+    if (Storage::disk('private')->exists($path)) {
+      $contents = Storage::disk('private')->get($path);
       return response($contents, 200)->header("Content-Type", $header_type);
     }
     abort(404);
+  }
+
+  /**
+   * Отдаёт любой файл курса по подписанному пути.
+   *
+   * Маршрут: /private/{aircraft}/{auk}/{path}, где path =
+   * "{expires}/{signature}/{файл}". Первые два сегмента — подпись,
+   * их проверяет middleware ValidatePrivateContentSignature; остальное —
+   * путь к файлу внутри каталога курса.
+   *
+   * Зачем единый метод вместо девяти htmles* с фиксированным числом
+   * сегментов: глубина вложенности файлов у курсов разная, а подпись
+   * в пути должна быть перед именем файла независимо от её длины.
+   */
+  public function htmlesPath($aircraft, $auk, $path)
+  {
+    $segments = explode('/', (string) $path);
+
+    // Минимум: expires, signature, имя файла.
+    if (count($segments) < 3) {
+      return response("File not found", 404);
+    }
+
+    // Отбрасываем подпись — её уже проверил middleware.
+    array_shift($segments);
+    array_shift($segments);
+
+    $file = implode('/', $segments);
+
+    if ($file === '' || $file === 'index.html') {
+      // index.html отдаём целиком, как раньше делал htmles00.
+      $fullPath = PrivateContent::safePath($aircraft, $auk, 'index.html');
+      $ext = pathinfo($fullPath)['extension'];
+      $header_type = $this->get_mime_type($ext);
+
+      if (Storage::disk('private')->exists($fullPath)) {
+        $contents = Storage::disk('private')->get($fullPath);
+        return response($contents, 200)->header("Content-Type", $header_type);
+      }
+
+      abort(404);
+    }
+
+    $fullPath = PrivateContent::safePath($aircraft, $auk, ...$segments);
+    $ext = pathinfo($fullPath)['extension'];
+    $header_type = $this->get_mime_type($ext);
+
+    if (Storage::disk('private')->exists($fullPath)) {
+      // ВАЖНО: readStream вызывается на диске 'private'. Вызов через
+      // фасад Storage::readStream() брал диск по умолчанию (local),
+      // файл не находился, возвращался null, и feof(null) ронял
+      // ответ с TypeError 500.
+      $handle = Storage::disk('private')->readStream($fullPath);
+
+      return response()->stream(function () use ($handle) {
+          while (!feof($handle)) {
+              $buffer = fread($handle, 8192);
+              ob_start();
+              echo $buffer;
+              ob_end_flush();
+          }
+
+          fclose($handle);
+      }, 200, [
+          "Content-Type" => $header_type
+      ]);
+    }
+
+    return response("File not found", 404);
   }
 
 // в этом контроллере пропускаем через фильтр статические файлы курсов,
@@ -55,14 +126,14 @@ class PrivateController extends Controller
   //   //$searchController = new SearchController();  
 
   //   if($html=='index.html') return;
-  //   $path = "private/{$aircraft}/{$auk}/{$html}";
+  //   $path = PrivateContent::safePath($aircraft, $auk, $html);
   //   $ext = pathinfo($path)['extension'];
   //   $header_type = $this->get_mime_type($ext);
     
     
     
-  //     if (Storage::exists($path)) {
-  //     $contents = Storage::get($path);    
+  //     if (Storage::disk('private')->exists($path)) {
+  //     $contents = Storage::disk('private')->get($path);    
     
     
   //     // делаем подсветку
@@ -72,7 +143,7 @@ class PrivateController extends Controller
   //     return response($contents, 200)->header("Content-Type", $header_type);
 
   //     //return Auth::user()->role;
-  //     //$contents = Storage::get($path);    
+  //     //$contents = Storage::disk('private')->get($path);    
   //     //return $contents;   
 
   //     //return View::make('courses', ['contents' => "$contents"]); 
@@ -96,12 +167,16 @@ class PrivateController extends Controller
           return;
       }
       
-      $path = "private/{$aircraft}/{$auk}/{$html}";
+      $path = PrivateContent::safePath($aircraft, $auk, $html);
       $ext = pathinfo($path)['extension'];
       $header_type = $this->get_mime_type($ext);
   
-      if (Storage::exists($path)) {
-          $handle = Storage::readStream($path);
+      if (Storage::disk('private')->exists($path)) {
+          // ВАЖНО: readStream вызывается на диске 'private'. Вызов через
+          // фасад Storage::readStream() брал диск по умолчанию (local),
+          // файл не находился, возвращался null, и feof(null) ронял
+          // ответ с TypeError 500.
+          $handle = Storage::disk('private')->readStream($path);
   
           return response()->stream(function () use ($handle) {
               while (!feof($handle)) {
@@ -129,11 +204,11 @@ class PrivateController extends Controller
   //         return;
   //     }
   
-  //     $path = "private/{$aircraft}/{$auk}/{$html}";
+  //     $path = PrivateContent::safePath($aircraft, $auk, $html);
   //     $ext = pathinfo($path)['extension'];
   //     $header_type = $this->get_mime_type($ext);
   
-  //     if (!Storage::exists($path)) {
+  //     if (!Storage::disk('private')->exists($path)) {
   //         return response("File not found", 404);
   //     }
   
@@ -158,11 +233,11 @@ class PrivateController extends Controller
 //         return;
 //     }
 
-//     $path = "private/{$aircraft}/{$auk}/{$html}";
+//     $path = PrivateContent::safePath($aircraft, $auk, $html);
 //     $ext = pathinfo($path)['extension'];
 //     $header_type = $this->get_mime_type($ext);
 
-//     if (!Storage::exists($path)) {
+//     if (!Storage::disk('private')->exists($path)) {
 //         return response("File not found", 404);
 //     }
 
@@ -201,7 +276,7 @@ class PrivateController extends Controller
 
   public function htmles2($aircraft, $auk, $html, $html2)
   {
-    $path = "private/{$aircraft}/{$auk}/{$html}/{$html2}";
+    $path = PrivateContent::safePath($aircraft, $auk, $html, $html2);
     $ext = pathinfo($path)['extension'];
     $header_type = $this->get_mime_type($ext);
 
@@ -217,8 +292,8 @@ class PrivateController extends Controller
 
 
     //return $contents;
-    if (Storage::exists($path)) {
-      $contents = Storage::get($path);
+    if (Storage::disk('private')->exists($path)) {
+      $contents = Storage::disk('private')->get($path);
       return response($contents, 200)->header("Content-Type", $header_type);
       //return $contents;                
     }
@@ -227,7 +302,7 @@ class PrivateController extends Controller
 
   public function htmles3($aircraft, $auk, $html, $html2, $html3)
   {
-    $path = "private/{$aircraft}/{$auk}/{$html}/{$html2}/{$html3}";
+    $path = PrivateContent::safePath($aircraft, $auk, $html, $html2, $html3);
     $ext = pathinfo($path)['extension'];
     $header_type = $this->get_mime_type($ext);
 
@@ -244,8 +319,8 @@ class PrivateController extends Controller
 
 
     //return $contents;
-    if (Storage::exists($path)) {
-      $contents = Storage::get($path);
+    if (Storage::disk('private')->exists($path)) {
+      $contents = Storage::disk('private')->get($path);
       return response($contents, 200)->header("Content-Type", $header_type);
       // $contents-> header('Content-Type', $header_type)   ;
       //return $contents;                
@@ -254,7 +329,7 @@ class PrivateController extends Controller
   }
   public function htmles4($aircraft, $auk, $html, $html2, $html3, $html4)
   {
-    $path = "private/{$aircraft}/{$auk}/{$html}/{$html2}/{$html3}/{$html4}";
+    $path = PrivateContent::safePath($aircraft, $auk, $html, $html2, $html3, $html4);
     $ext = pathinfo($path)['extension'];
     $header_type = $this->get_mime_type($ext);
     $opts = array(
@@ -268,8 +343,8 @@ class PrivateController extends Controller
 
 
     //return $contents;
-    if (Storage::exists($path)) {
-      $contents = Storage::get($path);
+    if (Storage::disk('private')->exists($path)) {
+      $contents = Storage::disk('private')->get($path);
       //return $contents;                
       return response($contents, 200)->header("Content-Type", $header_type);
     }
@@ -278,7 +353,7 @@ class PrivateController extends Controller
 
   public function htmles5($aircraft, $auk, $html, $html2, $html3, $html4, $html5)
   {
-    $path = "private/{$aircraft}/{$auk}/{$html}/{$html2}/{$html3}/{$html4}/{$html5}";
+    $path = PrivateContent::safePath($aircraft, $auk, $html, $html2, $html3, $html4, $html5);
     $ext = pathinfo($path)['extension'];
     $header_type = $this->get_mime_type($ext);
     $opts = array(
@@ -292,8 +367,8 @@ class PrivateController extends Controller
 
 
     //return $contents;
-    if (Storage::exists($path)) {
-      $contents = Storage::get($path);
+    if (Storage::disk('private')->exists($path)) {
+      $contents = Storage::disk('private')->get($path);
       return response($contents, 200)->header("Content-Type", $header_type);
       // return $contents;                
     }
@@ -302,7 +377,7 @@ class PrivateController extends Controller
 
   public function htmles6($aircraft, $auk, $html, $html2, $html3, $html4, $html5, $html6)
   {
-    $path = "private/{$aircraft}/{$auk}/{$html}/{$html2}/{$html3}/{$html4}/{$html5}/{$html6}";
+    $path = PrivateContent::safePath($aircraft, $auk, $html, $html2, $html3, $html4, $html5, $html6);
     $ext = pathinfo($path)['extension'];
     $header_type = $this->get_mime_type($ext);
     $opts = array(
@@ -316,8 +391,8 @@ class PrivateController extends Controller
 
 
     //return $contents;
-    if (Storage::exists($path)) {
-      $contents = Storage::get($path);
+    if (Storage::disk('private')->exists($path)) {
+      $contents = Storage::disk('private')->get($path);
       return response($contents, 200)->header("Content-Type", $header_type);
       // return $contents;                
     }
@@ -327,7 +402,7 @@ class PrivateController extends Controller
 
   public function htmles7($aircraft, $auk, $html, $html2, $html3, $html4, $html5, $html6, $html7)
   {
-    $path = "private/{$aircraft}/{$auk}/{$html}/{$html2}/{$html3}/{$html4}/{$html5}/{$html6}/{$html7}";
+    $path = PrivateContent::safePath($aircraft, $auk, $html, $html2, $html3, $html4, $html5, $html6, $html7);
     $ext = pathinfo($path)['extension'];
     $header_type = $this->get_mime_type($ext);
     $opts = array(
@@ -341,8 +416,8 @@ class PrivateController extends Controller
 
 
     //return $contents;
-    if (Storage::exists($path)) {
-      $contents = Storage::get($path);
+    if (Storage::disk('private')->exists($path)) {
+      $contents = Storage::disk('private')->get($path);
       return response($contents, 200)->header("Content-Type", $header_type);
       // return $contents;                
     }
@@ -352,7 +427,7 @@ class PrivateController extends Controller
 
   public function htmles8($aircraft, $auk, $html, $html2, $html3, $html4, $html5, $html6, $html7, $html8)
   {
-    $path = "private/{$aircraft}/{$auk}/{$html}/{$html2}/{$html3}/{$html4}/{$html5}/{$html6}/{$html7}/{$html8}";
+    $path = PrivateContent::safePath($aircraft, $auk, $html, $html2, $html3, $html4, $html5, $html6, $html7, $html8);
     $ext = pathinfo($path)['extension'];
     $header_type = $this->get_mime_type($ext);
     $opts = array(
@@ -366,23 +441,57 @@ class PrivateController extends Controller
 
 
     //return $contents;
-    if (Storage::exists($path)) {
-      $contents = Storage::get($path);
+    if (Storage::disk('private')->exists($path)) {
+      $contents = Storage::disk('private')->get($path);
       return response($contents, 200)->header("Content-Type", $header_type);
       // return $contents;                
     }
     abort(404);
   }
 
+  /**
+   * Выдаёт подписанный URL базового каталога курса.
+   *
+   * Фронтенд подставляет его в <base href>, и все относительные ресурсы
+   * (CSS, JS, картинки) наследуют токен. Требует авторизации — иначе
+   * подписанный URL можно было бы получить без входа в систему.
+   */
+  public function signedUrl(Request $request)
+  {
+    $aircraft = PrivateContent::sanitizeSegment((string) $request->query('aircraft', ''));
+    $auk = PrivateContent::sanitizeSegment((string) $request->query('auk', ''));
+
+    if ($aircraft === null || $auk === null) {
+      return response()->json([
+        'success' => false,
+        'data'    => null,
+        'error'   => 'Некорректный путь к курсу',
+        'meta'    => null,
+      ], 422);
+    }
+
+    // Отдаём подписанный префикс пути: фронтенд подставляет его в <base href>
+    // и дописывает имя файла. Подпись в пути наследуется всеми относительными
+    // ресурсами документа (CSS, JS, картинками).
+    return response()->json([
+        'success' => true,
+        'data'    => [
+            'base' => PrivateContentSigner::signedPath($aircraft, $auk),
+        ],
+        'error'   => null,
+        'meta'    => null,
+    ]);
+  }
+
   public function images(Request $request, $html)
   {
 
-    $path = "private/{$html}";
+    $path = PrivateContent::safePath($html);
 
 
     //return $contents;
-    if (Storage::exists($path)) {
-      $contents = Storage::get($path);
+    if (Storage::disk('private')->exists($path)) {
+      $contents = Storage::disk('private')->get($path);
       //return $contents;
       return $contents;
 

@@ -20,6 +20,35 @@
 
 return [
 
+    // Системные роли, которые должны существовать в БД сразу после
+    // установки. Это единственный источник правды: его используют
+    // RoleSeeder, artisan permissions:sync и RoleController.
+    //
+    // Ключ — канонический slug (совпадает с User::ROLE_ALIASES и с
+    // проверкой isSuperAdmin()), значение — отображаемое имя, которым
+    // заполняется role_matrix.
+    //
+    // Раньше RoleSeeder не вызывался из DatabaseSeeder вовсе, поэтому на
+    // чистой базе ролей не было, и permissions:sync молча пропускал их.
+    'system_roles' => [
+        'admin' => [
+            'name' => 'Администратор',
+            // Администратор — суперпользователь: обходит проверку прав,
+            // но ему всё равно назначается полный набор для корректности
+            // отчётов и на случай отключения bypass.
+            'permissions' => '*',
+        ],
+        'instructor' => [
+            'name' => 'Инструктор',
+            // набор берётся из role_matrix ниже
+            'permissions' => 'matrix',
+        ],
+        'trainee' => [
+            'name' => 'Обучаемый',
+            'permissions' => 'matrix',
+        ],
+    ],
+
     // Права, которые нельзя удалять/редактировать через API и UI.
     'protected_slugs' => [
         'system.maintenance',
@@ -69,6 +98,13 @@ return [
             'group' => 'courses',
             'legacy' => ['manage-course', 'edit_courses'],
         ],
+        // Публикация — отдельное право от manage: в LMS (Moodle/Canvas)
+        // автор может редактировать черновик, но публикация требует
+        // отдельного допуска.
+        'courses.publish' => [
+            'name' => 'Публикация и снятие с публикации курса',
+            'group' => 'courses',
+        ],
         'categories.manage' => [
             'name' => 'Управление категориями курсов',
             'group' => 'courses',
@@ -97,9 +133,30 @@ return [
             'name' => 'Управление банком вопросов',
             'group' => 'questions',
         ],
+        // take — прохождение (обучаемому), manage — выдача/сбор экмена (методисту)
         'exams.take' => [
             'name' => 'Прохождение экзаменов',
             'group' => 'questions',
+        ],
+        'exams.manage' => [
+            'name' => 'Управление экзаменами (выдача, сбор, сброс)',
+            'group' => 'questions',
+        ],
+
+        // ------------------------------------------------------------------
+        // Оценивание
+        // ------------------------------------------------------------------
+        'grading.manage' => [
+            'name' => 'Оценки, границы оценивания и журнал',
+            'group' => 'grading',
+        ],
+
+        // ------------------------------------------------------------------
+        // Прогресс обучения
+        // ------------------------------------------------------------------
+        'progress.view' => [
+            'name' => 'Просмотр прогресса обучения обучаемых',
+            'group' => 'progress',
         ],
 
         // ------------------------------------------------------------------
@@ -109,9 +166,27 @@ return [
             'name' => 'Загрузка файлов',
             'group' => 'content',
         ],
+        // Чтение учебного контента отделено от управления: методист
+        // может открыть и изучить АУК, не имея прав на его загрузку.
+        'content.view' => [
+            'name' => 'Просмотр учебного контента (АУК, материалы)',
+            'group' => 'content',
+        ],
         'content.manage' => [
             'name' => 'Управление учебным контентом (АУК, классы)',
             'group' => 'content',
+        ],
+
+        // ------------------------------------------------------------------
+        // Отчёты и аудит
+        // ------------------------------------------------------------------
+        'reports.view' => [
+            'name' => 'Просмотр отчётов и аналитики',
+            'group' => 'reports',
+        ],
+        'audit.view' => [
+            'name' => 'Просмотр журнала аудита доступа',
+            'group' => 'reports',
         ],
 
         // ------------------------------------------------------------------
@@ -122,7 +197,7 @@ return [
             'group' => 'system',
         ],
         'settings.manage' => [
-            'name' => 'Управление настройками и границами оценок',
+            'name' => 'Управление настройками системы',
             'group' => 'system',
         ],
         'system.maintenance' => [
@@ -139,14 +214,15 @@ return [
     */
     'role_matrix' => [
         'Инструктор' => [
-            'courses.view', 'courses.manage', 'categories.manage',
+            'courses.view', 'courses.manage', 'courses.publish', 'categories.manage',
             'groups.view', 'groups.manage',
-            'questions.view', 'questions.manage', 'exams.take',
-            'files.upload', 'content.manage',
-            'dictionaries.view', 'users.view',
+            'questions.view', 'questions.manage', 'exams.take', 'exams.manage',
+            'grading.manage', 'progress.view',
+            'files.upload', 'content.view', 'content.manage',
+            'dictionaries.view', 'reports.view', 'users.view',
         ],
         'Обучаемый' => [
-            'courses.view', 'exams.take', 'dictionaries.view',
+            'courses.view', 'exams.take', 'content.view', 'dictionaries.view',
         ],
     ],
 ];

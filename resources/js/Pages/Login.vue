@@ -1,5 +1,5 @@
 <template>
-  <v-flex xs12 sm8 md4>
+  <v-col cols="12" sm="8" md="4">
     <v-card class="elevation-12 mx-auto" style="width: 600px">
       <v-toolbar color="primary">
         <v-toolbar-title>Форма авторизации</v-toolbar-title>
@@ -37,7 +37,7 @@
       </v-card-actions>
     </v-card>
     <popup :alert="alert" :alertType="alertType" :snackbarText="snackbarText" :overlay="alert" :alertFalse="alertFalse"></popup>  
-  </v-flex>
+  </v-col>
 </template>
 
 <script>

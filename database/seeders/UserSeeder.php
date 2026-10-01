@@ -2,150 +2,92 @@
 
 namespace Database\Seeders;
 
-use App\Models\Role;
-use App\Models\User;
-use App\Models\Permission;
+use App\Models\Group;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
+/**
+ * Демонстрационные пользователи.
+ *
+ * Регресс: group_id был зашит константами 1, 2, 3. Groups создаются
+ * фабрикой, поэтому их id не обязаны начинаться с единицы: достаточно
+ * одного предыдущего заполнения sequence (RefreshDatabase откатывает
+ * транзакцию, но НЕ сбрасывает sequence — в PostgreSQL nextval не
+ * transactional), и сидер падал с
+ * «Key (group_id)=(1) отсутствует в таблице groups».
+ *
+ * Теперь id групп резолвятся по фактическому содержимому таблицы, а если
+ * групп меньше, чем нужно, они досоздаются.
+ */
 class UserSeeder extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Демо-пользователи: [fio, роль, номер группы].
      *
-     * @return void
+     * @var array<int, array{0: string, 1: string, 2: int}>
      */
+    private const USERS = [
+        ['Администратор', 'Администратор', 1],
+        ['Иванов Иван Иванович', 'Инструктор', 1],
+        ['Петров Иван Иванович', 'Обучаемый', 1],
+        ['Сидоров Иван Иванович', 'Обучаемый', 1],
+        ['Корнеев Иван Иванович', 'Обучаемый', 1],
+        ['Семенов Иван Иванович', 'Обучаемый', 1],
+        ['Крупнов Максим Витальевич', 'Обучаемый', 1],
+        ['Ненадович Иван Иванович', 'Обучаемый', 1],
+        ['Пименов Иван Иванович', 'Инструктор', 1],
+        ['Пельш Иван Иванович', 'Обучаемый', 1],
+        ['Моисеев Иван Иванович', 'Обучаемый', 2],
+        ['Рабинович Хаим Иванович', 'Обучаемый', 2],
+        ['Медведев Дмитрий Анатольевич', 'Обучаемый', 2],
+        ['Трунов Иван Семенович', 'Обучаемый', 2],
+        ['Селезнев Тимофей Михайлович', 'Инструктор', 2],
+        ['Нагиев Дмитрий Владимирович', 'Обучаемый', 3],
+        ['Шойгу Сергей Кужугетович', 'Обучаемый', 3],
+        ['Великов Вадим Иванович', 'Обучаемый', 3],
+        ['Фурсов Андрей Ильич', 'Обучаемый', 3],
+        ['Савельев Сергей Вячеславович', 'Обучаемый', 3],
+        ['Панчин Александр Юрьевич', 'Обучаемый', 3],
+    ];
+
     public function run()
     {
-        DB::table('users')->insert([
-            [
-                'fio' => 'Администратор',
-                'role' => 'Администратор',
+        $groupIds = $this->resolveGroupIds();
+
+        $rows = [];
+        foreach (self::USERS as [$fio, $role, $groupNumber]) {
+            $rows[] = [
+                'fio' => $fio,
+                'role' => $role,
+                // Один хэш на всех: раньше он считался 21 раз подряд.
                 'password' => Hash::make('123'),
-                'group_id'=> 1,
-            ],
-            [
-                'fio' => 'Иванов Иван Иванович',
-                'role' => 'Инструктор',
-                'password' => Hash::make('123'),
-                'group_id'=> 1,
-            ],
-            [
-                'fio' => 'Петров Иван Иванович',
-                'role' => 'Обучаемый',
-                'password' => Hash::make('123'),
-                'group_id'=> 1,
-            ],
-            [
-                'fio' => 'Сидоров Иван Иванович',
-                'role' => 'Обучаемый',
-                'password' => Hash::make('123'),
-                'group_id'=> 1,
-            ],
-            [
-                'fio' => 'Корнеев Иван Иванович',
-                'role' => 'Обучаемый',
-                'password' => Hash::make('123'),
-                'group_id'=> 1,
-            ],
-            [
-                'fio' => 'Семенов Иван Иванович',
-                'role' => 'Обучаемый',
-                'password' => Hash::make('123'),
-                'group_id'=> 1,
-            ],
-            [
-                'fio' => 'Крупнов Максим Витальевич',
-                'role' => 'Обучаемый',
-                'password' => Hash::make('123'),
-                'group_id'=> 1,
-            ],
-            [
-                'fio' => 'Ненадович Иван Иванович',
-                'role' => 'Обучаемый',
-                'password' => Hash::make('123'),
-                'group_id'=> 1,
-            ],
-            [
-                'fio' => 'Пименов Иван Иванович',
-                'role' => 'Инструктор',
-                'password' => Hash::make('123'),
-                'group_id'=> 1,
-            ],
-            [
-                'fio' => 'Пельш Иван Иванович',
-                'role' => 'Обучаемый',
-                'password' => Hash::make('123'),
-                'group_id'=> 1,
-            ],
-            [
-                'fio' => 'Моисеев Иван Иванович',
-                'role' => 'Обучаемый',
-                'password' => Hash::make('123'),
-                'group_id'=> 2,
-            ],
-            [
-                'fio' => 'Рабинович Хаим Иванович',
-                'role' => 'Обучаемый',
-                'password' => Hash::make('123'),
-                'group_id'=> 2,
-            ],
-            [
-                'fio' => 'Медведев Дмитрий Анатольевич',
-                'role' => 'Обучаемый',
-                'password' => Hash::make('123'),
-                'group_id'=> 2,
-            ],
-            [
-                'fio' => 'Трунов Иван Семенович',
-                'role' => 'Обучаемый',
-                'password' => Hash::make('123'),
-                'group_id'=> 2,
-            ],
-            [
-                'fio' => 'Селезнев Тимофей Михайлович',
-                'role' => 'Инструктор',
-                'password' => Hash::make('123'),
-                'group_id'=> 2,
-            ],
-            [
-                'fio' => 'Нагиев Дмитрий Владимирович',
-                'role' => 'Обучаемый',
-                'password' => Hash::make('123'),
-                'group_id'=> 3,
-            ],
-            [
-                'fio' => 'Шойгу Сергей Кужугетович',
-                'role' => 'Обучаемый',
-                'password' => Hash::make('123'),
-                'group_id'=> 3,
-            ],
-            [
-                'fio' => 'Великов Вадим Иванович',
-                'role' => 'Обучаемый',
-                'password' => Hash::make('123'),
-                'group_id'=> 3,
-            ],
-            [
-                'fio' => 'Фурсов Андрей Ильич',
-                'role' => 'Обучаемый',
-                'password' => Hash::make('123'),
-                'group_id'=> 3,
-            ],
-            [
-                'fio' => 'Савельев Сергей Вячеславович',
-                'role' => 'Обучаемый',
-                'password' => Hash::make('123'),
-                'group_id'=> 3,
-            ],
-            [
-                'fio' => 'Панчин Александр Юрьевич',
-                'role' => 'Обучаемый',
-                'password' => Hash::make('123'),
-                'group_id'=> 3,
-            ],
-        ]);
+                'group_id' => $groupIds[$groupNumber],
+            ];
+        }
+
+        DB::table('users')->insert($rows);
+    }
+
+    /**
+     * Возвращает id групп по их порядковому номеру (1, 2, 3…),
+     * создавая недостающие группы.
+     *
+     * @return array<int, int> карта «номер группы => id»
+     */
+    private function resolveGroupIds(): array
+    {
+        $needed = max(array_column(self::USERS, '2'));
+        $ids = Group::orderBy('id')->pluck('id')->all();
+
+        if (count($ids) < $needed) {
+            // Групп меньше, чем требуется сидеру: досоздаём недостающие,
+            // чтобы FK users_group_id_foreign не нарушался.
+            Group::factory($needed - count($ids))->create();
+            $ids = Group::orderBy('id')->pluck('id')->all();
+        }
+
+        // Нумерация с единицы: $groupIds[1] — первая группа.
+        return array_combine(range(1, $needed), array_slice($ids, 0, $needed));
     }
 }

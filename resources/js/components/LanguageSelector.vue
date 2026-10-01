@@ -22,17 +22,17 @@
       </span>
     </template>
     <template v-slot:item="{ item }">
-      <v-list-item-icon>
+      <!-- Vuetify 3: v-list-item-icon переименован в v-list-item-media,
+           v-list-item-content удалён. -->
+      <v-list-item-media>
         <template v-if="item.abbr === 'en'">
           <EnFlag class="logo" />
         </template>
         <template v-else>
           <RuFlag class="logo" />
         </template>
-      </v-list-item-icon>
-      <v-list-item-content>
-        <v-list-item-title v-text="item.lang"></v-list-item-title>
-      </v-list-item-content>
+      </v-list-item-media>
+      <v-list-item-title v-text="item.lang"></v-list-item-title>
     </template>
   </v-select>
 </template>

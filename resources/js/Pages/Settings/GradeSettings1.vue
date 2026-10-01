@@ -1,6 +1,7 @@
 <template>
   <div>
-    <v-title>Страница настроек1</v-title>
+    <!-- Компонента v-title в Vuetify нет (ни в 2.x, ни в 3.x). -->
+    <h1 class="h1-title">Страница настроек1</h1>
 
     <form @submit.prevent="saveSettings">
 

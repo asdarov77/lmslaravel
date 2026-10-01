@@ -52,10 +52,22 @@ return [
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
         ],
-// Добавляем private диск
+// Диск с контентом курсов (АУК).
+// КРИТИЧНО: root схлопывался в storage_path('app/'.env('PRIVATE_PATH')), а
+// переменной PRIVATE_PATH в .env нет — env() возвращал null, и root был
+// равен storage/app/. Контент же лежит в storage/app/public/private/.
+// В итоге Storage::exists('private/<самолёт>/<АУК>/imsmanifest.xml') и
+// отдача index.html всегда смотрели в несуществующий storage/app/private/
+// и возвращали 404: ни импорт курсов в БД, ни просмотр материалов не работали.
         'private' => [
             'driver' => 'local',
-            'root' => storage_path('app/'.env('PRIVATE_PATH')),
+            // root = родитель app.courses_path, потому что все пути в коде
+            // начинаются с 'private/...' (private/<самолёт>/<АУК>/<файл>).
+            // Источник истины — config('app.courses_path'), чтобы не было
+            // двух независимых определений одного пути.
+            'root' => rtrim(dirname(rtrim((string) config('app.courses_path'), '/')), '/'),
+            'url' => env('APP_URL').'/storage/private',
+            'visibility' => 'public',
         ],
 
     ],

@@ -12,10 +12,18 @@ use App\Models\Category;
 use Illuminate\Support\Facades\DB;
 use App\Models\Course;
 use App\Models\Link;
+use App\Support\PrivateContent;
+use Illuminate\Support\Str;
 
 
 class AircraftController extends Controller
 {
+  /**
+   * Каталоги внутри контента, которые НЕ являются самолётами или АУК:
+   * вопросы GIFT, исходники (orig), статика SCORM (app) и т.п.
+   */
+  private const SERVICE_DIRECTORIES = ['GIFT', 'orig', 'app', 'eDoc', 'imscp', 'imsmanifest.xml', 'js', 'css', 'models'];
+
   // делаем ссылку на другой контроллер (GiftController)
   protected $giftController;
 
@@ -25,33 +33,68 @@ class AircraftController extends Controller
   }
   // -----end-----------------------------
 
+  /**
+   * Список папок-классов (самолётов) в каталоге контента.
+   *
+   * Раньше в результат попадали и файлы, и служебные папки: импортёр
+   * принимал их за самолёты и создавал лишние записи в БД.
+   */
   public function showclassesfs()
   {
-
-    $courses_path = Config::get('app.courses_path');
-    //$courses_path = Config::get('app.private_path');     
+    $courses_path = rtrim((string) Config::get('app.courses_path'), '/');
     $classes = array();
-    if (file_exists($courses_path)) {
-      $items = array_diff(scandir($courses_path), array('..', '.'));
-     // $classes = array_diff(scandir($courses_path), array('..', '.'));
-      // берем только папки,отсекаем файлы
-      foreach ($items as $item) {
-        if (is_dir($courses_path . '/' . $item)) {
-          $classes[] = $item;
+
+    if (is_dir($courses_path)) {
+      foreach (scandir($courses_path) as $item) {
+        if ($item === '.' || $item === '..' || str_starts_with($item, '.')) {
+          continue;
         }
+        if (! is_dir($courses_path . '/' . $item)) {
+          continue;
+        }
+        if (in_array($item, self::SERVICE_DIRECTORIES, true)) {
+          continue;
+        }
+        $classes[] = $item;
       }
-    }   
+    }
+
+    sort($classes);
+
     return array_values($classes);
   }
 
+  /**
+   * Список АУК (папок-курсов) внутри самолёта.
+   *
+   * Возвращаются ТОЛЬКО подкаталоги. Раньше возвращался любой элемент
+   * scandir(), поэтому для КЛЕН в список попадала папка GIFT и импортёр
+   * пытался создать фиктивный курс «GIFT».
+   */
   public function showauks(string $air)
   {
-    $courses_path = Config::get('app.courses_path');
-    $full_path = $courses_path . '/' . $air;
+    $air = PrivateContent::sanitizeSegment($air);
+    $courses_path = rtrim((string) Config::get('app.courses_path'), '/');
+    $full_path = $air === null ? '' : $courses_path . '/' . $air;
     $auks = array();
-    if (file_exists($full_path)) {
-      $auks = array_diff(scandir($full_path), array('..', '.'));
+
+    if ($full_path !== '' && is_dir($full_path)) {
+      foreach (scandir($full_path) as $item) {
+        if ($item === '.' || $item === '..' || str_starts_with($item, '.')) {
+          continue;
+        }
+        if (! is_dir($full_path . '/' . $item)) {
+          continue;
+        }
+        if (in_array($item, self::SERVICE_DIRECTORIES, true)) {
+          continue;
+        }
+        $auks[] = $item;
+      }
     }
+
+    sort($auks);
+
     return $auks;
   }
 
@@ -71,72 +114,176 @@ class AircraftController extends Controller
   //
 
 
-  public function storeclasses(Request $request)
+  /**
+   * Приводит ввод к строке.
+   *
+   * Нужен для комбобоксов Vuetify: выбранный элемент может прийти объектом
+   * ({ text, value }, { title, name }) или массивом, а не строкой. Без
+   * нормализации валидация 'string' отклоняла запрос с 422, хотя значение
+   * было выбрано в интерфейсе.
+   */
+  private function normalizeStringInput(mixed $value): ?string
   {
-    if (DB::table('aircrafts')->where('path', (string)request('path'))->exists()) return; // выбрасываем если такой класс уже существует                          
-
-    $aircraft = new Aircraft();
-    $aircraft->title = request('title');
-    $aircraft->path = request('path');
-    $aircraft->save();
-    $aircraft_id = $aircraft->id;
-
-    $coursesArr = array_values($this->showauks($aircraft->path));
-
-    // Добавление записей
-    $_coursesArr = [];
-    foreach ($coursesArr as $item) { // $interests array contains input data
-      $auk = new Course();
-      //$auk->path = $aircraft->path . '/' . $item; // запись вида Ми-38/АУК-01
-      $auk->path =  $item; // запись вида АУК-01
-      $full_path_manifest = Config::get('app.courses_path') . '/' . $aircraft->path . '/' . $item . '/' . 'imsmanifest.xml';
-      //$full_path_manifest = Config::get('app.private_path') . '/' .$aircraft->path.'/'. $item.'/' . 'imsmanifest.xml';
-
-      //--------------privatemanicontroller insert data from manifest new---------------
-      // пока оставляем как есть, для фасада storage пути другие !
-      $pathmanifest = "private/{$aircraft->path}/{$item}/imsmanifest.xml";
-      //dd($pathmanifest);
-      if (Storage::exists($pathmanifest)) {
-        $contents = Storage::get($pathmanifest);
-        // сюда вставляем функцию парсинга xml файла, $contents - string      
-        $menuxmlcontent = $this->parsemanifest($contents, $aircraft_id, $item); // объект                            
-        //dd($menuxmlcontent);
-      }
-      //--------------end privatemanicontroller insert data from manifest new---------------
-
-
-      //                        
-      //---------------------------------ЗАГРУЗКА ВОПРОСОВ-----------------------------
-      //
-
-      //получаем список файлов, по умолчанию лежат внутри АУК в папке GIFT
-
-      $full_path_gifts = Config::get('app.courses_path') . '/' . $aircraft->path . '/' . $item . '/' . 'GIFT';
-
-      $gifts = array();
-      if (file_exists($full_path_gifts)) {
-        $gifts = array_diff(scandir($full_path_gifts), array('..', '.'));
-      }
-
-      if ($gifts) {
-        foreach ($gifts as $gift) {
-          $this->giftController->store(Config::get('app.courses_path') . $aircraft->path . '/' . $item . '/' . 'GIFT/' . $gift);
-        }
-      }
-
-      //                        
-      //---------------------------------end ЗАГРУЗКА ВОПРОСОВ-----------------------------
-      //
+    if (is_string($value)) {
+      return trim($value) === '' ? null : trim($value);
     }
 
+    if (is_array($value)) {
+      // Массив вида ['БПЛА'] или ['text' => ..., 'value' => ...].
+      $value = $value[0] ?? $value['value'] ?? $value['text'] ?? $value['title'] ?? $value['name'] ?? null;
 
-    return $aircraft;
+      return is_string($value) && trim($value) !== '' ? trim($value) : null;
+    }
+
+    if (is_object($value)) {
+      $value = $value->value ?? $value->text ?? $value->title ?? $value->name ?? null;
+
+      return is_string($value) && trim($value) !== '' ? trim($value) : null;
+    }
+
+    return null;
+  }
+
+  /**
+   * Импортирует самолёт и все его АУК из каталога контента в БД.
+   *
+   * Источник: config('app.courses_path') (= storage/app/public/private).
+   * Для каждой папки-АУК читается imsmanifest.xml, из которого создаются
+   * категории, курс, структура АУК и ссылки на материалы; затем
+   * подтягиваются вопросы из папки GIFT.
+   *
+   * Раньше здесь:
+   *  - объект Course создавался (`new Course()`), но никогда не
+   *    сохранялся — мёртвый код, из-за которого казалось, что курс создан;
+   *  - импорт шёл без транзакции, и падение на середине оставляло в БД
+   *    самолёт с half-загруженными АУК;
+   *  - повторный импорт молча возвращал пустой ответ без объяснения;
+   *  - пути склеивались конкатенацией и разваливались, если courses_path
+   *    задан без завершающего слэша.
+   */
+  public function storeclasses(Request $request)
+  {
+    // Нормализуем ввод ДО валидации. Vuetify-комбобокс может прислать
+    // выбранный элемент объектом ({ text, value } или { title }), а не
+    // строкой — тогда валидация 'string' падала с 422 «The path must be
+    // a string», хотя пользователь явно выбрал класс в списке.
+    $title = $this->normalizeStringInput($request->input('title'));
+    $path = $this->normalizeStringInput($request->input('path'));
+
+    $validated = validator([
+      'title' => $title,
+      'path' => $path,
+    ], [
+      'title' => 'required|string|max:255',
+      'path'  => 'required|string|max:255',
+    ])->validate();
+
+    $path = PrivateContent::sanitizeSegment($validated['path']);
+
+    if ($path === null) {
+      return response()->json([
+        'success' => false,
+        'data'    => null,
+        'error'   => 'Некорректное имя класса (каталога)',
+        'meta'    => null,
+      ], 422);
+    }
+
+    if (DB::table('aircrafts')->where('path', $path)->exists()) {
+      // Раньше здесь был голый `return;` — клиент получал пустой 200
+      // и не понимал, импортировано ли что-то. Теперь понятная ошибка.
+      return response()->json([
+        'success' => false,
+        'data'    => null,
+        'error'   => "Класс «{$validated['title']}» уже импортирован",
+        'meta'    => null,
+      ], 409);
+    }
+
+    $coursesPath = rtrim((string) Config::get('app.courses_path'), '/');
+    $aircraftDir = $coursesPath . '/' . $path;
+
+    if (! is_dir($aircraftDir)) {
+      return response()->json([
+        'success' => false,
+        'data'    => null,
+        'error'   => "Каталог «{$path}» не найден в {$coursesPath}",
+        'meta'    => null,
+      ], 422);
+    }
+
+    $auks = $this->showauks($path);
+    $summary = ['auk' => [], 'gift_files_parsed' => 0, 'skipped' => []];
+
+    // Транзакция: не оставляем в БД половину импортированного самолёта.
+    DB::transaction(function () use ($validated, $path, $auks, $coursesPath, &$summary) {
+      $aircraft = Aircraft::create([
+        'title' => $validated['title'],
+        'path'  => $path,
+      ]);
+
+      $aircraftId = $aircraft->id;
+
+      foreach ($auks as $item) {
+        $manifestPath = PrivateContent::buildPath([$path, $item, 'imsmanifest.xml']);
+
+        if ($manifestPath === null || ! Storage::disk('private')->exists($manifestPath)) {
+          $summary['skipped'][] = "{$path}/{$item} (нет imsmanifest.xml)";
+          continue;
+        }
+
+        $contents = Storage::disk('private')->get($manifestPath);
+        $this->parsemanifest($contents, $aircraftId, $item);
+        $summary['auk'][] = $item;
+
+        // Вопросы лежат в папке GIFT внутри АУК.
+        // ВАЖНО: GiftController::store() только разбирает GIFT в HTML и
+        // ВОЗВРАЩАЕТ результат — в таблицу questions ничего не пишет
+        // (вопросы заводятся через POST /api/questions). Поэтому здесь
+        // только проверяем, что файлы читаются, и считаем их разобранными.
+        $giftsDir = $coursesPath . '/' . $path . '/' . $item . '/GIFT';
+
+        if (! is_dir($giftsDir)) {
+          continue;
+        }
+
+        foreach (scandir($giftsDir) as $gift) {
+          if ($gift === '.' || $gift === '..') {
+            continue;
+          }
+          $giftFile = $giftsDir . '/' . $gift;
+
+          if (! is_file($giftFile)) {
+            continue;
+          }
+
+          $this->giftController->store($giftFile);
+          $summary['gift_files_parsed']++;
+        }
+      }
+    });
+
+    return response()->json([
+      'success' => true,
+      'data'    => Aircraft::with('courses')->find(
+        Aircraft::where('path', $path)->value('id')
+      ),
+      'error'   => null,
+      'meta'    => $summary,
+    ], 201);
   }
 
 
   public function parsemanifest($contents, $aircraft_id, $auk)
   {
-    $xml = simplexml_load_string($contents);
+    // Битый/невалидный XML раньше приводил к ErrorException из
+    // simplexml_load_string() и 500. Теперь это понятная ошибка уровня 422.
+    $xml = @simplexml_load_string($contents);
+
+    if ($xml === false) {
+      throw new \RuntimeException("АУК «{$auk}»: не удалось разобрать imsmanifest.xml");
+    }
+
     $categories = []; // пишем категории в БД
     $resources = []; // вспомогательный массив ресурсы,для поиска и последующей записи файлов от модуля    
     $t = [];
@@ -159,21 +306,41 @@ class AircraftController extends Controller
 
     // заполнение категорий в БД
     foreach ($xml->course->category as $key => $c) {
-      $_t = [];
-      $_t['name'] = (string)$c->attributes()['name'];
-      $_t['shortname'] = (string)$c->attributes()['shortname'];
+      $attrs = $c->attributes();
+
+      $name = trim((string) ($attrs['name'] ?? ''));
+
+      if ($name === '') {
+        continue;
+      }
+
+      // shortname есть не во всех манифестах (у КЛЕН его нет вообще).
+      // Раньше кодом становилась пустая строка, все категории самолёта
+      // получали code = '' и больше не различались — см. фикс связывания
+      // категорий в RecurseXML().
+      $shortname = trim((string) ($attrs['shortname'] ?? ''));
+
+      if ($shortname === '') {
+        // Стабильный код из названия: устраняет коллизии и остаётся
+        // предсказуемым при повторном импорте.
+        $shortname = PrivateContent::sanitizeSegment(
+          Str::ascii($name)
+        );
+        $shortname = $shortname === null ? null : substr(preg_replace('/\s+/', '_', $shortname), 0, 64);
+      }
 
       Category::updateOrCreate(
         [
-          'title' => (string)$c->attributes()['name'],
-          'aircraft_id' => $aircraft_id
+          'title' => $name,
+          'aircraft_id' => $aircraft_id,
         ],
         [
-          'code' => (string)$c->attributes()['shortname'],
+          'code' => $shortname,
           'description' => 'test',
         ]
       );
-      array_push($categories, $_t);
+
+      array_push($categories, ['name' => $name, 'shortname' => (string) $shortname]);
     }
 
     //--------------------------------------конец заполнения категорий-------
@@ -245,29 +412,43 @@ class AircraftController extends Controller
           $curCat = explode(",", $attrs_cat);
 
           foreach ($curCat as $_curCat) {
-            $curCatId = (Category::where([
-              ['code', '=', $_curCat],
-              ['aircraft_id', '=', $aircraft_id]
-            ])
-              //$curCatId = (Category::where('code',$_curCat) //where('aircraft_id', $aircraft_id)
-              ->get()
+            $_curCat = trim((string) $_curCat);
+
+            if ($_curCat === '') {
+              continue;
+            }
+
+            $categoryIds = Category::where('code', $_curCat)
+              ->where('aircraft_id', '=', $aircraft_id)
               ->pluck('id')
-              ->all()
-            );
+              ->all();
 
-            DB::table('aukstructure_category')->updateOrInsert(
-              [
-                'category_id' => (int)implode('', $curCatId),
-                'aukstructure_id' => (int)$parent_id,
-              ],
-            );
+            // Раньше: (int)implode('', $curCatId). При нескольких найденных
+            // категориях implode СКЛЕИВАЛ их id в одно число
+            // (например [21, 26] => 2126), и INSERT в aukstructure_category
+            // падал с нарушением внешнего ключа. При отсутствии совпадений
+            // получался category_id = 0 — тоже нарушение FK.
+            // Теперь связь создаётся по КАЖДОМУ найденному id, а при
+            // отсутствии совпадений просто пропускается.
+            if ($categoryIds === []) {
+              continue;
+            }
 
-            DB::table('category_course')->updateOrInsert(
-              [
-                'category_id' => (int)implode('', $curCatId),
-                'course_id' => (int)$course_id,
-              ],
-            );
+            foreach ($categoryIds as $categoryId) {
+              DB::table('aukstructure_category')->updateOrInsert(
+                [
+                  'category_id' => (int) $categoryId,
+                  'aukstructure_id' => (int) $parent_id,
+                ],
+              );
+
+              DB::table('category_course')->updateOrInsert(
+                [
+                  'category_id' => (int) $categoryId,
+                  'course_id' => (int) $course_id,
+                ],
+              );
+            }
           }
         }
 

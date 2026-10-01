@@ -41,25 +41,42 @@ class SyncPermissions extends Command
             }
         }
 
-        // 2. Матрица ролей
+        // 2. Системные роли + матрица прав
+        //
+        // Раньше здесь стояло `if (!$role) { warn(...); continue; }`: на базе
+        // без предварительного db:seed ролей не было, и команда рапортовала
+        // «роль не найдена — пропущена», оставляя систему без ролей вообще.
+        // Теперь отсутствующие системные роли создаются, а существующие
+        // legacy-роли (с русскими slug'ами) переиспользуются.
+        $systemRoles = (array) config('permissions.system_roles', []);
+        $matrix = (array) config('permissions.role_matrix', []);
+        $allPermissionIds = Permission::pluck('id')->all();
         $assigned = 0;
-        foreach (config('permissions.role_matrix', []) as $roleName => $slugs) {
-            $role = Role::where('rolename', $roleName)->first()
-                ?? Role::where('slug', $roleName)->first();
 
-            if (!$role) {
-                $this->warn("роль «{$roleName}» не найдена — пропущена");
-                continue;
+        foreach ($systemRoles as $slug => $definition) {
+            $name = $definition['name'] ?? $slug;
+            $role = $this->findOrCreateSystemRole($slug, $name);
+
+            if ($role->wasRecentlyCreated) {
+                $this->line("создана роль: <info>{$name}</info> (slug: {$slug})");
             }
 
-            $ids = Permission::whereIn('slug', $slugs)->pluck('id');
-            $missing = array_diff($slugs, Permission::whereIn('id', $ids)->pluck('slug')->all());
-            foreach ($missing as $m) {
-                $this->warn("  право {$m} отсутствует в БД — пропущено");
+            $mode = $definition['permissions'] ?? 'matrix';
+
+            if ($mode === '*') {
+                $ids = $allPermissionIds;
+            } else {
+                $slugs = (array) ($matrix[$name] ?? $matrix[$slug] ?? []);
+                $ids = Permission::whereIn('slug', $slugs)->pluck('id')->all();
+
+                foreach (array_diff($slugs, Permission::whereIn('id', $ids)->pluck('slug')->all()) as $missing) {
+                    $this->warn("  право {$missing} отсутствует в БД — пропущено");
+                }
             }
 
-            $before = DB::table('permissions_roles')->where('role_id', $role->id)->count();
             $existing = DB::table('permissions_roles')->where('role_id', $role->id)->pluck('permission_id')->all();
+            $newForRole = 0;
+
             foreach ($ids as $id) {
                 if (!in_array($id, $existing)) {
                     DB::table('permissions_roles')->insert([
@@ -67,14 +84,67 @@ class SyncPermissions extends Command
                         'permission_id' => $id,
                     ]);
                     $assigned++;
+                    $newForRole++;
                 }
             }
-            $this->line("роль «{$roleName}»: было {$before}, добавлено " . ($assigned));
+
+            $this->line("роль «{$name}»: прав всего " . count($ids) . ", добавлено {$newForRole}");
+        }
+
+        // Роли из матрицы, которых нет в system_roles, — тоже не теряем:
+        // создаём по имени, чтобы конфиг и БД не расходились.
+        foreach ($matrix as $roleName => $slugs) {
+            $slug = $this->slugForRoleName($roleName);
+
+            if (Role::where('slug', $slug)->exists() || Role::where('rolename', $roleName)->exists()) {
+                continue;
+            }
+
+            Role::create(['rolename' => $roleName, 'slug' => $slug]);
+            $this->line("создана роль из role_matrix: <info>{$roleName}</info> (slug: {$slug})");
         }
 
         PermissionCatalog::flushCache();
         $this->info("Готово. Создано прав: {$created}, назначено связей: {$assigned}.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Находит или создаёт системную роль с каноническим slug'ом.
+     * Legacy-роль с тем же rolename переиспользуется (slug мигрируется).
+     */
+    private function findOrCreateSystemRole(string $slug, string $name): Role
+    {
+        $role = Role::where('slug', $slug)->first();
+
+        if ($role) {
+            return $role;
+        }
+
+        $legacy = Role::where('rolename', $name)->first();
+
+        if ($legacy) {
+            $legacy->slug = $slug;
+            $legacy->save();
+
+            return $legacy;
+        }
+
+        return Role::create(['rolename' => $name, 'slug' => $slug]);
+    }
+
+    /**
+     * Канонический slug для названия роли из role_matrix.
+     */
+    private function slugForRoleName(string $roleName): string
+    {
+        foreach ((array) config('permissions.system_roles', []) as $slug => $definition) {
+            if (($definition['name'] ?? null) === $roleName) {
+                return (string) $slug;
+            }
+        }
+
+        return \Illuminate\Support\Str::slug($roleName) ?: \Illuminate\Support\Str::ascii($roleName);
     }
 }

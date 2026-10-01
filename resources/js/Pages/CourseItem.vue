@@ -1,5 +1,5 @@
 <template>
-  <v-flex xs12 sm8 md4>
+  <v-col cols="12" sm="8" md="4">
     <v-card class="elevation-12 mx-auto" style="width: 1200px">
       <v-toolbar color="primary">
         <v-toolbar-title>Описание курса {{ courses.title }} </v-toolbar-title>
@@ -38,7 +38,7 @@
         </v-form>
       </v-card-text>
     </v-card>
-  </v-flex>
+  </v-col>
 </template>
 
 <script>

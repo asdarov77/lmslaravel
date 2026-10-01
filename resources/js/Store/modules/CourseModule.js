@@ -262,24 +262,24 @@ const CourseModule = {
     async fetchCourse({ commit }, payload) {
 
       try {
-        const { course_id, category_id } = payload;
-        //console.log(payload, "payload")
+        // Раньше сюда передавали число (this.idEdit), а не объект, и
+        // деструктуризация { course_id } = 16 давала undefined. При
+        // payload = null (страница открыта без ?idEdit=) деструктуризация
+        // роняла страницу с TypeError. Нормализуем ввод.
+        const { course_id, category_id } = payload && typeof payload === 'object'
+          ? payload
+          : { course_id: payload ?? null, category_id: null };
+
         let response;
         if (course_id && category_id) {
-          //console.log(course_id, category_id)
           response = await fetchCourseByCourseAndCategory(course_id, category_id);
-          //console.log(response.data, "response.aircraft_id");
         } else if (course_id) {
-          console.log("only course_id")
           response = await fetchCourseByCourse(course_id);
         } else if (category_id) {
-          console.log("only cat_id")
           response = await fetchCourseByCategory(category_id);
         } else {
           response = await fetchCourses();
         }
-        //const response = await fetchCourse(id)
-        //console.log(response, 'fetchCourse+++')                
         commit('SET_COURSE', unwrap(response))
         return Promise.resolve(response)
       } catch (error) {
@@ -343,9 +343,13 @@ const CourseModule = {
     },
     async fetchCategory({ commit }, id) {
       try {
-        //params = { ...params, exclude_by_name: 'SysAdmin' } 
+        // Раньше fetchCategory(null) формировал URL /api/categories/null
+        // и сервер отвечал 404. Просто не делаем запрос без id.
+        if (id === null || id === undefined) {
+          commit('SET_CATEGORY', null)
+          return Promise.resolve(null)
+        }
         const response = await fetchCategory(id)
-        //console.log(response, 'fetchCategory')          
         commit('SET_CATEGORY', unwrap(response))
         return Promise.resolve(response)
       } catch (error) {

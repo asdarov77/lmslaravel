@@ -14,6 +14,7 @@ import router from './Router';
 import store from './Store';
 // import store  from './Store/test.js';
 import vuetify from './Vuetify';
+import canDirective from './plugins/can.directive';
 
 
 
@@ -47,17 +48,14 @@ const app = createApp(App, {
   .use(store)
   .use(i18n)
 
-// Директива v-permission="'users.view'" / v-permission="['users.view','manage-users']"
-// Скрывает элемент, если у пользователя нет ни одного из указанных прав
-// (OR — как middleware `permission:a,b` на бэкенде). При изменении прав
-// Vuex-геттер реактивен, и видимость пересчитывается автоматически.
-app.directive('permission', {
-  mounted(el, binding) {
-    const required = Array.isArray(binding.value) ? binding.value : [binding.value]
-    if (!store.getters['Auth/hasPermission'](required)) {
-      el.parentNode && el.parentNode.removeChild(el)
-    }
-  },
-})
+// v-can — декларативная проверка прав (подробности в plugins/can.directive.js):
+//   v-can="'users.view'"                      — одно право
+//   v-can="['users.view','manage-users']"     — достаточно ЛЮБОГО (OR)
+//   v-can.all="['a','b']"                     — нужны ВСЕ (AND)
+// Элемент скрывается через display:none и возвращается, когда права
+// приходят из GET /api/v1/me, поэтому элемент не «исчезает навсегда».
+// v-permission — старый алиас той же директивы (обратная совместимость).
+app.directive('can', canDirective);
+app.directive('permission', canDirective);
 
 app.mount('#app');
