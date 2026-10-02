@@ -50,15 +50,13 @@
       </v-row>
       <v-row class="ml-3 mr-3 mb-3">
         <v-col cols="12">
-          <v-btn @click="addAnswer" class="mr-2" color="primary">Добавить ответ</v-btn>
-          <v-btn @click="toggleRemoveButtons" class="mr-2" color="error">Удалить ответ</v-btn>
-          <v-btn v-if="saveChangesButtons" @click="saveChanges" class="mr-2" color="primary">Сохранить
-            изменения</v-btn>
+          <v-btn @click="addAnswer" class="mr-2" color="primary">{{ $t("questions.addAnswer") }}</v-btn>
+          <v-btn @click="toggleRemoveButtons" class="mr-2" color="error">{{ $t("questions.deleteAnswer") }}</v-btn>
+          <v-btn v-if="saveChangesButtons" @click="saveChanges" class="mr-2" color="primary">{{ $t("questions.saveChanges") }}</v-btn>
         </v-col>
       </v-row>
     </v-form>
-    <popup :alert="alert" :alertType="alertType" :snackbarText="snackbarText" :overlay="alert" :alertFalse="alertFalse">
-    </popup>
+    <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>
   </v-card> -->
 
   <!-- ############################################################################################################# -->
@@ -100,27 +98,23 @@
       </v-row>
       <v-row class="ml-3 mr-3 mb-3">
         <v-col cols="12">
-          <v-btn @click="addAnswer" class="mr-2" color="primary">Добавить ответ</v-btn>
-          <v-btn @click="toggleRemoveButtons" class="mr-2" color="error">Удалить ответ</v-btn>
-          <v-btn v-if="saveChangesButtons" @click="saveChanges" class="mr-2" color="primary">Сохранить
-            изменения</v-btn>
+          <v-btn @click="addAnswer" class="mr-2" color="primary">{{ $t("questions.addAnswer") }}</v-btn>
+          <v-btn @click="toggleRemoveButtons" class="mr-2" color="error">{{ $t("questions.deleteAnswer") }}</v-btn>
+          <v-btn v-if="saveChangesButtons" @click="saveChanges" class="mr-2" color="primary">{{ $t("questions.saveChanges") }}</v-btn>
         </v-col>
       </v-row>
     </v-form>
-    <popup :alert="alert" :alertType="alertType" :snackbarText="snackbarText" :overlay="alert" :alertFalse="alertFalse">
-    </popup>
+    <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>
   </v-card>
 </template>
 
 
 <script>
 import $api from "../../api/httpClient";
-import popup from "../Popup.vue";
+import AppToast from "../../components/ui/AppToast.vue";
 import { required, minLength, minValue, between, oneOf } from 'vuelidate/lib/validators'
 export default {
-  components: {
-    popup
-  },
+  components: { AppToast },
   props:
   {
     category_id: {
@@ -232,9 +226,6 @@ export default {
       this.editedQuestion.answers.splice(index, 1);
       this.toggleRemoveButtons()
       this.saveChangesButtons = true
-    },
-    alertFalse() {
-      this.alert = false;
     },
   }
 };

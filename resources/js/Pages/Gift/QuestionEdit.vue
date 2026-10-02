@@ -20,22 +20,19 @@
         </v-text-field>          
       </v-col>
     </v-row>
-    <v-btn @click="addAnswer" class="mr-2" color="primary">Добавить ответ</v-btn>
-    <v-btn @click="toggleRemoveButtons" class="mr-2" color="error">Удалить ответ</v-btn>
-    <v-btn v-if="saveChangesButtons" @click="saveChanges" class="mr-2" color="primary">Сохранить изменения</v-btn>
+    <v-btn @click="addAnswer" class="mr-2" color="primary">{{ $t("questions.addAnswer") }}</v-btn>
+    <v-btn @click="toggleRemoveButtons" class="mr-2" color="error">{{ $t("questions.deleteAnswer") }}</v-btn>
+    <v-btn v-if="saveChangesButtons" @click="saveChanges" class="mr-2" color="primary">{{ $t("questions.saveChanges") }}</v-btn>
   </v-form>
-  <popup :alert="alert" :alertType="alertType" :snackbarText="snackbarText" :overlay="alert" :alertFalse="alertFalse">
-  </popup>
+  <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>
 </template>
 
 <script>
 import $api from "../../api/httpClient";
 import { unwrapResponse } from "../../api/envelope";
-import popup from "../Popup.vue";
+import AppToast from "../../components/ui/AppToast.vue";
 export default {
-  components: {
-    popup
-  },
+  components: { AppToast },
   props:
       {
         idEdit: {
@@ -153,9 +150,6 @@ export default {
         this.alertType = "error";
         this.alert = true;
         return;
-    },
-    alertFalse() {
-      this.alert = false;
     },
   }
 };

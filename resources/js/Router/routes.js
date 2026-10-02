@@ -140,9 +140,14 @@ const routes = [
         //props: true // разрешение на передачу данных через router.parms
     },
     {
-        // тестовый вариант открытия страницы(манифест)
+        // просмотр материалов курса.
+        //
+        // content.manage — только для методиста (загрузка контента),
+        // обучаемому достаточно content.view. Раньше здесь стояли
+        // courses.manage + content.manage, поэтому обучаемый с
+        // courses.view и content.view получал 403 на своих же курсах.
         path: '/courses/itemmani',
-        meta: { permission: ['courses.manage', 'content.manage'] },
+        meta: { permission: ['content.view', 'content.manage'] },
         component: () => import('../Pages/CourseManifest.vue'),
         // props: route => ({ idEdit: Number(route.params.idEdit)}),
         props: (route) => ({
@@ -156,7 +161,9 @@ const routes = [
         path: '/courses/desc/:idEdit',
         component: () => import('../Pages/CourseItem.vue'),
         name: 'courses.desc',
-        meta: { permission: ['courses.manage', 'content.manage'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
+        // Описание курса — это чтение, поэтому достаточно courses.view.
+        // Право courses.manage нужно для правки, а не для просмотра.
+        meta: { permission: ['courses.view', 'courses.manage'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
     },
     // новый (ресурсный) контроллер
     {
@@ -185,7 +192,11 @@ const routes = [
         path: '/categories',
         component: () => import('../Pages/Category/CategoryList.vue'),
         name: 'categories.index',
-        meta: { permission: ['courses.view', 'categories.manage'] },    },
+        // Справочник специальностей — методическая страница.
+        // courses.view тут был ошибкой: обучаемый им владеет, поэтому
+        // OR-проверка пропускала его и позволяла открыть редактирование
+        // чужих категорий, хотя бэкенд на запись всё равно отдаёт 403.
+        meta: { permission: ['categories.manage'] },    },
     {
         path: '/register-categories',
         component: () => import('../Pages/Category/RegisterCategory.vue'),
@@ -223,6 +234,34 @@ const routes = [
         name: 'group.learning',
         meta: { permission: ['users.courses'] },    },
     {
+        // Учебный план обучаемого: его собственные назначения.
+        // Отдельная страница вместо админской формы записи групп
+        // (/group/learning, право users.courses), которая отдавала 403.
+        path: '/my/learning',
+        component: () => import('../Pages/Learning/MyLearningPlan.vue'),
+        name: 'learning.plan',
+    },
+    {
+        // Экзамены обучаемого: что назначено, когда открыто, сколько попыток.
+        path: '/my/exams',
+        component: () => import('../Pages/Exam/ExamList.vue'),
+        name: 'exams.mine',
+    },
+    {
+        // Прохождение экзамена.
+        path: '/exams/:idEdit',
+        component: () => import('../Pages/Exam/ExamRunner.vue'),
+        name: 'exams.take',
+        props: route => ({ idEdit: Number(route.params.idEdit) }),
+    },
+    {
+        // Дашборд обучаемого в структуре классического LMS:
+        // показатели, дедлайны, экзамены, мои курсы.
+        path: '/dashboard',
+        component: () => import('../Pages/Dashboard/TraineeDashboard.vue'),
+        name: 'dashboard',
+    },
+    {
         path: '/auk',
         meta: { permission: ['courses.view'] },
         component: () => import('../Pages/User/UserPage.vue'),
@@ -236,7 +275,11 @@ const routes = [
         meta: { permission: ['questions.manage'] },    },
     {
         path: '/questions',
-        meta: { permission: ['questions.view', 'questions.manage'] },
+        // Прохождение экзамена — exams.take (обучаемый),
+        // questions.view/manage — работа с банком вопросов (методист).
+        // Раньше здесь стояли только questions.*, поэтому «Экзамены»
+        // были недоступны обучаемому, хотя право exams.take у него есть.
+        meta: { permission: ['exams.take', 'questions.view', 'questions.manage'] },
         component: () => import('../Pages/Gift/ExamineItem.vue'),
         props: (route) => ({
             idEdit: toIntOrNull(route.query.idEdit),

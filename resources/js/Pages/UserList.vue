@@ -1,203 +1,270 @@
 <template>
-  <v-btn class="mb-3" color="success" :to="{ name: 'regist' }"
-      >Добавить пользователя</v-btn
+  <div class="u-page">
+    <PageHeader
+      :title="$t('users.list.title')"
+      :subtitle="$t('users.list.subtitle')"
     >
-  <v-table dense class="elevation-1 cursor-pointer">
-    <thead>
-      <tr>
-        <th class="text-left">No</th>
-        <th class="text-left">Пользователь</th>
-        <!-- <th class="text-left">Курсы</th> -->
-        <th class="text-left">Группа</th>
-        <th class="text-left">Роль</th>
-        <th class="text-left">Редактировать</th>
-        <!-- <th class="text-left" v-if="user.role==='Администратор'">Сменить пароль</th> -->
-        <th class="text-left" v-if="hasEditPermission">Сменить пароль</th>
-        <th class="text-left">Удалить</th>
-        <th class="text-left">Права</th>
-      </tr>
-    </thead>
+      <template #actions>
+        <v-btn color="primary" variant="flat" :to="{ name: 'regist' }">
+          <v-icon start icon="mdi-account-plus-outline" size="18" aria-hidden="true"></v-icon>
+          {{ $t("users.list.create") }}
+        </v-btn>
+      </template>
+    </PageHeader>
 
-    <tbody>
-      <tr v-for="_user in users" :key="_user.id">
-        <td class="py-1">{{ _user.id }}</td>
-        <td class="py-1">
-          <router-link
-            :to="{
-              name: 'user.edit',
-              params: {
-                idEdit: _user.id,
-              },
-            }"
-          >
-            {{ _user.fio }}
-          </router-link>
-        </td>
-        <!-- <td class="py-1">          
-          <ul>
-            <li v-for="item in _user.categories" :key="item.id">
-              {{ item.title }}
-            </li>
-          </ul>
-        </td> -->
-        <!-- <td class="py-1">{{ _user.group ? _user.group.groupname : "" }}</td> -->
-        <td class="py-1">{{ _user.group }}</td>
+    <DataTable
+      :columns="columns"
+      :rows="filteredUsers"
+      :loading="isLoading"
+      :title="$t('users.list.title')"
+      :count="filteredUsers.length"
+      :caption="$t('users.list.title')"
+      :empty-title="allUsers.length ? $t('users.list.emptyFiltered') : $t('users.list.emptyTitle')"
+      :empty-text="allUsers.length ? $t('users.list.emptyFilteredText') : $t('users.list.emptyText')"
+      :empty-icon="'mdi-account-multiple-outline'"
+    >
+      <template #filters>
+        <v-text-field
+          v-model="search"
+          :placeholder="$t('users.list.search')"
+          :aria-label="$t('users.list.search')"
+          prepend-inner-icon="mdi-magnify"
+          variant="outlined"
+          density="compact"
+          hide-details
+          clearable
+        />
+      </template>
 
-        <td class="py-1">
-          <ul>
-            {{
-              _user.role
-            }}
-          </ul>
-        </td>
-        <td class="my-1">
+      <template #cell-id="{ value }">
+        <span class="u-table__num">{{ value }}</span>
+      </template>
+
+      <template #cell-fio="{ row }">
+        <router-link
+          class="users-link"
+          :to="{ name: 'user.edit', params: { idEdit: row.id } }"
+        >
+          {{ row.fio }}
+        </router-link>
+      </template>
+
+      <template #cell-role="{ value }">
+        <!-- Роль бейджем: так она читается с одного взгляда, а не
+             размазывается по колонке текстом. -->
+        <span class="u-badge" :class="roleBadgeClass(value)">{{ value || '—' }}</span>
+      </template>
+
+      <template #cell-group="{ value }">
+        <span v-if="!value" class="u-muted">—</span>
+        <span v-else class="u-truncate" style="display: block; max-width: 24ch" :title="value">
+          {{ value }}
+        </span>
+      </template>
+
+      <template #cell-actions="{ row }">
+        <div class="users-actions">
           <v-btn
-            tile
-            color="success"
-            class="my-1"
-            @click="
-              this.$router.push({
-                name: 'user.edit',
-                params: { idEdit: _user.id },
-              })
-            "
-          >
-            <v-icon left> mdi-pencil </v-icon> Редактировать
-          </v-btn>
-        </td>
-
-        <td v-if="hasEditPermission">
-          <v-btn
-            tile
-            color="yellow"
-            class="my-1"
-            @click="
-              this.$router.push({
-                name: 'user.chpass',
-                params: { idEdit: _user.id },
-              })
-            "
-          >
-            Пароль </v-btn
-          >
-        </td>
-
-        <td>
-          <v-btn tile color="error" @click="deleteUser(_user.id)">
-            Удалить</v-btn
-          >
-        </td>
-        <!-- Права вынесены в отдельный раздел: здесь только переход к нему.
-             Само назначение прав — на /permissions, там же решается,
-             что именно разрешено текущему пользователю. -->
-        <td>
-          <v-btn
-            tile
+            size="small"
+            variant="text"
             color="primary"
-            variant="tonal"
-            :disabled="!canSeePermissions"
-            :to="{ name: 'permissions.manage', query: { user: _user.id } }"
-            title="Права доступа"
+            :to="{ name: 'user.edit', params: { idEdit: row.id } }"
+            :title="$t('users.list.edit')"
+            :aria-label="`${$t('users.list.edit')}: ${row.fio}`"
           >
-            Права</v-btn
-          >
-        </td>
-      </tr>
-    </tbody>
-  </v-table>
+            <v-icon icon="mdi-pencil-outline" size="18" aria-hidden="true"></v-icon>
+          </v-btn>
 
-  <popup
-    :alert="alert"
-    :alertType="alertType"
-    :snackbarText="snackbarText"
-    :overlay="alert"
-    :alertFalse="alertFalse"
-  ></popup>
+          <!-- Смена пароля доступна не всем: раньше колонка просто
+               пропадала, и пользователь не понимал, куда нажать. -->
+          <v-btn
+            v-if="canEdit"
+            size="small"
+            variant="text"
+            :to="{ name: 'user.chpass', params: { idEdit: row.id } }"
+            :title="$t('users.list.password')"
+            :aria-label="`${$t('users.list.password')}: ${row.fio}`"
+          >
+            <v-icon icon="mdi-lock-outline" size="18" aria-hidden="true"></v-icon>
+          </v-btn>
+
+          <v-btn
+            size="small"
+            variant="text"
+            color="primary"
+            :disabled="!canSeePermissions"
+            :to="{ name: 'permissions.manage', query: { user: row.id } }"
+            :title="$t('users.list.permissions')"
+            :aria-label="`${$t('users.list.permissions')}: ${row.fio}`"
+          >
+            <v-icon icon="mdi-shield-key-outline" size="18" aria-hidden="true"></v-icon>
+          </v-btn>
+
+          <v-btn
+            size="small"
+            variant="text"
+            color="error"
+            :aria-label="`${$t('users.list.delete')}: ${row.fio}`"
+            :title="$t('users.list.delete')"
+            @click="askDelete(row)"
+          >
+            <v-icon icon="mdi-trash-can-outline" size="18" aria-hidden="true"></v-icon>
+          </v-btn>
+        </div>
+      </template>
+    </DataTable>
+
+    <ConfirmDialog
+      v-model="deleteDialog"
+      :title="$t('users.delete.title')"
+      :confirm-text="$t('users.delete.confirm')"
+      :cancel-text="$t('common.cancel')"
+      :busy="deleting"
+      @cancel="deleteDialog = false"
+      @confirm="confirmDelete"
+    >
+      {{ $t('users.delete.text', { name: pendingUser?.fio ?? '' }) }}
+    </ConfirmDialog>
+
+    <AppToast v-model="toast.open" :type="toast.type" :text="toast.text" />
+  </div>
 </template>
 
-
 <script>
-// :to="{
-//   name: 'user.chpass',
-//   params: {
-//     idEdit: _user.id,
-//   },
-// }"
-import popup from "./Popup.vue";
 import { mapState, mapGetters } from "vuex";
+import PageHeader from "../components/ui/PageHeader.vue";
+import DataTable from "../components/ui/DataTable.vue";
+import ConfirmDialog from "../components/ui/ConfirmDialog.vue";
+import AppToast from "../components/ui/AppToast.vue";
 
 export default {
-  components: { popup },
+  name: "UserList",
+  components: { PageHeader, DataTable, ConfirmDialog, AppToast },
+
   data() {
     return {
-      isLoading: false,
-      alert: false,
-      alertType: "",
-      overlay: false,
-      snackbarText: "",
+      search: "",
+      isLoading: true,
+      deleting: false,
+      deleteDialog: false,
+      pendingId: null,
+      toast: { open: false, text: "", type: "success" },
     };
   },
-  async mounted() {
-    //console.log(localStorage.getItem('token'))
-    // Каталог прав здесь больше не нужен: назначение вынесено на
-    // отдельную страницу /permissions.
-    this.$store
-      .dispatch("User/fetchUsers")
-      .catch((error) => console.error(error))
-      .finally(() => (this.isLoading = false));
-    if (this.allGroups.length === 0) {
-      this.$store.dispatch("User/fetchGroups");
+
+  async created() {
+    await this.$store.dispatch("User/fetchUsers").catch(() => {});
+    if (!this.allGroups.length) {
+      await this.$store.dispatch("User/fetchGroups").catch(() => {});
     }
+    this.isLoading = false;
   },
+
   computed: {
-    ...mapState("User", ["totalUsers", "allGroups"]),
-    //...mapState("Auth", ["accessToken", "user"]),
-    ...mapGetters("User", ["users", "groups"]),
+    ...mapGetters("User", ["users"]),
+    ...mapState("User", ["allGroups"]),
     ...mapGetters("Auth", ["hasPermission"]),
 
-    hasEditPermission() {
-      return this.hasPermission(["manage-users"], "Manage users");
+    allUsers() {
+      return this.users ?? [];
+    },
+
+    filteredUsers() {
+      const query = (this.search ?? "").trim().toLowerCase();
+      if (!query) return this.allUsers;
+
+      return this.allUsers.filter((user) =>
+        String(user.fio ?? "").toLowerCase().includes(query)
+      );
+    },
+
+    columns() {
+      return [
+        { key: "id", title: "ID", width: "64px" },
+        { key: "fio", title: this.$t("users.list.name") },
+        { key: "role", title: this.$t("users.list.role"), width: "160px" },
+        { key: "group", title: this.$t("users.list.group"), width: "200px" },
+        { key: "actions", title: "", align: "right", width: "180px" },
+      ];
     },
 
     /**
-     * Кнопка «Права» есть только у тех, кому раздел вообще доступен:
-     * у администратора (users.permissions) и у инструктора (users.view).
-     * Иначе кнопка вела бы на 403.
+     * Раньше проверка шла по legacy-slug «manage-users». Он покрыт
+     * алиасом users.view в каталоге прав, но полагаться на алиас в
+     * UI не нужно — там канонический slug.
      */
+    canEdit() {
+      return this.hasPermission(["users.update", "manage-users"]);
+    },
+
+    /** Раздел прав открыт администратору и инструктору. */
     canSeePermissions() {
       return this.hasPermission(["users.permissions", "users.view"]);
+    },
+
+    pendingUser() {
+      return this.allUsers.find((user) => user.id === this.pendingId) ?? null;
     },
   },
 
   methods: {
-    alertFalse() {
-      this.alert = false;
+    roleBadgeClass(role) {
+      if (role === "Администратор" || role === "admin") return "u-badge--danger";
+      if (role === "Инструктор" || role === "instructor") return "u-badge--primary";
+      return "";
     },
-    async deleteUser(user_id) {
-      //console.log(user_id, "user_id");
-      if (confirm("Вы хотите удалить пользователя " + user_id + " ?"))
-        this.$store
-          .dispatch("User/deleteUser", user_id)
-          .then(() => {
-            this.snackbarText = "пользователь удален";
-            this.alertType = "success";
-          })
-          .catch((error) => {
-            //console.error(error)
-            //console.log(error.response.status)
-            if (error.response.status === 500) {
-              this.snackbarText = "нельзя удалить суперпользователя";
-              this.alertType = "error";
-            }
-          })
-          .finally(() => {
-            this.alert = true;
-          });
-      this.$store
-        .dispatch("User/fetchUsers")
-        .catch((error) => console.error(error))
-        .finally(() => (this.isLoading = false));
+
+    askDelete(user) {
+      this.pendingId = user.id;
+      this.deleteDialog = true;
+    },
+
+    async confirmDelete() {
+      if (!this.pendingId) return;
+
+      this.deleting = true;
+
+      try {
+        await this.$store.dispatch("User/deleteUser", this.pendingId);
+        await this.$store.dispatch("User/fetchUsers");
+        this.notify(this.$t("users.delete.done"), "success");
+      } catch (error) {
+        // 500 отдавался, когда удаляли суперпользователя.
+        this.notify(
+          error?.response?.status === 500
+            ? this.$t("users.delete.cannotDeleteSuper")
+            : this.$t("users.delete.error"),
+          "error"
+        );
+      } finally {
+        this.deleting = false;
+        this.deleteDialog = false;
+        this.pendingId = null;
+      }
+    },
+
+    notify(text, type) {
+      this.toast = { open: true, text, type };
     },
   },
 };
 </script>
+
+<style scoped>
+.users-link {
+  color: var(--c-primary);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.users-link:hover {
+  text-decoration: underline;
+}
+
+.users-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-1);
+}
+</style>

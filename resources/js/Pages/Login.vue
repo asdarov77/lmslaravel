@@ -2,7 +2,7 @@
   <v-col cols="12" sm="8" md="4">
     <v-card class="elevation-12 mx-auto" style="width: 600px">
       <v-toolbar color="primary">
-        <v-toolbar-title>Форма авторизации</v-toolbar-title>
+        <v-toolbar-title>{{ $t("login.formTitle") }}</v-toolbar-title>
       </v-toolbar>
       <v-card-text>
         <v-form v-on:@submit.prevent="loginForm">
@@ -33,22 +33,22 @@
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn v-on:click="loginForm" color="primary">Вход</v-btn>
+        <v-btn v-on:click="loginForm" color="primary">{{ $t("login.submitBtn") }}</v-btn>
       </v-card-actions>
     </v-card>
-    <popup :alert="alert" :alertType="alertType" :snackbarText="snackbarText" :overlay="alert" :alertFalse="alertFalse"></popup>  
+    <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>  
   </v-col>
 </template>
 
 <script>
 import LanguageSelector from '../components/LanguageSelector.vue'
 //import { LanguageService } from '../services/language.service'
-import popup from './Popup.vue';
+import AppToast from "../components/ui/AppToast.vue";
 //import * as storage from "../Store/index.js";
 export default {
   // name: "LoginComponent",
     components: {
-    LanguageSelector, popup
+    LanguageSelector, AppToast
   },
   data() {    
     return {
@@ -69,9 +69,6 @@ export default {
     // this.$store.commit('Ui/SET_LANGUAGE', 'ru')
   },
   methods: {
-    alertFalse() {
-      this.alert = false
-    },
      async loginForm() {
       this.errors = [];
       

@@ -22,13 +22,7 @@
             v-model="password_confirmation"
             type="password"
           ></v-text-field>
-          <popup
-            :alert="alert"
-            :alertType="alertType"
-            :snackbarText="snackbarText"
-            :overlay="alert"
-            :alertFalse="alertFalse"
-          ></popup>
+          <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>
           <v-container class="notification is-danger" v-if="errors.length">
             <p v-for="error in errors" v-bind:key="error">
               {{ error }}
@@ -38,19 +32,17 @@
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn v-on:click="submitForm" color="primary">Сохранить</v-btn>
+        <v-btn v-on:click="submitForm" color="primary">{{ $t("common.save") }}</v-btn>
       </v-card-actions>
     </v-card>
   </v-col>
 </template>
 
 <script>
-import popup from "../Popup.vue";
+import AppToast from "../../components/ui/AppToast.vue";
 import { mapState, mapGetters } from "vuex";
 export default {
-  components: {
-    popup,
-  },
+  components: { AppToast },
   props: ["idEdit"],
   data() {
     return {
@@ -72,9 +64,6 @@ export default {
     //...mapGetters('User', ['users','groups']),
   },
   methods: {
-    alertFalse() {
-      this.alert = false;
-    },
     submitForm: function () {
       if (this.password !== this.password_confirmation) {
         this.errors.push("пароли не совпадают");

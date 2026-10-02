@@ -1,140 +1,147 @@
 <template>
-  <v-col cols="12" sm="8" md="4">
-    <v-card class="elevation-12 mx-auto">
-      <v-toolbar color="primary">
-        <v-toolbar-title>Редактирование группы </v-toolbar-title>
-        <!-- {{ groupameEdit }} -->
-      </v-toolbar>
-      <v-card-text>
-        <v-form v-on:@submit.prevent="submitForm">
-          <v-text-field
-            label="наименование группы"
-            type="text"
-            v-model="group.groupname"
-          ></v-text-field>
-          <v-text-field
-            label="описание группы"
-            type="text"
-            v-model="group.groupdescription"
-          ></v-text-field>
-          <v-btn
-            tile
-            color="green"
-            class="my-3"
-            @click="this.$router.push({ name: 'group.learning', params: { idEdit: group.id, } })"
+  <div class="u-page">
+    <FormCard
+      :title="$t('groups.edit.title')"
+      :subtitle="group.groupname ? $t('groups.edit.subtitle', { name: group.groupname }) : ''"
+      :busy="saving"
+      :loading="loading"
+      @submit="submitForm"
+      @cancel="cancelBtnHead"
+    >
+      <v-text-field
+        v-model="group.groupname"
+        :label="$t('groups.create.name')"
+        :error-messages="fieldErrors.groupname"
+        autofocus
+      ></v-text-field>
+
+      <v-textarea
+        v-model="group.groupdescription"
+        :label="$t('groups.create.description')"
+        :error-messages="fieldErrors.groupdescription"
+        rows="3"
+        auto-grow
+      ></v-textarea>
+
+      <!-- Второе действие формы, а не кнопка цвета «green» внутри
+           карточки: раньше зелёная кнопка рядом с синей кнопкой
+           сохранения читалась как отдельное главное действие. -->
+      <div class="d-flex mt-2">
+        <v-btn
+          variant="tonal"
+          color="primary"
+          prepend-icon="mdi-school-outline"
+          :disabled="saving || !group.id"
+          :to="{ name: 'group.learning', params: { idEdit: group.id } }"
         >
-          на курсы
-        </v-btn
-        >
-          <v-container class="notification is-danger" v-if="errors.length">
-            <!--class="has-text-centered"> -->
-            <p v-for="error in errors" v-bind:key="error">
-              {{ error }}
-            </p>
-          </v-container>
-        </v-form>
-      </v-card-text>
-      <v-card-actions>
-        <v-spacer></v-spacer>
-        <!-- <v-btn v-on:click="submitForm" color="primary">Сохранить</v-btn> -->
-        <ButtonGroup @submitForm="submitForm" @cancelBtn="cancelBtnHead"></ButtonGroup>
-      </v-card-actions>
-    </v-card>
-  </v-col>
+          {{ $t("groups.edit.enroll") }}
+        </v-btn>
+      </div>
+
+      <v-alert
+        v-for="(error, index) in errors"
+        :key="index"
+        type="error"
+        class="mt-3"
+        :text="error"
+      ></v-alert>
+    </FormCard>
+
+    <AppToast v-model="toast.open" :type="toast.type" :text="toast.text" />
+  </div>
 </template>
 
 <script>
 import { mapState, mapGetters } from "vuex";
-import ButtonGroup from "../../components/ButtonGroup.vue";
+import { asArray, extractFieldErrors } from "../../api/envelope";
+import FormCard from "../../components/ui/FormCard.vue";
+import AppToast from "../../components/ui/AppToast.vue";
+
 export default {
-  components: { ButtonGroup },
-  //props: ["idEdit"],
+  name: "GroupItemEdit",
+  components: { FormCard, AppToast },
+
   props: {
-    idEdit: {
-      type: Number,
-      required: true,
-    },
+    idEdit: { type: Number, required: true },
   },
+
   data() {
     return {
-      //groupname: this.groupnameEdit,
-      //groupdescription: this.groupdescriptionEdit,
-      //group: [], // группа с указанным ID из базы данных
       errors: [],
+      fieldErrors: {},
+      saving: false,
+      loading: false,
+      toast: { open: false, text: "", type: "success" },
     };
   },
+
   computed: {
     ...mapState("User", ["allGroups", "users", "group"]),
     ...mapGetters("User", ["users", "groups"]),
   },
 
-  created() {
-    //if(this.idEdit){
-    //console.log(this.idEdit, 'id')
-    this.$store.dispatch("User/fetchGroup", this.idEdit);
-    //}
+  async created() {
+    this.loading = true;
+    await this.$store.dispatch("User/fetchGroup", this.idEdit).catch(() => {});
+    this.loading = false;
   },
 
   methods: {
-    submitForm: function () {
-      if (!this.errors.length) {
-        const formData = {
-          groupname: this.group.groupname,
-          groupdescription: this.group.groupdescription,
-        };
+    validate() {
+      this.errors = [];
+      this.fieldErrors = {};
 
-        //????? this.$store.dispatch("User/fetchGroup", this.idEdit);
-        this.$store
-          .dispatch("User/updateGroup", { id: this.idEdit, data: formData })
-          .then(() => {})
-          .catch((error) => {
-            console.error(error);
-          })
-          .finally(() => this.$router.back());
+      if (String(this.group.groupname ?? "").trim() === "") {
+        this.fieldErrors.groupname = this.$t("groups.create.errors.nameRequired");
+      } else {
+        const exists = asArray(this.allGroups).some(
+          (item) =>
+            item.id !== this.idEdit &&
+            String(item.groupname ?? "").trim().toLowerCase() ===
+              this.group.groupname.trim().toLowerCase()
+        );
+
+        if (exists) {
+          this.fieldErrors.groupname = this.$t("groups.create.errors.nameTaken");
+        }
       }
 
-      // if(this.idEdit){
-      // //axios
-      // $api
-      //   .put("/api/groups/" + this.idEdit, formData)
-      //   .then((response) => {
-      //     console.log(response);
-      //      this.$router.push("/groups/list");
-      //   })
-      // }
-      // else
-      // $api
-      // //axios
-      // .post("/api/groups/", formData)
-      //   .then((response) => {
-      //     console.log(response);
-      //      this.$router.push("/groups/list");
-      //   })
-      //   .catch((error) => {
-      //     if (error.response) {
-      //       for (const property in error.response.data) {
-      //         this.errors.push(
-      //           `${property}: ${error.response.data[property]}`
-      //         );
-      //       }
-
-      //       console.log(JSON.stringify(error.response.data));
-      //     } else if (error.message) {
-      //       this.errors.push("Something went wrong. Please try again");
-      //       console.log(JSON.stringify(error));
-      //     }
-      //   });
+      return Object.keys(this.fieldErrors).length === 0;
     },
 
-    cancelBtnHead()
-    {
-      //console.log('cancel');
-      this.$router.go(-1);
+    async submitForm() {
+      if (this.saving) return;
+
+      this.errors = [];
+
+      if (!this.validate()) return;
+
+      this.saving = true;
+
+      try {
+        await this.$store.dispatch("User/updateGroup", {
+          id: this.idEdit,
+          data: {
+            groupname: this.group.groupname.trim(),
+            groupdescription: this.group.groupdescription.trim(),
+          },
+        });
+
+        this.toast = { open: true, text: this.$t("groups.edit.done"), type: "success" };
+        this.$router.push("/groups/list");
+      } catch (error) {
+        const { fields, general } = extractFieldErrors(error, this.$t("groups.edit.errors.generic"));
+        Object.assign(this.fieldErrors, fields);
+        this.errors = general ? [general] : [];
+        this.toast = { open: true, text: general ?? "", type: "error" };
+      } finally {
+        this.saving = false;
+      }
     },
 
+    cancelBtnHead() {
+      this.$router.back();
+    },
   },
-  //},
 };
 </script>
-
-<style></style>

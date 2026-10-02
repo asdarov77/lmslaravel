@@ -82,3 +82,36 @@ export const numericQuery = params => {
   });
   return out;
 };
+
+/**
+ * Достаёт ошибки полей из ответа API.
+ *
+ * Поддерживаются оба формата, потому что в проекте встречаются оба:
+ *  - конверт middleware ApiResponseEnvelope: { error: { message, details } };
+ *  - «голая» ошибка Laravel: { errors: { field: [messages] } }.
+ *
+ * Возвращает { поля: {поле: текст}, общая: string|null } — вызывающий
+ * сам решает, показать ли в поле или в общем блоке.
+ */
+export const extractFieldErrors = (error, fallbackMessage = null) => {
+  const body = error?.response?.data ?? null;
+  const details = body?.error?.details ?? body?.errors ?? null;
+  const fields = {};
+
+  if (details && typeof details === 'object' && !Array.isArray(details)) {
+    Object.entries(details).forEach(([field, messages]) => {
+      // Ключ вида "course_id.0" приводим к имени поля: нумерация
+      // элементов массива пользователю ничего не объясняет.
+      const name = field.replace(/\.\d+$/, '');
+      const text = Array.isArray(messages) ? messages.join(' ') : String(messages);
+      fields[name] = fields[name] ? `${fields[name]} ${text}` : text;
+    });
+  }
+
+  const general =
+    body?.error?.message && typeof body.error.message === 'string'
+      ? body.error.message
+      : fallbackMessage || error?.message || null;
+
+  return { fields, general };
+};

@@ -117,7 +117,10 @@ test.describe('Импортированный класс: контент кур�
     await page.goto(`${BASE}/#/courses/list`, { waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(3000)
 
-    const openBtn = page.locator('a', { hasText: /^Открыть$/ }).first()
+    // В редизайне списка курсов действие «Открыть» стало иконкой с
+    // aria-label, как и остальные действия. Ищем по aria-label,
+    // а не по тексту: текста у иконки нет.
+    const openBtn = page.locator('a[aria-label^="Открыть материалы курса"]').first()
     await expect(openBtn, 'кнопка «Открыть» есть в списке курсов').toBeVisible()
 
     const href = await openBtn.getAttribute('href')
@@ -176,20 +179,29 @@ test.describe('Фильтр по категории', () => {
       return found?.title ?? null
     }, categoryId)
 
-    if (categoryTitle) {
-      const link = page.locator('.menu-list li a', { hasText: categoryTitle }).first()
-      await expect(link, 'категория видна в списке').toBeVisible()
-      await link.click()
-      await page.waitForTimeout(2500)
-    }
+    // Список категорий в редизайне — кнопки .courses__nav-item,
+    // а не ссылки .menu-list li a из старой вёрстки на Bulma.
+    await expect(
+      page.locator('.courses__nav-item', { hasText: categoryTitle }).first(),
+      'категория видна в списке',
+    ).toBeVisible()
+    await page.locator('.courses__nav-item', { hasText: categoryTitle }).first().click()
+    await page.waitForTimeout(2500)
 
-    // Отфильтрованный список непустой и содержит связанные курсы.
+    // Проверяем именно отфильтрованный набор, а не «список не пуст»:
+    // прежняя проверка проходила и при полностью сломанном фильтре,
+    // потому что условие было защищено `if (shown.length > 0)`.
     const shown = await page.evaluate(() =>
-      [...document.querySelectorAll('.card .card-content p.is-size-5')].map((n) => n.textContent.trim())
+      // атрибут всегда строка, а expected — числа из API,
+      // поэтому приводим к Number, иначе сравнение ложно падает
+      [...document.querySelectorAll('.courses__card')].map((n) => Number(n.getAttribute('data-course-id')))
     )
-    if (shown.length > 0) {
-      expect(shown.length, 'показаны отфильтрованные курсы').toBeGreaterThan(0)
-    }
+
+    expect(shown.length, 'показаны отфильтрованные курсы').toBeGreaterThan(0)
+    expect(
+      shown.slice().sort(),
+      'в UI показан ровно набор курсов, связанных с категорией через pivot',
+    ).toEqual(expected.slice().sort())
   })
 
   test('сброс фильтра возвращает полный список', async ({ page }) => {

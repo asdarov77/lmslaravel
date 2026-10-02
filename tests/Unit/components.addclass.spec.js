@@ -29,11 +29,23 @@ import { createStore } from 'vuex'
 import { createVuetify } from 'vuetify'
 import * as vuetifyComponents from 'vuetify/components'
 import * as vuetifyDirectives from 'vuetify/directives'
+import { createI18n } from 'vue-i18n'
 import CourseModule from '../../resources/js/Store/modules/CourseModule'
+import ru from '../../resources/js/locales/ru.json'
+import en from '../../resources/js/locales/en.json'
 
 import AddClass, { toClassPath, extractApiError } from '../../resources/js/Pages/Course/AddClass.vue'
 
 const vuetify = createVuetify({ components: vuetifyComponents, directives: vuetifyDirectives })
+// Страница переведена на $t, поэтому i18n нужен как плагин:
+// опция верхнего уровня из VTU v1 молча игнорируется.
+const i18n = createI18n({
+  legacy: false,
+  globalInjection: true,
+  locale: 'ru',
+  fallbackLocale: 'ru',
+  messages: { ru, en },
+})
 const tick = (n = 0) => new Promise((r) => setTimeout(r, n))
 
 const envelope = (data, meta = null) => ({ data: { success: true, data, error: null, meta } })
@@ -63,6 +75,7 @@ const mountPage = () =>
     store,
     vuetify,
     global: {
+      plugins: [i18n],
       mocks: {
         $store: store,
         $route: { params: {}, query: {} },

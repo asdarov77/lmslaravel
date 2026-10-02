@@ -1,126 +1,148 @@
 <template>
-  <v-col cols="12" sm="8" md="4">
-    <v-card class="elevation-12 mx-auto">
-      <v-toolbar color="primary">        
-        <v-toolbar-title>Добавить группу </v-toolbar-title>        
-      </v-toolbar>
-      <v-card-text>
-        <v-form v-on:@submit.prevent="submitForm">
-          <v-text-field
-            label="наименование группы"
-            type="text"
-            v-model="groupname"
-          ></v-text-field>
-          <v-text-field
-            label="описание группы"
-            type="text"
-            v-model="groupdescription"
-          ></v-text-field>
+  <div class="u-page">
+    <FormCard
+      :title="$t('groups.create.title')"
+      :subtitle="$t('groups.create.subtitle')"
+      :busy="saving"
+      :submit-text="$t('common.create')"
+      @submit="submitForm"
+      @cancel="cancelBtnHead"
+    >
+      <v-text-field
+        v-model="groupname"
+        :label="$t('groups.create.name')"
+        :placeholder="$t('groups.create.namePlaceholder')"
+        :error-messages="fieldErrors.groupname"
+        autofocus
+      ></v-text-field>
 
-          <v-container class="notification is-danger" v-if="errors.length">
-            <!--class="has-text-centered"> -->
-            <p v-for="error in errors" v-bind:key="error">
-              {{ error }}
-            </p>
-          </v-container>
-        </v-form>
-      </v-card-text>
-      <v-card-actions>
-        <v-spacer></v-spacer>
-        <v-btn v-on:click="submitForm" color="primary">Сохранить</v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-col>
+      <v-textarea
+        v-model="groupdescription"
+        :label="$t('groups.create.description')"
+        :placeholder="$t('groups.create.descriptionPlaceholder')"
+        :error-messages="fieldErrors.groupdescription"
+        rows="3"
+        auto-grow
+      ></v-textarea>
+
+      <!--
+        Ошибки сервера показываем явно.
+
+        Раньше здесь стоял <v-container class="notification is-danger">:
+        класс из Bulma, которого в приложении нет (Bulma грузится с CDN
+        лишь на пяти страницах), поэтому блок ошибок рендерился без
+        единого стиля — серверный 422 был виден как пустое место.
+      -->
+      <v-alert
+        v-for="(error, index) in errors"
+        :key="index"
+        type="error"
+        class="mt-3"
+        :text="error"
+      ></v-alert>
+    </FormCard>
+
+    <AppToast v-model="toast.open" :type="toast.type" :text="toast.text" />
+  </div>
 </template>
 
 <script>
-import { mapState, mapGetters } from 'vuex'
+import { mapState, mapGetters } from "vuex";
+import { asArray, extractFieldErrors } from "../../api/envelope";
+import FormCard from "../../components/ui/FormCard.vue";
+import AppToast from "../../components/ui/AppToast.vue";
 
 export default {
-  //props: ["idEdit"],
-  // props: 
-  // {
-  //   idEdit: {
-  //     type: Number,
-  //     required: true
-  //   },
-  // }, 
+  name: "CreateGroup",
+  components: { FormCard, AppToast },
+
   data() {
     return {
-      groupname: '',
-      groupdescription: '',
-      //group: [], // группа с указанным ID из базы данных
+      groupname: "",
+      groupdescription: "",
       errors: [],
-    }
-  },
-  computed: {
-    ...mapState('User', ['allGroups','users']),    
-    ...mapGetters('User', ['users','groups']),
+      fieldErrors: {},
+      saving: false,
+      toast: { open: false, text: "", type: "success" },
+    };
   },
 
-  created() {   
-    
-    //if(this.idEdit){
-      //console.log(this.idEdit, 'id')
-      //this.$store.dispatch('User/fetchGroup', this.idEdit)      
-     
-    //}   
+  computed: {
+    ...mapState("User", ["allGroups", "users"]),
+    ...mapGetters("User", ["users", "groups"]),
   },
 
   methods: {
-    submitForm: function () {      
-      if (!this.errors.length) {
-        const formData = {
-          groupname: this.groupname,
-          groupdescription: this.groupdescription,
-          
-        };          
-        this.$store                
-        .dispatch('User/createGroup', {...formData})
-        .then(() => { 
-        })
-        .catch(error => {
-          console.error(error)
-        })        
-        .finally(() => this.$router.back())            
+    /**
+     * Клиентская валидация.
+     *
+     * Раньше проверка выглядела как `if (!this.errors.length)`, но
+     * массив errors нигде не наполнялся — условие всегда истинно, и
+     * пустая группа уходила на сервер. Теперь пустое имя — ошибка
+     * до запроса.
+     */
+    validate() {
+      this.errors = [];
+      this.fieldErrors = {};
+
+      if (this.groupname.trim() === "") {
+        this.fieldErrors.groupname = this.$t("groups.create.errors.nameRequired");
+      } else if (this.groupname.trim().length > 255) {
+        this.fieldErrors.groupname = this.$t("groups.create.errors.nameTooLong");
+      } else {
+        const exists = asArray(this.allGroups).some(
+          (group) =>
+            String(group.groupname ?? "").trim().toLowerCase() ===
+            this.groupname.trim().toLowerCase()
+        );
+
+        if (exists) {
+          this.fieldErrors.groupname = this.$t("groups.create.errors.nameTaken");
         }
+      }
 
+      if (this.groupdescription.length > 255) {
+        this.fieldErrors.groupdescription = this.$t("groups.create.errors.descriptionTooLong");
+      }
 
-        // if(this.idEdit){        
-        // //axios
-        // $api        
-        //   .put("/api/groups/" + this.idEdit, formData)
-        //   .then((response) => {
-        //     console.log(response);
-        //      this.$router.push("/groups/list");
-        //   })
-        // }
-        // else
-        // $api
-        // //axios 
-        // .post("/api/groups/", formData)
-        //   .then((response) => {
-        //     console.log(response);
-        //      this.$router.push("/groups/list");
-        //   })
-        //   .catch((error) => {
-        //     if (error.response) {
-        //       for (const property in error.response.data) {
-        //         this.errors.push(
-        //           `${property}: ${error.response.data[property]}`
-        //         );
-        //       }
+      return Object.keys(this.fieldErrors).length === 0;
+    },
 
-        //       console.log(JSON.stringify(error.response.data));
-        //     } else if (error.message) {
-        //       this.errors.push("Something went wrong. Please try again");
-        //       console.log(JSON.stringify(error));
-        //     }
-        //   });
+    async submitForm() {
+      if (this.saving) return;
+
+      this.errors = [];
+
+      if (!this.validate()) return;
+
+      this.saving = true;
+
+      try {
+        await this.$store.dispatch("User/createGroup", {
+          groupname: this.groupname.trim(),
+          groupdescription: this.groupdescription.trim(),
+        });
+
+        this.toast = { open: true, text: this.$t("groups.create.done"), type: "success" };
+        this.$router.push("/groups/list");
+      } catch (error) {
+        // Раньше .finally() уводил назад в любом случае, поэтому
+        // при ошибке пользователь оказывался на списке без объяснения.
+        const { fields, general } = extractFieldErrors(
+          error,
+          this.$t("groups.create.errors.generic")
+        );
+        Object.assign(this.fieldErrors, fields);
+        this.errors = general ? [general] : [];
+        this.toast = { open: true, text: general ?? "", type: "error" };
+      } finally {
+        this.saving = false;
       }
     },
-  //},
+
+    cancelBtnHead() {
+      this.$router.back();
+    },
+  },
 };
 </script>
-
-<style></style>

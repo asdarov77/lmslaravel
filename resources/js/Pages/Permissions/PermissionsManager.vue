@@ -161,18 +161,12 @@
       </v-col>
     </v-row>
 
-    <popup
-      :alert="alert"
-      :alertType="alertType"
-      :snackbarText="snackbarText"
-      :overlay="alert"
-      :alertFalse="alertFalse"
-    ></popup>
+    <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>
   </div>
 </template>
 
 <script>
-import popup from "../Popup.vue";
+import AppToast from "../../components/ui/AppToast.vue";
 import { mapState, mapGetters } from "vuex";
 
 /**
@@ -189,7 +183,7 @@ import { mapState, mapGetters } from "vuex";
  */
 export default {
   name: "PermissionsManager",
-  components: { popup },
+  components: { AppToast },
 
   data() {
     return {
@@ -388,10 +382,6 @@ export default {
         this.saving = false;
         this.alert = true;
       }
-    },
-
-    alertFalse() {
-      this.alert = false;
     },
   },
 };

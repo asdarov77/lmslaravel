@@ -121,7 +121,10 @@ test.describe('Регресс: страницы не падают и отобр�
     await page.goto('/#/user/list');
     await page.waitForTimeout(2500);
 
-    await page.getByRole('button', { name: /редактировать/i }).first().click();
+    // Действие в строке — иконка, доступное имя задано aria-label.
+    // Ищем по aria-label, а не по роли: v-btn с :to рендерится ссылкой
+    // (<a>), а не кнопкой — это верная семантика для навигации.
+    await page.locator('[aria-label^="Редактировать:"]').first().click();
     await page.waitForTimeout(2000);
 
     // ФИО должно подставиться из данных пользователя (а не из конверта)

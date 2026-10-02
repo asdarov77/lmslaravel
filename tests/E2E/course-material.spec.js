@@ -249,9 +249,16 @@ test.describe('страница материала курса', () => {
     const course = await findCourseWithModules(page, token)
     test.skip(!course, 'нет курса с модулями')
 
-    await page.request.delete(BASE + '/api/favorites/999999', {
+    // Чистим всё: иначе записи от прошлых прогонов ломают проверку
+    // ожидаемого количества.
+    const stale = await page.request.get(BASE + '/api/favorites/', {
       headers: { Authorization: 'Bearer ' + token },
     })
+    for (const item of (await stale.json())?.data?.favorites ?? []) {
+      await page.request.delete(BASE + '/api/favorites/' + item.course_id, {
+        headers: { Authorization: 'Bearer ' + token },
+      })
+    }
 
     await page.goto(`${BASE}/#/courses/itemmani?idEdit=${course.id}`, {
       waitUntil: 'domcontentloaded',
@@ -376,33 +383,45 @@ test.describe('запись групп на курсы', () => {
     await leaves[leaves.length - 1].click()
     await page.waitForTimeout(800)
 
-    const created = []
+    // Запоминаем id созданных записей, чтобы убрать именно свои.
+    //
+    // Раньше уборка проходила по всем группам подряд и удаляла ВСЕ записи
+    // учебного плана — включая реальные записи обучаемого. Плюс проверка
+    // брала «первую группу с записями», а это оказывалась группа с
+    // чужими данными, и тест падал на study_from.
+    const createdIds = []
     page.on('response', async (r) => {
-      if (r.url().includes('/api/group/learning') && r.status() === 201) created.push(r.status())
+      if (!r.url().includes('/api/group/learning') || r.status() !== 201) return
+      const body = await r.json().catch(() => null)
+      // Эндпоинт возвращает массив id созданных строк.
+      for (const id of (body?.data ?? [])) {
+        if (id != null) createdIds.push(id)
+      }
     })
 
     await page.getByRole('button', { name: 'Сохранить' }).click()
     await page.waitForTimeout(3500)
 
-    expect(created, 'запись создана').toEqual([201])
+    expect(createdIds.length, 'запись создана и вернула id').toBeGreaterThan(0)
 
     const groups = await page.request.get(BASE + '/api/groups', {
       headers: { Authorization: 'Bearer ' + token },
     })
     const list = (await groups.json())?.data ?? []
-    const touched = list.find((g) => (g.group2learnings ?? []).length > 0)
-    expect(touched, 'запись видна в группе').toBeTruthy()
-    const row = (touched?.group2learnings ?? [])[0]
-    expect(row?.course_id, 'сохранён настоящий id курса').toBeTruthy()
-    expect(row?.study_from).toBe('2026-12-01')
 
-    // Убираем за собой.
-    for (const group of list) {
-      for (const item of group.group2learnings ?? []) {
-        await page.request.delete(`${BASE}/api/learning/${item.id}`, {
-          headers: { Authorization: 'Bearer ' + token },
-        })
-      }
+    const rows = list.flatMap((g) => (g.group2learnings ?? []).map((r) => ({ ...r, group_id: g.id })))
+    const mine = rows.filter((r) => createdIds.includes(r.id))
+
+    expect(mine.length, 'запись видна в группе').toBe(createdIds.length)
+    expect(mine[0]?.course_id, 'сохранён настоящий id курса').toBeTruthy()
+    expect(mine[0]?.study_from).toBe('2026-12-01')
+    expect(mine[0]?.study_to).toBe('2026-12-31')
+
+    // Убираем за собой ТОЛЬКО свои записи.
+    for (const id of createdIds) {
+      await page.request.delete(`${BASE}/api/learning/${id}`, {
+        headers: { Authorization: 'Bearer ' + token },
+      })
     }
   })
 })

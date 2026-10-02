@@ -1,84 +1,133 @@
 <template>
-  <v-col cols="12" sm="8" md="4">
-    <v-card class="elevation-12 mx-auto">
-      <v-toolbar color="primary">
-        <v-toolbar-title>Добавить категорию </v-toolbar-title>
-      </v-toolbar>
-      <v-card-text>
-        <v-form v-on:@submit.prevent="submitForm">
-          <v-text-field
-            label="Название категории"
-            type="text"
-            v-model="title"
-          ></v-text-field>
-          <v-text-field
-            label="Описание категории"
-            type="text"
-            v-model="description"
-          ></v-text-field>
-          <v-container class="notification is-danger" v-if="errors.length">
-            <!--class="has-text-centered"> -->
-            <p v-for="error in errors" v-bind:key="error">
-              {{ error }}
-            </p>
-          </v-container>
-        </v-form>
-      </v-card-text>
-      <v-card-actions>
-        <v-spacer></v-spacer>
-        <!-- <v-btn v-on:click="submitForm" color="primary">Сохранить</v-btn> -->
-        <ButtonGroup @submitForm="submitForm" @cancelBtn="cancelBtnHead"></ButtonGroup>
-      </v-card-actions>
-    </v-card>
-  </v-col>
+  <div class="u-page">
+    <FormCard
+      :title="$t('categories.create.title')"
+      :subtitle="$t('categories.create.subtitle')"
+      :busy="saving"
+      :submit-text="$t('common.create')"
+      @submit="submitForm"
+      @cancel="cancelBtnHead"
+    >
+      <v-text-field
+        v-model="title"
+        :label="$t('categories.create.name')"
+        :placeholder="$t('categories.create.namePlaceholder')"
+        :error-messages="fieldErrors.title"
+        autofocus
+      ></v-text-field>
+
+      <v-textarea
+        v-model="description"
+        :label="$t('categories.create.description')"
+        :placeholder="$t('categories.create.descriptionPlaceholder')"
+        :error-messages="fieldErrors.description"
+        rows="3"
+        auto-grow
+      ></v-textarea>
+
+      <!-- Класс notification is-danger раньше не давал никакого вида:
+           Bulma в приложении не подключена, и ошибка 422 выглядела
+           как пустой блок. -->
+      <v-alert
+        v-for="(error, index) in errors"
+        :key="index"
+        type="error"
+        class="mt-3"
+        :text="error"
+      ></v-alert>
+    </FormCard>
+
+    <AppToast v-model="toast.open" :type="toast.type" :text="toast.text" />
+  </div>
 </template>
 
 <script>
-import { mapState, mapGetters } from 'vuex'
-import ButtonGroup from "../../components/ButtonGroup.vue";
+import { mapState, mapGetters } from "vuex";
+import { asArray, extractFieldErrors } from "../../api/envelope";
+import FormCard from "../../components/ui/FormCard.vue";
+import AppToast from "../../components/ui/AppToast.vue";
 
 export default {
-  components: {ButtonGroup},
+  name: "RegisterCategory",
+  components: { FormCard, AppToast },
 
   data() {
     return {
       title: "",
       description: "",
       errors: [],
+      fieldErrors: {},
+      saving: false,
+      toast: { open: false, text: "", type: "success" },
     };
   },
 
-  async mounted() {
-    //console.log("mounted register category");    
-  },
   computed: {
-      ...mapState('Course', ['totalCategories','categories']),
-      ...mapGetters('Course', ['categories','courses']),
+    ...mapState("Course", ["totalCategories", "categories"]),
+    ...mapGetters("Course", ["categories", "courses"]),
   },
 
   methods: {
-    submitForm: function () {
-      if (!this.errors.length) {
-        const formData = {
-          title: this.title,
-          description: this.description,
-        };
-        this.$store
-          .dispatch("Course/createCategory", { ...formData })
-          .then(() => {})
-          .catch((error) => {
-            console.error(error);
-          })
-          .finally(() => this.$router.back());
+    validate() {
+      this.errors = [];
+      this.fieldErrors = {};
+
+      const name = this.title.trim();
+
+      if (name === "") {
+        this.fieldErrors.title = this.$t("categories.create.errors.nameRequired");
+      } else if (name.length > 255) {
+        this.fieldErrors.title = this.$t("categories.create.errors.nameTooLong");
+      } else {
+        const exists = asArray(this.categories).some(
+          (category) => String(category.title ?? "").trim().toLowerCase() === name.toLowerCase()
+        );
+
+        if (exists) {
+          this.fieldErrors.title = this.$t("categories.create.errors.nameTaken");
+        }
+      }
+
+      if (this.description.length > 255) {
+        this.fieldErrors.description = this.$t("categories.create.errors.descriptionTooLong");
+      }
+
+      return Object.keys(this.fieldErrors).length === 0;
+    },
+
+    async submitForm() {
+      if (this.saving) return;
+
+      this.errors = [];
+
+      if (!this.validate()) return;
+
+      this.saving = true;
+
+      try {
+        await this.$store.dispatch("Course/createCategory", {
+          title: this.title.trim(),
+          description: this.description.trim(),
+        });
+
+        this.toast = { open: true, text: this.$t("categories.create.done"), type: "success" };
+        this.$router.push("/categories");
+      } catch (error) {
+        const { fields, general } = extractFieldErrors(
+          error,
+          this.$t("categories.create.errors.generic")
+        );
+        Object.assign(this.fieldErrors, fields);
+        this.errors = general ? [general] : [];
+        this.toast = { open: true, text: general ?? "", type: "error" };
+      } finally {
+        this.saving = false;
       }
     },
-    cancelBtnHead()
-    {
-      //console.log('cancel');
-      this.$router.go(-1);
+
+    cancelBtnHead() {
+      this.$router.back();
     },
   },
 };
 </script>
-
-<style></style>

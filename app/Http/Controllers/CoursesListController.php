@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Course;
+use App\Support\CourseVisibility;
 
 use Illuminate\Http\Request;
 
@@ -18,6 +19,12 @@ class CoursesListController extends Controller
         // Также без eager loading aircraft делал N+1 запрос.
         $query = Course::with('aircraft', 'categories')
             ->whereNotNull('aircraft_id');
+
+        // Обучаемый видит только курсы, на которые записана его группа.
+        // Без этого /api/courses отдавал ему весь каталог, включая
+        // специальности и курсы, к учебному плану которых он отношения
+        // не имеет.
+        CourseVisibility::restrictToEnrolled($query, $request->user());
 
         // Фильтры. Фронтенд шлёт их и раньше (Pages/Courses.vue ->
         // Course/fetchCoursesFilter), но контроллер их игнорировал: выбор

@@ -116,7 +116,7 @@
                     }}</v-btn>   
                 </li>
               </ul>
-              <p v-else class="ml-5 mr-5 mt-1 search-files__no-results">Нет результатов</p>
+              <p v-else class="ml-5 mr-5 mt-1 search-files__no-results">{{ $t("courseManifest.noResults") }}</p>
             </div> -->
             <!--                                            рабочий вариант                           -->
 
@@ -135,7 +135,7 @@
                     }}</v-btn>
                 </li>
               </ul>
-              <p v-else class="ml-5 mr-5 mt-1 search-files__no-results">Нет результатов</p>
+              <p v-else class="ml-5 mr-5 mt-1 search-files__no-results">{{ $t("courseManifest.noResults") }}</p>
             </div>
             <!--                                            рабочий эксперимент                           -->
 
@@ -211,8 +211,7 @@
       </v-col>
     </v-row>
   </v-card>
-  <popup :alert="alert" :alertType="alertType" :snackbarText="snackbarText" :overlay="alert" :alertFalse="alertFalse">
-  </popup>
+  <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>
 </template>
 
 <!-- <script> -->
@@ -221,7 +220,7 @@
 const apiUrl = import.meta.env.VITE_APP_URL;
 import $api from "../api/httpClient";
 import { unwrapResponse, unwrapArray, unwrapField, numericQuery } from "../api/envelope";
-import popup from "./Popup.vue";
+import AppToast from "../components/ui/AppToast.vue";
 import { mapState, mapGetters } from "vuex";
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { faTimes } from '@fortawesome/free-solid-svg-icons';
@@ -230,7 +229,7 @@ library.add(faTimes);
 
 export default {
   components: {
-    popup, FontAwesomeIcon
+    AppToast, FontAwesomeIcon
 
   },
 
@@ -898,12 +897,6 @@ export default {
         .delete(apiUrl + `/api/favorites/${id}`).then(() => {
           this.getFavorites();
         });
-    },
-
-
-
-    alertFalse() {
-      this.alert = false;
     },
     async search() {
       const formData = {

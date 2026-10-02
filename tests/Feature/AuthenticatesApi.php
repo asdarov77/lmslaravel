@@ -13,10 +13,44 @@ use Illuminate\Testing\TestResponse;
  */
 trait AuthenticatesApi
 {
+    /**
+     * Войти под новым пользователем.
+     *
+     * Сбрасываем уже разрешённых guard'ов: контейнер приложения в тестах
+     * один на все запросы теста, и guard, разрешивший пользователя в
+     * ПРЕДЫДУЩЕМ запросе, остаётся закэшированным. Из-за этого запрос с
+     * корректным токеном нового пользователя проверялся под старым —
+     * например, инструктор с правом exams.manage получал 403, потому что
+     * проверялся обучаемый из предыдущего вызова asUser().
+     *
+     * В боевом приложении этого нет: контейнер создаётся заново на каждый
+     * запрос (php artisan serve / php-fpm, Octane не используется).
+     */
     protected function asUser(array $attrs = []): User
     {
         $user = User::factory()->create($attrs);
         $token = $user->createToken('t')->plainTextToken;
+
+        $this->app['auth']->forgetGuards();
+
+        $this->withHeader('Authorization', 'Bearer ' . $token);
+
+        return $user;
+    }
+
+    /**
+     * Войти под СУЩЕСТВУЮЩИМ пользователем.
+     *
+     * Нужно, когда в одном тесте под одним и тем же пользователем идут
+     * несколько запросов: asUser() создаёт нового, и передать ему чужой id
+     * нельзя — фабрика упрётся в нарушение уникальности.
+     */
+    protected function asExistingUser(User $user): User
+    {
+        $token = $user->createToken('t')->plainTextToken;
+
+        $this->app['auth']->forgetGuards();
+
         $this->withHeader('Authorization', 'Bearer ' . $token);
 
         return $user;

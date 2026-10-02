@@ -25,6 +25,27 @@ class AuthController extends Controller
         $this->middleware("auth:sanctum")->except(['login', 'register']);
     }
 
+    /**
+     * Регистрация / создание пользователя.
+     *
+     * Раньше роль приходила из тела запроса без всякой проверки:
+     *   $user->role = $request->role;
+     * А эндпоинт публичный (`except(['login', 'register'])`), поэтому любой
+     * мог отправить {"role": "Администратор"} и получить все права каталога
+     * вместе с is_super_admin. Проверено на живой базе: у такого
+     * пользователя оказалось 26 прав из 26.
+     *
+     * Теперь роль назначается по правилам:
+     *  - тот, кто имеет users.create (администратор, инструктор), вправе
+     *    указать роль из известного списка и группу — это его рабочий
+     *    сценарий «Новый пользователь»;
+     *  - все остальные (публичная саморегистрация) получают роль
+     *    «Обучаемый» и остаются без группы: группа определяет учебный
+     *    план, и задать её самому себе значит подписаться на материалы
+     *    чужой группы;
+     *  - приходит неизвестная роль → 422, а не молчаливое сохранение
+     *    мусора в колонке role.
+     */
     public function register(Request $request)
     {
         $fields = $request->validate([
@@ -32,16 +53,49 @@ class AuthController extends Controller
             'password' => 'required|string|confirmed',
             // Без проверки объект/строка из v-combobox уезжает в bigint → 500
             'group_id' => ['nullable', 'integer', 'exists:groups,id'],
+            'role' => ['nullable', 'string'],
         ]);
+
+        // Роль назначается по правам актора. ВАЖНО: маршрут исключён из
+        // auth:sanctum ($this->middleware(...)->except(['login','register'])),
+        // поэтому $request->user() здесь ВСЕГДА null — даже с корректным
+        // Bearer-токеном. Актор разрешается явно через guard, иначе
+        // администратор не смог бы создать пользователя с ролью и всем
+        // уходить в «Обучаемый».
+        $actor = auth('sanctum')->user();
+
+        $known = array_merge(
+            ...array_values(User::ROLE_ALIASES)
+        );
+
+        $requested = is_string($fields['role'] ?? null) ? trim($fields['role']) : '';
+
+        if ($requested !== '' && ! in_array($requested, $known, true)) {
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'error' => [
+                    'code' => '422',
+                    'message' => 'Неизвестная роль. Допустимые: '.implode(', ', $known),
+                ],
+                'meta' => null,
+            ], 422);
+        }
+
+        // Право выдавать роль есть только у тех, кто создаёт пользователей.
+        $mayAssignRole = $actor !== null
+            && ($actor->isSuperAdmin() || $actor->hasPermission('users.create'));
+
+        $role = $mayAssignRole && $requested !== '' ? $requested : 'Обучаемый';
 
         $user = User::create([
             'fio' => $fields['fio'],
             'password' => bcrypt($fields['password'])
         ]);
-        $user->group_id = $request->group_id;
-        $user->role = $request->role;
+        $user->group_id = $mayAssignRole ? ($fields['group_id'] ?? null) : null;
+        $user->role = $role;
         $user->save();
-        //$token = $user->createToken($request->name)->plainTextToken;
+
         $response = [
             'user' => $user,
         ];
@@ -436,6 +490,10 @@ public function group2learning(Request $request)
             'typeOfLesson' => ['nullable', 'string', 'max:255'],
             'study_from' => ['required', 'date'],
             'study_to' => ['required', 'date', 'after_or_equal:study_from'],
+            // Дедлайн не обязателен: у части записей его нет, и это
+            // нормально. Но если задан — он не может быть раньше начала
+            // периода, иначе срок сдачи оказывается позади.
+            'deadline' => ['nullable', 'date', 'after_or_equal:study_from'],
         ]);
 
         $created = [];
@@ -454,6 +512,9 @@ public function group2learning(Request $request)
                     'typeOfLesson' => $validated['typeOfLesson'] ?? null,
                     'study_from' => $validated['study_from'],
                     'study_to' => $validated['study_to'],
+                    // Без ключа insert упал бы на NOT NULL у колонки
+                    // без default; с явным null дедлайн остаётся пустым.
+                    'deadline' => $validated['deadline'] ?? null,
                 ]);
             }
         });

@@ -29,7 +29,9 @@
       "exams": "Exams",
       "questionbank": "Question bank",
       "mycourses": "My courses",
-      "userSection": "User management"
+      "userSection": "User management",
+      "myLearning": "My learning",
+      "dashboard": "Dashboard"
     },
     "buttons": {
       "cancel": "cancel",
@@ -234,6 +236,323 @@
     "toTop": "Back to top",
     "alreadyFavorite": "Already in favorites",
     "favoriteError": "Failed to update favorites",
-    "favoriteRemoved": "Removed from favorites"
+    "favoriteRemoved": "Removed from favorites",
+    "noResults": "No results"
+  },
+  "groups": {
+    "list": {
+      "title": "Groups",
+      "subtitle": "Trainee classes and course enrolments",
+      "create": "Add group",
+      "search": "Search by name",
+      "name": "Name",
+      "description": "Description",
+      "courses": "Courses",
+      "category": "Category",
+      "period": "Period",
+      "enroll": "Enrol on courses",
+      "enrollShort": "Enrol",
+      "edit": "Edit",
+      "delete": "Delete",
+      "emptyTitle": "No groups yet",
+      "emptyText": "Create the first group to enrol it on courses",
+      "emptyFiltered": "Nothing found",
+      "emptyFilteredText": "No group matches your query. Try different search terms"
+    },
+    "delete": {
+      "title": "Delete group?",
+      "text": "Group “{name}” and all its course enrolments will be removed. This cannot be undone.",
+      "confirm": "Delete",
+      "done": "Group deleted",
+      "error": "Failed to delete the group"
+    },
+    "create": {
+      "title": "New group",
+      "subtitle": "Name and description of a trainee class",
+      "name": "Name",
+      "namePlaceholder": "For example: Group 42",
+      "description": "Description",
+      "descriptionPlaceholder": "What this group does",
+      "done": "Group created",
+      "errors": {
+        "nameRequired": "Group name is required",
+        "nameTooLong": "No more than 255 characters",
+        "nameTaken": "A group with this name already exists",
+        "descriptionTooLong": "Description up to 255 characters",
+        "generic": "Failed to save the group"
+      }
+    },
+    "edit": {
+      "title": "Edit group",
+      "subtitle": "Group “{name}”",
+      "enroll": "Enrol on courses",
+      "done": "Group updated",
+      "errors": {
+        "generic": "Failed to save the group"
+      }
+    }
+  },
+  "common": {
+    "close": "Close",
+    "cancel": "Cancel",
+    "save": "Save",
+    "create": "Create",
+    "loading": "Loading",
+    "noGroupsFound": "No groups found",
+    "delete": "Delete",
+    "refresh": "Refresh"
+  },
+  "users": {
+    "list": {
+      "title": "Users",
+      "subtitle": "Accounts, roles and groups",
+      "create": "Add user",
+      "search": "Search by name",
+      "name": "User",
+      "role": "Role",
+      "group": "Group",
+      "edit": "Edit",
+      "password": "Change password",
+      "permissions": "Permissions",
+      "delete": "Delete",
+      "emptyTitle": "No users yet",
+      "emptyText": "Add the first user to assign a role and a group",
+      "emptyFiltered": "Nobody found",
+      "emptyFilteredText": "No user matches your query. Try a different name"
+    },
+    "delete": {
+      "title": "Delete user?",
+      "text": "Account “{name}” will be permanently removed.",
+      "confirm": "Delete",
+      "done": "User deleted",
+      "error": "Failed to delete the user",
+      "cannotDeleteSuper": "Superuser cannot be deleted"
+    },
+    "role": "Role",
+    "roleHintPublic": "Public registration always creates a trainee"
+  },
+  "categories": {
+    "list": {
+      "title": "Categories",
+      "subtitle": "Category reference by aircraft",
+      "create": "Add category",
+      "filterAircraft": "Aircraft",
+      "all": "All",
+      "name": "Name",
+      "code": "Code",
+      "description": "Description",
+      "aircraft": "Aircraft",
+      "edit": "Edit",
+      "delete": "Delete",
+      "emptyTitle": "No categories yet",
+      "emptyText": "Add a category to tag course material",
+      "emptyFiltered": "No categories for this aircraft",
+      "emptyFilteredText": "Clear the filter or add a category for the selected aircraft"
+    },
+    "delete": {
+      "title": "Delete category?",
+      "text": "Category “{name}” will be removed. Material tagged with it will lose the link.",
+      "confirm": "Delete",
+      "done": "Category deleted",
+      "error": "Failed to delete the category"
+    },
+    "create": {
+      "title": "New category",
+      "subtitle": "A category tags course material",
+      "name": "Name",
+      "namePlaceholder": "For example: Navigator",
+      "description": "Description",
+      "descriptionPlaceholder": "Who the material is for",
+      "done": "Category created",
+      "errors": {
+        "nameRequired": "Category name is required",
+        "nameTooLong": "No more than 255 characters",
+        "nameTaken": "A category with this name already exists",
+        "descriptionTooLong": "Description up to 255 characters",
+        "generic": "Failed to save the category"
+      }
+    },
+    "edit": {
+      "title": "Edit category",
+      "subtitle": "Category “{name}”",
+      "done": "Category updated",
+      "errors": {
+        "generic": "Failed to save the category"
+      }
+    }
+  },
+  "courses": {
+    "list": {
+      "title": "Courses",
+      "subtitle": "Training courses and materials by aircraft",
+      "create": "Add course",
+      "filterAircraft": "Class",
+      "filterCategory": "Course categories",
+      "allCategories": "All categories",
+      "onlyVisible": "Show published only",
+      "onlyHidden": "Show hidden only",
+      "more": "Details",
+      "edit": "Edit",
+      "openManifest": "Open course materials",
+      "openManifestHint": "Opens in a new tab",
+      "delete": "Delete",
+      "hidden": "Hidden",
+      "noDescription": "No description yet",
+      "emptyTitle": "No courses yet",
+      "emptyText": "Add a course to upload materials into it",
+      "emptyFiltered": "Nothing matches the filters",
+      "emptyFilteredText": "Clear the class and category filters or switch visibility"
+    },
+    "delete": {
+      "title": "Delete course?",
+      "text": "Course “{name}” and all its materials will be removed. This cannot be undone.",
+      "confirm": "Delete",
+      "done": "Course deleted",
+      "error": "Failed to delete the course"
+    }
+  },
+  "groupLearning": {
+    "title": "Enroll user groups in courses"
+  },
+  "classes": {
+    "title": "Add class",
+    "clearData": "Clear data"
+  },
+  "questions": {
+    "addAnswer": "Add answer",
+    "deleteAnswer": "Delete answer",
+    "saveChanges": "Save changes"
+  },
+  "plan": {
+    "title": "Learning plan",
+    "subtitle": "Courses and materials assigned to your group",
+    "filterAll": "All",
+    "module": "Module",
+    "lessonType": "Lesson type",
+    "period": "Period",
+    "specialties": "Specialties",
+    "openMaterials": "Materials",
+    "statCourses": "Courses",
+    "emptyTitle": "Your learning plan is empty",
+    "emptyText": "You have not been enrolled in any course yet. Please contact your instructor.",
+    "emptyFiltered": "Nothing with this status",
+    "emptyFilteredText": "Pick another status or show all entries.",
+    "loadError": "Failed to load the learning plan",
+    "forbidden": "No access to the learning plan",
+    "status": {
+      "active": "In progress",
+      "planned": "Planned",
+      "completed": "Completed"
+    },
+    "deadline": "deadline"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "greeting": "Hello",
+    "subtitle": "Your learning status today",
+    "statCourses": "Courses",
+    "statActive": "Active",
+    "statProgress": "Progress",
+    "statExams": "Exams passed",
+    "myCourses": "My courses",
+    "myCoursesHint": "Courses assigned to your group",
+    "upcoming": "Due soon",
+    "upcomingHint": "Deadlines within the next 7 days",
+    "upcomingEmpty": "No deadlines in the coming week",
+    "exams": "Exams",
+    "examsHint": "Results of your attempts",
+    "examAttempts": "Attempts",
+    "examAvg": "Average score",
+    "examPassed": "Passed",
+    "examsEmpty": "No exams taken yet",
+    "progress": "Learning progress",
+    "progressHint": "Share of courses whose materials you opened",
+    "openPlan": "Open learning plan",
+    "goExams": "Go to exams",
+    "loadError": "Failed to load dashboard data",
+    "deadlineToday": "Today",
+    "deadlineTomorrow": "Tomorrow",
+    "deadlineInDays": "in {days} d"
+  },
+  "calendar": {
+    "title": "Training calendar",
+    "subtitle": "Study periods of groups by courses and modules",
+    "filterGroup": "Group",
+    "filterCourse": "Course",
+    "filterCategory": "Specialty",
+    "filterStatus": "Status",
+    "filterAll": "All",
+    "allGroups": "All groups",
+    "allCourses": "All courses",
+    "allCategories": "All specialties",
+    "filteredBy": "Filtered by:",
+    "resetFilters": "Reset filters",
+    "periodsShown": "Events shown: {count}",
+    "emptyTitle": "The calendar is empty",
+    "emptyText": "No group is enrolled in any course. Enrollments are created in the group enrollment section.",
+    "emptyFiltered": "Nothing matches the filter",
+    "emptyFilteredText": "Loosen the conditions or reset the filters.",
+    "loadError": "Failed to load the calendar",
+    "forbidden": "No access to the calendar",
+    "detailGroup": "Group",
+    "detailTeacher": "Instructor",
+    "detailStatus": "Status",
+    "close": "Close",
+    "today": "Today",
+    "month": "Month",
+    "week": "Week",
+    "list": "List",
+    "filterKind": "Event type",
+    "kindAll": "All",
+    "kindPeriod": "Study periods",
+    "kindDeadline": "Deadlines",
+    "deadlinePrefix": "Due: "
+  },
+  "exams": {
+    "title": "Exams",
+    "subtitle": "Assessments assigned to you",
+    "statTotal": "Assigned",
+    "statAvailable": "Available",
+    "statPassed": "Passed",
+    "start": "Start",
+    "retry": "Try again",
+    "finished": "Exam completed",
+    "passed": "Passed",
+    "notPassed": "Not passed",
+    "window": "Availability window",
+    "until": "until",
+    "noWindow": "No date limits",
+    "attempts": "Attempts",
+    "attemptsUsedOf": "{used} of {total} used",
+    "attemptsLeft": "Attempts left: {count}",
+    "attemptsExhausted": "No attempts left",
+    "passingScore": "Pass mark",
+    "bestScore": "Best score",
+    "score": "Score",
+    "correct": "Correct answers",
+    "emptyTitle": "No exams",
+    "emptyText": "No exam has been assigned to you yet.",
+    "unavailable": "Exam unavailable",
+    "backToList": "Back to exams",
+    "loadError": "Failed to load exams",
+    "submitError": "Failed to submit answers",
+    "noQuestions": "This exam has no questions. Please contact your instructor.",
+    "progress": "Question {current} of {total}",
+    "answeredOf": "Answered {answered} of {total}",
+    "prev": "Back",
+    "next": "Next",
+    "finish": "Finish exam",
+    "answerAll": "Answer all questions to finish the exam.",
+    "state": {
+      "available": "Available",
+      "planned": "Not open yet",
+      "closed": "Window closed",
+      "exhausted": "No attempts left"
+    },
+    "take": {
+      "title": "Taking the exam",
+      "subtitle": "Answer the questions and finish",
+      "finished": "Exam completed"
+    }
   }
 }

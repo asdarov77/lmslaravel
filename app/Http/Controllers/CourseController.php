@@ -58,6 +58,13 @@ class CourseController extends Controller
 
         $courseFilter = app()->make(CourseFilter::class, ['queryParams' => array_filter($data)]);
         $query = Course::filter($courseFilter)->orderByDesc('id');
+
+        // Область видимости: обучаемый получает только курсы своей группы.
+        // Методисту и администратору (courses.manage) остаётся полный
+        // каталог, иначе нельзя было бы увидеть и отредактировать курс,
+        // который ещё никому не назначен.
+        \App\Support\CourseVisibility::restrictToEnrolled($query, $request->user());
+
         $paginator = $query->paginate($perPage, ['*'], 'page', $page);
 
         $meta = [

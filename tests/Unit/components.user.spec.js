@@ -22,10 +22,11 @@ import AuthModule from '../../resources/js/Store/modules/AuthModule'
 const vuetify = createVuetify({ components, directives })
 const i18n = createI18n({
   legacy: false,
+  globalInjection: true,
   locale: 'ru',
   messages: {
-    ru: { app: { buttons: { save: 'сохранить', cancel: 'отмена' } } },
-    en: { app: { buttons: { save: 'save', cancel: 'cancel' } } },
+    ru: { app: { buttons: { save: 'сохранить', cancel: 'отмена' } }, ...ru },
+    en: { app: { buttons: { save: 'save', cancel: 'cancel' } }, ...en },
   },
 })
 
@@ -33,6 +34,8 @@ import UserItemEdit from '../../resources/js/Pages/User/UserItemEdit.vue'
 import Register from '../../resources/js/Pages/Register.vue'
 import UserPage from '../../resources/js/Pages/User/UserPage.vue'
 import GroupList from '../../resources/js/Pages/GroupList.vue'
+import ru from '../../resources/js/locales/ru.json'
+import en from '../../resources/js/locales/en.json'
 
 // Конверт ровно такой, как отдаёт middleware ApiResponseEnvelope
 const envelope = data => ({ data: { success: true, data, error: null, meta: null } })
@@ -76,10 +79,10 @@ const passthroughStub = name => ({
 
 const mountPage = component =>
   mount(component, {
-    store,
-    vuetify,
-    i18n,
     global: {
+      // i18n ставится плагином: опция верхнего уровня осталась от
+      // VTU v1 и молча игнорируется, из-за чего $t был недоступен.
+      plugins: [i18n],
       mocks: {
         // provide: точка монтирования не ставит стор в $store,
         // поэтому передаём его явно через mocks

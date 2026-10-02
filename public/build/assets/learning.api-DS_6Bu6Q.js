@@ -1,0 +1,1 @@
+import{H as r,K as s,G as n}from"./app-CCIsaL0h.js";const t=()=>n.get("/api/my/learning"),e=()=>n.get("/api/my/dashboard"),p={fetchMyLearning:t,fetchMyDashboard:e,planItems:a=>s(a),dashboard:a=>r(a)||{}};export{p as l};

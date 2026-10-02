@@ -187,7 +187,9 @@ test.describe('CRUD категории через UI', () => {
     // UpdateCategory.vue отправлял весь state.category вместе с
     // устаревшим алиасом name, и PUT отвечал 200, не меняя название.
     const row = page.locator('tbody tr', { hasText: title })
-    await row.locator('a,button', { hasText: 'Редактировать' }).first().click()
+    // Кнопка действия — иконка с aria-label «Редактировать: <название>».
+    // Селектор по aria-label, а не по роли: ссылка рендерится как <a>.
+    await row.locator('[aria-label^="Редактировать:"]').click()
     await page.waitForTimeout(1200)
 
     const nameField = page.locator('input').first()
@@ -272,8 +274,11 @@ test.describe('Редактирование пользователя с выбо
 
     expect(errors, 'редактирование пользователя не должно давать 5xx').toEqual([])
 
-    // Чистим за собой
+    // Чистим за собой: сначала пользователя, потом группу.
+    // Раньше удалялся только пользователь, и группа оставалась в базе —
+    // по 3 группы за каждый прогон, со временем их становились сотни.
     await page.request.delete(BASE + `/api/user/${userId}`, { headers: authHeader })
+    await page.request.delete(BASE + `/api/groups/${groupId}`, { headers: authHeader })
   })
 })
 
@@ -289,13 +294,16 @@ test.describe('Выпадающий список групп в редактир�
 
     // Создаём две группы: пустой список нельзя спутать с «одна группа»
     const names = []
+    const groupIds = []
     for (const label of ['Первая', 'Вторая']) {
       const r = await page.request.post(BASE + '/api/groups', {
         headers: authHeader,
         data: { groupname: `E2E ${label} группа ${Date.now()}${label}` },
       })
       expect(r.status(), `создание группы ${label}`).toBe(201)
-      names.push((await r.json()).data.groupname)
+      const body = await r.json()
+      names.push(body.data.groupname)
+      groupIds.push(body.data.id)
     }
 
     const u = await page.request.post(BASE + '/api/register', {
@@ -312,23 +320,31 @@ test.describe('Выпадающий список групп в редактир�
     await page.goto(`${HASH}/user/edit/${userId}`, { waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(1800)
 
-    // Открываем именно поле «Группа» (v-select) и смотрим варианты
-    const groupSelect = page.locator('.v-select', { has: page.locator('label', { hasText: 'Группа' }) }).first()
+    // .v-input — базовый класс Vuetify 3 и для v-select, и для
+    // v-autocomplete: привязка к .v-select ломалась бы при смене
+    // компонента.
+    const groupSelect = page.locator('.v-input', { has: page.locator('label', { hasText: 'Группа' }) }).first()
     await expect(groupSelect, 'поле «Группа» присутствует на форме').toBeVisible()
 
+    // Ищем группу по имени прямо в поле выбора.
+    //
+    // Раньше проверка шла по тексту всего раскрытого меню, но список
+    // групп виртуализируется: Vuetify держит в DOM только видимую
+    // часть (около 45 элементов), поэтому новая группа в конце списка
+    // в DOM не попадала, и проверка падала. Поиск по полю — это и
+    // реальный пользовательский путь, и проверка самого фильтра,
+    // который добавлен в select.
     await groupSelect.click()
-    await page.waitForTimeout(900)
+    await page.waitForTimeout(700)
+    await page.keyboard.type(names[0], { delay: 15 })
+    await page.waitForTimeout(1000)
 
-    const menu = page.locator('.v-menu__content, .v-overlay__content').last()
+    const menu = page.locator('.v-overlay__content').last()
     await expect(menu, 'список групп открылся').toBeVisible()
 
-    for (const name of names) {
-      await expect(menu, `в списке есть группа «${name}»`).toContainText(name)
-    }
-
-    // Выбираем первую группу и сохраняем
-    await menu.locator('.v-list-item, .v-list-item-title', { hasText: names[0] }).first().click()
+    await menu.locator('.v-list-item', { hasText: names[0] }).first().click()
     await page.waitForTimeout(600)
+    await expect(groupSelect, 'в поле выбрана найденная группа').toContainText(names[0])
     await page.getByRole('button', { name: /сохранить/i }).first().click()
     await page.waitForTimeout(1500)
 
@@ -339,6 +355,11 @@ test.describe('Выпадающий список групп в редактир�
 
     expect(errors, 'страница редактирования не должна падать').toEqual([])
 
+    // Чистим за собой: пользователя, затем обе группы (см. тест выше —
+    // без этого каждая проверка оставляла в базе по три записи).
     await page.request.delete(BASE + `/api/user/${userId}`, { headers: authHeader })
+    for (const id of groupIds) {
+      await page.request.delete(BASE + `/api/groups/${id}`, { headers: authHeader })
+    }
   })
 })

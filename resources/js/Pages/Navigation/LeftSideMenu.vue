@@ -15,7 +15,12 @@ const { t } = useI18n({ useScope: "global" });
       >
       </v-list-item>
 
-      <v-list-group value="true">
+      <!--
+        Группа скрывается, если все её пункты отфильтрованы по правам.
+        Иначе у обучаемого остаётся заголовок «Управление пользователями»,
+        который никуда не ведёт и выглядит как недогруженная страница.
+      -->
+      <v-list-group v-if="menuUsers.length" value="true">
         <template v-slot:activator="{ props }">
           <v-list-item
             v-bind="props"
@@ -69,16 +74,23 @@ export default {
         //   contentType: "",
         // },
         {
+          // Загрузка файлов — только тем, кто контент создаёт.
+          // contentType: "" делал пункт видимым ВСЕМ, включая
+          // обучаемого, который по этому пункту получал 403.
           icon: "mdi-cloud-upload",
           title: this.$t("app.menu.files"),
           link: "/files/add",
-          contentType: "",
+          contentType: "content.manage",
         },
         {
+          // Справочник категорий (специальностей) — методическая
+          // страница. Раньше стоял contentType: "", поэтому обучаемый
+          // видел «Категории» и все специальности, включая те,
+          // на которые его не записывали.
           icon: "mdi-domain",
           title: this.$t("app.menu.categories"),
           link: "/categories",
-          contentType: "",
+          contentType: "categories.manage",
         },
         {
           icon: "mdi-domain",
@@ -105,23 +117,46 @@ export default {
         //   contentType: "manage-users",
         // },
         {
-          // Регресс: пункт вёл на /user/learning — такого маршрута в
-          // Router/routes.js нет, клик открывал страницу 404. Теперь
-          // ведёт на существующий group.learning, а заголовок переведён
-          // в i18n вместо литерала "user learning".
-          // Без id в конце: раньше был жёстко зашит /group/learning/1,
-          // то есть из меню записать можно было только группу №1, и
-          // непонятно было, какую именно. Теперь группу выбирают в форме.
-          icon: "mdi-calendar",
+          // Запись групп на курсы — методическая операция (users.courses).
+          // Это НЕ «учебный план» обучаемого: см. пункт ниже.
+          icon: "mdi-account-group-outline",
           title: this.$t("app.menu.learning"),
           link: "/group/learning",
-          contentType: " ",
+          // contentType: " " (пробел) — не slug. visibleFor() делает
+          // .trim(), получал пустую строку и показывал пункт ВСЕМ,
+          // включая обучаемого, которому маршрут отдавал 403.
+          contentType: "users.courses",
         },
         {
-          icon: "mdi-calendar",
+          // Учебный план обучаемого: его собственные курсы и материалы.
+          // До этого пункта не существовало — обучаемый не видел ни одного
+          // назначенного ему курса, а «Учебный план» в меню вёл на
+          // админскую форму и отдавал 403.
+          icon: "mdi-calendar-month-outline",
+          title: this.$t("app.menu.myLearning"),
+          link: "/my/learning",
+          contentType: "",
+        },
+        {
+          // Личный кабинет (дашборд): показатели, дедлайны, экзамены.
+          icon: "mdi-view-dashboard-outline",
+          title: this.$t("app.menu.dashboard"),
+          link: "/dashboard",
+          contentType: "",
+        },
+        {
+          // Экзамены. Обучение экзамену (exams.take) есть и у
+          // обучаемого, поэтому пункт нельзя прятать за manage-users —
+          // иначе обучаемый не может пройти назначенный ему экзамен.
+          //
+          // Ведёт на /my/exams (список назначенного), а не сразу на
+          // страницу прохождения: раньше пункт открывал форму, где
+          // вопросы выбирались по модулю в адресной строке, и обучаемый
+          // не видел, что ему вообще назначено.
+          icon: "mdi-clipboard-check-outline",
           title: this.$t("app.menu.exams"),
-          link: "/questions",
-          contentType: "manage-users",
+          link: "/my/exams",
+          contentType: ["exams.take", "exams.manage"],
         },
         {
           icon: "mdi-calendar",
@@ -137,10 +172,12 @@ export default {
     menuUsers() {
       const items = [
         {
+          // contentType: "" показывал «Пользователей» обучаемому,
+          // хотя /user/list закрыт правом users.view.
           icon: "mdi-account-multiple-outline",
           title: this.$t("app.menu.users"),
           link: "/user/list",
-          contentType: "",
+          contentType: "users.view",
         },
         {
           icon: "mdi-account-plus",
@@ -149,10 +186,11 @@ export default {
           contentType: "manage-users",
         },
         {
+          // Управление группами — тоже contentType: "" было.
           icon: "mdi-account-group-outline",
           title: this.$t("app.menu.groups"),
           link: "/groups/list",
-          contentType: "",
+          contentType: ["groups.view", "groups.manage"],
         },
         {
           // Управление правами вынесено из списка пользователей
@@ -163,17 +201,9 @@ export default {
           link: "/permissions",
           contentType: ["users.permissions", "users.view"],
         },
-        {
-          // Регресс: подпись была "Курсы" — такой же, как у пункта
-          // /courses/list. Оба элемента получали одинаковый id, и Vuetify
-          // ругался «Multiple nodes with the same ID». Пункт ведёт на
-          // личный кабинет (/auk), поэтому подпись «Мои курсы».
-          icon: "mdi-cog-outline",
-          title: this.$t("app.menu.mycourses"),
-          link: "/auk",
-          contentType: "",
-        },
-        
+        // Пункт «Мои курсы» (/auk) убран: это та же личная страница,
+        // что и /dashboard, и два пункта об одном и том же в меню —
+        // лишнее. Ссылка на /auk остаётся рабочей (маршрут не удалён).
       ]
       
       return items.filter(menu => this.visibleFor(menu.contentType));

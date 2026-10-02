@@ -2,7 +2,7 @@
   <v-col cols="12" sm="8" md="4">
     <v-card class="elevation-12 mx-auto" style="width: 600px">
       <v-toolbar color="primary">
-        <v-toolbar-title>Добавить пользователя</v-toolbar-title>
+        <v-toolbar-title>{{ $t("users.list.create") }}</v-toolbar-title>
       </v-toolbar>
       <v-card-text>
         <v-form v-on:@submit.prevent="regForm">
@@ -14,17 +14,27 @@
             id="userLogin"
             v-model="fio"
           ></v-text-field>
+          <!--
+            Роль выбирается только тем, кто имеет право создавать
+            пользователей. Раньше список был всегда полным, включая
+            публичную саморегистрацию, где любой мог отметить
+            «Администратор» (бэкенд такое значение принимал без проверки).
+            Теперь бэкенд всё равно понижает роль до «Обучаемого», а форма
+            просто не предлагает недоступный выбор.
+          -->
           <v-select
             prepend-icon="person"
-            label="Роль"
+            :label="$t('users.role')"
             type="text"
-            :items="['Администратор', 'Инструктор', 'Обучаемый']"
+            :items="roleOptions"
             v-model="role"
             item-value="id"
             item-title="rolename"
+            :hint="!mayAssignRole ? $t('users.roleHintPublic') : null"
+            persistent-hint
             empty-option
           ></v-select>
-          <div v-if="role === 'Обучаемый'">
+          <div v-if="role === 'Обучаемый' && mayAssignGroup">
             <v-select
               prepend-icon="person"
               label="Группа"
@@ -56,13 +66,7 @@
               {{ error }}
             </p>
           </v-container>
-          <popup
-            :alert="alert"
-            :alertType="alertType"
-            :snackbarText="snackbarText"
-            :overlay="alert"
-            :alertFalse="alertFalse"
-          ></popup>
+          <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>
         </v-form>
       </v-card-text>
       <v-card-actions>
@@ -75,11 +79,11 @@
 </template>
 
 <script>
-import popup from "./Popup.vue";
+import AppToast from "../components/ui/AppToast.vue";
 import ButtonGroup from "../components/ButtonGroup.vue";
 import { mapState, mapGetters } from "vuex";
 export default {
-  components: { popup,ButtonGroup },
+  components: { AppToast,ButtonGroup },
   data() {
     return {
       fio: "",
@@ -96,6 +100,26 @@ export default {
   computed: {
     ...mapState("User", ["totalUsers", "allGroups"]),
     ...mapGetters("User", ["groups"]),
+    ...mapGetters("Auth", ["hasPermission"]),
+
+    /**
+     * Право назначать роль есть у администратора и инструктора.
+     * Публичному посетителю остаётся «Обучаемый».
+     */
+    mayAssignRole() {
+      return this.hasPermission(["users.create"]);
+    },
+
+    /** Группу назначает тот же набор ролей — она определяет учебный план. */
+    mayAssignGroup() {
+      return this.mayAssignRole;
+    },
+
+    roleOptions() {
+      return this.mayAssignRole
+        ? ["Администратор", "Инструктор", "Обучаемый"]
+        : ["Обучаемый"];
+    },
   },
   created() {
     // /api/groups закрыт авторизацией, а /reg — публичная страница.
@@ -107,9 +131,6 @@ export default {
     });
   },
   methods: {
-    alertFalse() {
-      this.alert = false;
-    },
     submitForm () {
       this.errors = [];
 
@@ -122,10 +143,13 @@ export default {
         //return true;
       }
       if (!this.errors.length) {
+        // Роль и группу отправляем только если их можно назначать.
+        // Иначе поля ушли бы в «пользу», а бэкенд их всё равно
+        // проигнорировал бы — расхождение формы и поведения.
         const formData = {
           fio: this.fio,
-          role: this.role,
-          group_id: this.id ? this.id : "",
+          role: this.mayAssignRole ? this.role : "Обучаемый",
+          group_id: this.mayAssignGroup && this.id ? this.id : "",
           password: this.password,
           password_confirmation: this.password_confirmation,
         };

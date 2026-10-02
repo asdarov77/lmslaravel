@@ -17,13 +17,40 @@ class Group2learningController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
+    /**
+     * Список записей на курсы.
+     *
+     * Раньше возвращались ВСЕ строки таблицы любому авторизованному:
+     * маршрут висел только на auth:sanctum. То есть обучаемый мог
+     * перечислить учебные планы чужих групп — кто на какой курс записан
+     * и когда. Это учебные данные другого человека.
+     *
+     * Теперь выдача ограничена областью видимости, а не только фактом
+     * входа: обучаемый видит свою группу, тот, у кого есть users.courses
+     * (методист), — все группы. Так же, как с каталогом курсов.
+     */
     public function index(FilterRequest $request)
+    {
+        $data = $request->validated();
+        $filter = app()->make(Group2learningFilter::class, ['queryParams' => array_filter($data)]);
+        $query = Group2learning::filter($filter);
 
-    {    
-            $data = $request->validated();
-            $filter = app()->make(Group2learningFilter::class, ['queryParams' => array_filter($data)]);
-            $learnings = Group2learning::filter($filter)->get();
-            return $learnings;         
+        $user = auth('sanctum')->user();
+
+        $maySeeAll = $user !== null
+            && ($user->isSuperAdmin() || $user->hasPermission('users.courses'));
+
+        if (! $maySeeAll) {
+            $groupId = $data['group_id'] ?? $user?->group_id;
+
+            if (! $groupId) {
+                return response()->json(['data' => [], 'meta' => ['total' => 0]]);
+            }
+
+            $query->where('group_id', (int) $groupId);
+        }
+
+        return $query->get();
     }
 
 
@@ -40,25 +67,24 @@ class Group2learningController extends Controller
 
 
     /**
-     * Show the form for creating a new resource.
+     * Создание записи через RESTful-маршрут POST /api/learning.
      *
-     * @return \Illuminate\Http\Response
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
+     * Метод был пустой заглушкой и возвращал 200, НИЧЕГО не записывая.
+     * Это худший вид поломки: клиент (в том числе автотесты) получал
+     * «успех», а учебный план оставался пустым — запись группы молча
+     * терялась.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
+     * Валидацию и саму запись переиспользуем у AuthController@group2learning:
+     * там она уже исправлялась (пустые course_id, нечисловые id, NOT NULL,
+     * транзакция против частичной записи, контракт ответа), и дублировать
+     * её во второй раз — значит завести два разных поведения на одну
+     * операцию.
      */
     public function store(Request $request)
     {
-        //
+        return app(AuthController::class)->group2learning($request);
     }
+
 
     /**
      * Display the specified resource.
@@ -68,7 +94,10 @@ class Group2learningController extends Controller
      */
     public function show($id)
     {
-        $learnings = Group2learning::find($id);
+        // Раньше здесь был `Group2learning::find($id);` без return —
+        // метод всегда отдавал null, то есть 200 с пустым телом вместо
+        // самой записи.
+        return Group2learning::findOrFail($id);
     }
 
     /**
@@ -98,7 +127,7 @@ class Group2learningController extends Controller
     // затирая существующие значения. Поэтому обновляем только переданные поля.
     $fields = $request->only([
         'course_id', 'group_id', 'category_id',
-        'parent_id', 'teacher', 'typeOfLesson', 'study_from', 'study_to',
+        'parent_id', 'teacher', 'typeOfLesson', 'study_from', 'study_to', 'deadline',
     ]);
     foreach ($fields as $key => $value) {
         $group2learn->{$key} = $value;

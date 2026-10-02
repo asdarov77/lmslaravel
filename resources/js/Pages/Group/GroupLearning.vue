@@ -1,7 +1,7 @@
 <template>
   <v-card class="elevation-12 mx-auto" style="max-width: 900px; overflow: visible">
     <v-toolbar color="primary">
-      <v-toolbar-title>Запись групп пользователей на курсы</v-toolbar-title>
+      <v-toolbar-title>{{ $t("groupLearning.title") }}</v-toolbar-title>
     </v-toolbar>
 
     <v-card-text>
@@ -128,6 +128,24 @@
               :error-messages="fieldErrors.study_to"
             ></v-text-field>
           </v-col>
+          <v-col>
+            <!--
+              Дедлайн — дата, к которой обучающийся обязан закончить
+              модуль. Не путать с «конецом» периода: конец означает, что
+              группа больше не занимается, дедлайн — когда сдавать.
+              Необязателен, поэтому оставляем пустым по умолчанию.
+            -->
+            <v-text-field
+              type="date"
+              v-model="form.deadline"
+              :label="$t('plan.deadline')"
+              variant="outlined"
+              :disabled="loading"
+              clearable
+              :min="form.study_from"
+              :error-messages="fieldErrors.deadline"
+            ></v-text-field>
+          </v-col>
         </v-row>
 
         <!-- Регресс: интерполяция была внутри HTML-комментария
@@ -152,18 +170,12 @@
       ></ButtonGroup>
     </v-card-actions>
 
-    <popup
-      :alert="alert"
-      :alertType="alertType"
-      :snackbarText="snackbarText"
-      :overlay="alert"
-      :alertFalse="alertFalse"
-    ></popup>
+    <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>
   </v-card>
 </template>
 
 <script>
-import popup from "../Popup.vue";
+import AppToast from "../../components/ui/AppToast.vue";
 import { mapState } from "vuex";
 import $api from "../../api/httpClient";
 import { asArray, unwrapArray, unwrapResponse, numericQuery } from "../../api/envelope";
@@ -173,7 +185,7 @@ import "vue3-treeselect/dist/vue3-treeselect.css";
 
 export default {
   name: "GroupLearning",
-  components: { popup, ButtonGroup, Treeselect },
+  components: { AppToast, ButtonGroup, Treeselect },
 
   props: {
     /** Группа из маршрута. Не обязательна: группу можно выбрать в форме. */
@@ -201,6 +213,7 @@ export default {
         typeOfLesson: "Лекция",
         study_from: new Date().toISOString().slice(0, 10),
         study_to: null,
+        deadline: null,
       },
 
       catFilter: [],
@@ -434,6 +447,9 @@ export default {
           typeOfLesson: this.form.typeOfLesson,
           study_from: this.form.study_from,
           study_to: this.form.study_to,
+          // null, а не пустая строка: бэкенд валидирует deadline как
+          // date, и пустая строка дала бы 422.
+          deadline: this.form.deadline || null,
         });
 
         this.alert = true;
@@ -455,10 +471,6 @@ export default {
 
     cancelBtnHead() {
       this.$router.go(-1);
-    },
-
-    alertFalse() {
-      this.alert = false;
     },
   },
 };

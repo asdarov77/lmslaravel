@@ -1,169 +1,259 @@
-<template>  
-  <v-btn color="success" class="mb-3" :to="{ name: 'groups.create' }"  
-  >Добавить группу</v-btn
-  >
-  <v-table dense class="elevation-1 cursor-pointer">
-    <template v-slot:default>      
-      <thead>
-        <tr>
-          <th class="text-left">id</th>
-          <th class="text-left">Наименование</th>
-          <th class="text-left">Описание</th>
-          <th class="text-left">Курсы</th>
-          <th class="text-left">Категория</th>
-          <th class="text-left">Период</th>
-          <th class="text-left">Записать на курсы</th>
-          <th class="text-left">Редактировать</th>
-          <th class="text-left">Удалить</th>
-        </tr>
-      </thead>
+<template>
+  <div class="u-page">
+    <PageHeader
+      :title="$t('groups.list.title')"
+      :subtitle="$t('groups.list.subtitle')"
+    >
+      <template #actions>
+        <v-btn color="primary" variant="flat" :to="{ name: 'groups.create' }">
+          <v-icon start icon="mdi-plus" size="18" aria-hidden="true"></v-icon>
+          {{ $t("groups.list.create") }}
+        </v-btn>
+      </template>
+    </PageHeader>
 
-      <tbody>
-        <tr v-for="item in allGroups" :key="item.id">
-          <td>{{ item.id }}</td>
-          <td>{{ item.groupname }}</td>
-          <td>{{ item.groupdescription }}</td>
-          <!-- в vuex индекс начинается с нуля, в БД с 1,поэтому cat[id-1] -->
-          <td>
-            <ul>
+    <DataTable
+      :columns="columns"
+      :rows="filteredGroups"
+      :loading="isLoading"
+      :title="$t('groups.list.title')"
+      :count="filteredGroups.length"
+      :caption="$t('groups.list.title')"
+      :empty-title="allGroups.length ? $t('groups.list.emptyFiltered') : $t('groups.list.emptyTitle')"
+      :empty-text="allGroups.length ? $t('groups.list.emptyFilteredText') : $t('groups.list.emptyText')"
+      :empty-icon="'mdi-account-group-outline'"
+    >
+      <!-- Фильтр по названию: список групп небольшой, но искать в нём
+           приходится часто, а раньше фильтра не было вовсе. -->
+      <template #filters>
+        <v-text-field
+          v-model="search"
+          :placeholder="$t('groups.list.search')"
+          :aria-label="$t('groups.list.search')"
+          prepend-inner-icon="mdi-magnify"
+          variant="outlined"
+          density="compact"
+          hide-details
+          clearable
+        />
+      </template>
 
-            <li v-for="_item in item.group2learnings" :key="_item.id">
-              <!-- {{ _item.course_id? courses[_item.course_id-1].title: "" }} -->
-            </li>
-          </ul>
-          </td>
-<!-- в vuex индекс начинается с нуля, в БД с 1,поэтому cat[id-1] -->
-          <td>
-            <ul>
-            <li v-for="_item in item.group2learnings" :key="_item.id" >
-              {{ _item.category_id? categories[_item.category_id-1].title: "" }}                            
-            </li>
-          </ul>
-          </td>
+      <template #cell-id="{ value }">
+        <span class="u-table__num">{{ value }}</span>
+      </template>
 
-          <td>
-            <ul>
-            <li v-for="_item in item.group2learnings" :key="_item.id">
-              {{ _item.study_from }}-{{ _item.study_to }}
-            </li>
-          </ul>
-          </td>
-           <!-- <td>
-            {{ item.study_from }}-{{ item.study_to }}</td> -->
-          <!-- Запись ведётся с указанием конкретной группы: id подставляется
-               в маршрут, поэтому группа уже выбрана и её видно в форме. -->
-          <td>
-            <v-btn color="primary"
-              variant="tonal"
-              :to="{ name: 'group.learning', params: { idEdit: item.id } }"
-              class="my-1"
-            >
-              Записать</v-btn
-            >
-          </td>
-          <td>
-            <v-btn color="success"
-              :to="{ name: 'groups.update', params: { idEdit: item.id } }"
-              class="my-1"
-            >
-              Редактировать</v-btn
-            >
-          </td>
-          <td>
-            <v-btn @click="dialog = !dialog" color="error" class="my-1">Удалить</v-btn>
-            
-            <Dialog
-              :dialog="dialog"
-              :title="'точно удалить'"
-              :text="'удалить группу ?'"
-              @dialogClose="dialog = false"
-              @confirm="deleteGroup(item.id)"              
-            >
-            </Dialog>
-          
-          </td>
-        </tr>
-      </tbody>
-    </template>
-  </v-table>{{hasPermission(['manage-users'],'Manage users')}}
-  
+      <template #cell-groupname="{ row }">
+        <router-link
+          class="groups-link"
+          :to="{ name: 'groups.update', params: { idEdit: row.id } }"
+        >
+          {{ row.groupname }}
+        </router-link>
+      </template>
+
+      <template #cell-groupdescription="{ value }">
+        <span class="u-truncate" style="display: block; max-width: 28ch" :title="value">
+          {{ value || '—' }}
+        </span>
+      </template>
+
+      <template #cell-courses="{ row }">
+        <span v-if="!row.group2learnings?.length" class="u-muted">—</span>
+        <span v-else>{{ row.group2learnings.length }}</span>
+      </template>
+
+      <template #cell-category="{ row }">
+        <span v-if="!row.group2learnings?.length" class="u-muted">—</span>
+        <ul v-else class="groups-cats">
+          <li v-for="entry in row.group2learnings" :key="entry.id">
+            {{ categoryTitle(entry.category_id) }}
+          </li>
+        </ul>
+      </template>
+
+      <template #cell-period="{ row }">
+        <span v-if="!row.group2learnings?.length" class="u-muted">—</span>
+        <span v-else class="u-nowrap">
+          {{ row.group2learnings[0].study_from }} — {{ row.group2learnings[0].study_to }}
+        </span>
+      </template>
+
+      <template #cell-actions="{ row }">
+        <div class="groups-actions">
+          <v-btn
+            size="small"
+            variant="text"
+            color="primary"
+            :to="{ name: 'group.learning', params: { idEdit: row.id } }"
+            :title="$t('groups.list.enroll')"
+            :aria-label="`${$t('groups.list.enroll')}: ${row.groupname}`"
+          >
+            <v-icon icon="mdi-school-outline" size="18" aria-hidden="true"></v-icon>
+            {{ $t("groups.list.enrollShort") }}
+          </v-btn>
+
+          <v-btn
+            size="small"
+            variant="text"
+            :to="{ name: 'groups.update', params: { idEdit: row.id } }"
+            :title="$t('groups.list.edit')"
+            :aria-label="`${$t('groups.list.edit')}: ${row.groupname}`"
+          >
+            <v-icon icon="mdi-pencil-outline" size="18" aria-hidden="true"></v-icon>
+          </v-btn>
+
+          <v-btn
+            size="small"
+            variant="text"
+            color="error"
+            :aria-label="`${$t('groups.list.delete')}: ${row.groupname}`"
+            :title="$t('groups.list.delete')"
+            @click="askDelete(row)"
+          >
+            <v-icon icon="mdi-trash-can-outline" size="18" aria-hidden="true"></v-icon>
+          </v-btn>
+        </div>
+      </template>
+    </DataTable>
+
+    <!--
+      Подтверждение удаления. Раньше диалог был один на страницу
+      (общий булев dialog), поэтому открывался сразу у всех строк,
+      а «Отменить» был красным, а «Удалить» — зелёным.
+    -->
+    <ConfirmDialog
+      v-model="deleteDialog"
+      :title="$t('groups.delete.title')"
+      :confirm-text="$t('groups.delete.confirm')"
+      :cancel-text="$t('common.cancel')"
+      :busy="deleting"
+      @cancel="deleteDialog = false"
+      @confirm="confirmDelete"
+    >
+      {{ $t('groups.delete.text', { name: pendingGroup?.groupname ?? '' }) }}
+    </ConfirmDialog>
+
+    <AppToast v-model="toast.open" :type="toast.type" :text="toast.text" />
+  </div>
 </template>
 
 <script>
-import { mapState, mapGetters } from 'vuex'
-import Dialog from "./Modal/Dialog.vue";
+import { mapState, mapGetters } from "vuex";
+import PageHeader from "../components/ui/PageHeader.vue";
+import DataTable from "../components/ui/DataTable.vue";
+import ConfirmDialog from "../components/ui/ConfirmDialog.vue";
+import AppToast from "../components/ui/AppToast.vue";
 
 export default {
-  components: { Dialog },
+  name: "GroupList",
+  components: { PageHeader, DataTable, ConfirmDialog, AppToast },
+
   data() {
     return {
-      showDialog: false,      
-      dialog: false,
-      overlay: false,
-      isLoading: false,   
-      //allGroups: [],   
-      //totalGroups: '',
-      catFilter: ''
+      search: "",
+      isLoading: true,
+      deleting: false,
+      deleteDialog: false,
+      pendingId: null,
+      toast: { open: false, text: "", type: "success" },
     };
   },
-  // created() {
-  //   //console.log("created");
-  //   // или this.$store.dispatch
-  //   //store.dispatch("Groups/fetchGroups"); // выполнить action,вызываем dispatch,параметром название action
-  // },
+
   async created() {
     this.$store.dispatch("Course/fetchCourses");
     this.$store.dispatch("Course/fetchCategories");
-    //console.log('mounted group')
-    await this.$store
-        .dispatch('User/fetchGroups')                
-        .catch(error => console.error(error))
-        .finally(() => (this.isLoading = false))
+    await this.$store.dispatch("User/fetchGroups").catch(() => {});
+    this.isLoading = false;
   },
 
+  computed: {
+    ...mapState("User", ["allGroups"]),
+    ...mapState("Course", ["categories"]),
 
-  
-  computed: {       
-     ...mapState('User', ['totalGroups', 'allGroups']),
-     ...mapState('Course', ['totalCourses','totalCategories', 'courses', 'course', 'categories']),
-     ...mapGetters('User', ['groups']),
-     ...mapGetters("Auth", ["hasPermission"]),
-     ...mapGetters("Course", ["courses", "categories"])
-  },
-
-  methods: {    
-    cancel() {
-      //console.log("cancel");
-      this.showDialog = false;
-      this.showDialogUser = false;
+    columns() {
+      return [
+        { key: "id", title: "ID", width: "64px" },
+        { key: "groupname", title: this.$t("groups.list.name") },
+        { key: "groupdescription", title: this.$t("groups.list.description") },
+        { key: "courses", title: this.$t("groups.list.courses"), width: "96px" },
+        { key: "category", title: this.$t("groups.list.category"), width: "200px" },
+        { key: "period", title: this.$t("groups.list.period"), width: "180px" },
+        { key: "actions", title: "", align: "right", width: "200px" },
+      ];
     },
-    //-------!! temporary !! загрузка групп записанных на курсы с group2learning-----------
-    // returnCategories(cat_id) {
-    //   this.catFilter = this.categories.filter(function (e) {
-    //     return e.id === cat_id;
-    //   });
-    // },
-    //-----------конец загрузки  -------
-    // confirm() {
-    //   console.log('confirm');
-    //   this.showDialog = false;
-    // },
-    // confirmUser() {
-    //   console.log('confirm user');
-    //   this.showDialogUser = false;
-    // },
 
-    async deleteGroup(group_id) {
-      //console.log(group_id); 
-      
-      this.$store.dispatch('User/deleteGroup', group_id).catch(error => console.error(error))
-      this.$store
-        .dispatch('User/fetchGroups')
-        .catch(error => console.error(error))
-        .finally(() => (console.log("удалена группа  ",group_id) ))      
+    pendingGroup() {
+      return this.allGroups.find((group) => group.id === this.pendingId) ?? null;
+    },
+
+    filteredGroups() {
+      const query = (this.search ?? "").trim().toLowerCase();
+      if (!query) return this.allGroups;
+      return this.allGroups.filter(
+        (group) => String(group.groupname ?? "").toLowerCase().includes(query)
+      );
+    },
+  },
+
+  methods: {
+    categoryTitle(categoryId) {
+      if (!categoryId) return "—";
+      return this.categories.find((c) => c.id === categoryId)?.title ?? `#${categoryId}`;
+    },
+
+    askDelete(group) {
+      this.pendingId = group.id;
+      this.deleteDialog = true;
+    },
+
+    async confirmDelete() {
+      if (!this.pendingId) return;
+
+      this.deleting = true;
+
+      try {
+        await this.$store.dispatch("User/deleteGroup", this.pendingId);
+        await this.$store.dispatch("User/fetchGroups");
+        this.notify(this.$t("groups.delete.done"), "success");
+      } catch (error) {
+        this.notify(this.$t("groups.delete.error"), "error");
+      } finally {
+        this.deleting = false;
+        this.deleteDialog = false;
+        this.pendingId = null;
+      }
+    },
+
+    notify(text, type) {
+      this.toast = { open: true, text, type };
     },
   },
 };
 </script>
 
-  
+<style scoped>
+.groups-link {
+  color: var(--c-primary);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.groups-link:hover {
+  text-decoration: underline;
+}
+
+.groups-cats {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+  color: var(--c-text-secondary);
+}
+
+.groups-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-1);
+}
+</style>

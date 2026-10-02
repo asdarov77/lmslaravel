@@ -123,10 +123,19 @@ class AuthTest extends TestCase
     {
         $group = \App\Models\Group::first() ?? \App\Models\Group::factory()->create();
 
+        // Запрос от имени того, кто имеет право назначать группу.
+        // Публичной саморегистрации группа недоступна (см.
+        // RegistrationRoleTest) — здесь проверяется форма запроса:
+        // числовой group_id принимается и сохраняется, а не роняет в 500.
+        $actor = \App\Models\User::factory()->create(['role' => 'Администратор']);
+        $token = $actor->createToken('t')->plainTextToken;
+        $this->withHeader('Authorization', 'Bearer '.$token);
+
         $response = $this->postJson('/api/register', [
             'fio'                  => 'РегЧисло',
             'password'             => 'secret123',
             'password_confirmation'=> 'secret123',
+            'role'                 => 'Обучаемый',
             'group_id'             => $group->id,
         ]);
 

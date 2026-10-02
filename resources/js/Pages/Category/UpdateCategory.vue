@@ -1,115 +1,155 @@
 <template>
-  <v-card>
-    <v-card-title>Редактирование категории</v-card-title>
+  <div class="u-page">
+    <FormCard
+      :title="$t('categories.edit.title')"
+      :subtitle="category ? $t('categories.edit.subtitle', { name: category.title }) : ''"
+      :busy="saving"
+      :show-cancel="true"
+      :submit-text="$t('common.save')"
+      @submit="submitForm"
+      @cancel="cancelBtnHead"
+    >
       <!--
-        Пока категория не приехала из store, category === null. Обращаться
-        к category.title в таком состоянии нельзя: v-model падал с
+        Пока категория не приехала из стора, category === null, и
+        обращаться к category.title нельзя: v-model падал с
         "Cannot read properties of null" ещё до загрузки данных.
         Форма рендерится только когда сущность готова к правке.
       -->
-      <v-row v-if="category">
-        <v-col>
+      <template v-if="category">
         <v-text-field
-            label="Название категории"
-            type="text"
-            v-model="category.title"
+          v-model="category.title"
+          :label="$t('categories.create.name')"
+          :error-messages="fieldErrors.title"
+          autofocus
         ></v-text-field>
-        </v-col>
-        <v-col>
-          <v-text-field
-              label="Краткое название курса"
-              type="text"
-              v-model="category.description"
-          ></v-text-field>
-        </v-col>
-      </v-row>
-      <v-progress-circular v-else indeterminate></v-progress-circular>
-      <v-container class="notification is-danger" v-if="errors.length">
-        <p v-for="error in errors" v-bind:key="error">
-          {{ error }}
-        </p>
-      </v-container>
-<!--    <v-card-actions>-->
-<!--      <v-spacer></v-spacer>-->
-<!--      <v-btn @click="this.$router.back()" color="error">Отмена</v-btn>-->
-<!--      &lt;!&ndash; <v-btn v-on:click="login" color="primary" to="/MyAccount">Login</v-btn> &ndash;&gt;-->
-<!--      <v-btn @click="submitForm()" color="primary">Сохранить</v-btn>-->
-<!--    </v-card-actions>-->
-    <ButtonGroup @submitForm="submitForm" v-if="category"></ButtonGroup>
-  </v-card>
+
+        <v-textarea
+          v-model="category.description"
+          :label="$t('categories.create.description')"
+          :error-messages="fieldErrors.description"
+          rows="3"
+          auto-grow
+        ></v-textarea>
+      </template>
+
+      <div v-else class="d-flex justify-center py-6">
+        <v-progress-circular indeterminate aria-label="Загрузка"></v-progress-circular>
+      </div>
+
+      <v-alert
+        v-for="(error, index) in errors"
+        :key="index"
+        type="error"
+        class="mt-3"
+        :text="error"
+      ></v-alert>
+    </FormCard>
+
+    <AppToast v-model="toast.open" :type="toast.type" :text="toast.text" />
+  </div>
 </template>
 
 <script>
-// FIXME !! title=character(255), description=text. Разница в курсоре при клике на поле в форме редактирования
-import {mapState, mapGetters} from 'vuex'
-import ButtonGroup from "../../components/ButtonGroup.vue";
+import { mapState, mapGetters } from "vuex";
+import { asArray, extractFieldErrors } from "../../api/envelope";
+import FormCard from "../../components/ui/FormCard.vue";
+import AppToast from "../../components/ui/AppToast.vue";
 
 export default {
-  components: {
-    ButtonGroup
+  name: "UpdateCategory",
+  components: { FormCard, AppToast },
+
+  props: {
+    idEdit: { type: Number, required: true },
   },
-  props:
-      {
-        idEdit: {
-          type: Number,
-          required: true
-        },
-      },
+
   data() {
     return {
       errors: [],
+      fieldErrors: {},
+      saving: false,
+      toast: { open: false, text: "", type: "success" },
     };
   },
+
   async mounted() {
-    //console.log("mounted",this.catId, "эта категория");    
-    this.$store.dispatch('Course/fetchCategory', this.idEdit)
+    await this.$store.dispatch("Course/fetchCategory", this.idEdit).catch(() => {});
   },
+
   computed: {
-    ...mapState('Course', ['courses', 'category', 'totalCategories']),
-    ...mapGetters('Course', ['categories', 'courses']),
+    ...mapState("Course", ["courses", "category", "totalCategories"]),
+    ...mapGetters("Course", ["categories", "courses"]),
   },
 
   methods: {
-    submitForm() {
+    validate() {
+      this.errors = [];
+      this.fieldErrors = {};
+
       // Без этой проверки кнопка «Сохранить» отправляла бы null вместо
-      // данных категории (v-model уже не даёт нажать её, но действие
-      // можно вызвать и программно).
-      if (!this.category) {
-        return Promise.resolve()
+      // данных категории.
+      if (!this.category) return false;
+
+      const title = String(this.category.title ?? "").trim();
+
+      if (title === "") {
+        this.fieldErrors.title = this.$t("categories.create.errors.nameRequired");
+      } else {
+        const exists = asArray(this.categories).some(
+          (item) =>
+            item.id !== this.idEdit &&
+            String(item.title ?? "").trim().toLowerCase() === title.toLowerCase()
+        );
+
+        if (exists) {
+          this.fieldErrors.title = this.$t("categories.create.errors.nameTaken");
+        }
       }
+
+      return Object.keys(this.fieldErrors).length === 0;
+    },
+
+    async submitForm() {
+      if (this.saving) return;
+
+      this.errors = [];
+
+      if (!this.validate()) return;
+
+      this.saving = true;
 
       // Отправляем только редактируемые поля. Раньше уходил весь объект
-      // state.category вместе с appended-алиасом name и служебными полями
-      // (id/created_at/updated_at), из-за чего правка названия терялась.
-      const data = {
-        title: this.category.title,
-        description: this.category.description,
-      }
+      // state.category вместе с устаревшим алиасом name и служебными
+      // полями (id/created_at/updated_at), из-за чего правка названия
+      // терялась — PUT отвечал 200, не меняя ничего.
+      try {
+        await this.$store.dispatch("Course/updateCategory", {
+          id: this.idEdit,
+          data: {
+            title: String(this.category.title).trim(),
+            description: String(this.category.description ?? "").trim(),
+          },
+        });
 
-      return this.$store
-        .dispatch('Course/updateCategory', { id: this.idEdit, data })
-        .then(() => {
-          this.errors = []
-          this.$router.back()
-        })
-        .catch(error => {
-          this.errors = []
-          const response = error && error.response
-          const validation =
-            response && response.data && response.data.errors
-              ? response.data.errors
-              : null
-          if (validation) {
-            Object.keys(validation).forEach(field => {
-              this.errors.push(`${field}: ${validation[field][0]}`)
-            })
-          } else {
-            this.errors.push('Не удалось сохранить категорию')
-          }
-        })
+        await this.$store.dispatch("Course/fetchCategories");
+        this.toast = { open: true, text: this.$t("categories.edit.done"), type: "success" };
+        this.$router.push("/categories");
+      } catch (error) {
+        const { fields, general } = extractFieldErrors(
+          error,
+          this.$t("categories.edit.errors.generic")
+        );
+        Object.assign(this.fieldErrors, fields);
+        this.errors = general && !Object.keys(fields).length ? [general] : [];
+        this.toast = { open: true, text: general ?? "", type: "error" };
+      } finally {
+        this.saving = false;
+      }
+    },
+
+    cancelBtnHead() {
+      this.$router.back();
     },
   },
 };
 </script>
-
-<style></style>

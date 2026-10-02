@@ -26,9 +26,16 @@
                     <td>{{ topic.typeOfLesson }}</td>
 
                     <td>
+                        <!--
+                            target="_blank" уже был, но не было rel:
+                            новое окно получало доступ к window.opener
+                            страницы-родителя. Материалы открываются
+                            в отдельном окне намеренно — это полноэкранный
+                            просмотрщик.
+                        -->
                         <v-btn
                             color="success"
-                            flat
+                            variant="flat"
                             :to="{
                                 name: 'courses.itemmani',
                                 query: {
@@ -37,6 +44,7 @@
                                 },
                             }"
                             target="_blank"
+                            rel="noopener"
                         >
                             Открыть
                         </v-btn>

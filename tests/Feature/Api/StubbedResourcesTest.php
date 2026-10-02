@@ -61,16 +61,47 @@ class StubbedResourcesTest extends TestCase
         $this->assertSame([], $this->getJson('/api/learning')->json('data'));
     }
 
-    public function test_learning_store_is_a_stub_and_creates_nothing()
+    /**
+     * Раньше здесь стояло test_learning_store_is_a_stub_and_creates_nothing:
+     * тест ЗАКРЕПЛЯЛ поведение пустой заглушки store(), которая отвечала
+     * 200, ничего не записывая. Клиент получал «успех», а учебный план
+     * оставался пустым — молчаливая потеря данных.
+     *
+     * store() теперь делегирует проверенной записи AuthController@
+     * group2learning, поэтому маршрут действительно создаёт запись.
+     */
+    public function test_learning_store_creates_a_record()
     {
         $this->admin();
 
+        $group = \App\Models\Group::factory()->create();
+        $course = \App\Models\Course::factory()->create();
+
         $response = $this->postJson('/api/learning', [
-            'group_id'     => 1,
-            'typeOfLesson' => 'lecture',
+            'group_id'        => $group->id,
+            'entries'         => [['course_id' => $course->id, 'parent_id' => null]],
+            'typeOfLesson'    => 'lecture',
+            'study_from'      => now()->toDateString(),
+            'study_to'        => now()->addWeek()->toDateString(),
         ]);
 
-        $response->assertStatus(200);
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('group2learnings', [
+            'group_id'  => $group->id,
+            'course_id' => $course->id,
+        ]);
+    }
+
+    /** Неполный контракт (без entries и дат) должен отклоняться, а не молча игнорироваться. */
+    public function test_learning_store_validates_payload()
+    {
+        $this->admin();
+
+        $this->postJson('/api/learning', [
+            'group_id'     => 1,
+            'typeOfLesson' => 'lecture',
+        ])->assertStatus(422);
+
         $this->assertDatabaseCount('group2learnings', 0);
     }
 
@@ -82,11 +113,33 @@ class StubbedResourcesTest extends TestCase
         ])->assertStatus(401);
     }
 
-    public function test_learning_show_is_a_stub_always_200()
+    /**
+     * Раньше show() был заглушкой `Group2learning::find($id);` без return:
+     * на несуществующий id отвечали 200 с пустым телом вместо 404, то
+     * есть «запись есть, вот она» — с данными null.
+     */
+    public function test_learning_show_returns_404_for_missing_record()
     {
         $this->admin();
 
-        $this->getJson('/api/learning/999999')->assertStatus(200);
+        $this->getJson('/api/learning/999999')->assertStatus(404);
+    }
+
+    public function test_learning_show_returns_the_record()
+    {
+        $this->admin();
+
+        $group = \App\Models\Group::factory()->create();
+        $course = \App\Models\Course::factory()->create();
+        $row = \App\Models\Group2learning::factory()->create([
+            'group_id' => $group->id,
+            'course_id' => $course->id,
+        ]);
+
+        $this->getJson('/api/learning/'.$row->id)
+            ->assertStatus(200)
+            ->assertJsonPath('data.id', $row->id)
+            ->assertJsonPath('data.course_id', $course->id);
     }
 
     /** Находка: edit() — заглушка, а маршрута /learning/{id}/edit нет → 404. */

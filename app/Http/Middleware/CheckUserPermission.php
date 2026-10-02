@@ -25,10 +25,24 @@ class CheckUserPermission
 {
     public function handle(Request $request, Closure $next, string ...$permissions): Response
     {
-        $user = Auth::user();
+        /*
+         * Именно $request->user(), а НЕ Auth::user().
+         *
+         * Auth::user() обращается к guard'у по умолчанию, тогда как
+         * маршруты авторизуются через auth:sanctum. Значение, оставшееся
+         * в guard от предыдущего запроса, «протекало» в проверку прав: два
+         * обращения подряд разными пользователями давали 403 инструктору
+         * с правом exams.manage, потому что проверялся ПРЕДЫДУЩИЙ
+         * пользователь. Для проверки прав это потенциально уязвимость, а
+         * не только проблема тестов.
+         *
+         * $request->user() берёт того, кого поставил auth:sanctum именно
+         * для этого запроса, и устареть не может.
+         */
+        $user = $request->user() ?? Auth::user();
 
         if (!$user) {
-            abort(Response::HTTP_UNAUTHORIZED, 'Необходима авторизация');
+            abort(Response::HTTP_UNAUTHORIZED, 'Необходимая авторизация');
         }
 
         // Супер-администратор имеет все права (как Moodle site admin /

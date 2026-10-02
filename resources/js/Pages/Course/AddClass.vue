@@ -2,7 +2,7 @@
   <v-col xs12 sm8 md4>
     <v-card class="elevation-12 mx-auto">
       <v-toolbar color="primary">
-        <v-toolbar-title>Добавление класса</v-toolbar-title>
+        <v-toolbar-title>{{ $t("classes.title") }}</v-toolbar-title>
       </v-toolbar>
       <v-card-text>
         <v-alert
@@ -49,7 +49,7 @@
       </v-card-text>
       <v-card-actions class="d-flex justify-space-between">
         <v-btn @click="clearDatabase" :loading="clearing" :disabled="loading" class="mr-auto" color="error">
-          Очистить базу данных
+          {{ $t("classes.clearData") }}
         </v-btn>
         <ButtonGroup
           class="mr-3"

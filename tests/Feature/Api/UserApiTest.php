@@ -183,10 +183,17 @@ class UserApiTest extends TestCase
     {
         $group = Group::factory()->create();
 
+        // Группу вправе назначить тот, у кого есть users.create:
+        // публичная саморегистрация её не получает (RegistrationRoleTest).
+        $admin = User::factory()->create(['role' => 'Администратор']);
+        $token = $admin->createToken('t')->plainTextToken;
+        $this->withHeader('Authorization', 'Bearer '.$token);
+
         $this->postJson('/api/register', [
             'fio'                  => 'СГруппой',
             'password'             => 'secret123',
             'password_confirmation'=> 'secret123',
+            'role'                 => 'Обучаемый',
             'group_id'             => $group->id,
         ])->assertStatus(201);
 

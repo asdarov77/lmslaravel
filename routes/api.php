@@ -23,6 +23,9 @@ use App\Http\Controllers\GradeBoundaryController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\AircraftController;
 use App\Http\Controllers\CoursesListController;
+use App\Http\Controllers\MyLearningController;
+use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\ExamController;
 use App\Http\Controllers\CategoryListController;
 use App\Http\Controllers\ClearDBController;
 use App\Http\Controllers\FileLoadAndExtractController;
@@ -167,6 +170,29 @@ Route::middleware(['auth:sanctum', 'permission:users.courses,create-tasks'])->gr
     Route::patch('/learning/{learning}', [Group2learningController::class, 'update'])->whereNumber('learning');
     Route::delete('/learning/{learning}', [Group2learningController::class, 'destroy'])->whereNumber('learning');
 });
+// Личный кабинет обучаемого: учебный план и дашборд.
+//
+// Требования к этим данным минимальны — любой авторизованный имеет право
+// видеть СВОЙ план. Ограничение не в правах, а в области данных: контроллер
+// читает записи только своей группы, поэтому отдельное право (например
+// content.view) не нужно и не должно быть условием показа.
+//
+// До этого пункт меню «Учебный план» вёл на админскую форму записи групп
+// (/group/learning, право users.courses) и отдавал обучаемому 403.
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/my/learning', [MyLearningController::class, 'plan']);
+    Route::get('/my/dashboard', [MyLearningController::class, 'dashboard']);
+});
+
+// Календарь учебного процесса: лента периодов обучения из
+// group2learnings. Область видимости задаёт сам контроллер (своя группа
+// для обучаемого, все группы для методиста), поэтому доменное право здесь
+// не требуется — фильтровать список изнутри дешевле и безопаснее, чем
+// запрещать доступ целиком.
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/calendar', [CalendarController::class, 'index']);
+});
+
 Route::get('lessons/', [LessonsController::class, 'lessons'])->middleware('auth:sanctum'); // занятия  в иерархической структуре
 Route::apiResource('aukstructure', AukstructureController::class)
     ->only(['index', 'show'])
@@ -325,7 +351,37 @@ Route::middleware(['auth:sanctum', 'permission:questions.manage'])->group(functi
     Route::delete('/gift/{gift}', [GiftController::class, 'destroy'])->whereNumber('gift');
 });
 Route::delete('/gift-clear', [GiftController::class, 'truncate'])->middleware(['auth:sanctum','permission:system.maintenance']);
-Route::apiResource('questions', QuestionsController::class)->only(['index', 'show'])->middleware('auth:sanctum')->whereNumber('question');
+// Экзамены: назначение, выдача вопросов, приём попыток.
+//
+// Чтение — любой авторизованный, но КАЖДЫЙ видит только назначенное ему
+// (область видимости задаёт контроллер). Запись — по exams.manage.
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/my/exams', [ExamController::class, 'mine']);
+    Route::get('/exam-attempts', [ExamController::class, 'attempts']);
+    // Вопросы экзамена и приём попытки — тоже любой авторизованный:
+    // право «управлять экзаменами» не нужно тому, кто их сдаёт.
+    Route::get('/exams/{exam}/questions', [ExamController::class, 'questions'])->whereNumber('exam');
+    Route::post('/exams/{exam}/attempts', [ExamController::class, 'submit'])->whereNumber('exam');
+});
+Route::middleware(['auth:sanctum', 'permission:exams.manage'])->group(function () {
+    Route::apiResource('exams', ExamController::class)->only(['index', 'store', 'update', 'destroy'])->whereNumber('exam');
+});
+
+// Банк вопросов больше НЕ открыт всем авторизованным.
+//
+// Здесь отдавались ответы вместе с is_correct, поэтому любой вошедший —
+// включая обучаемого — мог вычитать правильные ответы на любой вопрос и
+// «сдать» экзамен не отвечая. Экзамен теперь берёт вопросы через
+// /exams/{exam}/questions, где is_correct нет, а проверка идёт на
+// сервере. Админские инструменты (ExamineMain, QuestionEdit, QuestionNew)
+// работают по-прежнему: им нужно видеть правильный вариант, и у них
+// есть questions.view / questions.manage.
+Route::apiResource('questions', QuestionsController::class)
+    ->only(['index', 'show'])
+    // auth:sanctum идёт первым: иначе авторизованный получал 401 вместо
+    // 403, и фронт не мог отличить «нет прав» от «истёк токен».
+    ->middleware(['auth:sanctum', 'permission:questions.view,questions.manage'])
+    ->whereNumber('question');
 Route::middleware(['auth:sanctum', 'permission:questions.manage'])->group(function () {
     Route::post('/questions', [QuestionsController::class, 'store']);
     Route::put('/questions/{question}', [QuestionsController::class, 'update'])->whereNumber('question');

@@ -113,15 +113,24 @@
         ></v-text-field>
       </v-col>
       <v-col>
-        <v-select
-            variant="solo"
+        <!--
+          v-autocomplete, а не v-select: список групп виртуализируется,
+          а сам список разрастается (десятки групп). У v-select без
+          filter поле ввода не фильтрует, и нужную группу приходилось
+          искать долгой прокруткой. v-autocomplete ищет по item-title
+          из коробки.
+        -->
+        <v-autocomplete
+            variant="outlined"
+            density="comfortable"
             label="Группа"
             :items="allGroups"
             v-model="user.group_id"
             item-value="id"
             item-title="groupname"
+            :no-data-text="$t('common.noGroupsFound')"
             clearable
-        ></v-select>
+        ></v-autocomplete>
       </v-col>
       <v-col></v-col>
     </v-row>
@@ -144,17 +153,14 @@
            правила доступа для администратора и инструктора. -->
       <div>
         <v-btn
-            style="margin-left: 10px"
-            tile
-            color="green"
-            variant="tonal"
-            class="my-3"
-            :disabled="!canSeePermissions"
-            :to="{ name: 'permissions.manage', query: { user: user.id } }"
+          class="my-3 ml-3"
+          color="success"
+          variant="tonal"
+          :disabled="!canSeePermissions"
+          :to="{ name: 'permissions.manage', query: { user: user.id } }"
         >
-          Права доступа
-        </v-btn
-        >
+          {{ $t("users.list.permissions") }}
+        </v-btn>
       </div>
       <ButtonGroup @submitForm="submitForm" @cancelBtn="cancelBtnHead"></ButtonGroup>
     </div>
@@ -234,6 +240,7 @@ export default {
     })
   },
   methods: {
+
     cancelBtnRegistration(){      
       // this.$store
       //     .dispatch('Course/categories')

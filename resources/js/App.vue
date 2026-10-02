@@ -12,7 +12,7 @@ const { t } = useI18n({ useScope: "global" });
   <!-- <link href="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css" rel="stylesheet" /> -->
   <v-app
     >
-    <v-app-bar app color="primary" prominent v-show='courseItemShow'>
+    <v-app-bar color="primary" prominence="prominent" v-show="courseItemShow">
       <v-app-bar-nav-icon
         v-if="checkLeftSideMenu()"
         variant="text"

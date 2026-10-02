@@ -54,23 +54,20 @@ class CategoryController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        //$objArr = array();
-        //if (Auth::user()->role == "Администратор") {
-        $category = Category::orderBy('id')->get();
-        return $category;
-       
-    //}
-    //else {
-    // $cat =  Auth::user()->categories; 
-    // foreach ($cat as $item) {
-    //     array_push($objArr, $item);
-    // }
+        $query = Category::orderBy('id');
 
+        // Справочник специальностей целиком нужен методисту, который эти
+        // категории и ведёт. Обучаемому показываем только те, где у его
+        // группы есть назначенный курс: в LMS (Moodle/Canvas) список
+        // категорий ученика — это его учебный план, а не весь справочник.
+        //
+        // Намерение было заложено здесь же, но осталось закомментированным,
+        // поэтому любой авторизованный получал все 13 специальностей.
+        \App\Support\CourseVisibility::restrictCategoriesToEnrolled($query, $request->user());
 
-   // return $objArr;
-//}
+        return $query->get();
     }
 
     /**

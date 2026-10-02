@@ -28,8 +28,31 @@ const catalogSlugs = (() => {
 /** Маршруты, которые по замыслу доступны всем (публичные и служебные). */
 const PUBLIC_ROUTES = new Set(['/', '/login', '/reg', '/about', '/my', '/logout', '/datepicker', '/403', '/404', '/500'])
 
-/** Маршруты, доступные только авторизованному, но без доменного права. */
-const AUTH_ONLY_ROUTES = new Set(['/my', '/logout', '/datepicker'])
+/**
+ * Маршруты, доступные только авторизованному, но без доменного права.
+ *
+ * Право нужно там, где решение принимает RBAC. У маршрутов ниже решения
+ * нет: пользователь читает СВОИ данные, а область данных ограничена на
+ * сервере (CourseVisibility и выборка по group_id). Навешивать на них
+ * content.view было бы произвольно — человек без этого права всё равно
+ * видит свой план, а человек с ним не должен видеть чужих.
+ *
+ *  - /my, /logout, /datepicker — служебные;
+ *  - /my/learning — учебный план самого обучаемого;
+ *  - /dashboard — личный кабинет самого обучаемого;
+ *  - /my/exams — свои экзамены;
+ *  - /exams/:idEdit — прохождение своего экзамена.
+ *
+ * У /my/exams и /exams/:idEdit область видимости задаёт ExamController:
+ * пользователю отдаются только те экзамены, которые назначены ему или его
+ * группе. Навешивать content.view было бы произвольно: право «сдать
+ * свой экзамен» не должно зависеть от права смотреть контент, и наоборот.
+ */
+const AUTH_ONLY_ROUTES = new Set([
+  '/my', '/logout', '/datepicker',
+  '/my/learning', '/dashboard',
+  '/my/exams', '/exams/:idEdit',
+])
 
 const flat = (routes || []).flat(Infinity).filter(Boolean)
 
@@ -43,6 +66,11 @@ describe('frontend RBAC: meta.permission согласовано с бэкенд-
   it('каждый защищённый маршрут объявляет meta.permission', () => {
     const unprotected = flat
       .filter(r => r && r.path && !PUBLIC_ROUTES.has(r.path))
+      // AUTH_ONLY_ROUTES здесь учитывается намеренно: раньше константа
+      // использовалась только в третьей проверке, из-за чего маршруты
+      // «авторизован, но без доменного права» приходилось объявлять
+      // meta.permission с произвольным slug'ом.
+      .filter(r => !AUTH_ONLY_ROUTES.has(r.path))
       .filter(r => !Array.isArray(r.meta?.permission) || r.meta.permission.length === 0)
       .map(r => r.path)
 

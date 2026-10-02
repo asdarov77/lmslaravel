@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Group;
+use Illuminate\Support\Facades\DB;
 use App\Models\Group2learning;
 use Illuminate\Http\Request;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -136,6 +137,15 @@ class GroupController extends Controller
         //$this->authorize('view' );
         //if (Gate::allows('delete-group')) {
         $group = Group::findOrFail($id);
+
+        // Записи группы на курсы удаляем вместе с группой.
+        //
+        // Раньше удаление группы оставляло строки в group2learnings
+        // «сиротами»: внешнего ключа на groups там нет, поэтому группа
+        // исчезала, а её учебный план оставался в таблице навсегда —
+        // и всплывал в общем списке /api/learning.
+        DB::table('group2learnings')->where('group_id', $group->id)->delete();
+
         $group->delete();
         return response()->json(null, 204);
         //} else

@@ -20,14 +20,19 @@ import CourseModule from '../../resources/js/Store/modules/CourseModule'
 
 import UpdateCategory from '../../resources/js/Pages/Category/UpdateCategory.vue'
 import CategoryList from '../../resources/js/Pages/Category/CategoryList.vue'
+import ru from '../../resources/js/locales/ru.json'
+import en from '../../resources/js/locales/en.json'
 
 const vuetify = createVuetify({ components, directives })
 const i18n = createI18n({
   legacy: false,
+  // Опция i18n верхнего уровня в mount() осталась от VTU v1 и молча
+  // игнорируется: без плагина $t в шаблоне недоступен.
+  globalInjection: true,
   locale: 'ru',
   messages: {
-    ru: { app: { buttons: { save: 'сохранить', cancel: 'отмена' } } },
-    en: { app: { buttons: { save: 'save', cancel: 'cancel' } } },
+    ru: { app: { buttons: { save: 'сохранить', cancel: 'отмена' } }, ...ru },
+    en: { app: { buttons: { save: 'save', cancel: 'cancel' } }, ...en },
   },
 })
 
@@ -36,10 +41,12 @@ const tick = () => new Promise(r => setTimeout(r, 0))
 
 let store
 let back
+let push
 
 beforeEach(() => {
   vi.clearAllMocks()
   back = vi.fn()
+  push = vi.fn()
   store = createStore({ modules: { Course: CourseModule } })
 })
 
@@ -47,13 +54,13 @@ const mountPage = (component, props = {}) =>
   mount(component, {
     store,
     vuetify,
-    i18n,
     propsData: props,
     global: {
+      plugins: [i18n],
       mocks: {
         $store: store,
         $route: { params: { idEdit: '1' } },
-        $router: { back, push: vi.fn() },
+        $router: { back, push },
       },
       stubs: {
         'v-text-field': { template: '<input />' },
@@ -100,22 +107,23 @@ describe('UpdateCategory: сохранение правки', () => {
     expect(payload.name).toBeUndefined()
   })
 
-  it('после успешной правки название обновляется в сторе и уходит назад', async () => {
+  it('после успешной правки название обновляется в сторе и уходит к списку', async () => {
     store.commit('Course/SET_CATEGORY', { id: 1, title: 'Борт-инженер', description: 'd' })
     http.put.mockResolvedValue(envelope({ id: 1, title: 'Борт-инженер', name: 'Борт-инженер' }))
+    // После сохранения форма перечитывает список категорий, чтобы
+    // изменения были видны без перезагрузки страницы.
+    http.get.mockResolvedValue(envelope([{ id: 1, title: 'Борт-инженер', description: 'd' }]))
 
     const wrapper = mountPage(UpdateCategory, { idEdit: 1 })
     await wrapper.vm.submitForm()
     await tick()
 
-    // Список на /categories обязан показать новое название без перезагрузки
-    store.commit('Course/SET_ALL_CATEGORIES', [{ id: 1, title: 'Летчик' }])
-    await wrapper.vm.submitForm()
-    await tick()
-
     expect(store.state.Course.categories[0].title).toBe('Борт-инженер')
     expect(store.state.Course.category.title).toBe('Борт-инженер')
-    expect(back).toHaveBeenCalled()
+    // Уход теперь явный (push к списку), а не «назад»: у формы есть
+    // конкретное место назначения, back() уводил в произвольную точку.
+    expect(push).toHaveBeenCalledWith('/categories')
+    expect(back).not.toHaveBeenCalled()
     expect(wrapper.vm.errors).toEqual([])
   })
 
@@ -124,22 +132,33 @@ describe('UpdateCategory: сохранение правки', () => {
     err.response = { data: { errors: { title: ['Название обязательно'] } } }
     http.put.mockRejectedValue(err)
 
+    // Категория должна быть загружена: без неё форма не отправляет
+    // запрос вовсе, и серверный путь ошибки не проверяется.
+    store.commit('Course/SET_CATEGORY', { id: 1, title: 'Борт-инженер', description: 'd' })
+
     const wrapper = mountPage(UpdateCategory, { idEdit: 1 })
     await wrapper.vm.submitForm()
     await tick()
 
-    expect(wrapper.vm.errors.join(' ')).toMatch(/Название обязательно/)
+    // Ошибка поля показывается рядом с полем, а не общим блоком:
+    // так её видно сразу, без прокрутки к низу формы.
+    expect(wrapper.vm.fieldErrors.title).toMatch(/Название обязательно/)
+    expect(push).not.toHaveBeenCalled()
     expect(back).not.toHaveBeenCalled()
   })
 
   it('при сетевой ошибке без деталей тоже остаёмся на странице', async () => {
     http.put.mockRejectedValue(new Error('Network Error'))
+    store.commit('Course/SET_CATEGORY', { id: 1, title: 'Борт-инженер', description: 'd' })
 
     const wrapper = mountPage(UpdateCategory, { idEdit: 1 })
     await wrapper.vm.submitForm()
     await tick()
 
+    // Сетевая ошибка без деталей: показываем общий текст, но остаёмся
+    // на странице — иначе пользователь теряет введённое.
     expect(wrapper.vm.errors.join(' ')).toMatch(/Не удалось сохранить/)
+    expect(push).not.toHaveBeenCalled()
     expect(back).not.toHaveBeenCalled()
   })
 })
@@ -161,19 +180,21 @@ describe('CategoryList: таблица заполнена сразу', () => {
     const wrapper = mountPage(CategoryList)
     await tick()
 
-    // filtredCat инициализировался [] и заполнялся только методом filter()
-    // по клику на чекбокс «борт» — при обычном заходе было «0-0 of 0»
-    expect(wrapper.vm.filtredCat).toHaveLength(2)
+    // Раньше список наполнялся только методом filter() по клику на
+    // чекбокс «борт» — при обычном заходе таблица была пустой.
+    // Сейчас строки берутся из вычисляемого filteredCategories,
+    // поэтому проверяем именно его, а не бывшее внутреннее поле.
+    expect(wrapper.vm.filteredCategories).toHaveLength(2)
     expect(wrapper.text()).toContain('Летчик')
     expect(wrapper.text()).toContain('Борт инженер')
   })
 
-  it('filtredCat не остаётся массивом, если сервер вернул null', async () => {
+  it('список остаётся массивом, если сервер вернул null', async () => {
     http.get.mockResolvedValue(envelope(null))
     store.commit('Course/SET_ALL_CATEGORIES', [])
     const wrapper = mountPage(CategoryList)
     await tick()
 
-    expect(wrapper.vm.filtredCat).toEqual([])
+    expect(wrapper.vm.filteredCategories).toEqual([])
   })
 })

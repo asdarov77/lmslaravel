@@ -1,6 +1,12 @@
 
 import './bootstrap.js';
-//import '../css/app.css';
+
+// Токены и базовые классы подключаются один раз на всё приложение.
+// До этого app.css был закомментирован в vite.config.mjs, и шаблоны
+// подтягивали его через @import внутри <style> — из-за чего стили
+// приезжали в одни страницы и не приезжали в другие.
+import '../css/tokens.css';
+import '../css/app.css';
 
 import 'vuetify/styles';
 import { createApp } from 'vue';

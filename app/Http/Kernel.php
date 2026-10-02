@@ -23,7 +23,16 @@ class Kernel extends HttpKernel
         \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
         \App\Http\Middleware\TrimStrings::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
-        \Illuminate\Session\Middleware\StartSession::class,   // добавлять к каждой сессии посредника
+        /*
+         * StartSession убран ИЗ ГЛОБАЛЬНОГО стека.
+         *
+         * Здесь он был, поэтому сессия заводилась на КАЖДЫЙ запрос,
+         * включая API — в storage/framework/sessions накопились тысячи
+         * файлов, хотя Auth::login() в приложении не вызывается нигде и
+         * аутентификация держится на Bearer-токенах. Для web-запросов
+         * сессия всё равно доступна: StartSession стоит в группе 'web'
+         * (ниже), где ему и место.
+         */
     ];
 
     /**
@@ -42,8 +51,20 @@ class Kernel extends HttpKernel
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
 
+        /*
+         * API работает на Bearer-токенах, поэтому EnsureFrontendRequestsAreStateful
+         * здесь не нужен и вреден:
+         *  - он запускает сессию на КАЖДОМ API-запросе (в
+         *    storage/framework/sessions лежало 3387 файлов, тогда как
+         *    Auth::login() в приложении не вызывается нигде);
+         *  - он добавляет cookie-аутентификацию как второй источник
+         *    личности рядом с токеном, и сессия получает приоритет
+         *    (см. Sanctum\Guard::__invoke и config/sanctum.php).
+         *
+         * CSRF-угрозы здесь тоже не было: SPA не шлёт X-XSRF-TOKEN,
+         * а middleware VerifyCsrfToken в группу api не входит.
+         */
         'api' => [
-             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,   // https://laravel.com/docs/8.x/sanctum
 //            'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \App\Http\Middleware\ApiResponseEnvelope::class,
