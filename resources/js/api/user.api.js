@@ -8,6 +8,12 @@ const deleteUser = id => httpClient.delete(`/api/user/${id}`)
 const fetchGroups = () => httpClient.get('/api/groups')
 const fetchGroup = (id) => httpClient.get(`/api/groups/${id}`)
 const fetchPermissions = () => httpClient.get('/api/permissions')
+// Каталог прав по разделам (группы берёт бэкенд из config/permissions.php).
+// В ответе у каждого права есть assignable — можно ли его выдать текущему
+// пользователю: администратору всё, инструктору только его собственный набор.
+const fetchPermissionCatalog = () => httpClient.get('/api/permissions/catalog')
+// Пользователи, чьи права текущий может менять (страница управления правами).
+const fetchManageableUsers = () => httpClient.get('/api/user/manageable')
 const createGroup = data => httpClient.post('/api/groups', data)
 const updateGroup = (id, data) => httpClient.put(`/api/groups/${id}`, data)
 const deleteGroup = id => httpClient.delete(`/api/groups/${id}`)
@@ -25,6 +31,8 @@ export {
   deleteUser,
   fetchGroups,
   fetchPermissions,  
+  fetchPermissionCatalog,
+  fetchManageableUsers,
   createGroup,
   updateGroup,
   deleteGroup,

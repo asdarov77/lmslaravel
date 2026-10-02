@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Permission;
 use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use App\Support\PermissionCatalog;
+use App\Support\PermissionScope;
 
 class PermissionController extends Controller
 {
@@ -19,6 +21,22 @@ class PermissionController extends Controller
     {
         $permission = Permission::all();
         return $permission;
+    }
+
+    /**
+     * Каталог прав, сгруппированный по разделам, с id из БД.
+     *
+     * Отдельный метод вместо разбора плоского /api/permissions на фронте:
+     * группировка живёт в config/permissions.php, и продублировать её
+     * в JS — значит гарантированно разъехаться при добавлении права.
+     * Заодно проставляется признак assignable — что актор вправе выдать.
+     */
+    public function catalog()
+    {
+        $actor = Auth::user();
+        abort_unless(PermissionScope::canOpen($actor), 403, 'Недостаточно прав для просмотра каталога прав');
+
+        return array_values(PermissionScope::withIds(PermissionScope::catalog($actor)));
     }
 
     /**

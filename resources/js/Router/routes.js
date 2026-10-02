@@ -83,12 +83,16 @@ const routes = [
     //     name: 'user.chroll',
     //     //props: true
     // },
+    //
+    // Управление правами — отдельная страница (было: колонка в списке
+    // пользователей + диалог в карточке пользователя).
+    // Доступна администратору (users.permissions) и инструктору
+    // (users.view); что именно можно — решает PermissionScope на бэкенде.
     {
-        path: '/user/chperm/:idEdit',
-        component: () => import('../Pages/User/UserChperm.vue'),
-        name: 'user.chperm',
-        props: route => ({ idEdit: Number(route.params.idEdit) }),
-        meta: { permission: ['users.permissions'] },
+        path: '/permissions',
+        component: () => import('../Pages/Permissions/PermissionsManager.vue'),
+        name: 'permissions.manage',
+        meta: { permission: ['users.permissions', 'users.view'] },
     },
     //
     // Блок групп
@@ -209,9 +213,13 @@ const routes = [
         name: 'calendar',
     },
     {
-        path: '/group/learning/:idEdit',
+        // Запись групп на курсы. id в конце опционален: пункт меню ведёт
+        // на /group/learning без id, и группу выбирают в форме — раньше
+        // был жёстко зашит /group/learning/1, то есть записать можно
+        // было только группу №1.
+        path: '/group/learning/:idEdit?',
         component: () => import('../Pages/Group/GroupLearning.vue'),
-        props: route => ({ idEdit: Number(route.params.idEdit) }),
+        props: route => ({ idEdit: toIntOrNull(route.params.idEdit) }),
         name: 'group.learning',
         meta: { permission: ['users.courses'] },    },
     {

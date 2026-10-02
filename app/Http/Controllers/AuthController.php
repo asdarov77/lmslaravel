@@ -7,6 +7,7 @@ use App\Models\User;
 
 use App\Models\Group2learning;
 use App\Models\Permission;
+use App\Support\PermissionScope;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Hash;
@@ -238,9 +239,10 @@ class AuthController extends Controller
             'password' => bcrypt($fields['password']),
         ]));
 
-        if ($request->filled('permission_id')) {
-            $user->permissions()->sync($request->input('permission_id'));
-        }
+        // Права новому пользователю назначаются через
+        // PUT /api/user/chperm/{id} (users.permissions), а не через
+        // создание пользователя (users.create): иначе создатель мог бы
+        // раздать права без соответствующего права.
 
         return response()->json($user->fresh(), 201);
     }
@@ -310,9 +312,13 @@ class AuthController extends Controller
         $user->specialization = request('specialization');
         $user->group_id = request('group_id');
         $user->save();
-        if ($request->has('permission_id')) {
-            $user->permissions()->sync($request->input('permission_id') ?? []);
-        }
+
+        // Раньше здесь синхронизировались права, если в теле был
+        // permission_id. Это был обход: маршрут защищён users.update,
+        // и право выдавать права (users.permissions) при этом не
+        // требовалось. Теперь права меняются только через
+        // PUT /api/user/chperm/{id} (users.permissions) и через
+        // отдельную страницу управления правами.
 
         return response()->json($user->fresh(), 200);
     }
@@ -344,29 +350,117 @@ class AuthController extends Controller
     }
     public function chperm(Request $request, $id)
     {
+        $actor = Auth::user();
         $user = User::findOrFail($id);
-        $user->permissions()->sync($request->input('permission_id', []));
+
+        // Кому актор вообще вправе назначать права. Инструктор не
+        // дотянется до администратора и до чужой группы; проверка
+        // обязана быть на сервере, а не только в интерфейсе.
+        if (! PermissionScope::canManageUser($actor, $user)) {
+            abort(403, 'Недостаточно прав для изменения прав этого пользователя');
+        }
+
+        $validated = $request->validate([
+            'permission_id' => ['present', 'array'],
+            'permission_id.*' => ['integer', 'exists:permissions,id'],
+        ]);
+
+        $requested = Permission::whereIn('id', $validated['permission_id'])->get();
+
+        // Актор не может выдать право, которого не имеет сам: иначе
+        // инструктор с users.view выдал бы users.delete и обошёл
+        // ограничение, которое здесь же и проверяется.
+        $partition = PermissionScope::partition($actor, $requested->pluck('slug')->all());
+
+        if ($partition['denied'] !== []) {
+            abort(403, 'Нельзя назначить права, которых нет у вас: '.implode(', ', $partition['denied']));
+        }
+
+        $user->permissions()->sync($requested->pluck('id')->all());
+        $user->forgetPermissionCache();
+
         // json(), а не response(): иначе ответ уходит без конверта
         return response()->json($user->fresh()->load('permissions'), 201);
     }
 
-    public function group2learning(Request $request)
+    /**
+     * Пользователи, чьи права актор вправе менять.
+     *
+     * Для отдельной страницы управления правами. Отличается от
+     * /api/user/list тем, что отдаёт ровно то, что актор способен
+     * отредактировать: администратору — всех, инструктору — только
+     * свою группу и без администраторов.
+     */
+    public function manageableUsers()
     {
-        foreach ($request->course_id as $_course_id) {
+        $actor = Auth::user();
+        abort_unless(PermissionScope::canOpen($actor), 403, 'Недостаточно прав для управления правами');
 
-            DB::table('group2learnings')->insert(
-                [
-                    'group_id' => $request->group_id,                
-                    'category_id' => $request->category_id,
-                    'course_id' => $_course_id,                    
-                    'teacher' => $request->teacher,
-                    'typeOfLesson' => $request->typeOfLesson,
-                    'study_from' => $request->study_from,
-                    'study_to' => $request->study_to
-                ],
+        $query = User::query()->with('permissions:id,name,slug')->orderBy('id');
 
-            );
+        if (! $actor->isSuperAdmin()) {
+            // Кто угодно, кроме администраторов, и только своя группа.
+            $query->whereNotIn('role', User::ROLE_ALIASES['admin'])
+                ->where('group_id', $actor->group_id);
         }
+
+        return $query->get()->map(fn (User $user) => [
+            'id' => $user->id,
+            'fio' => $user->fio,
+            'role' => $user->role,
+            'group_id' => $user->group_id,
+            'is_admin' => $user->isAdmin(),
+            'permissions' => $user->permissions->map->only(['id', 'slug', 'name'])->values(),
+        ]);
+    }
+
+public function group2learning(Request $request)
+    {
+        // Регресс: валидации не было вообще. Пустой course_id приводил к
+        // «foreach() argument must be of type array, null given» (500),
+        // нечисловой id — к нарушению внешнего ключа (500), а незаполненные
+        // category/teacher/typeOfLesson — к нарушению NOT NULL (500).
+        // Пользователю это выглядело как «Сохранить ничего не делает».
+        //
+        // Запись идёт по «курс + модуль»: сам курс лежит в course_id,
+        // конкретный модуль (aukstructure) — в parent_id. Раньше туда
+        // клался id узла дерева, который с курсом ничего общего не имеет,
+        // и учебный план потом открывал несуществующий курс.
+        $validated = $request->validate([
+            'group_id' => ['required', 'integer', 'exists:groups,id'],
+            'entries' => ['required', 'array', 'min:1'],
+            'entries.*.course_id' => ['required', 'integer', 'exists:courses,id'],
+            'entries.*.parent_id' => ['nullable', 'integer', 'exists:aukstructures,id'],
+            'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+            'teacher' => ['nullable', 'string', 'max:255'],
+            'typeOfLesson' => ['nullable', 'string', 'max:255'],
+            'study_from' => ['required', 'date'],
+            'study_to' => ['required', 'date', 'after_or_equal:study_from'],
+        ]);
+
+        $created = [];
+
+        // Транзакция: раньше курсы могли записаться частично — несколько
+        // успешных insert и одна ошибка на последнем оставляли группу
+        // записанной на половину выбранных курсов.
+        DB::transaction(function () use ($validated, &$created) {
+            foreach ($validated['entries'] as $entry) {
+                $created[] = DB::table('group2learnings')->insertGetId([
+                    'group_id' => $validated['group_id'],
+                    'course_id' => $entry['course_id'],
+                    'parent_id' => $entry['parent_id'] ?? null,
+                    'category_id' => $validated['category_id'] ?? null,
+                    'teacher' => $validated['teacher'] ?? null,
+                    'typeOfLesson' => $validated['typeOfLesson'] ?? null,
+                    'study_from' => $validated['study_from'],
+                    'study_to' => $validated['study_to'],
+                ]);
+            }
+        });
+
+        // Отдаём созданные строки: раньше метод возвращал null, и вызывающий
+        // код не мог ни показать результат, ни обновить список записей.
+        return response()->json($created, 201);
     }
 
 }

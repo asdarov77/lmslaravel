@@ -109,9 +109,12 @@ export default {
           // Router/routes.js нет, клик открывал страницу 404. Теперь
           // ведёт на существующий group.learning, а заголовок переведён
           // в i18n вместо литерала "user learning".
+          // Без id в конце: раньше был жёстко зашит /group/learning/1,
+          // то есть из меню записать можно было только группу №1, и
+          // непонятно было, какую именно. Теперь группу выбирают в форме.
           icon: "mdi-calendar",
           title: this.$t("app.menu.learning"),
-          link: "/group/learning/1",
+          link: "/group/learning",
           contentType: " ",
         },
         {
@@ -150,6 +153,15 @@ export default {
           title: this.$t("app.menu.groups"),
           link: "/groups/list",
           contentType: "",
+        },
+        {
+          // Управление правами вынесено из списка пользователей
+          // в отдельную страницу. contentType — массив: пункт виден
+          // администратору (users.permissions) и инструктору (users.view).
+          icon: "mdi-shield-key-outline",
+          title: this.$t("app.menu.permissions"),
+          link: "/permissions",
+          contentType: ["users.permissions", "users.view"],
         },
         {
           // Регресс: подпись была "Курсы" — такой же, как у пункта

@@ -12,6 +12,7 @@
           <th class="text-left">Курсы</th>
           <th class="text-left">Категория</th>
           <th class="text-left">Период</th>
+          <th class="text-left">Записать на курсы</th>
           <th class="text-left">Редактировать</th>
           <th class="text-left">Удалить</th>
         </tr>
@@ -49,6 +50,17 @@
           </td>
            <!-- <td>
             {{ item.study_from }}-{{ item.study_to }}</td> -->
+          <!-- Запись ведётся с указанием конкретной группы: id подставляется
+               в маршрут, поэтому группа уже выбрана и её видно в форме. -->
+          <td>
+            <v-btn color="primary"
+              variant="tonal"
+              :to="{ name: 'group.learning', params: { idEdit: item.id } }"
+              class="my-1"
+            >
+              Записать</v-btn
+            >
+          </td>
           <td>
             <v-btn color="success"
               :to="{ name: 'groups.update', params: { idEdit: item.id } }"

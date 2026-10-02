@@ -140,15 +140,19 @@
       >
         Роль</v-btn
       > -->
+      <!-- Права вынесены в отдельный раздел /permissions: там свои
+           правила доступа для администратора и инструктора. -->
       <div>
         <v-btn
             style="margin-left: 10px"
             tile
             color="green"
+            variant="tonal"
             class="my-3"
-            @click="dialog=true"
+            :disabled="!canSeePermissions"
+            :to="{ name: 'permissions.manage', query: { user: user.id } }"
         >
-          Разрешение
+          Права доступа
         </v-btn
         >
       </div>
@@ -171,9 +175,6 @@
         {{ error }}
       </p>
     </v-container>
-    <v-dialog v-model="dialog">
-      <UserChperm :idEdit="user.id" @submitForm="dialogFalse" @cancelBtn="cancelBtn"></UserChperm>
-    </v-dialog>
     <!-- <v-dialog v-model="dialogReg">
       <UserLearning :idEdit="user.id" @submitForm="this.dialogReg = false" @cancelBtn="cancelBtnRegistration"></UserLearning>
     </v-dialog> -->
@@ -189,11 +190,10 @@ import sferejsonData from "../User/sfere.json";
 //import UserLearning from "./UserLearning.vue";
 //import jsonData from "../User/city.json";
 import Multiselect from "@vueform/multiselect";
-import UserChperm from "./UserChperm.vue";
 import ButtonGroup from "../../components/ButtonGroup.vue";
 
 export default {
-  components: {Multiselect, UserChperm, ButtonGroup},
+  components: {Multiselect, ButtonGroup},
   props:
       {
         idEdit: {
@@ -214,6 +214,12 @@ export default {
   computed: {
     ...mapState('User', ['allGroups', 'user']),
     //...mapGetters('User', ['users','groups']),
+    ...mapGetters('Auth', ['hasPermission']),
+
+    /** Раздел прав открыт администратору и инструктору — остальным кнопка не нужна. */
+    canSeePermissions() {
+      return this.hasPermission(['users.permissions', 'users.view'])
+    },
   },
 
   created() {
@@ -237,13 +243,6 @@ export default {
     },
     cancelBtnHead(){
       this.$router.back()
-    },
-    dialogFalse(){
-      this.dialog = false
-    },
-    cancelBtn(){      
-      this.$store.dispatch('User/fetchUser', this.idEdit)
-      this.dialog = false
     },
 
     // Приводит group_id к number|null. Защищает от отправки в API

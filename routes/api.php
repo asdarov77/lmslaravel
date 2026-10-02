@@ -143,7 +143,17 @@ Route::put('user/chpass/{id}', [AuthController::class, 'chpass'])->middleware('a
 Route::delete('user/{id}', [AuthController::class, 'destroy'])->middleware(['auth:sanctum', 'permission:users.delete'])->whereNumber('id');
 Route::patch('user/{id}', [AuthController::class, 'update'])->middleware(['auth:sanctum', 'permission:users.update'])->whereNumber('id');
 //Route::put('user/chroll/{id}', [AuthController::class, 'chroll']);
-Route::put('user/chperm/{id}', [AuthController::class, 'chperm'])->middleware(['auth:sanctum', 'permission:users.permissions'])->whereNumber('id');
+// Управление правами. На маршруте — «можно ли вообще открыть управление
+// правами»: администратор (users.permissions) либо инструктор
+// (users.view). Кому именно и какие права можно назначить решает
+// PermissionScope в контроллере: инструктор не дотянется до прав,
+// которых нет у него самого, и до администраторов.
+Route::put('user/chperm/{id}', [AuthController::class, 'chperm'])
+    ->middleware(['auth:sanctum', 'permission:users.permissions,users.view'])->whereNumber('id');
+
+// Отдельная страница управления правами: кому актор вправе менять права.
+Route::get('user/manageable', [AuthController::class, 'manageableUsers'])
+    ->middleware(['auth:sanctum', 'permission:users.permissions,users.view']);
 
 Route::post('group/learning/', [AuthController::class, 'group2learning'])->middleware(['auth:sanctum', 'permission:users.courses,create-tasks']); // запись группы пользователей на курс
 // Ранее learning был вообще без middleware — любой неавторизованный мог писать в таблицу.
@@ -233,6 +243,11 @@ Route::apiResource('permissions', PermissionController::class)
     ->only(['index', 'show'])
     ->middleware('auth:sanctum')
     ->whereNumber('permission');
+
+// Каталог прав, сгруппированный по разделам. Группировка берётся из
+// config/permissions.php, поэтому не расходится с бэкендом.
+Route::get('/permissions/catalog', [PermissionController::class, 'catalog'])
+    ->middleware(['auth:sanctum', 'permission:users.permissions,users.view']);
 Route::middleware(['auth:sanctum', 'permission:users.permissions'])->group(function () {
     Route::post('/permissions', [PermissionController::class, 'store']);
     Route::put('/permissions/{permission}', [PermissionController::class, 'update'])->whereNumber('permission');

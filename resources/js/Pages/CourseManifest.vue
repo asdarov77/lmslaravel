@@ -6,36 +6,91 @@
     <v-row dense no-gutters>
       <v-col cols="3">
         <!-- <v-sheet rounded elevation="4" class="flex-child text-subtitle-1 pa-2 mt-1"> -->
-        <v-sheet class="my-sheet pa-2 mt-1" color="#f5f5f5" :style="{ overflow: 'auto', 'overflow-y': 'auto' }">
+        <v-sheet class="my-sheet cm-tree pa-2 mt-1" color="#f5f5f5">
           <!-- кнопки для поиска в тексте,добавления в избранное -->
           <v-sheet class="mx-auto mt-0 mb-3" elevation=4 rounded=lg>
             <div class="text-center" :style="{ fontSize: '20px' }">{{ titleauk.toUpperCase() }}</div>
           </v-sheet>
-          <v-row no-gutters align="center ">
-            <v-col cols="1" class="row-with-line"></v-col>
-            <v-col cols="4" class="d-flex align-center">
-              <v-icon size="x-large" class=" icon-list" :class="{ active: showItems }" @click="toggleList">{{ showItems ?
-                'mdi-view-list' : 'mdi-view-list-outline'
-              }}</v-icon>
-              <v-icon size="x-large" class="icon-favorite" :class="{ active: isFavorite }" @click="toggleFavorite">{{
-                isFavorite ? 'mdi-heart' : 'mdi-heart-outline' }}</v-icon>
-              <v-icon size="x-large" class="icon-search" :class="{ active: showSearch }" @click="toggleSearch">{{
-                showSearch ? 'mdi-magnify-minus-outline' : 'mdi-magnify' }}</v-icon>
-            </v-col>
-            <v-col cols="6" class="row-with-line "></v-col>
-            <v-col cols="1" class="d-flex align-center">
-              <v-icon size="x-large" @click="addToFavorites(activeId)" icon="mdi-playlist-star" class="addToFav"></v-icon>
-            </v-col>
-          </v-row>
+          <!-- Панель инструментов.
+                     Регресс: здесь стояли фиксированные width:130px на трёх
+                     иконках внутри колонки 4/12 (390px в ~30% ширины) плюс
+                     .row-with-line с margin-bottom:-31px. Из-за отрицательного
+                     отступа блоки наезжали друг на друга, а иконки вылезали
+                     за пределы колонки — шапка «ломалась» на разных ширинах.
+                     Теперь это обычная flex-панель без фиксированных ширин
+                     и отрицательных отступов. -->
+          <div class="cm-toolbar" role="toolbar" aria-label="Панель курса">
+            <div class="cm-toolbar__group">
+              <button type="button"
+                class="cm-tool"
+                :class="{ 'cm-tool--on': showItems }"
+                :title="$t('courseManifest.showTree')"
+                :aria-pressed="showItems"
+                @click="toggleList"
+              >
+                <v-icon size="22">{{ showItems ? 'mdi-view-list' : 'mdi-view-list-outline' }}</v-icon>
+                <span class="cm-tool__label">{{ $t('courseManifest.tree') }}</span>
+              </button>
 
-          <v-row v-if="isFavorite" class="ml-1 mr-1">
-            <ul>
-              <li v-for="item in favorites" :key="item.id">
-                {{ item.title }}
-                <font-awesome-icon icon="times" @click="removeFavorite(item.course_id)" />
+              <button type="button"
+                class="cm-tool"
+                :class="{ 'cm-tool--on': isFavorite }"
+                :title="$t('courseManifest.favorites')"
+                :aria-pressed="isFavorite"
+                @click="toggleFavorite"
+              >
+                <v-icon size="22">{{ isFavorite ? 'mdi-heart' : 'mdi-heart-outline' }}</v-icon>
+                <span class="cm-tool__label">{{ $t('courseManifest.favorite') }}</span>
+              </button>
+
+              <button type="button"
+                class="cm-tool"
+                :class="{ 'cm-tool--on': showSearch }"
+                :title="$t('courseManifest.search')"
+                :aria-pressed="showSearch"
+                @click="toggleSearch"
+              >
+                <v-icon size="22">{{ showSearch ? 'mdi-magnify-minus-outline' : 'mdi-magnify' }}</v-icon>
+                <span class="cm-tool__label">{{ $t('courseManifest.search') }}</span>
+              </button>
+
+              <button type="button"
+                class="cm-tool"
+                :disabled="!activeId"
+                :title="$t('courseManifest.addFavorite')"
+                @click="addToFavorites(activeId)"
+              >
+                <v-icon size="22">mdi-bookmark-plus-outline</v-icon>
+                <span class="cm-tool__label">{{ $t("courseManifest.addFavoriteShort") }}</span>
+              </button>
+            </div>
+
+            <div class="cm-toolbar__meta">
+              <span v-if="activeTitle" class="cm-toolbar__current" :title="activeTitle">
+                {{ activeTitle }}
+              </span>
+              <v-progress-circular v-if="isLoading" indeterminate size="18" width="2" color="primary" />
+            </div>
+          </div>
+
+          <!-- Избранное. Раньше список был пустым без объяснения, а переключение
+               режима ещё и скрывало дерево, из-за чего казалось, что кнопка
+               «сломалась». Теперь режимы не исключают друг друга. -->
+          <div v-if="isFavorite" class="cm-favorites">
+            <div class="cm-favorites__head">
+              {{ $t('courseManifest.favorites') }}
+              <v-btn size="x-small" variant="text" @click="isFavorite = false">{{ $t('courseManifest.close') }}</v-btn>
+            </div>
+            <ul v-if="favorites.length" class="cm-favorites__list">
+              <li v-for="item in favorites" :key="item.id" class="cm-favorites__item">
+                <span class="cm-favorites__title">{{ item.title }}</span>
+                <v-btn icon="mdi-close" size="x-small" variant="text"
+                  :title="$t('courseManifest.removeFavorite')"
+                  @click="removeFavorite(item.course_id)"></v-btn>
               </li>
             </ul>
-          </v-row>
+            <p v-else class="cm-favorites__empty">{{ $t('courseManifest.favoritesEmpty') }}</p>
+          </div>
 
           <v-row v-if="showSearch">
             <v-text-field class="ml-5 mr-5" :loading="loading" density="compact" v-model="searchTerm" variant="outlined"
@@ -92,32 +147,25 @@
 
 
           </v-row>
-          <!-- <div v-if="showItems" v-for="(item, index) in filterByCategoryAukstructures" :key="item.parent_id"> -->
-          <div v-if="showItems" v-for="(item, index) in aukstructures" :key="item.id">
-            <div class="mt-1 mx-3" :style="[
-              item.type !== 3
-                ? {
-                  cursor: 'default',
-                  opacity: '.7',
-                  color: 'green',
-                }
-                : {
-                  cursor: 'pointer',
-                  //border: '2px solid firebrick',
-                },
-              {
-                fontSize: `${-5 * item.type + 30}px`,
-                //transform: `translate(${item.type * 20}px)`,
-                paddingLeft: `${(item.type - 1) * 10}px`,
-                display: 'inline-block',
-                wordWrap: 'break-word',
-              },
-            ]">
-              <div @mouseover="item.type === 3 ? showthumb(item.id) : ''" @mouseleave="hidethumb(item.id)" :id="item.id"
-                @click="item.type === 3 ? getlink(item.id) : ''" v-if="index !== 0">
-                {{ item.title }}
-                <!-- {{ item.id }}--{{ item.title }} -->
-              </div>
+          <!-- Список разделов/подразделов/модулей.
+                     Подсветка при наведении — на CSS, а не через
+                     @mouseover + document.getElementById: обработчик
+                     на каждом узле заставлял браузер трогать DOM на
+                     каждом движении мыши, из-за чего страница «дёргалась»
+                     и рендерилась медленно (182 узла). -->
+          <div v-if="showItems" v-for="(item, index) in aukstructures" :key="item.id"
+            class="auk-node" :style="nodeStyle(item)" :data-type="item.type">
+            <div v-if="index !== 0"
+              class="auk-node__title"
+              :class="{
+                'auk-node__title--module': item.type === 3,
+                'auk-node__title--active': item.id === activeId,
+                'auk-node__title--visited': isVisited(item.id),
+              }"
+              :title="item.title"
+              @click="item.type === 3 ? openModule(item) : ''"
+            >
+              {{ item.title }}
             </div>
           </div>
         </v-sheet>
@@ -125,14 +173,32 @@
 
       <!-- ------------------------------------правый iframe ----------------------------------------------------------->
 
-      <v-col cols="9">
-        <v-sheet rounded elevation="5" class="my-sheet pa-2 mt-2 mr-2"
-          :style="{ 'border-radius': '8px', overflow: 'auto', 'overflow-y': 'auto' }">
+      <v-col cols="9" class="cm-content-col">
+        <v-sheet rounded elevation="5" class="my-sheet cm-content pa-2 mt-2 mr-2"
+          ref="contentEl">
+          <!-- Материал открывается длинным документом: без кнопки «вверх»
+               приходилось прокручивать страницу мышью. Показывается только
+               когда прокрутка действительно есть. -->
+          <v-btn
+            v-show="canScrollUp"
+            class="cm-scroll-top"
+            color="primary"
+            size="small"
+            elevation="6"
+            icon="mdi-arrow-up"
+            :title="$t('courseManifest.toTop')"
+            @click="scrollToTop"
+          ></v-btn>
           <div id="iframe-container" :style="{ 'border-radius': '8px' }">
             <p v-if="error" class="has-text-danger px-3 py-2">{{ error }}</p>
+            <!-- Высота материала держится в состоянии Vue, а не в
+                 инлайновом onload. Регресс: атрибут onload писал высоту
+                 прямо в DOM, а :style="{ height: '' }" при каждом
+                 ре-рендере её затирал — материал схлопывался до 172px
+                 после первого же изменения состояния и оставался таким. -->
             <iframe class="hello px-5" :srcdoc="contentHtml" ref="myIframe" name="iframe_a"
-              onload="try{this.style.height=(this.contentWindow.document.body.scrollHeight+20)+'px';}catch(e){}" :style="contentStyleObj"
-              width="100%" scrolling="auto">
+              @load="onFrameLoad" :style="{ height: frameHeight }"
+              width="100%" scrolling="auto" title="Материал курса">
             </iframe>
 
             <!-- <iframe class="hello px-5" :src="link" ref="myIframe" name="iframe_a" @load="updateDocHeight"  @load="onIframeLoaded" 
@@ -187,6 +253,11 @@ export default {
 
       titleauk: "",
       aukstructures: [],
+      // id уже открытых модулей — для подсветки «посещённого» светло-серым.
+      visitedIds: [],
+      // Заголовок активного модуля для панели инструментов.
+      activeTitle: "",
+      canScrollUp: false,
       filterByCategoryAukstructures: [],
       categories: {},
       link: "",
@@ -194,9 +265,8 @@ export default {
       // по ссылке, и вложенные ресурсы падали в 403 без подписи.
       contentHtml: "",
       firstId: '',
-      contentStyleObj: {
-        height: "",
-      },
+      // Высота кадра в состоянии: см. onFrameLoad.
+      frameHeight: '320px',
       activeId: this.firstId,
       curAuk: this.item,
 
@@ -262,6 +332,8 @@ export default {
     // });
 
     this.getFavorites(); // загружаем избранное
+    this.restoreVisited();
+    this.$nextTick(this.bindScroll);
 
     //this.$store.dispatch("Course/fetchCourse",  { courseId: this.idEdit, categoryId: this.category_id });    
     if (!this.aircrafts) {
@@ -313,10 +385,15 @@ export default {
   },
 
 
-  // beforeDestroy() {
-  // this.$refs.myIframe.removeEventListener('load', this.onIframeLoaded);
-  // this.isLoading===false;
-  // },
+  beforeUnmount() {
+    // Слушатель прокрутки жил на странице вечно и держал компонент,
+    // из-за чего навигация копила их по одной на каждый переход.
+    if (this.scrollHandler) {
+      const el = this.$refs.contentEl?.$el ?? this.$refs.contentEl;
+      el?.removeEventListener('scroll', this.scrollHandler);
+      this.scrollHandler = null;
+    }
+  },
 
   watch: {
     link(newLink, oldLink) {
@@ -359,6 +436,115 @@ export default {
 
 
   methods: {
+    /**
+     * Стиль узла дерева. Отступ и кегль зависят от уровня (type),
+     * остальное — на CSS. Раньше кегль, курсор, цвет и opacity были
+     * инлайновыми для каждого из 182 узлов, из-за чего любое изменение
+     * состояния перерисовывало дерево целиком.
+     */
+    nodeStyle(item) {
+      return {
+        paddingLeft: `${Math.max(0, (item.type - 1) * 12 + 8)}px`,
+        fontSize: `${30 - item.type * 4}px`,
+      };
+    },
+
+    isVisited(id) {
+      return this.visitedIds.includes(id);
+    },
+
+    /** Открытие модуля: контент + отметка «посещён». */
+    openModule(item) {
+      this.getlink(item.id);
+    },
+
+    markVisited(id) {
+      if (!this.visitedIds.includes(id)) {
+        this.visitedIds = [...this.visitedIds, id];
+      }
+      this.persistVisited();
+    },
+
+    /** Ключ хранилища — по курсу: прогресс разных курсов не смешивается. */
+    visitedKey() {
+      return `course-manifest-visited:${this.idEdit}`;
+    },
+
+    persistVisited() {
+      try {
+        window.localStorage.setItem(this.visitedKey(), JSON.stringify(this.visitedIds));
+      } catch (error) {
+        // localStorage бывает недоступен (приватный режим): прогресс
+        // просто не сохранится, ломать страницу из-за этого не нужно.
+      }
+    },
+
+    restoreVisited() {
+      try {
+        const raw = window.localStorage.getItem(this.visitedKey());
+        const parsed = raw ? JSON.parse(raw) : [];
+        this.visitedIds = Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        this.visitedIds = [];
+      }
+    },
+
+    /**
+     * Слушатель прокрутки.
+     *
+     * Через requestAnimationFrame: событие прокрутки приходит десятками
+     * раз в секунду, а изменение реактивного состояния на каждом из них
+     * перерисовывало дерево из 180+ узлов и пересоздавало iframe — отсюда
+     * «низкая скорость рендеринга» и подвисание материала.
+     *
+     * Кнопка сделана через v-show, а не v-if: v-if уничтожал и создавал
+     * iframe заново на каждом появлении кнопки, и высота материала
+     * схлопывалась до пустой.
+     */
+    bindScroll() {
+      const el = this.$refs.contentEl?.$el ?? this.$refs.contentEl;
+
+      if (!el) return;
+
+      let frame = null;
+
+      this.scrollHandler = () => {
+        if (frame !== null) return;
+
+        frame = window.requestAnimationFrame(() => {
+          frame = null;
+          this.canScrollUp = el.scrollTop > 240;
+        });
+      };
+
+      el.addEventListener('scroll', this.scrollHandler, { passive: true });
+      this.canScrollUp = el.scrollTop > 240;
+    },
+
+    /**
+     * Подгоняет высоту кастра под содержимое материала.
+     *
+     * Раньше это делал инлайновый onload, писавший высоту прямо в DOM.
+     * Vue на каждом ре-рендере перезаписывал :style пустым значением, и
+     * материал «схлопывался» до размера пустого iframe.
+     */
+    onFrameLoad(event) {
+      try {
+        const doc = event?.target?.contentDocument;
+        const height = doc?.body?.scrollHeight ?? 0;
+
+        if (height > 0) {
+          this.frameHeight = `${height + 20}px`;
+        }
+      } catch (error) {
+        // srcdoc-документ бывает недоступен (sandbox) — оставляем прошлую высоту.
+      }
+    },
+
+    scrollToTop() {
+      const el = this.$refs.contentEl?.$el ?? this.$refs.contentEl;
+      el?.scrollTo({ top: 0, behavior: 'smooth' });
+    },
     // onIframeLoad(event) {
     //   const iframe = event.currentTarget;
     //   iframe.style.height = (iframe.contentWindow.document.body.scrollHeight + 20) + 'px';
@@ -414,6 +600,17 @@ export default {
     async getlink(item_id) {
       this.isLoading = true;
       this.activeId = item_id;
+      this.activeTitle = this.aukstructures.find((item) => item.id === item_id)?.title ?? '';
+      // Сбрасываем прошлую высоту: иначе до загрузки нового документа
+      // в кадре пустота, а блок занимает размер предыдущего материала.
+      this.frameHeight = '320px';
+      // Новый материал открыт сверху, значит «вверх» идти некуда.
+      // Без сброса кнопка оставалась видимой: событие scroll не
+      // срабатывает, когда позиция и так уже 0.
+      this.canScrollUp = false;
+      // Отмечаем модуль посещённым сразу, а не после загрузки контента:
+      // долгая загрузка не должна оставлять пункт «непосещённым».
+      this.markVisited(item_id);
       //console.log('getlink')      
       try {
         // Контент курсов отдаётся по подписи, а не по auth:sanctum:
@@ -630,23 +827,26 @@ export default {
         });
     },
     // добавить в избранное
+    /**
+     * Панели не исключают друг друга.
+     *
+     * Регресс: переключатели гасили другие панели и само дерево
+     * (toggleSearch ставил showItems = false). Из-за этого нажатие на
+     * «лупу» или «сердечко» убирало список материалов, и казалось, что
+     * кнопки сломаны. Теперь каждый управляет только своей панелью,
+     * а дерево скрывает отдельная кнопка «Дерево».
+     */
     toggleFavorite() {
       this.isFavorite = !this.isFavorite;
-      this.showItems = false;
-      this.showSearch = false;
-      if (this.isFavorite == false) this.showItems = true;
+      if (this.isFavorite) this.getFavorites();
     },
+
     toggleList() {
-      //this.clearContent();
       this.showItems = !this.showItems;
-      this.isFavorite = false;
-      this.showSearch = false;
     },
+
     toggleSearch() {
       this.showSearch = !this.showSearch;
-      this.isFavorite = false;
-      this.showItems = false;
-      if (this.showSearch == false) this.showItems = true;
     },
     // onClickSearch() {
     //   this.loading = true
@@ -667,7 +867,24 @@ export default {
           this.getFavorites(); // загружаем избранное
         })
         .catch(error => {
-          // Обработка ошибки
+          // 400 — материал уже в избранном. Раньше ошибка уходила в
+          // консоль и пользователь видел «ничего не произошло».
+          const message =
+            error?.response?.data?.error?.message || error?.response?.data?.error || "";
+
+          if (error?.response?.status === 400) {
+            this.alert = true;
+            this.alertType = "info";
+            this.snackbarText =
+              typeof message === "string" && message
+                ? message
+                : this.$t("courseManifest.alreadyFavorite");
+            return;
+          }
+
+          this.alert = true;
+          this.alertType = "error";
+          this.snackbarText = this.$t("courseManifest.favoriteError");
         });
     },
 
@@ -725,88 +942,230 @@ export default {
   display: inline-block;
 }
 
-
 .v-card {
   border: 1px solid lightgrey;
 }
 
+/* --------------------------- панель инструментов --------------------------- */
+/* Регресс: у иконок стоял width:130px (три штуки — 390px) внутри колонки
+   4/12, а у разделителя .row-with-line был margin-bottom:-31px. Иконки
+   вылезали за колонку, а отрицательный отступ наезжал блоками друг на
+   друга — шапка ломалась. Здесь обычный flex без фиксированных ширин. */
+.cm-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 8px;
+  border-bottom: 1px solid #d0d0d0;
+  background: #fafafa;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.cm-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.cm-toolbar__meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cm-toolbar__current {
+  font-size: 13px;
+  color: #555;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Кнопка инструмента: обычная кнопка, а не v-icon с рамками.
+   Состояние «включено» — фоном и цветом, а не обводкой. */
+.cm-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #444;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  transition: background-color .15s ease-in-out, color .15s ease-in-out;
+}
+
+.cm-tool:hover:not(:disabled) {
+  background: #e8eef7;
+  color: #1a4d8f;
+}
+
+/* Клавиатурная доступность: фокус должен быть виден, иначе
+   пользователь не понимает, где он находится. */
+.cm-tool:focus-visible {
+  outline: 2px solid #1a73e8;
+  outline-offset: 1px;
+}
+
+.cm-tool--on {
+  background: #1a73e8;
+  color: #fff;
+}
+
+.cm-tool:disabled {
+  opacity: .45;
+  cursor: default;
+}
+
+/* -------------------------------- избранное ------------------------------- */
+.cm-favorites {
+  margin: 8px 4px;
+  padding: 8px 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.cm-favorites__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.cm-favorites__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.cm-favorites__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.cm-favorites__title {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cm-favorites__empty {
+  margin: 0;
+  font-size: 14px;
+  color: #777;
+}
+
+/* ------------------------------ дерево материалов -------------------------- */
 .my-sheet {
-
-  opacity: 1;
-  /* потом удалить opacity,сделал чтобы стили не убирать для v-sheet */
-  /* height: 800px; */
-  /* Установите высоту для v-sheet, чтобы прокрутка сработала */
-}
-
-.icon-list::before {
-  /* border-radius: 10%; */
-  opacity: 0.5;
-  transition: opacity 0.2s ease-in-out;
-}
-
-.icon-list:hover::before {
   opacity: 1;
 }
 
-/* .icon-favorite {
-  position: relative;  
-} */
-
-.icon-favorite::before {
-  /* border-radius: 10%; */
-  opacity: 0.5;
-  transition: opacity 0.2s ease-in-out;
+/* Обе колонки прокручиваются независимо, шапка остаётся на месте.
+   Регресс: у блока контента стоял только overflow:auto без высоты,
+   из-за чего он разрастался на всю длину документа (4530px при
+   scrollHeight = clientHeight) и не прокручивался вовсе — скроллилась
+   вся страница, и кнопка «вверх» не могла найти свой контейнер. */
+.cm-tree,
+.cm-content {
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-.icon-favorite:hover::before {
-  opacity: 1;
+/* На невысоких экранах оставляем хоть немного места под контент. */
+@media (max-height: 620px) {
+  .cm-tree,
+  .cm-content {
+    max-height: calc(100vh - 110px);
+  }
 }
 
-.icon-search::before {
-  opacity: 0.5;
-  transition: opacity 0.2s ease-in-out;
+.auk-node {
+  margin: 2px 0;
+  word-wrap: break-word;
 }
 
-.icon-search:hover::before {
-  opacity: 1;
+.auk-node__title {
+  display: inline-block;
+  padding: 3px 6px;
+  border-radius: 4px;
+  line-height: 1.25;
+  /* Разделы и подразделы — не кликабельны, поэтому без курсора руки. */
+  cursor: default;
 }
 
-.row-with-line {
-  border-bottom: 2px solid green;
-  margin-bottom: -31px;
+/* Раздел/подраздел приглушены, чтобы взгляд шёл к модулям. */
+.auk-node[data-type="0"] .auk-node__title,
+.auk-node[data-type="1"] .auk-node__title,
+.auk-node[data-type="2"] .auk-node__title {
+  color: #4b7a3a;
+  opacity: .78;
+  font-weight: 600;
 }
 
-.row-with-line .active {
-  border-bottom: none !important;
+.auk-node__title--module {
+  cursor: pointer;
+  color: #222;
 }
 
-.icon-list,
-.icon-favorite,
-.icon-search {
-
-  border-bottom: 2px solid green;
-  width: 130px;
-  /* position: relative; */
-
+.auk-node__title--module:hover {
+  background: #e8eef7;
 }
 
-.addToFav {
-  /* width: 70px; */
-  border-bottom: 2px solid green;
-  border-top: 1px solid green;
-  border-left: 1px solid green;
-  border-right: 1px solid green;
-  border-top-left-radius: 50%;
-  border-top-right-radius: 10%;
+/* Уже открытый модуль — светло-серым: видно, где пользователь был,
+   не спорит с подсветкой текущего пункта. */
+.auk-node__title--visited {
+  background: #ececec;
+  color: #666;
 }
 
-.active {
-  border-bottom: none;
-  border-top: 2px solid green;
-  border-left: 2px solid green;
-  border-right: 2px solid green;
-  border-top-left-radius: 15%;
-  border-top-right-radius: 15%;
+.auk-node__title--module.auk-node__title--visited:hover {
+  background: #dfe7f2;
+}
+
+/* Текущий модуль — синим, поверх посещённого. */
+.auk-node__title--active {
+  background: #1a73e8;
+  color: #fff;
+}
+
+.auk-node__title--active:hover {
+  background: #1667cf;
+}
+
+/* ------------------------------ кнопка «вверх» ----------------------------- */
+.cm-content-col {
+  position: relative;
+}
+
+.cm-scroll-top {
+  position: sticky;
+  top: 12px;
+  margin-left: auto;
+  margin-right: 8px;
+  z-index: 4;
+  display: block;
 }
 
 .search-files__total-results {

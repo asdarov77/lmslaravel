@@ -1,469 +1,465 @@
 <template>
-  <v-card class="elevation-12 mx-auto" style="width: 600px; overflow: visible">
+  <v-card class="elevation-12 mx-auto" style="max-width: 900px; overflow: visible">
     <v-toolbar color="primary">
       <v-toolbar-title>Запись групп пользователей на курсы</v-toolbar-title>
     </v-toolbar>
-    <!-- {{ group.courses }} -->
-    <!-- {{ options }} -->
-    <!-- {{ courseFilter }} -->
-    <!-- {{ selectedOptions }} -->
-    <!-- {{ courseFilter }} -->
-    <v-card-text>
 
-      <v-form v-on:@submit.prevent="submitForm">
-        <!-- ***************удалить*************** -->
-        <!-- <treeselect placeholder="тест" 
-        v-model="group.courses" 
-        :multiple="true" 
-        :options="options"                  
-         /> -->
-        <!-- ***************удалить*************** -->
-        <v-select label="Класс" type="text" :items="aircrafts" v-model="group.aircrafts" item-value="id" item-title="path"
-          empty-option clearable:true @update:modelValue="changeAir(group.aircrafts)">
-        </v-select>
-        <v-select label="Категории" type="text" :items="catFilter" v-model="group.categories" item-value="id"
-          item-title="title" empty-option @update:modelValue="changeCat(group.categories)" ref="selectedElcat">
-        </v-select>
-        <v-divider></v-divider>
-        <!-- <v-select
-          label="Курсы"
+    <v-card-text>
+      <v-form @submit.prevent="submitForm">
+        <!-- ============================ выбор группы ============================ -->
+        <!-- Регресс: поля выбора группы не было вовсе. Группа бралась только
+             из маршрута (/group/learning/:idEdit), а пункт меню вёл на
+             жёстко зашитый /group/learning/1 — то есть записать можно было
+             только группу №1, и непонятно было, какую именно. -->
+        <v-select
+          label="Группа"
           type="text"
-          :items="courseFilter"
-          v-model="group.courses"
-          multiple
+          :items="allGroups"
+          v-model="form.group_id"
+          item-value="id"
+          item-title="groupname"
+          :disabled="loading"
+          :error-messages="fieldErrors.group_id"
+          @update:modelValue="onGroupChange"
+        ></v-select>
+
+        <v-select
+          label="Класс"
+          type="text"
+          :items="aircrafts"
+          v-model="form.aircraft_id"
+          item-value="id"
+          item-title="path"
+          :disabled="loading"
+          :error-messages="fieldErrors.aircraft_id"
+          @update:modelValue="changeAir"
+        ></v-select>
+
+        <v-select
+          label="Категории"
+          type="text"
+          :items="catFilter"
+          v-model="form.category_id"
           item-value="id"
           item-title="title"
-          empty-option          
-          ref="selectedElcourse"            
-        @onClick:modelValue="onClick" // вернуть в treeselect
-        @update:modelValue="changeCourseTree(group.courses)"  
-        >        
-      </v-select> -->
-        <treeselect placeholder="Курсы" :default-expand-level="1" v-model="group.courses" :multiple="true"
-          :options="options" @update:modelValue="test(group.courses)" ref="treeSelectInput" />
+          :disabled="loading || !form.aircraft_id"
+          :error-messages="fieldErrors.category_id"
+          @update:modelValue="changeCat"
+        ></v-select>
 
-        <!-- <v-progress-linear ></v-progress-linear> -->
+        <v-divider class="my-3"></v-divider>
 
+        <!-- Дерево курсов: раздел -> подраздел -> модуль. В выбор идут
+             только модули (type 3), они и есть единица записи. -->
+        <v-alert
+          v-if="!hasAircraft"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="mb-3"
+          text="Выберите класс и категорию — после этого появится список курсов"
+        ></v-alert>
 
-        <v-select label="Инструктор" type="text" :items="filteredUserRole" v-model="group.teacher"
-          item-title="fio"></v-select>
-        <v-select label="Вид занятия" type="text"
-          :items="['Лекция', 'Практическое занятие', 'Самостоятельная подготовка']" v-model="group.typeOfLesson"
-          item-value="id"></v-select>
+        <treeselect
+          v-if="form.aircraft_id && form.category_id"
+          :key="treeselectKey"
+          placeholder="Курсы и модули"
+          :default-expand-level="1"
+          v-model="form.course_ids"
+          :options="options"
+          :multiple="true"
+          :clearable="false"
+          :disabled="loading || saving"
+        />
 
-        <v-divider></v-divider>
-        <v-container>
-          <v-row>
-            <v-col>
-              <v-text-field type="date" v-model="group.study_from" label="начало" variant="outlined">
-              </v-text-field>
-            </v-col>
+        <v-alert
+          v-if="form.course_ids.length"
+          type="info"
+          variant="tonal"
+          density="compact"
+          class="mt-3"
+          :text="`Выбрано модулей: ${form.course_ids.length}`"
+        ></v-alert>
 
-            <v-col>
-              <v-text-field type="date" v-model="group.study_to" label="конец" variant="outlined">
-              </v-text-field>
-            </v-col>
-          </v-row>
-        </v-container>
+        <v-divider class="my-3"></v-divider>
 
-        <v-container class="notification is-danger" v-if="errors.length">
+        <v-select
+          label="Инструктор"
+          type="text"
+          :items="instructors"
+          v-model="form.teacher"
+          item-value="fio"
+          item-title="fio"
+          clearable
+          :disabled="loading"
+        ></v-select>
 
-          <p v-for="error in errors" v-bind:key="error" class="has-text-centered">
-            <!-- {{ error }} -->
-          </p>
-        </v-container>
-        <popup :alert="alert" :alertType="alertType" :snackbarText="snackbarText" :overlay="alert"
-          :alertFalse="alertFalse"></popup>
+        <!-- Регресс: у select со строковыми items стояло item-value="id".
+             У строки нет поля id, поэтому модель всегда становилась
+             undefined, и вид занятия молча не сохранялся. -->
+        <v-select
+          label="Вид занятия"
+          type="text"
+          :items="lessonTypes"
+          v-model="form.typeOfLesson"
+          :disabled="loading"
+        ></v-select>
+
+        <v-divider class="my-3"></v-divider>
+
+        <v-row>
+          <v-col>
+            <v-text-field
+              type="date"
+              v-model="form.study_from"
+              label="начало"
+              variant="outlined"
+              :disabled="loading"
+              :error-messages="fieldErrors.study_from"
+            ></v-text-field>
+          </v-col>
+          <v-col>
+            <v-text-field
+              type="date"
+              v-model="form.study_to"
+              label="конец"
+              variant="outlined"
+              :disabled="loading"
+              :error-messages="fieldErrors.study_to"
+            ></v-text-field>
+          </v-col>
+        </v-row>
+
+        <!-- Регресс: интерполяция была внутри HTML-комментария
+             (<!-- {{ error }} -->), поэтому пользователь видел красные
+             пустые блоки без единого слова. -->
+        <v-alert
+          v-for="(error, index) in errors"
+          :key="index"
+          type="error"
+          variant="tonal"
+          class="mb-2"
+          :text="error"
+        ></v-alert>
       </v-form>
     </v-card-text>
+
     <v-card-actions>
       <v-spacer></v-spacer>
-      <!-- <v-btn v-on:click="login" color="primary" to="/MyAccount">Login</v-btn> -->
-      <!-- <v-btn v-on:click="submitForm" color="primary">Сохранить</v-btn> -->
-      <ButtonGroup @submitForm="submitForm" @cancelBtn="cancelBtnHead"></ButtonGroup>
+      <ButtonGroup
+        @submitForm="submitForm"
+        @cancelBtn="cancelBtnHead"
+      ></ButtonGroup>
     </v-card-actions>
+
+    <popup
+      :alert="alert"
+      :alertType="alertType"
+      :snackbarText="snackbarText"
+      :overlay="alert"
+      :alertFalse="alertFalse"
+    ></popup>
   </v-card>
 </template>
 
 <script>
-//  <!-- @update:modelValue="changeCourse(group.courses)" -->
-import PermissionWrapper from "../PermissionWrapper.vue";
 import popup from "../Popup.vue";
-import { mapState, mapGetters } from "vuex";
+import { mapState } from "vuex";
 import $api from "../../api/httpClient";
-import { unwrapArray, numericQuery } from "../../api/envelope";
+import { asArray, unwrapArray, unwrapResponse, numericQuery } from "../../api/envelope";
 import ButtonGroup from "../../components/ButtonGroup.vue";
-import Treeselect from 'vue3-treeselect';
-import 'vue3-treeselect/dist/vue3-treeselect.css';
+import Treeselect from "vue3-treeselect";
+import "vue3-treeselect/dist/vue3-treeselect.css";
 
 export default {
-  components: { PermissionWrapper, popup, ButtonGroup, Treeselect },
-  props: ["idEdit"],
+  name: "GroupLearning",
+  components: { popup, ButtonGroup, Treeselect },
+
+  props: {
+    /** Группа из маршрута. Не обязательна: группу можно выбрать в форме. */
+    idEdit: { type: Number, default: null },
+  },
+
   data() {
     return {
       errors: [],
-      isLoading: false,
+      fieldErrors: {},
+      loading: true,
+      saving: false,
       alert: false,
       alertType: "",
-      overlay: false,
       snackbarText: "",
-      //----------- отфильтрованные массивы для item в v-select--------------
-      airFilter: [],
+
+      // Форма хранится локально, а не в сторе: state.group — это
+      // редактируемая группа, смешивать её с формой записи нельзя.
+      form: {
+        group_id: null,
+        aircraft_id: null,
+        category_id: null,
+        course_ids: [],
+        teacher: null,
+        typeOfLesson: "Лекция",
+        study_from: new Date().toISOString().slice(0, 10),
+        study_to: null,
+      },
+
       catFilter: [],
-      courseFilter: [],
-      userFilter: [],
-
-
-      // -------------------------конец отфильтрованные массивы --------------
-      //------------------------------options for treeview----------------------------
       options: [],
-      selectedOptions: [] //здесь выбранные пункты куска дерева
-
-      // ***************удалить*************** -->
-      // options: [ {
-      //     id: 'a',
-      //     label: 'a',
-      //     children: [ {
-      //       id: 'aa',
-      //       label: 'aa',
-      //       children: [ {
-      //       id: 'aaa',
-      //       label: 'aaa',
-      //     }, {
-      //       id: 'abb',
-      //       label: 'abb',
-      //     } ],
-      //     }, {
-      //       id: 'ab',
-      //       label: 'ab',
-      //     } ],
-      //   }, {
-      //     id: 'b',
-      //     label: 'b',
-      //   }, {
-      //     id: 'c',
-      //     label: 'c',
-      //   } ]
-      // ***************удалить*************** -->
-
-      //---------------------------------удалить потом----------------------------
-      // dateFrom: group.dateFrom,
-      // dateTo: group.dateTo,
+      // id узла дерева -> id курса-владельца. Treeselect возвращает только
+      // выбранные id, а сохранять нужно и курс, и модуль.
+      nodeCourse: {},
+      // Пересоздаёт treeselect при смене класса/категории: у vue3-treeselect
+      // нет реактивного сброса выбранных значений, и без этого в дереве
+      // оставались id модулей от предыдущей категории.
+      treeselectKey: 0,
     };
   },
-  created() {
-    // set default value for study_from to today's date
-    let today = new Date()
-    this.group.study_from = today.toISOString().substr(0, 10)
-    // this.$store
-    //   .dispatch("User/fetchUsers")
-    //   .catch((error) => console.error(error))
-    //   .finally(() => (this.isLoading = false));
 
-    this.$store.dispatch("User/fetchUsers");
-
-    this.$store.dispatch("Course/fetchCategories");
-    this.$store.dispatch("Course/fetchCourses");
-    this.$store.dispatch("Course/fetchAircrafts");
-    //this.$store.dispatch("Course/fetchCoursesFilter", );
-    this.$store.dispatch("User/fetchGroup", this.idEdit);
-  },
   computed: {
-    ...mapState("User", ["group", "users"]),
-    ...mapState("Course", ["courses", "categories", "aircrafts"]),
+    ...mapState("User", ["allGroups", "users"]),
+    ...mapState("Course", ["aircrafts", "categories"]),
 
-    ...mapGetters("Course", ["courses"]),
-    // ...mapGetters("Auth", ["hasPermission"]),
-
-    hasEditPermission() {
-      return this.hasPermission(["manage-users"], "Manage users");
+    lessonTypes() {
+      return ["Лекция", "Практическое занятие", "Самостоятельная подготовка"];
     },
 
-    filteredUserRole() {
-      return this.users.filter(item => item.role === 'Инструктор')
+    instructors() {
+      return this.users.filter((user) => user.role === "Инструктор");
+    },
+
+    hasAircraft() {
+      return Boolean(this.form.aircraft_id && this.form.category_id);
     },
   },
-  watch: {
-    dateFrom(value, oldValue) {
-      //console.log(oldValue,"old Value");
-      //console.log(value,"new Value");
-    },
-    dateTo(value, oldValue) {
-      // console.log(oldValue,"old Value");
-      // console.log(value,"new Value");
-    },
+
+  async created() {
+    await this.load();
   },
 
   methods: {
-    alertFalse() {
-      this.alert = false;
+    async load() {
+      this.loading = true;
+
+      // Группы нужны обязательно: без них не выбрать, кому записывать курс.
+      await Promise.all([
+        this.$store.dispatch("User/fetchGroups"),
+        this.$store.dispatch("User/fetchUsers"),
+        this.$store.dispatch("Course/fetchCategories"),
+        this.$store.dispatch("Course/fetchAircrafts"),
+      ]).catch((error) => console.error(error));
+
+      this.loading = false;
+
+      // Если пришли с маршрута /group/learning/:id — подставляем группу,
+      // но остаёмся на форме: выбор всё равно за пользователем.
+      const fromRoute = Number(this.idEdit);
+
+      if (Number.isInteger(fromRoute) && fromRoute > 0) {
+        this.form.group_id = fromRoute;
+        this.onGroupChange();
+      }
     },
-    cancelBtn() {
-      this.$emit("cancelBtn");
+
+    onGroupChange() {
+      this.fieldErrors.group_id = "";
     },
-    alertFalse() {
-      this.alert = false;
-    },
+
     changeAir(id_air) {
-      // this.$refs["selectedElcourse"].reset();
-      //console.log(this.$refs["treeSelectInput"], "treeselect");
-      this.$refs["treeSelectInput"].clear();
-      this.$refs["selectedElcat"].reset();
-      this.courseFilter = [];
-      this.catFilter = [];
-      this.catFilter = this.categories.filter(function (e) {
-        return e.aircraft_id === id_air;
+      this.fieldErrors.aircraft_id = "";
+      this.resetCourses();
+
+      // Категории принадлежат конкретному классу.
+      // Сравнение строгое по числу: id из v-select приходит числом,
+      // а из маршрута мог прийти строкой.
+      this.form.category_id = null;
+      this.catFilter = id_air
+        ? this.categories.filter((category) => Number(category.aircraft_id) === Number(id_air))
+        : [];
+    },
+
+    async changeCat(id_cat) {
+      this.fieldErrors.category_id = "";
+      this.resetCourses();
+
+      if (!id_cat || !this.form.aircraft_id) return;
+
+      const params = numericQuery({
+        aircraft_id: this.form.aircraft_id,
+        category_id: id_cat,
       });
-    },
-    changeCat(id_cat) {
-      this.$refs["treeSelectInput"].clear();
-      this.courseFilter = [];
-      if (id_cat) {
-        const courseFilter = numericQuery({
-          aircraft_id: this.group.aircrafts,
-          category_id: this.group.categories,
-        });
-        $api.get("/api/course", { params: courseFilter }).then((response) => {
-          this.courseFilter = unwrapArray(response);
 
-          //console.log(urlToGet);
-          //console.log(this.courseFilter[0].aukstructures);
-          // замена aukstructure плоского на иерархическую
-          var index;
-          for (index = 0; index < this.courseFilter.length; ++index) {
-            // console.log(this.courseFilter[0].aukstructures, '\n\n\n\n\n\n\n'); 
-            // console.log(this.courseFilter[index].aukstructures, '\n\n\n\n\n\n\n'); 
-            this.courseFilter[index].aukstructures = this.flatToHierarchy(this.courseFilter[index].aukstructures);
-          }
-          //console.log(this.courseFilter[0].aukstructures, "this.courseFilter")     
-          // копия массива courseFilter c переименованными полями для работы с treeview
-          //console.log(this.courseFilter[0].aukstructures)
-          //           this.options = this.courseFilter.aukstructures.map(function(aukstructure) {
-          //   return aukstructure;
-          // });
-          //console.log(this.options)
-          //for (ii = 0; index < this.courseFilter.length; ++ii) {
+      try {
+        const response = await $api.get("/api/course", { params });
+        const courses = unwrapArray(response);
 
-          // this.options = this.courseFilter.map(item => ({
-          //           id: item.id,
-          //           label: item.title,
+        // В дерево идут только разделы/подразделы, а их потомки — модули.
+        // Дерево строится из плоского списка aukstructures по parent_id.
+        const nodeCourse = {};
 
-          //           // parent_id: item.parent_id,
-          //           // children: item.aukstructures.map(a => ({
-          //           //    id: a.id,            
-          //           //    label: a.title,            
-          //           //   //  parent_id: a.parent_id,
+        this.options = courses.map((course) => ({
+          id: `course-${course.id}`,
+          // vue3-treeselect читает именно `label` и `children`.
+          // Без переименования title -> label узлы рендерятся пустыми,
+          // а при выборе падает «Cannot read properties of null (reading 'id')».
+          label: course.title,
+          children: this.flatToHierarchy(asArray(course.aukstructures), course.id, nodeCourse),
+        }));
 
-          //           //    children: a.children.map(aa => ({
-          //           //    id: aa.id,            
-          //           //    label: aa.title,            
-          //           //   //  parent_id: aa.parent_id,
+        this.nodeCourse = nodeCourse;
 
-          //           //   children: aa.children.map(aaa => ({
-          //           //    id: aaa.id,            
-          //           //    label: aaa.title,                         
-          //           //   //  parent_id: aaa.parent_id,
-          //           //  }))   
-          //           //  }))                 
-          //          //}))     
-          //         }));
-
-          // исправленный вариант,где не дублируется название курса
-          //console.log(JSON.stringify(this.courseFilter[0]))
-          // this.options = this.courseFilter.map(course =>
-          //   course.aukstructures.map(item => ({
-          //     id: item.id,
-          //     label: item.title,
-          //      children: item.children.map(a => ({
-          //        id: a.id,
-          //        label: a.title,
-          //       children: a.children.map(aa => ({
-          //         id: aa.id,
-          //         label: aa.title,
-          //         children: aa.children.map(aaa => ({
-          //           id: aaa.id,
-          //           label: aaa.title,
-          //         }))
-          //       }))
-          //      }))
-          //   }))
-          // ).flat();
-
-
-
-
-
-
-
-          this.options = this.courseFilter.map(course =>
-            course.aukstructures.map(item =>
-              this.renameFieldsRecursive(item, 'title', 'label')
-            )
-          ).flat();
-
-
-          // console.log(this.options);
-
-          //this.options = this.courseFilter.map(item => ({
-          //           id: item.id,
-          //           label: item.title,
-          // aukstructures: item.map(a => ({
-          //           // parent_id: item.parent_id,
-          //           // children: item.aukstructures.map(a => ({
-          //  id: a.id,            
-          //  label: a.title,            
-          //           //   //  parent_id: a.parent_id,
-
-          //           //    children: a.children.map(aa => ({
-          //           //    id: aa.id,            
-          //           //    label: aa.title,            
-          //           //   //  parent_id: aa.parent_id,
-
-          //           //   children: aa.children.map(aaa => ({
-          //           //    id: aaa.id,            
-          //           //    label: aaa.title,                         
-          //           //   //  parent_id: aaa.parent_id,
-          //           //  }))   
-          //           //  }))                 
-          //   }))     
-          //  }));
-
-
-
-
-
-          //console.log(this.options)      
-        });
+        this.treeselectKey += 1;
+      } catch (error) {
+        this.options = [];
+        this.errors.push("Не удалось загрузить список курсов");
+        console.error(error);
       }
     },
 
-    // Метод для переименования полей в массиве options
-    // этот массив явлется входными данными в treeselect
-    renameFieldsRecursive(obj, oldName, newName) {
-      if (typeof obj !== 'object' || obj === null) {
-        return obj;
-      }
+    resetCourses() {
+      this.form.course_ids = [];
+      this.options = [];
+      this.nodeCourse = {};
+      this.treeselectKey += 1;
+    },
 
-      const newObj = {};
-      for (const [key, value] of Object.entries(obj)) {
-        if (key === oldName) {
-          newObj[newName] = value;
-        } else if (key === 'children') {
-          newObj.children = value.map(child => this.renameFieldsRecursive(child, oldName, newName));
+    /**
+     * Плоский список aukstructures -> иерархия по parent_id
+     * с ключами treeselect (id / label / children).
+     *
+     * Узлы без родителя становятся корнями. Модули (type 3) — это
+     * листья: именно их id уходят в запись, поэтому у них нет id,
+     * который можно было бы спутать с другим деревом.
+     */
+    flatToHierarchy(flat, courseId, nodeCourse) {
+      const byId = new Map();
+
+      flat.forEach((item) => {
+        if (!item) return;
+        // label обязателен для treeselect, title из БД не подходит.
+        nodeCourse[item.id] = courseId;
+        byId.set(item.id, { id: item.id, label: item.title, children: [] });
+      });
+
+      const roots = [];
+
+      byId.forEach((node) => {
+        const parent = byId.get(node.parent_id);
+
+        if (parent && parent !== node) {
+          parent.children.push(node);
         } else {
-          newObj[key] = this.renameFieldsRecursive(value, oldName, newName);
-        }
-      }
-
-      return newObj;
-    },
-
-
-    // метод преобразования структуры плоской в иерархическую
-
-    flatToHierarchy(flat) {
-      const roots = [],
-        map = [],
-        id = [];
-      flat.forEach(item => {
-        map.push(Object.assign({}, item)); // копируем
-        id.push(item.id);
-      });
-      let i;
-      map.forEach(item => {
-        // Не пойму зачем вы вставили сюда null !?
-        if ( /*item.parent_id === null ||*/ !item.parent_id || (i = id.indexOf(item.parent_id)) === -1) {
-          roots.push(item);
-          return;
-        }
-        if (map[i].children) {
-          map[i].children.push(item);
-        }
-        else {
-          map[i].children = [item];
+          roots.push(node);
         }
       });
+
       return roots;
     },
-    // проверка текущей даты
-    validateDate() {
-      let today = new Date()
-      let studyFrom = new Date(this.group.study_from)
-      if (studyFrom < today) {
-        this.errors.push('Дата начала не может быть меньше текущей даты')
-        return false
+
+    /** Приводит ответ API к списку строк с читаемым сообщением. */
+    collectErrors(error) {
+      const details = error?.response?.data?.error?.details;
+
+      if (details && typeof details === "object") {
+        Object.entries(details).forEach(([field, messages]) => {
+          const text = Array.isArray(messages) ? messages.join(" ") : String(messages);
+          this.fieldErrors[field.replace(/\.\d+$/, "")] = text;
+        });
+        return;
       }
-      return true
+
+      this.errors.push(
+        error?.response?.data?.error?.message || error?.message || "Не удалось сохранить запись"
+      );
     },
 
-
-
-    submitForm() {
+    validate() {
       this.errors = [];
-      if (this.group.study_from > this.group.study_to) {
-        this.errors.push("дата начала не может быть раньше даты окончания");
-        this.snackbarText = "дата начала не может быть раньше даты окончания";
-        this.alertType = "error";
-        this.alert = true;
-      }
-      if (!this.group.study_from) {
-        this.errors.push("дата начала не задана");
-        this.snackbarText = "дата начала не задана";
-        this.alertType = "error";
-        this.alert = true;
-      }
-      if (!this.group.study_to) {
-        this.errors.push("дата окончания не задана");
-        this.snackbarText = "дата окончания не задана";
-        this.alertType = "error";
-        this.alert = true;
-      }
-      if (!this.validateDate()) {
-        this.errors.push("дата начала не может быть меньше текущей");
-        this.snackbarText = "дата начала меньше текущей";
-        this.alertType = "error";
-        this.alert = true;
-      }
-      console.log("this.validate()")
-      if (!this.errors.length && (this.group.study_from && this.group.study_to && this.group.study_from < this.group.study_to)) {
-        const formData = {
-          course_id: this.group.courses,
-          group_id: this.idEdit,
-          category_id: this.group.categories,
-          // parent_id: this.group.courses,
-          study_from: this.group.study_from,
-          study_to: this.group.study_to,
-          teacher: this.group.teacher,
-          typeOfLesson: this.group.typeOfLesson,
-        };
-        //console.log(formData);
+      this.fieldErrors = {};
 
-        let urlToUp = "/api/group/learning";
-        this.$store.dispatch("Course/fetchGroup2learnings", formData)
-          .catch((error) => console.error(error))
-          .finally(() => this.$router.push("/groups/list"));
+      if (!this.form.group_id) {
+        this.fieldErrors.group_id = "Выберите группу";
+      }
+      if (!this.form.aircraft_id) {
+        this.fieldErrors.aircraft_id = "Выберите класс";
+      }
+      if (!this.form.category_id) {
+        this.fieldErrors.category_id = "Выберите категорию";
+      }
+      if (this.form.course_ids.length === 0) {
+        this.errors.push("Выберите хотя бы один курс или модуль");
+      }
+      if (!this.form.study_from) {
+        this.fieldErrors.study_from = "Укажите дату начала";
+      }
+      if (!this.form.study_to) {
+        this.fieldErrors.study_to = "Укажите дату окончания";
+      } else if (this.form.study_from && this.form.study_to < this.form.study_from) {
+        this.fieldErrors.study_to = "Дата окончания не может быть раньше даты начала";
+      }
+
+      return Object.keys(this.fieldErrors).length === 0 && this.errors.length === 0;
+    },
+
+    async submitForm() {
+      // Защита от повторного клика: запрос уходит один раз.
+      if (this.saving) return;
+
+      if (!this.validate()) {
+        this.alert = true;
+        this.alertType = "error";
+        this.snackbarText = "Проверьте заполнение формы";
+        return;
+      }
+
+      this.saving = true;
+      this.alert = false;
+
+      try {
+        // Раскрываем выбранные узлы в «курс + модуль»: сам курс в course_id,
+        // конкретный модуль (aukstructure) — в parent_id. Раньше туда уходил
+        // просто id узла, и учебный план открывал несуществующий курс.
+        const entries = Array.from(new Set(this.form.course_ids)).map((nodeId) => {
+          const asCourse = /^course-(\d+)$/.exec(String(nodeId));
+
+          return asCourse
+            ? { course_id: Number(asCourse[1]), parent_id: null }
+            : { course_id: this.nodeCourse[nodeId], parent_id: nodeId };
+        }).filter((entry) => entry.course_id);
+
+        await this.$store.dispatch("Course/fetchGroup2learnings", {
+          group_id: this.form.group_id,
+          entries,
+          category_id: this.form.category_id,
+          teacher: this.form.teacher,
+          typeOfLesson: this.form.typeOfLesson,
+          study_from: this.form.study_from,
+          study_to: this.form.study_to,
+        });
+
+        this.alert = true;
+        this.alertType = "success";
+        this.snackbarText = "Группа записана на курсы";
+        // Уходим только после успеха. Раньше redirect стоял в finally,
+        // поэтому и неудачное сохранение выбрасывало на список групп,
+        // и сообщение об ошибке пользователь уже не видел.
+        this.$router.push("/groups/list");
+      } catch (error) {
+        this.collectErrors(error);
+        this.alert = true;
+        this.alertType = "error";
+        this.snackbarText = this.errors[0] || "Не удалось сохранить запись";
+      } finally {
+        this.saving = false;
       }
     },
 
     cancelBtnHead() {
-      //console.log('cancel');
       this.$router.go(-1);
     },
 
-    //---------------------------------------------
-    test(array) {
-      console.log(array.length);
-      var index;
-      for (index = 0; index < array.length; ++index) {
-
-        this.selectedOptions = _.find(array, function (selectedOptions) {
-          return selectedOptions.id == array[index]
-        })
-      }
-    }
-
-    //---------------------------------------------
-
+    alertFalse() {
+      this.alert = false;
+    },
   },
 };
 </script>
@@ -472,17 +468,12 @@ export default {
 
 <style>
 .v-card-text {
-  /* font-size: 1.1rem; */
   font-size: 16px;
-
 }
 
 .vue-treeselect__control {
   height: 56px;
   border-bottom: 1px solid;
-  /* box-shadow: 0 3px 1px -2px var(--v-high-emphasis-opacity, rgba(0, 0, 0, 0.2)), 0 2px 2px 0 var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.14)), 0 1px 5px 0 var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.12)); */
-  /* --v-field-padding-top :10px;
-  --v-field-padding-start:16px; */
   background: #f4f4f4;
   margin-bottom: 17px;
   border-radius: 5px;
@@ -493,14 +484,12 @@ export default {
   padding-left: 12px;
   line-height: 56px;
   color: #848484;
-
 }
 
 .vue-treeselect__control-arrow-container {
   width: 38px;
 }
 
-.vue-treeselect:not(.vue-treeselect--disabled) .vue-treeselect__multi-value-item:not(.vue-treeselect__multi-value-item-disabled):hover .vue-treeselect__multi-value-item:not(.vue-treeselect__multi-value-item-new) .vue-treeselect__multi-value-item:not(.vue-treeselect__multi-value-item-new):hover,
 .vue-treeselect__multi-value-item {
   cursor: pointer;
   color: #7a7a7a;
@@ -508,15 +497,7 @@ export default {
   border-bottom: 3px solid;
 }
 
-
-
 .vue-treeselect--has-value .vue-treeselect__multi-value {
   margin-bottom: 15px;
-
-}
-
-/* --focused */
-.vue-treeselect__value-containe:hover {
-  background: red;
 }
 </style>

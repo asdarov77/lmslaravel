@@ -5,6 +5,8 @@ import {
   fetchGroups,
   fetchGroup,
   fetchPermissions,
+  fetchPermissionCatalog,
+  fetchManageableUsers,
   updateUserPermissions,  
   createGroup,
   updateGroup,
@@ -27,6 +29,11 @@ const UserModule = {
         allGroups: [],
         totalGroups: 0,
         allPermissions: [],
+        // Каталог прав по разделам + пользователи, чьи права текущий
+        // вправе менять. Нужны отдельной странице управления правами.
+        permissionGroups: [],
+        manageableUsers: [],
+        permissionScope: null,
       
         group: {
           id: null,
@@ -76,6 +83,12 @@ const UserModule = {
           },
           SET_ALL_PERMISSIONS(state, allPermissions) {
             state.allPermissions = asArray(allPermissions)
+          },
+          SET_PERMISSION_GROUPS(state, groups) {
+            state.permissionGroups = asArray(groups)
+          },
+          SET_MANAGEABLE_USERS(state, users) {
+            state.manageableUsers = asArray(users)
           },
           SET_GROUP(state, group) {
             state.group = group
@@ -201,6 +214,31 @@ const UserModule = {
               return Promise.reject(error)
             }
           },
+          /**
+           * Каталог прав по разделам для страницы управления правами.
+           * Бэкенд проставляет assignable по роли актора, поэтому
+           * интерфейс не решает сам, что можно выдать.
+           */
+          async fetchPermissionCatalog({ commit }) {
+            try {
+              const response = await fetchPermissionCatalog()
+              commit('SET_PERMISSION_GROUPS', asArray(unwrap(response)))
+              return Promise.resolve(response)
+            } catch (error) {
+              return Promise.reject(error)
+            }
+          },
+
+          async fetchManageableUsers({ commit }) {
+            try {
+              const response = await fetchManageableUsers()
+              commit('SET_MANAGEABLE_USERS', asArray(unwrap(response)))
+              return Promise.resolve(response)
+            } catch (error) {
+              return Promise.reject(error)
+            }
+          },
+
           async fetchPermissions({ commit }) {
             try {
               const response = await fetchPermissions()

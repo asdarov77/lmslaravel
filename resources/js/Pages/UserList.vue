@@ -1,13 +1,4 @@
 <template>
-  <!-- <permission-wrapper
-    content-type="Manage users"
-    :operations="['manage-users']"
-     <v-btn class="mb-3" color="success" :to="{ name: 'regist' }"
-      >Добавить пользователя</v-btn
-    >
-  >
-</permission-wrapper
-  > -->
   <v-btn class="mb-3" color="success" :to="{ name: 'regist' }"
       >Добавить пользователя</v-btn
     >
@@ -17,13 +8,13 @@
         <th class="text-left">No</th>
         <th class="text-left">Пользователь</th>
         <!-- <th class="text-left">Курсы</th> -->
-        <th class="text-left">Разрешения</th>
         <th class="text-left">Группа</th>
         <th class="text-left">Роль</th>
         <th class="text-left">Редактировать</th>
         <!-- <th class="text-left" v-if="user.role==='Администратор'">Сменить пароль</th> -->
         <th class="text-left" v-if="hasEditPermission">Сменить пароль</th>
         <th class="text-left">Удалить</th>
+        <th class="text-left">Права</th>
       </tr>
     </thead>
 
@@ -49,14 +40,6 @@
             </li>
           </ul>
         </td> -->
-        <td class="py-1">
-          <!-- {{ _user.permissions }} -->
-          <ul>
-            <li v-for="perm in _user.permissions" :key="perm.name">
-              {{ perm.name }}
-            </li>
-          </ul>
-        </td>
         <!-- <td class="py-1">{{ _user.group ? _user.group.groupname : "" }}</td> -->
         <td class="py-1">{{ _user.group }}</td>
 
@@ -104,6 +87,21 @@
             Удалить</v-btn
           >
         </td>
+        <!-- Права вынесены в отдельный раздел: здесь только переход к нему.
+             Само назначение прав — на /permissions, там же решается,
+             что именно разрешено текущему пользователю. -->
+        <td>
+          <v-btn
+            tile
+            color="primary"
+            variant="tonal"
+            :disabled="!canSeePermissions"
+            :to="{ name: 'permissions.manage', query: { user: _user.id } }"
+            title="Права доступа"
+          >
+            Права</v-btn
+          >
+        </td>
       </tr>
     </tbody>
   </v-table>
@@ -125,12 +123,11 @@
 //     idEdit: _user.id,
 //   },
 // }"
-import PermissionWrapper from "./PermissionWrapper.vue";
 import popup from "./Popup.vue";
 import { mapState, mapGetters } from "vuex";
 
 export default {
-  components: { PermissionWrapper, popup },
+  components: { popup },
   data() {
     return {
       isLoading: false,
@@ -142,7 +139,8 @@ export default {
   },
   async mounted() {
     //console.log(localStorage.getItem('token'))
-    this.$store.dispatch("User/fetchPermissions");
+    // Каталог прав здесь больше не нужен: назначение вынесено на
+    // отдельную страницу /permissions.
     this.$store
       .dispatch("User/fetchUsers")
       .catch((error) => console.error(error))
@@ -159,6 +157,15 @@ export default {
 
     hasEditPermission() {
       return this.hasPermission(["manage-users"], "Manage users");
+    },
+
+    /**
+     * Кнопка «Права» есть только у тех, кому раздел вообще доступен:
+     * у администратора (users.permissions) и у инструктора (users.view).
+     * Иначе кнопка вела бы на 403.
+     */
+    canSeePermissions() {
+      return this.hasPermission(["users.permissions", "users.view"]);
     },
   },
 
