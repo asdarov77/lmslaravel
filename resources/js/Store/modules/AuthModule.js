@@ -1,6 +1,7 @@
 import { TokenService } from "../../services/storage.service";
 import { UserService } from "../../services/user.service";
 import { login, logout, fetchMe } from "../../api/auth.api";
+import { canonicalRoleSlug, ROLE_ALIASES, roleSlugsFrom } from "../../utils/roles";
 
 const AuthService = { login, logout, fetchMe };
 
@@ -55,6 +56,11 @@ const AuthModule = {
         // Первичное значение — снимок из LocalStorage; роутер при первом
         // переходе дёргает GET /api/v1/me и заменяет его актуальным.
         permissionSlugs: permissionNames(getInitialUser()),
+        // Канонические slug'ы ролей. Отдельное поле, а не вычисление из
+        // user.role: роль из role_user (назначается через chroll) в
+        // строковой колонке отсутствует, и сверка только по ней считала
+        // такого пользователя «без роли» — Home.vue показывал пустой экран.
+        roleSlugs: roleSlugsFrom(getInitialUser(), getInitialUser()?.roles),
         // КРИТИЧНО: Все поля должны быть объявлены здесь для реактивности
         errors: null,
         language: "ru", // или null, в зависимости от дефолта
@@ -73,10 +79,16 @@ const AuthModule = {
             state.accessToken = null;
             state.user = {};
             state.permissionSlugs = [];
+            state.roleSlugs = [];
             state.errors = null;
         },
         SET_USER(state, user) {
             state.user = user;
+        },
+        SET_ROLE_SLUGS(state, slugs) {
+            state.roleSlugs = Array.isArray(slugs)
+                ? [...new Set(slugs.map(canonicalRoleSlug).filter(Boolean))]
+                : [];
         },
         SET_PERMISSIONS(state, slugs) {
             state.permissionSlugs = Array.isArray(slugs)
@@ -116,6 +128,7 @@ const AuthModule = {
                 // эффективный набор приходит из GET /api/v1/me, который
                 // вызывает роутер при первом переходе.
                 commit("SET_PERMISSIONS", permissionNames({ permissions: payload.permissions }));
+                commit("SET_ROLE_SLUGS", roleSlugsFrom(user, payload.roles));
 
                 return response;
             } catch (error) {
@@ -161,6 +174,17 @@ const AuthModule = {
                     user.is_super_admin = payload.is_super_admin;
                 }
 
+                // Роли — из role_slugs (уже канонические) либо из массива
+                // roles. Приоритет у role_slugs по той же причине, что и у
+                // permission_slugs: это эффективное значение с бэкенда.
+                const effectiveRoles = Array.isArray(payload.role_slugs) && payload.role_slugs.length > 0
+                    ? payload.role_slugs
+                    : roleSlugsFrom(user, payload.roles);
+                if (effectiveRoles.length > 0) {
+                    user.role_slugs = effectiveRoles;
+                    commit("SET_ROLE_SLUGS", effectiveRoles);
+                }
+
                 UserService.saveUser(user);
                 commit("SET_USER", user);
                 return user;
@@ -189,14 +213,44 @@ const AuthModule = {
         loggedIn: (state) => !!state.accessToken,
 
         /**
+         * Канонические slug'ы ролей: state.roleSlugs (наполняется из
+         * login и GET /api/v1/me) с дозагрузкой из state.user, если
+         * стейт собран из старого снимка в LocalStorage.
+         */
+        roleSlugs: (state) => {
+            const merged = new Set(state.roleSlugs || []);
+            for (const slug of roleSlugsFrom(state.user, state.user?.roles)) merged.add(slug);
+            return [...merged];
+        },
+
+        /**
+         * hasRole('admin') — единая проверка роли вместо сравнений
+         * вида user.role === 'Обучаемый' в компонентах.
+         */
+        hasRole: (state, getters) => (...slugs) => {
+            const required = slugs.flat().filter(Boolean).map((s) => canonicalRoleSlug(s));
+            if (required.length === 0) return true;
+            return required.some((slug) => getters.roleSlugs.includes(slug));
+        },
+
+        isAdmin: (state, getters) => getters.hasRole("admin"),
+        isInstructor: (state, getters) => getters.hasRole("instructor"),
+        isTrainee: (state, getters) => getters.hasRole("trainee"),
+
+        /**
          * Супер-администратор: роль admin/Администратор ИЛИ флаг от
          * бэкенда (GET /api/v1/me -> is_super_admin). Дублирует
          * User::isSuperAdmin() и Gate::before на бэкенде.
+         *
+         * Роли разворачиваются здесь, а не через геттер hasRole:
+         * от этого геттера зависят hasPermission и can, и их нельзя
+         * вызывать с частично собранным набором геттеров (так делают
+         * и юнит-тесты) — иначе проверка падает с
+         * «getters.hasRole is not a function».
          */
         isSuperAdmin: (state) =>
             !!state.user?.is_super_admin ||
-            state.user?.role === "admin" ||
-            state.user?.role === "Администратор",
+            roleSlugsFrom(state.user, state.user?.roles).includes("admin"),
 
         /**
          * Множество прав пользователя (slug + алиасы каталога).
@@ -253,4 +307,5 @@ const AuthModule = {
     },
 };
 
+export { canonicalRoleSlug, ROLE_ALIASES };
 export default AuthModule;

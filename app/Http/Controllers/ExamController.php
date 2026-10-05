@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Exam;
+use App\Policies\ExamPolicy;
 use App\Models\ExamAttempt;
 use App\Models\Question;
 use App\Models\User;
@@ -318,33 +319,27 @@ class ExamController extends Controller
         ]);
     }
 
-    /** Есть ли право управлять экзаменами. */
+    /**
+     * Есть ли право управлять экзаменами.
+     *
+     * Правило перенесено в ExamPolicy: там же оно доступно Gate и
+     * @can. Здесь осталась тонкая обёртка, чтобы не переписывать все
+     * места вызова.
+     */
     private function manages(?User $actor): bool
     {
-        return $actor !== null
-            && ($actor->isSuperAdmin() || $actor->hasPermission('exams.manage'));
+        return $actor !== null && app(ExamPolicy::class)->manage($actor);
     }
 
     /** Назначен ли экзамен этому пользователю. */
     private function assignedTo(Exam $exam, ?User $actor): bool
     {
-        if ($this->manages($actor)) {
-            return true;
-        }
-
         if ($actor === null) {
             return false;
         }
 
-        if ($exam->user_id !== null) {
-            return $exam->user_id === $actor->id;
-        }
-
-        if ($exam->group_id !== null) {
-            return $exam->group_id === $actor->group_id;
-        }
-
-        return false;
+        // Управляющему доступно всё; остальным — только назначенное.
+        return app(ExamPolicy::class)->view($actor, $exam);
     }
 
     /**

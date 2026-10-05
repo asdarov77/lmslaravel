@@ -300,7 +300,9 @@
     "loading": "Loading",
     "noGroupsFound": "No groups found",
     "delete": "Delete",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "roleUnknown": "We could not determine your role. Please contact an administrator.",
+    "goHome": "Go home"
   },
   "users": {
     "list": {
@@ -318,7 +320,8 @@
       "emptyTitle": "No users yet",
       "emptyText": "Add the first user to assign a role and a group",
       "emptyFiltered": "Nobody found",
-      "emptyFilteredText": "No user matches your query. Try a different name"
+      "emptyFilteredText": "No user matches your query. Try a different name",
+      "roles": "Roles"
     },
     "delete": {
       "title": "Delete user?",
@@ -329,7 +332,18 @@
       "cannotDeleteSuper": "Superuser cannot be deleted"
     },
     "role": "Role",
-    "roleHintPublic": "Public registration always creates a trainee"
+    "roleHintPublic": "Public registration always creates a trainee",
+    "chrole": {
+      "title": "Assign roles",
+      "user": "User",
+      "card": "User roles",
+      "role": "Roles",
+      "hint": "A role defines permissions. Grant permissions separately on the Permissions page.",
+      "selfForbidden": "You cannot change your own roles — this prevents self-promotion.",
+      "saved": "Roles assigned",
+      "failed": "Failed to assign roles"
+    },
+    "roleHintReadonly": "Roles are assigned on the “Assign roles” page (users.permissions permission)"
   },
   "categories": {
     "list": {
@@ -554,5 +568,45 @@
       "subtitle": "Answer the questions and finish",
       "finished": "Exam completed"
     }
+  },
+  "bank": {
+    "title": "Question bank",
+    "subtitle": "Questions by specialty and course module",
+    "category": "Specialty",
+    "module": "Module",
+    "pickCategory": "Select a specialty",
+    "pickModule": "Select a module",
+    "pickCategoryFirst": "Select a specialty first",
+    "empty": "no questions",
+    "question": "Question",
+    "answers": "Answers",
+    "actions": "Actions",
+    "edit": "Edit",
+    "delete": "Delete",
+    "create": "Add question",
+    "rowsPerPage": "Rows per page",
+    "found": "Questions in this module: {count}",
+    "totals": "Questions: {questions} · specialties: {categories} · modules: {modules}",
+    "integrityTitle": "The bank contains questions that cannot be used in an exam",
+    "withoutAnswers": "Without answers: {count}",
+    "withoutCorrect": "Without a correct answer: {count}",
+    "multipleCorrect": "With several correct answers: {count}",
+    "integrity": {
+      "no_answers": "No answers",
+      "no_correct": "No correct answer",
+      "multiple_correct": "Several correct"
+    },
+    "correctCount": "correct: {count}",
+    "emptyPickTitle": "Select a specialty",
+    "emptyPickText": "Questions are stored per specialty. Pick a specialty, then a module.",
+    "emptyModuleTitle": "This specialty has no modules with questions",
+    "emptyModuleText": "The questions may be under another specialty — check the counters above.",
+    "emptyQuestionsTitle": "This module has no questions",
+    "emptyQuestionsText": "Add the first question — it goes straight into the bank and becomes available for exams.",
+    "deleteTitle": "Delete the question?",
+    "deleteText": "This cannot be undone.",
+    "deleted": "Question deleted",
+    "deleteError": "Failed to delete the question",
+    "loadError": "Failed to load the question bank"
   }
 }

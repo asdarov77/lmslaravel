@@ -179,6 +179,7 @@ import AppToast from "../../components/ui/AppToast.vue";
 import { mapState } from "vuex";
 import $api from "../../api/httpClient";
 import { asArray, unwrapArray, unwrapResponse, numericQuery } from "../../api/envelope";
+import { canonicalRoleSlug } from "../../utils/roles";
 import ButtonGroup from "../../components/ButtonGroup.vue";
 import Treeselect from "vue3-treeselect";
 import "vue3-treeselect/dist/vue3-treeselect.css";
@@ -237,7 +238,10 @@ export default {
     },
 
     instructors() {
-      return this.users.filter((user) => user.role === "Инструктор");
+      // Раньше отбор шёл по строке user.role === "Инструктор". У части
+      // записей роль записана как 'instructor', и такие инструкторы
+      // просто исчезали из списка. Сверяем канонический slug.
+      return this.users.filter((user) => canonicalRoleSlug(user.role) === "instructor");
     },
 
     hasAircraft() {

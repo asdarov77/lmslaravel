@@ -145,7 +145,17 @@ Route::get('user/{id}/edit', [AuthController::class, 'editData'])->middleware(['
 Route::put('user/chpass/{id}', [AuthController::class, 'chpass'])->middleware('auth:sanctum')->whereNumber('id');
 Route::delete('user/{id}', [AuthController::class, 'destroy'])->middleware(['auth:sanctum', 'permission:users.delete'])->whereNumber('id');
 Route::patch('user/{id}', [AuthController::class, 'update'])->middleware(['auth:sanctum', 'permission:users.update'])->whereNumber('id');
-//Route::put('user/chroll/{id}', [AuthController::class, 'chroll']);
+// Назначение ролей. Маршрут был закомментирован, хотя страница
+// UserChrole.vue продолжала вызывать PUT /api/user/chroll/{id} — то есть
+// роль нельзя было назначить ни через UI, ни через API, и все назначения
+// в боевой базе шли через свободную строку users.role, которую писал
+// PATCH /api/user/{id} без всякой проверки.
+//
+// Право — users.permissions, то же, что у chperm: назначение роли не
+// мельче назначения прав, а инструктор, у которого есть users.view,
+// до этой страницы не дотягивается.
+Route::put('user/chroll/{id}', [AuthController::class, 'chroll'])
+    ->middleware(['auth:sanctum', 'permission:users.permissions'])->whereNumber('id');
 // Управление правами. На маршруте — «можно ли вообще открыть управление
 // правами»: администратор (users.permissions) либо инструктор
 // (users.view). Кому именно и какие права можно назначить решает
@@ -228,7 +238,11 @@ Route::get('/v1/health', function () {
 
 Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
-    Route::post('/files/add', [FilesController::class, 'upload']);
+    // Загрузка файлов требовала только auth:sanctum — право files.upload
+    // из каталога на этом маршруте не проверялось, то есть загрузить
+    // мог любой вошедший, включая обучаемого.
+    Route::post('/files/add', [FilesController::class, 'upload'])
+        ->middleware('permission:files.upload,content.manage,courses.manage');
 });
 //
 // блок курсов старый
@@ -383,6 +397,9 @@ Route::apiResource('questions', QuestionsController::class)
     ->middleware(['auth:sanctum', 'permission:questions.view,questions.manage'])
     ->whereNumber('question');
 Route::middleware(['auth:sanctum', 'permission:questions.manage'])->group(function () {
+    // Сводка банка: счётчики по специальностям/темам и нарушения
+    // целостности (вопросы без ответов или без верного варианта).
+    Route::get('/questions/statistics', [QuestionsController::class, 'statistics']);
     Route::post('/questions', [QuestionsController::class, 'store']);
     Route::put('/questions/{question}', [QuestionsController::class, 'update'])->whereNumber('question');
     Route::patch('/questions/{question}', [QuestionsController::class, 'update'])->whereNumber('question');

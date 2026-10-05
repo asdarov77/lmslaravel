@@ -73,15 +73,12 @@ export default {
   },
   methods: {
     checkLeftSideMenu(){
-      if (
-        this.loggedIn && this.user.role !== 'Обучаемый') {
-        return true
-      }
-      else {
-        {
-          return false
-        }
-      }
+      // Раньше здесь было сравнение user.role !== 'Обучаемый' по строке.
+      // Оно ломалось дважды: у обучаемого роль хранится как 'trainee'
+      // в части записей (сравнение давало true и показывало меню),
+      // а у пользователя с ролью из role_user колонка role пуста —
+      // то есть проверка читала несуществующее поле.
+      return this.loggedIn && !this.isTrainee;
     },
     changeRu() {
       this.$store.commit("Ui/SET_LANGUAGE", "ru");
@@ -106,7 +103,7 @@ export default {
   //----------сохранение в session storage----------------
 
   computed: {
-    ...mapGetters("Auth", ["loggedIn"]),
+    ...mapGetters("Auth", ["loggedIn", "isTrainee"]),
     ...mapState("Ui", ["menudrawler", "language"]),
     ...mapState("Auth", ["user"]),
 

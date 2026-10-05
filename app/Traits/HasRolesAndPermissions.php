@@ -4,6 +4,7 @@ namespace App\Traits;
 
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\User;
 use App\Support\PermissionCatalog;
 use Illuminate\Support\Facades\Cache;
 
@@ -148,29 +149,32 @@ trait HasRolesAndPermissions
 
         $matrix = config('permissions.role_matrix', []);
 
-        // Строка role хранится в разных вариантах записи: в UI — русские
-        // названия ('Инструктор'), в API-тестах и сид-данных — английские
-        // ('instructor'). User::ROLE_ALIASES уже описывает это соответствие,
-        // поэтому сравниваем по нему, а не по регистру.
-        $role = trim((string) ($this->attributes['role'] ?? ''));
+        // Роль берём через roleSlugs(): он учитывает и колонку users.role,
+        // и связь role_user. Раньше здесь читался только $this->attributes['role'],
+        // поэтому пользователь с ролью, назначенной через chroll, не получал
+        // базовых прав матрицы вообще.
+        $slugs = method_exists($this, 'roleSlugs') ? $this->roleSlugs() : [];
 
-        if ($role === '') {
+        if ($slugs === []) {
             return [];
         }
 
-        $candidates = [$role];
-        foreach (self::ROLE_ALIASES as $variants) {
-            foreach ($variants as $variant) {
-                if (mb_strtolower($variant) === mb_strtolower($role)) {
-                    $candidates = $variants;
-                    break 2;
-                }
+        // Кандидаты: сам slug плюс все его варианты написания
+        // ('trainee', 'Обучаемый'), т.к. ключи матрицы исторически
+        // записаны по-разному.
+        $candidates = [];
+
+        foreach ($slugs as $slug) {
+            $candidates[] = $slug;
+
+            foreach (User::ROLE_ALIASES[$slug] ?? [] as $variant) {
+                $candidates[] = $variant;
             }
         }
 
         foreach ($matrix as $roleName => $permissions) {
             foreach ($candidates as $candidate) {
-                if (mb_strtolower((string) $roleName) === mb_strtolower($candidate)) {
+                if (mb_strtolower((string) $roleName) === mb_strtolower((string) $candidate)) {
                     return array_values(array_filter((array) $permissions));
                 }
             }

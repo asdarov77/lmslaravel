@@ -14,13 +14,25 @@
         ></v-text-field>
       </v-col>
       <v-col>
-        <v-combobox
+        <!--
+            Роль только для чтения. Поле было v-combobox, то есть
+            свободный текст, и PATCH /api/user/{id} писал его прямо в
+            users.role — а это один из двух источников роли наряду с
+            role_user. В итоге любой, у кого есть users.update, мог
+            вписать «Администратор» и стать суперадмином, минуя chroll
+            (который запрещает менять собственные роли).
+            Теперь роль назначается только через «Назначение ролей»
+            (users.permissions), а здесь она показана для чтения.
+        -->
+        <v-text-field
             variant="solo"
-            v-model="user.role"
+            :model-value="roleLabel"
             dense
-            label="Роль"
-            :items="['Администратор', 'Инструктор', 'Обучаемый']"
-        ></v-combobox>
+            readonly
+            :label="$t('users.role')"
+            :hint="$t('users.roleHintReadonly')"
+            persistent-hint
+        ></v-text-field>
       </v-col>
       <v-col>
         <v-text-field
@@ -225,6 +237,23 @@ export default {
     /** Раздел прав открыт администратору и инструктору — остальным кнопка не нужна. */
     canSeePermissions() {
       return this.hasPermission(['users.permissions', 'users.view'])
+    },
+
+    /**
+     * Роль для показа. Берём связь role_user (её назначает chroll), а
+     * если её нет — строку users.role, в которой значения исторически
+     * записаны по-разному: «Обучаемый» или «trainee». Показываем как
+     * есть: поле только для чтения, и подменять текст здесь нечем.
+     */
+    roleLabel() {
+      const roles = this.user?.roles
+      if (Array.isArray(roles) && roles.length > 0) {
+        return roles
+          .map((role) => (typeof role === 'object' && role !== null ? role.rolename || role.slug : role))
+          .filter(Boolean)
+          .join(', ')
+      }
+      return this.user?.role || '—'
     },
   },
 

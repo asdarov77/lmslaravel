@@ -73,9 +73,135 @@ class User extends Authenticatable
         });
     }
 
+    /**
+     * Приводит произвольное написание роли к каноническому slug'у.
+     * Возвращает null, если значение не опознано.
+     */
+    public static function canonicalRoleSlug(?string $value): ?string
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        foreach (self::ROLE_ALIASES as $canonical => $variants) {
+            foreach ($variants as $variant) {
+                if (mb_strtolower($variant) === mb_strtolower($value)) {
+                    return $canonical;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Канонические slug'ы ролей пользователя — объединение ДВУХ источников:
+     * строковой колонки users.role и связи role_user.
+     *
+     * Раньше isAdmin()/isTrainee() читали только колонку `role`. Но роль,
+     * назначенная через UI, идёт через AuthController::chroll, который
+     * синхронизирует ТОЛЬКО role_user и колонку не трогает. В итоге такой
+     * пользователь считался «без роли»: role_matrix не выдавал ему базовых
+     * прав, а Home.vue вообще не находил компонент и показывал пустой
+     * экран. Теперь оба источника равноправны.
+     *
+     * @return array<int,string>
+     */
+    public function roleSlugs(): array
+    {
+        $slugs = [];
+
+        $fromColumn = self::canonicalRoleSlug($this->attributes['role'] ?? null);
+
+        if ($fromColumn !== null) {
+            $slugs[] = $fromColumn;
+        } else {
+            // Неизвестное значение не теряем: фронт должен показать его как
+            // есть, а не получить пустоту и не догадаться.
+            $raw = trim((string) ($this->attributes['role'] ?? ''));
+
+            if ($raw !== '') {
+                $slugs[] = $raw;
+            }
+        }
+
+        try {
+            $this->loadMissing('roles');
+
+            foreach ($this->roles as $role) {
+                $slug = self::canonicalRoleSlug($role->slug ?? null)
+                    ?? self::canonicalRoleSlug($role->rolename ?? null);
+
+                if ($slug !== null) {
+                    $slugs[] = $slug;
+                    continue;
+                }
+
+                $fallback = trim((string) ($role->slug ?? $role->rolename ?? ''));
+
+                if ($fallback !== '') {
+                    $slugs[] = $fallback;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Связи может не быть в схеме (часть установок). Роль из
+            // колонки мы уже получили — падать из-за этого нельзя.
+            \Illuminate\Support\Facades\Log::warning('roleSlugs: role relation check failed: '.$e->getMessage());
+        }
+
+        return array_values(array_unique($slugs));
+    }
+
+    /**
+     * Единый формат ролей для /api/login и /api/v1/me.
+     * Раньше login отдавал только $user->roles->pluck('rolename') —
+     * список названий без slug'ов, а /me — массив объектов. Фронт сравнивал
+     * строки и разбирался с этим в двух местах по-разному.
+     *
+     * @return array<int,array{id:int|null,name:string,slug:string}>
+     */
+    public function rolePayloads(): array
+    {
+        $payload = [];
+
+        foreach ($this->roleSlugs() as $slug) {
+            $payload[$slug] = [
+                'id' => $this->roles->firstWhere('slug', $slug)?->id,
+                'name' => $slug,
+                'slug' => $slug,
+            ];
+        }
+
+        try {
+            $this->loadMissing('roles');
+
+            foreach ($this->roles as $role) {
+                $slug = self::canonicalRoleSlug($role->slug ?? null)
+                    ?? self::canonicalRoleSlug($role->rolename ?? null)
+                    ?? trim((string) ($role->slug ?? $role->rolename ?? ''));
+
+                if ($slug === '') {
+                    continue;
+                }
+
+                $payload[$slug] = [
+                    'id' => $role->id ?? null,
+                    'name' => (string) ($role->rolename ?: $role->slug),
+                    'slug' => $slug,
+                ];
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('rolePayloads: role relation check failed: '.$e->getMessage());
+        }
+
+        return array_values($payload);
+    }
+
     protected function hasRoleAlias(string $role): bool
     {
-        return in_array($this->role, self::ROLE_ALIASES[$role] ?? [], true);
+        return in_array($role, $this->roleSlugs(), true);
     }
 
     public function isAdmin(): bool

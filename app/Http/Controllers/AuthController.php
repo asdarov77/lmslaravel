@@ -7,6 +7,7 @@ use App\Models\User;
 
 use App\Models\Group2learning;
 use App\Models\Permission;
+use App\Policies\UserPolicy;
 use App\Support\PermissionScope;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -179,7 +180,14 @@ class AuthController extends Controller
             'token' => $token, //->plainTextToken
 
             'permissions' => $permissions,
-            'roles' => $user->roles->pluck('rolename'),
+            // Единый формат ролей — тот же, что у GET /api/v1/me.
+            // Раньше здесь был только список названий (pluck('rolename')):
+            // фронт получал ['Обучаемый'] без slug и сравнивал строки,
+            // тогда как /me отдавал объекты {id,name,slug}. Два разных
+            // формата для одной сущности — источник «роль не найдена».
+            'roles' => $user->rolePayloads(),
+            'role_slugs' => $user->roleSlugs(),
+            'is_super_admin' => $user->isSuperAdmin(),
         ];
         return response()->json($response, 200);
     }
@@ -235,11 +243,12 @@ class AuthController extends Controller
                 // синхронизирован (permissions:sync), права вроде users.view
                 // в ответе отсутствовали, и меню у администратора пустело.
                 'permission_slugs' => $slugs->values()->all(),
-                'roles' => $user->roles->map(fn ($r) => [
-                    'id' => $r->id,
-                    'name' => $r->rolename,
-                    'slug' => $r->slug,
-                ]),
+                // rolePayloads() — общий сериализатор ролей, тот же, что
+                // использует login(). Он учитывает обе таблицы (колонку
+                // users.role и role_user), поэтому роль, назначенная через
+                // chroll, видна и здесь.
+                'roles' => $user->rolePayloads(),
+                'role_slugs' => $user->roleSlugs(),
                 'is_super_admin' => $user->isSuperAdmin(),
             ],
             'error' => null,
@@ -309,40 +318,54 @@ class AuthController extends Controller
         return User::with('permissions')->findOrFail($id);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        if ($id != 1) {
-            $user = User::findOrFail($id);
-            $user->delete();
-            return response()->json(null, 200);
+        $user = User::findOrFail($id);
+
+        // Жёсткий запрет, а не политика. Gate::before пропускает
+        // супер-администратора через ЛЮБУЮ проверку — включая те, где
+        // отказ обязателен при любой роли. Удалить себя нельзя никому:
+        // это закрывает себе последний вход в систему.
+        if ((int) $user->id === (int) $request->user()->id) {
+            abort(403, 'Нельзя удалить собственную учётную запись');
         }
-        return response()->json('невозможно удалить супер пользователя', 500);
+
+        // Раньше единственная защита была `$id != 1` — магическое число:
+        // любой другой администратор удалялся обычным users.delete,
+        // а отказ возвращал 500 вместо 403. Теперь область видимости
+        // решает UserPolicy::delete.
+        $this->authorize('delete', $user);
+
+        $user->delete();
+
+        return response()->json(null, 200);
     }
 
     public function getUserList()
     {
-        if (Auth::user()->role == "Администратор")
-            $user = User::orderBy('id')->get();
-        else
-            $user = User::orderBy('id')
-                ->where('group_id', '=', Auth::user()->group_id)
-                ->get();
-        foreach ($user as $_user) {
-            $_user->group;
-            $_user->permissions;
+        $actor = Auth::user();
 
-        }
-        return $user;
+        // Область видимости определяет UserPolicy::scopeQuery(), а не
+        // сравнение строк. Раньше здесь было
+        // `Auth::user()->role == "Администратор"`, из-за чего
+        // администратор, которому роль назначили через role_user,
+        // получал список только своей группы.
+        return UserPolicy::scopeQuery($actor)->with(['group', 'permissions'])->get();
     }
 
     public function getUser($id)
     {
-
         $user = User::findOrFail($id);
-        $user->permissions;
+
+        // Раньше карточка ЛЮБОГО пользователя отдавалась тому, у кого
+        // есть users.view: инструктор группы А открывал сотрудника
+        // группы Б по угаданному id. Теперь — своя запись либо
+        // запись в своей группе.
+        $this->authorize('view', $user);
+
+        $user->loadMissing('permissions');
 
         return $user;
-
     }
 
     public function update(Request $request, $id)
@@ -354,8 +377,22 @@ class AuthController extends Controller
         ]);
 
         $user = User::findOrFail($id);
+
+        // Область: инструктор правит свою группу, чужого администратора —
+        // нет. Раньше маршрута users.update хватало, и инструктор мог
+        // переписать ФИО и телефон сотрудника чужой группы.
+        $this->authorize('update', $user);
+
         $user->fio = request('fio');
-        $user->role = request('role');
+        // users.role здесь НЕ пишется. Поле было свободным текстом
+        // (v-combobox в UserItemEdit позволял ввести что угодно), и его
+        // значение — один из двух источников роли наряду с role_user.
+        // Значит, любой, у кого есть users.update, мог вписать
+        // «Администратор» и стать суперадмином в обход chroll, который
+        // специально запрещает менять собственные роли.
+        // Единственный писатель роли — PUT /api/user/chroll/{id}
+        // (users.permissions), а из этой формы роль выводится только
+        // для чтения.
         $user->phonenumber = request('phonenumber');
         $user->city = request('city');
         $user->country = request('country');
@@ -379,15 +416,16 @@ class AuthController extends Controller
 
     public function chpass(Request $request, $id)
     {
-        // Свой пароль — можно; чужой — только с правом users.update.
-        if ((int) $id !== (int) $request->user()->id
-            && !$request->user()->hasPermission('users.update')) {
-            abort(403, 'Недостаточно прав для смены пароля другого пользователя');
-        }
-
         $request->validate(['password' => 'required|string|min:6']);
 
         $user = User::findOrFail($id);
+
+        // Свой пароль — можно; чужой — как изменение профиля, то есть в
+        // пределах своей группы. Раньше проверка жила здесь и обходила
+        // область видимости: инструктор с users.update менял бы пароль
+        // сотруднику чужой группы.
+        $this->authorize('changePassword', $user);
+
         $user->password = bcrypt(request('password'));
         $user->save();
         // json(), а не response(): иначе ответ уходит без конверта
@@ -396,11 +434,45 @@ class AuthController extends Controller
 
     public function chroll(Request $request, $id)
     {
-        $user = User::findOrFail($id);
-        $user->roles()->sync($request->role_id);
+        // Раньше у метода не было ни авторизации, ни валидации: маршрут был
+        // закомментирован, поэтому страница назначения ролей просто
+        // отдавала 404, а роль менялась только через свободную строку
+        // users.role в PATCH /api/user/{id} (см. update()).
+        //
+        // Назначение роли = эскалация прав, поэтому:
+        //  1) своих ролей актор не меняет — иначе инструктор с
+        //     users.permissions повысил бы себя до администратора;
+        //  2) роли должны существовать, иначе sync() молча вешал бы
+        //     несуществующий id в role_user;
+        //  3) пустой список ролей допустим: это снятие ролей.
+        $data = $request->validate([
+            'role_id' => ['present', 'array'],
+            'role_id.*' => ['integer', 'exists:roles,id'],
+        ], [], ['role_id' => 'роли']);
 
-        // json(), а не response(): иначе ответ уходит без конверта
-        return response()->json($user->fresh(), 201);
+        $user = User::findOrFail($id);
+
+        // Жёсткий запрет: свои роли не меняет никто, включая
+        // супер-администратора, — иначе можно выйти из системы, оставив
+        // себе роль без прав. Gate::before такой запрет не проверит.
+        if ((int) $user->id === (int) $request->user()->id) {
+            abort(403, 'Нельзя менять собственные роли');
+        }
+
+        // Политика закрывает выход за пределы своей группы.
+        $this->authorize('assignRole', $user);
+
+        $user->roles()->sync($data['role_id']);
+
+        $user->unsetRelation('roles')->unsetRelation('permissions');
+        $user->loadMissing(['roles.permissions', 'permissions']);
+        $user->forgetPermissionCache();
+
+        return response()->json([
+            'user' => $user->fresh(),
+            'roles' => $user->rolePayloads(),
+            'role_slugs' => $user->roleSlugs(),
+        ], 200);
     }
     public function chperm(Request $request, $id)
     {

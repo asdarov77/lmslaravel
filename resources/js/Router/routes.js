@@ -77,12 +77,18 @@ const routes = [
         name: 'user.chpass',
         meta: { permission: ['users.update'] },        props: true,
     },
-    // {
-    //     path: '/user/chroll',
-    //     component: () => import('../Pages/User/UserChrole.vue'),
-    //     name: 'user.chroll',
-    //     //props: true
-    // },
+    // Назначение ролей. Маршрут был закомментирован вместе с API
+    // (PUT /api/user/chroll/{id}), поэтому роль нельзя было назначить
+    // ни через страницу, ни через API. Право — users.permissions, то же,
+    // что у управления правами: назначение роли не мельче назначения
+    // прав. chroll дополнительно запрещает менять собственные роли.
+    {
+        path: '/user/chrole/:idEdit',
+        component: () => import('../Pages/User/UserChrole.vue'),
+        name: 'user.chroll',
+        meta: { permission: ['users.permissions'] },
+        props: route => ({ idEdit: Number(route.params.idEdit) }),
+    },
     //
     // Управление правами — отдельная страница (было: колонка в списке
     // пользователей + диалог в карточке пользователя).

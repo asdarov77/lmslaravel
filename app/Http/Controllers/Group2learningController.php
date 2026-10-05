@@ -6,6 +6,7 @@ use App\Http\Filters\Group2learningFilter;
 use App\Http\Requests\Group2learning\FilterRequest;
 use Illuminate\Http\Request;
 use App\Models\Group2learning;
+use App\Policies\Group2learningPolicy;
 
 
 
@@ -35,20 +36,11 @@ class Group2learningController extends Controller
         $filter = app()->make(Group2learningFilter::class, ['queryParams' => array_filter($data)]);
         $query = Group2learning::filter($filter);
 
-        $user = auth('sanctum')->user();
-
-        $maySeeAll = $user !== null
-            && ($user->isSuperAdmin() || $user->hasPermission('users.courses'));
-
-        if (! $maySeeAll) {
-            $groupId = $data['group_id'] ?? $user?->group_id;
-
-            if (! $groupId) {
-                return response()->json(['data' => [], 'meta' => ['total' => 0]]);
-            }
-
-            $query->where('group_id', (int) $groupId);
-        }
+        // Область видимости описана в Group2learningPolicy: администратор
+        // и методист (users.courses) видят все группы, остальные — свою.
+        // Правило было продублировано прямо здесь, из-за чего show($id)
+        // остался без него и отдавал чужие записи по перебору id.
+        $query = Group2learningPolicy::scopeQuery(auth('sanctum')->user(), $query);
 
         return $query->get();
     }
@@ -97,7 +89,14 @@ class Group2learningController extends Controller
         // Раньше здесь был `Group2learning::find($id);` без return —
         // метод всегда отдавал null, то есть 200 с пустым телом вместо
         // самой записи.
-        return Group2learning::findOrFail($id);
+        $learning = Group2learning::findOrFail($id);
+
+        // Маршрут висел только на auth:sanctum, поэтому любой вошедший
+        // читал чужую учебную запись по идентификатору, даже когда
+        // index был уже ограничен своей группой.
+        $this->authorize('view', $learning);
+
+        return $learning;
     }
 
     /**
@@ -121,6 +120,11 @@ class Group2learningController extends Controller
     public function update(Request $request, $id)
     {
     $group2learn = Group2learning::findOrFail($id);
+
+    // Право записи групп на курсы продублировано политикой: раньше
+    // оно было только в middleware маршрута, и любая другая точка входа
+    // (например, внутренний вызов) осталась бы без проверки.
+    $this->authorize('update', $group2learn);
 
     // Находка: teacher/course_id/group_id/category_id — NOT NULL в БД.
     // Если их не передать, input() вернёт null и save() упадёт в 500,
@@ -154,6 +158,8 @@ class Group2learningController extends Controller
         
             // Находим экземпляр модели по его id
     $group2learn = Group2learning::findOrFail($id);
+
+    $this->authorize('delete', $group2learn);
 
     // Удаляем найденный экземпляр из базы данных
     $group2learn->delete();

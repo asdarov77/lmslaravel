@@ -100,6 +100,23 @@
             <v-icon icon="mdi-shield-key-outline" size="18" aria-hidden="true"></v-icon>
           </v-btn>
 
+          <!--
+              Назначение ролей. Пока маршрут был закомментирован, роль
+              менялась только свободным текстом в карточке пользователя
+              (PATCH /api/user/{id} писал users.role). Теперь единственный
+              писатель роли — chroll, и ссылка на него ведёт отсюда же.
+          -->
+          <v-btn
+            v-if="canAssignRoles"
+            size="small"
+            variant="text"
+            :to="{ name: 'user.chroll', params: { idEdit: row.id } }"
+            :title="$t('users.list.roles')"
+            :aria-label="`${$t('users.list.roles')}: ${row.fio}`"
+          >
+            <v-icon icon="mdi-shield-account-outline" size="18" aria-hidden="true"></v-icon>
+          </v-btn>
+
           <v-btn
             size="small"
             variant="text"
@@ -132,6 +149,7 @@
 
 <script>
 import { mapState, mapGetters } from "vuex";
+import { canonicalRoleSlug } from "../utils/roles";
 import PageHeader from "../components/ui/PageHeader.vue";
 import DataTable from "../components/ui/DataTable.vue";
 import ConfirmDialog from "../components/ui/ConfirmDialog.vue";
@@ -202,6 +220,16 @@ export default {
       return this.hasPermission(["users.permissions", "users.view"]);
     },
 
+    /**
+     * Назначение ролей — только users.permissions, то же право, что у
+     * PUT /api/user/chroll/{id}. Инструктор с users.view править роли не
+     * может: роль определяет набор прав, и её выдача не мельче выдачи
+     * самих прав.
+     */
+    canAssignRoles() {
+      return this.hasPermission(["users.permissions"]);
+    },
+
     pendingUser() {
       return this.allUsers.find((user) => user.id === this.pendingId) ?? null;
     },
@@ -209,8 +237,13 @@ export default {
 
   methods: {
     roleBadgeClass(role) {
-      if (role === "Администратор" || role === "admin") return "u-badge--danger";
-      if (role === "Инструктор" || role === "instructor") return "u-badge--primary";
+      // Сравнение по каноническому slug'у, а не по двум вариантам строки.
+      // Раньше роль 'trainee'/'Обучаемый' попадала в «прочие» молча,
+      // а любая новая роль требовала бы правки этого метода.
+      const slug = canonicalRoleSlug(role);
+      if (slug === "admin") return "u-badge--danger";
+      if (slug === "instructor") return "u-badge--primary";
+      if (slug === "trainee") return "u-badge--muted";
       return "";
     },
 

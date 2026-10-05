@@ -360,7 +360,6 @@ class UserApiTest extends TestCase
         $this->assertDatabaseHas('users', [
             'id'             => $user->id,
             'fio'            => 'Полное Имя',
-            'role'           => 'Инструктор',
             'phonenumber'    => '+79990001122',
             'city'           => 'Москва',
             'country'        => 'РФ',
@@ -370,6 +369,29 @@ class UserApiTest extends TestCase
             'spfere'         => 'Оборона',
             'specialization' => 'БПЛА',
         ]);
+    }
+
+    public function test_patch_does_not_change_role()
+    {
+        // Раньше PATCH /api/user/{id} писал свободную строку users.role,
+        // а это один из двух источников роли наряду с role_user. То есть
+        // любой, у кого есть users.update, мог вписать «Администратор» и
+        // стать суперадмином в обход chroll (который запрещает менять
+        // собственные роли). Роль назначается только через
+        // PUT /api/user/chroll/{id}.
+        $this->admin();
+        $user = User::factory()->create(['role' => 'Обучаемый']);
+
+        $this->patchJson("/api/user/{$user->id}", [
+            'fio'  => $user->fio,
+            'role' => 'Администратор',
+        ])->assertStatus(200);
+
+        $this->assertDatabaseHas('users', [
+            'id'   => $user->id,
+            'role' => 'Обучаемый',
+        ]);
+        $this->assertFalse($user->fresh()->isAdmin());
     }
 
     public function test_patch_returns_404_for_missing_user()
@@ -395,16 +417,60 @@ class UserApiTest extends TestCase
         $this->deleteJson('/api/user/999999')->assertStatus(404);
     }
 
-    /** id=1 защищён: удаление суперпользователя запрещено. */
-    public function test_cannot_delete_user_with_id_1()
+    /**
+     * Раньше удаление защищал единственный пользовательский идентификатор
+     * — `$id != 1` в контроллере. Магическое число: любой ДРУГОЙ
+     * администратор удалялся обычным users.delete, удалить самого себя
+     * тоже было можно, а отказ возвращал 500 вместо 403.
+     *
+     * Теперь решение принимает UserPolicy::delete: нельзя удалить себя,
+     * чужого администратора — только суперадмину, а id значения не имеет.
+     */
+    public function test_cannot_delete_self()
     {
-        $super = User::factory()->create();
-        $super->forceFill(['id' => 1])->save();
+        $actor = $this->admin();
+
+        $this->deleteJson("/api/user/{$actor->id}")->assertStatus(403);
+
+        $this->assertDatabaseHas('users', ['id' => $actor->id]);
+    }
+
+    public function test_first_user_id_has_no_special_protection()
+    {
+        // id=1 больше не привилегирован: защита держится на роли и на
+        // запрете удалять себя, а не на номере записи в таблице.
+        $first = User::factory()->create(['role' => 'Обучаемый']);
+        $first->forceFill(['id' => 1])->save();
 
         $this->admin();
-        $this->deleteJson('/api/user/1')->assertStatus(500);
 
-        $this->assertDatabaseHas('users', ['id' => 1]);
+        $this->deleteJson('/api/user/1')->assertStatus(200);
+        $this->assertDatabaseMissing('users', ['id' => 1]);
+    }
+
+    public function test_instructor_cannot_delete_admin()
+    {
+        $group = Group::factory()->create();
+        $admin = User::factory()->create(['role' => 'Администратор', 'group_id' => $group->id]);
+        $instructor = $this->asUser(['role' => 'Инструктор', 'group_id' => $group->id]);
+        $instructor->givePermissionsTo('users.delete');
+
+        $this->deleteJson("/api/user/{$admin->id}")->assertStatus(403);
+
+        $this->assertDatabaseHas('users', ['id' => $admin->id]);
+    }
+
+    public function test_instructor_cannot_delete_user_of_another_group()
+    {
+        $own = Group::factory()->create();
+        $other = Group::factory()->create();
+        $victim = User::factory()->create(['role' => 'Обучаемый', 'group_id' => $other->id]);
+        $instructor = $this->asUser(['role' => 'Инструктор', 'group_id' => $own->id]);
+        $instructor->givePermissionsTo('users.delete');
+
+        $this->deleteJson("/api/user/{$victim->id}")->assertStatus(403);
+
+        $this->assertDatabaseHas('users', ['id' => $victim->id]);
     }
 
     // ------------------------------------------------------------- PASSWORD

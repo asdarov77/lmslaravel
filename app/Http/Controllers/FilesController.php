@@ -34,12 +34,22 @@ class FilesController extends Controller
 
   public function upload(Request $request)
   {
+    // Валидация добавлена вместе с проверкой прав на маршруте. Раньше
+    // здесь не проверялось ничего: при отсутствии поля image цикл
+    // foreach по null давал 500, а размер и тип файла не ограничивались.
+    $validated = $request->validate([
+        'image' => ['required', 'array', 'min:1', 'max:20'],
+        'image.*' => ['required', 'file', 'max:20480'],
+    ], [], ['image' => 'файл']);
+
     $model = new File();
 
-    $files = $request->file('image');    
+    $files = $validated['image'];
     $id = auth()->user()->id; // id авторизованного пользователя
     $username = auth()->user()-> name; // name авторизованного пользователя
     
+    $stored = [];
+
     foreach ($files as $file) {
        $filename = $file->getClientOriginalName(); //получаем оригинальное имя файла
        $file->storeAs('/uploads/'. $username, $filename); // загружаем файл в файловую систему с оригинальным именем в папку с именем пользователя
@@ -49,7 +59,7 @@ class FilesController extends Controller
        //$name = $file . time() . '.' . $file->extension();      
         
 
-       File::create([
+       $stored[] = File::create([
          'name' => $filename,
          'type' => $type,
          'extension' => $ext,
@@ -76,7 +86,15 @@ class FilesController extends Controller
     // }
 
     
-       return 'success';      
+    // Ответ приходил голой строкой 'success', минуя конверт
+    // ApiResponseEnvelope: unwrapResponse на фронте получал строку вместо
+    // объекта и не мог разобрать результат.
+    return response()->json([
+        'success' => true,
+        'data' => $stored,
+        'error' => null,
+        'meta' => null,
+    ], 201);
   }
 
 

@@ -269,6 +269,19 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * Узкая числовая колонка (число ответов, счётчик).
+ *
+ * tabular-nums обязателен: без него цифры в колонке «прыгают» при
+ * переходе между 9 и 10, и таблица визуально «дёргается».
+ */
+.u-table th.u-table__answers,
+.u-table td.u-table__answers {
+  width: 1%;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .u-table-wrap {
   overflow-x: auto;
   border-radius: 0 0 var(--radius-md) var(--radius-md);
