@@ -124,6 +124,21 @@ export default {
   computed: {
     ...mapGetters("Auth", ["can"]),
 
+    /**
+     * Управляющий — тот, у кого есть право на людей, группы или курсы.
+     * Роль не проверяется: она могла быть не назначена при том, что
+     * право выдано напрямую (см. RoleDashboard).
+     */
+    isManager() {
+      return this.can(
+        "users.view",
+        "users.permissions",
+        "groups.view",
+        "groups.manage",
+        "courses.manage"
+      );
+    },
+
     menuItems() {
       const items = [
         // {
@@ -175,6 +190,14 @@ export default {
         //   link: "/filemanager",
         // },
         {
+          // Витрина курсов с самостоятельной записью. Требование берётся
+          // из маршрута /catalog: courses.view, то есть есть и у
+          // обучаемого — записаться он должен сам.
+          icon: "mdi-bookshelf",
+          title: this.$t("app.menu.catalog"),
+          link: "/catalog",
+        },
+        {
           // Запись групп на курсы — методическая операция (users.courses).
           // Это НЕ «учебный план» обучаемого: см. пункт ниже.
           icon: "mdi-account-group-outline",
@@ -192,6 +215,9 @@ export default {
           icon: "mdi-calendar-month-outline",
           title: this.$t("app.menu.myLearning"),
           link: "/my/learning",
+          // Личный учебный план: управляющему он не нужен, и раньше
+          // пункт водил его в пустую страницу.
+          onlyFor: "trainee",
         },
         {
           // Личный кабинет (дашборд): показатели, дедлайны, экзамены.
@@ -219,7 +245,7 @@ export default {
         },
       ]
       
-      return items.filter(menu => this.visibleFor(menu));
+      return items.filter(menu => this.visibleFor(menu) && this.fitsRole(menu));
     },
 
     menuUsers() {
@@ -263,7 +289,7 @@ export default {
         // лишнее. Ссылка на /auk остаётся рабочей (маршрут не удалён).
       ]
       
-      return items.filter(menu => this.visibleFor(menu));
+      return items.filter(menu => this.visibleFor(menu) && this.fitsRole(menu));
     },
   },
 
@@ -303,6 +329,22 @@ export default {
       // как в middleware `permission:a,b` на бэкенде. С массивом под
       // видом AND пункт скрывался бы и у того, кому право выдано.
       return this.can(...required);
+    },
+
+    /**
+     * Виден ли пункт именно этой категории пользователя.
+     *
+     * Часть пунктов нельзя описать правом: «Моё обучение» — это личный
+     * учебный план, и управляющему он не нужен, хотя право courses.view
+     * у него есть. Маршрут /my/learning открыт всем авторизованным, так
+     * что требование приходится задавать здесь.
+     */
+    fitsRole(item) {
+      const only = item?.onlyFor
+
+      if (!only) return true
+
+      return only === 'manager' ? this.isManager : !this.isManager
     },
   },
 };

@@ -7,6 +7,7 @@ use App\Http\Filters\AukstructureFilter;
 use App\Http\Requests\Course\FilterRequest;
 use Illuminate\Http\Request;
 use App\Models\Course;
+use App\Support\CourseAccess;
 use App\Models\Aircraft;
 use App\Models\Aukstructure;
 use App\Models\Link;
@@ -177,9 +178,16 @@ class CourseController extends Controller
 
 
     //-----------------------------рабочий вариант---------------------------------------------
-    public function show($id)
+    public function show(Request $request, $id)
     {
         $course = Course::with(['categories','aircraft','aukstructures.links'])->findOrFail($id);
+
+        // Материал курса открыт записанному или управляющему. Раньше
+        // здесь стоял только auth:sanctum, и любой вошедший читал курс
+        // по идентификатору: идентификаторы идут подряд, перебор
+        // занимает секунды. С появлением витрины тот же обход
+        // открывал бы незаписанный курс.
+        CourseAccess::authorizeOpen($request->user(), $course);
 
         // склейка пути        
         //         $courses_path = Config::get('app.courses_path'); // usr/local/share
@@ -206,8 +214,17 @@ class CourseController extends Controller
     //----------------------------------------------------
 
 
-    public function getlink($id)
+    public function getlink(Request $request, $id)
     {
+        // Ссылка ведёт на файл материала, поэтому доступ к ней
+        // ограничен так же, как к манифесту курса.
+        $auk = Aukstructure::with('course')->find($id);
+
+        if (! $auk || ! $auk->course) {
+            abort(404, 'Тема не найдена');
+        }
+
+        CourseAccess::authorizeOpen($request->user(), $auk->course);
 
         $link = (Link::where('aukstructure_id', $id)
             ->value('link')
@@ -279,15 +296,21 @@ class CourseController extends Controller
         ];
     }
 
-    public function get_first_auk($auk_id)
+    public function get_first_auk(Request $request, $auk_id)
     {
         // Находка: find() возвращает null, обращение ->course_id давало 500.
-        $cur_auk = Aukstructure::find($auk_id);
+        $cur_auk = Aukstructure::with('course')->find($auk_id);
         if (!$cur_auk) {
             return response()->json([
                 'message' => 'Aukstructure не найден',
             ], 404);
         }
+        // Отдаёт структуру курса, поэтому доступ такой же, как к
+        // манифесту: записанному или управляющему.
+        if ($cur_auk->course) {
+            CourseAccess::authorizeOpen($request->user(), $cur_auk->course);
+        }
+
         $cur_course_id = $cur_auk->course_id;
         $firstAukId = Aukstructure::where([
             ['course_id', '=', $cur_course_id],
@@ -344,9 +367,14 @@ class CourseController extends Controller
     //     return $urlfirst;
     // }
 
-    public function showmanifest($id)
+    public function showmanifest(Request $request, $id)
     {
-        $course = Course::find($id);
+        $course = Course::findOrFail($id);
+
+        // Манифест — это уже содержимое курса (путь к материалам и
+        // структура тем), а не описание в каталоге.
+        CourseAccess::authorizeOpen($request->user(), $course);
+
         $course->categories;
         $course->aircraft;
         // склейка пути        

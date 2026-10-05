@@ -202,3 +202,34 @@ describe('Боковое меню: видимость по правам', () => 
     expect(titles(wrapper)).not.toContain('Мои курсы')
   })
 })
+
+describe('Боковое меню: пункт только для своей категории', () => {
+  // Набор прав инструктора: он управляет людьми и курсами, но при этом
+  // не обучается, поэтому личный учебный план ему не нужен.
+  const INSTRUCTOR = [
+    'users.view', 'groups.view', 'groups.manage', 'courses.view',
+    'courses.manage', 'questions.view', 'exams.take',
+  ]
+
+  it('обучаемому показывает «Моё обучение»', () => {
+    const wrapper = mountMenu(['courses.view', 'content.view', 'exams.take'])
+    expect(titles(wrapper)).toContain('Моё обучение')
+  })
+
+  it('управляющему «Моё обучение» не показывает', () => {
+    // Раньше пункт был виден всем: маршрут /my/learning открыт любому
+    // авторизованному, и управляющий попадал в пустую страницу.
+    const wrapper = mountMenu(INSTRUCTOR)
+    const list = titles(wrapper)
+
+    expect(list).not.toContain('Моё обучение')
+    // При этом его собственные разделы остаются.
+    expect(list).toContain('Пользователи')
+    expect(list).toContain('Группы')
+  })
+
+  it('признак onlyFor ничего не ломает у обычного пункта', () => {
+    const wrapper = mountMenu(INSTRUCTOR)
+    expect(titles(wrapper)).toContain('Личный кабинет')
+  })
+})

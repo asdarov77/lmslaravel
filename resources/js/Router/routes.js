@@ -222,6 +222,18 @@ const routes = [
     // Блок файлов
     //
     {
+        // Витрина курсов с самостоятельной записью. Отдельна от
+        // /courses/list — там учебный план (только назначенное).
+        path: '/catalog',
+        component: () => import('../Pages/Catalog/CatalogPage.vue'),
+        name: 'catalog.index',
+        meta: {
+            permission: ['courses.view'],
+            titleKey: 'courses',
+            breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.catalog' }],
+        },
+    },
+    {
         path: '/files/add',
         component: () => import('../Pages/FileLoadSimple.vue'),
         name: 'files.simple',
@@ -271,7 +283,10 @@ const routes = [
         // показатели, дедлайны, экзамены, мои курсы.
         path: '/dashboard',
         meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.dashboard' }], titleKey: 'dashboard' },
-        component: () => import('../Pages/Dashboard/TraineeDashboard.vue'),
+        // Диспетчер: обучаемому — его кабинет, управляющему — сводка
+        // по системе. Раньше здесь всегда открывался кабинет
+        // обучаемого, и администратор видел «Состояние вашего обучения».
+        component: () => import('../Pages/Dashboard/RoleDashboard.vue'),
         name: 'dashboard',
     },
     {

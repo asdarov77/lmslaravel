@@ -31,7 +31,8 @@
       "mycourses": "My courses",
       "userSection": "User management",
       "myLearning": "My learning",
-      "dashboard": "Dashboard"
+      "dashboard": "Dashboard",
+      "catalog": "Course catalog"
     },
     "buttons": {
       "cancel": "cancel",
@@ -657,5 +658,65 @@
     "dark": "dark",
     "auto": "system",
     "toggle": "Toggle colour theme"
+  },
+  "manager": {
+    "title": "Dashboard",
+    "subtitle": "State of the learning process",
+    "greeting": "Hello",
+    "failed": "Summary is unavailable",
+    "open": "Open",
+    "attentionTitle": "Needs attention",
+    "attentionHint": "What to check right now",
+    "attentionEmpty": "All clear: nothing outstanding",
+    "recent": "Recent attempts",
+    "recentHint": "Results of the latest exams",
+    "recentEmpty": "No exam attempts yet",
+    "examUnknown": "Exam",
+    "actions": {
+      "addUser": "New user",
+      "addGroup": "New group",
+      "addCourse": "New course",
+      "calendar": "Calendar"
+    },
+    "stats": {
+      "users": "Users",
+      "usersOutside": "Without a group",
+      "groups": "Groups",
+      "courses": "Courses",
+      "categories": "Specialties",
+      "assignments": "Course assignments",
+      "questions": "Questions",
+      "questionsBroken": "Questions without a correct answer",
+      "attempts": "Attempts",
+      "passed": "Passed"
+    },
+    "attention": {
+      "groupWithoutPlan": "Group without a study plan",
+      "questionsWithoutCorrect": "Questions without a correct answer"
+    }
+  },
+  "catalog": {
+    "title": "Course catalog",
+    "subtitle": "Pick a course and enrol",
+    "search": "Search by title",
+    "category": "Specialty",
+    "all": "All",
+    "onlyMine": "My courses",
+    "found": "Showing {count} of {all}",
+    "loading": "Loading the catalog…",
+    "enrolled": "Enrolled",
+    "notEnrolled": "Not enrolled",
+    "enroll": "Enrol",
+    "leave": "Leave",
+    "aircraft": "Type:",
+    "topics": "Topics:",
+    "categories": "Specialties",
+    "emptyTitle": "No courses",
+    "emptyHint": "Change the filters or check back later",
+    "noEnrollHint": "Enrolment needs a group. Ask an administrator to assign you one.",
+    "left": "You left the course",
+    "failed": "Action failed",
+    "open": "Open course",
+    "noViewHint": "The course catalog requires the courses.view permission"
   }
 }

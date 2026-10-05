@@ -11,6 +11,7 @@ use App\Http\Controllers\LessonsController;
 use App\Http\Controllers\AukstructureController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\CourseController;
+use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\GroupController;
@@ -24,6 +25,7 @@ use App\Http\Controllers\GradeBoundaryController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\AircraftController;
 use App\Http\Controllers\CoursesListController;
+use App\Http\Controllers\ManagerDashboardController;
 use App\Http\Controllers\MyLearningController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ExamController;
@@ -193,6 +195,11 @@ Route::middleware(['auth:sanctum', 'permission:users.courses,create-tasks'])->gr
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/my/learning', [MyLearningController::class, 'plan']);
     Route::get('/my/dashboard', [MyLearningController::class, 'dashboard']);
+
+    // Сводка для администратора и инструктора. Отдельная от
+    // /my/dashboard: там «моё обучение», а здесь «что происходит в
+    // системе» — по области видимости актора.
+    Route::get('/dashboard/summary', ManagerDashboardController::class);
 });
 
 // Календарь учебного процесса: лента периодов обучения из
@@ -265,9 +272,24 @@ Route::middleware(['auth:sanctum', 'permission:courses.manage,content.manage'])-
     Route::patch('/course/{course}', [CourseController::class, 'update'])->whereNumber('course');
     Route::delete('/course/{course}', [CourseController::class, 'destroy'])->whereNumber('course');
 });
-Route::get('/coursemanifest/{id}', [CourseController::class, 'showmanifest'])->whereNumber('id');
-Route::get('/getlink/{id}', [CourseController::class, 'getlink'])->whereNumber('id');
-Route::get('/getfirstauk/{id}', [CourseController::class, 'get_first_auk'])->whereNumber('id');
+// Витрина курсов и самостоятельная запись. Отдельна от /api/courses:
+// там учебный план (только записанное), здесь каталог с отметкой
+// «записан/не записан».
+Route::get('/catalog', [CatalogController::class, 'index'])->middleware('auth:sanctum');
+Route::post('/catalog/{course}/enroll', [CatalogController::class, 'enroll'])
+    ->middleware('auth:sanctum')->whereNumber('course');
+Route::delete('/catalog/{course}/enroll', [CatalogController::class, 'unenroll'])
+    ->middleware('auth:sanctum')->whereNumber('course');
+
+// Материал курса. Раньше эти три маршрута висели без middleware, и
+// любой вошедший читал манифест и ссылки любого курса по идентификатору.
+// С появлением витрины тот же обход позволял открыть незаписанный курс.
+Route::get('/coursemanifest/{id}', [CourseController::class, 'showmanifest'])
+    ->middleware('auth:sanctum')->whereNumber('id');
+Route::get('/getlink/{id}', [CourseController::class, 'getlink'])
+    ->middleware('auth:sanctum')->whereNumber('id');
+Route::get('/getfirstauk/{id}', [CourseController::class, 'get_first_auk'])
+    ->middleware('auth:sanctum')->whereNumber('id');
 //-------------------- классы -----------------
 Route::get('/classes/', [AircraftController::class, 'indexclasses'])->middleware('auth:sanctum');
 Route::get('/classesfs/', [AircraftController::class, 'showclassesfs'])->middleware('auth:sanctum');

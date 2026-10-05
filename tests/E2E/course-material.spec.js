@@ -202,11 +202,33 @@ test.describe('страница материала курса', () => {
     await modules.nth(2).click()
     await page.waitForTimeout(2500)
 
+    // Открытый модуль — это ещё и текущий, а текущий красится синим
+    // поверх посещённого. Чтобы проверить именно серый, нужно увести
+    // «текущий» на другой пункт: тогда прежний останется посещённым,
+    // но перестанет быть активным.
+    await modules.nth(3).click()
+    await page.waitForTimeout(2500)
+    await page.mouse.move(5, 5)
+    await page.waitForTimeout(400)
+
     const visited = await page.evaluate(() => {
       const el = document.querySelector('.auk-node__title--visited')
       return el ? getComputedStyle(el).backgroundColor : null
     })
-    expect(visited, 'посещённый пункт подсвечен серым').toBe('rgb(236, 236, 236)')
+    expect(visited, 'посещённый, но не текущий пункт подсвечен серым').toBe(
+      'rgb(236, 236, 236)'
+    )
+
+    // Под наведением посещённый пункт всё равно должен отличаться от
+    // обычного серого: это явное правило, а не побочный эффект.
+    await page.locator('.auk-node__title--visited').first().hover()
+    await page.waitForTimeout(400)
+    const visitedHovered = await page.evaluate(() => {
+      const el = document.querySelector('.auk-node__title--visited')
+      return el ? getComputedStyle(el).backgroundColor : null
+    })
+    expect(visitedHovered, 'посещённый под курсором подсвечивается').toBe('rgb(223, 231, 242)')
+    await page.mouse.move(5, 5)
 
     const stored = await page.evaluate(
       (id) => localStorage.getItem(`course-manifest-visited:${id}`),
