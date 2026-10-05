@@ -1,11 +1,6 @@
 
 
-
 <template>
-  <link
-    rel="stylesheet"
-    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css"
-  />
   <v-btn @click="goback"> back</v-btn>
 <!--  <v-table dense class="elevation-1 cursor-pointer">-->
 <!--    <thead>-->

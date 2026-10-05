@@ -30,11 +30,9 @@
             hide-no-data
             hide-selected
           ></v-select>    
-          <v-container class="notification is-danger" v-if="errors.length">
-            <p v-for="error in errors" v-bind:key="error">
-              {{ error }}
-            </p>
-          </v-container>
+          <v-alert v-if="errors.length" type="error" density="compact" class="mb-4">
+            <div v-for="error in errors" :key="error">{{ error }}</div>
+          </v-alert>
         </v-form>
       </v-card-text>
     </v-card>

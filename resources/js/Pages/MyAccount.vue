@@ -1,14 +1,4 @@
-<!-- <template>
-  <div class="about">
-    <div class="hero is-info">
-      <div class="hero-body has-text-centered">        
-          <p v-if="loggedIn">
-            Добрый день, {{ user.fio }}
-          </p>
-      </div>
-    </div>
-  </div>{{totalUsers}}-{{totalGroups}}-{{asd}}
-</template> -->
+
 
 <!-- <template>
   <v-card

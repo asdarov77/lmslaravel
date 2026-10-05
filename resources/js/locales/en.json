@@ -104,6 +104,26 @@
       "passport-detail": {
         "title": "Passports"
       }
+    },
+    "brand": "LMS",
+    "titleBy": "LMS — {page}",
+    "pages": {
+      "home": "Home",
+      "users": "Users",
+      "groups": "Groups",
+      "courses": "Courses",
+      "categories": "Specialties",
+      "files": "Files",
+      "calendar": "Calendar",
+      "dashboard": "Dashboard",
+      "myLearning": "My learning",
+      "exams": "Exams",
+      "questionbank": "Question bank",
+      "permissions": "Permissions",
+      "reguser": "New user",
+      "classes": "Classes",
+      "login": "Sign in",
+      "regist": "Registration"
     }
   },
   "login": {
@@ -302,7 +322,8 @@
     "delete": "Delete",
     "refresh": "Refresh",
     "roleUnknown": "We could not determine your role. Please contact an administrator.",
-    "goHome": "Go home"
+    "goHome": "Go home",
+    "breadcrumbs": "Breadcrumbs"
   },
   "users": {
     "list": {
@@ -567,6 +588,10 @@
       "title": "Taking the exam",
       "subtitle": "Answer the questions and finish",
       "finished": "Exam completed"
+    },
+    "runner": {
+      "title": "Taking the exam",
+      "back": "Back to my exams"
     }
   },
   "bank": {
@@ -608,5 +633,29 @@
     "deleted": "Question deleted",
     "deleteError": "Failed to delete the question",
     "loadError": "Failed to load the question bank"
+  },
+  "search": {
+    "open": "Open search",
+    "label": "Search the learning system",
+    "placeholder": "Courses, topics, groups, people",
+    "hint": "Start typing a query",
+    "tooShort": "Enter at least two characters",
+    "empty": "Nothing found",
+    "failed": "Search is unavailable",
+    "groups": {
+      "courses": "Courses",
+      "modules": "Topics",
+      "categories": "Specialties",
+      "groups": "Groups",
+      "users": "People",
+      "questions": "Questions"
+    }
+  },
+  "theme": {
+    "label": "Theme",
+    "light": "light",
+    "dark": "dark",
+    "auto": "system",
+    "toggle": "Toggle colour theme"
   }
 }

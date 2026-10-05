@@ -54,8 +54,9 @@ beforeEach(() => {
   store = createStore({
     modules: {
       User: UserModule,
-      // GroupList/Register используют геттер hasPermission
-      Auth: { ...AuthModule, getters: { hasPermission: () => () => true } },
+      // Страницы пользователей используют геттер can (hasPermission
+      // помечен как устаревший).
+      Auth: { ...AuthModule, getters: { can: () => () => true } },
     },
   })
 })

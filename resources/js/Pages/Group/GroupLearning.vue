@@ -490,7 +490,7 @@ export default {
 .vue-treeselect__control {
   height: 56px;
   border-bottom: 1px solid;
-  background: #f4f4f4;
+  background: var(--c-surface-3);
   margin-bottom: 17px;
   border-radius: 5px;
 }

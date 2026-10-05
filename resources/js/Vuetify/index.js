@@ -16,17 +16,55 @@ import * as directives from 'vuetify/directives'
  * раньше этой темы. Читаем их уже на этапе создания vuetify — DOM к
  * этому моменту готов, потому что тема создаётся модулем при импорте.
  */
-const cssVar = (name, fallback) => {
+/**
+ * Чтение токенов из CSS.
+ *
+ * Для светлой темы берём значения из :root. Для тёмной — из элемента
+ * с классом .v-theme--dark: tokens.css переопределяет токены именно под
+ * этим селектором, а :root всегда содержит светлые значения. Раньше
+ * тёмная тема читала :root, то есть получала СВЕТЛУЮ палитру при
+ * `dark: true` — переключатель был бы включён, а цвета остались бы
+ * светлыми.
+ *
+ * Единственный источник значений — tokens.css: константы здесь
+ * продублировали бы его, и через месяц они бы разошлись.
+ */
+const readVar = (element, name, fallback) => {
   if (typeof window === 'undefined' || !window.getComputedStyle) return fallback
 
-  const value = window.getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
+  const value = window.getComputedStyle(element)
+    .getPropertyValue(`--${name}`)
     .trim()
 
   return value || fallback
 }
 
-const token = (name, fallback) => cssVar(`--${name}`, fallback)
+const token = (name, fallback) =>
+  readVar(typeof document === 'undefined' ? {} : document.documentElement, name, fallback)
+
+/** Токены тёмной темы: временный элемент с её классом. */
+const darkToken = (() => {
+  const cache = {}
+
+  return (name, fallback) => {
+    if (cache[name] !== undefined) return cache[name]
+
+    if (typeof document === 'undefined' || !document.body) return fallback
+
+    const probe = document.createElement('div')
+    probe.className = 'v-theme--dark'
+    // Пробник не должен влиять на раскладку и не показываться.
+    probe.style.display = 'none'
+    document.body.appendChild(probe)
+
+    const value = readVar(probe, name, fallback)
+
+    probe.remove()
+    cache[name] = value
+
+    return value
+  }
+})()
 
 const vuetify = createVuetify({
   components,
@@ -68,23 +106,23 @@ const vuetify = createVuetify({
       dark: {
         dark: true,
         colors: {
-          primary: token('c-primary', '#7aa7e8'),
-          secondary: token('c-surface-3', '#2a2f35'),
-          surface: token('c-surface', '#1c2024'),
-          background: token('c-bg', '#14171a'),
-          'surface-variant': token('c-surface-3', '#2a2f35'),
-          'on-surface-variant': token('c-text-secondary', '#b0b7bf'),
-          error: token('c-danger', '#f2857c'),
-          info: token('c-info', '#7aa7e8'),
-          success: token('c-success', '#6fce8f'),
-          warning: token('c-warning', '#e3b341'),
-          'on-primary': token('c-on-primary', '#0f1620'),
-          'on-error': '#1c2024',
-          'on-success': '#1c2024',
-          'on-warning': '#1c2024',
+          primary: darkToken('c-primary', '#7aa7e8'),
+          secondary: darkToken('c-surface-3', '#2a2f35'),
+          surface: darkToken('c-surface', '#1c2024'),
+          background: darkToken('c-bg', '#14171a'),
+          'surface-variant': darkToken('c-surface-3', '#2a2f35'),
+          'on-surface-variant': darkToken('c-text-secondary', '#b0b7bf'),
+          error: darkToken('c-danger', '#f2857c'),
+          info: darkToken('c-info', '#7aa7e8'),
+          success: darkToken('c-success', '#6fce8f'),
+          warning: darkToken('c-warning', '#e3b341'),
+          'on-primary': darkToken('c-on-primary', '#0f1620'),
+          'on-error': darkToken('c-text-inverse', '#1c2024'),
+          'on-success': darkToken('c-text-inverse', '#1c2024'),
+          'on-warning': darkToken('c-text-inverse', '#1c2024'),
         },
         variables: {
-          'border-color': token('c-border', '#363c43'),
+          'border-color': darkToken('c-border', '#363c43'),
           'border-opacity': 1,
         },
       },

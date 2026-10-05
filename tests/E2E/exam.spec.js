@@ -176,7 +176,14 @@ test.describe('Экзамен', () => {
     // --- лимит попыток на сервере ---------------------------------------
     const second = await page.request.post(`${BASE}/api/exams/${examId}/attempts`, {
       headers: { Authorization: 'Bearer ' + userToken, Accept: 'application/json' },
-      data: { answers: [{ question_id: questionId, answer_id: 1 }] },
+      // answer_id берём из вопросов, выданных сервером для этого
+      // экзамена. Раньше стояла константа 1, и проверка лимита попыток
+      // на самом деле проверяла существование ответа №1: как только
+      // таблица ответов пересоздавалась, валидация отвечала 422 вместо
+      // ожидаемого 403 — и тест проходил/падал не по существу.
+      data: {
+        answers: [{ question_id: questionId, answer_id: bundle.questions[0].answers[0].id }],
+      },
     })
     expect(second.status(), 'max_attempts=1, вторая попытка запрещена').toBe(403)
 

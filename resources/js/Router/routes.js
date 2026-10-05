@@ -22,16 +22,19 @@ const routes = [
 
     {
         path: '/',
+        meta: { titleKey: 'home' },
         component: () => import('../Pages/Home.vue'),
         name: 'home'
     },
     {
         path: '/login',
+        meta: { titleKey: 'login' },
         component: () => import('../Pages/Login.vue'),
         name: 'login',
     },
     {
         path: '/reg',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.reguser' }], titleKey: 'regist' },
         component: () => import('../Pages/Register.vue'),
         name: 'regist'
 
@@ -64,18 +67,18 @@ const routes = [
         path: '/user/list',
         component: () => import('../Pages/UserList.vue'),
         name: 'user.list',
-        meta: { permission: ['users.view'] },    },
+        meta: { permission: ['users.view'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.users' }], titleKey: 'users' },    },
     {
         path: '/user/edit/:idEdit',
         component: () => import('../Pages/User/UserItemEdit.vue'),
         name: 'user.edit',
-        meta: { permission: ['users.update', 'users.view'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
+        meta: { permission: ['users.update', 'users.view'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.users', to: '/user/list' }, { key: 'users.list.edit' }], titleKey: 'users' },        props: route => ({ idEdit: Number(route.params.idEdit) }),
     },
     {
         path: '/user/chpass/:idEdit',
         component: () => import('../Pages/User/UserChpass.vue'),
         name: 'user.chpass',
-        meta: { permission: ['users.update'] },        props: true,
+        meta: { permission: ['users.update'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.users', to: '/user/list' }, { key: 'users.list.password' }], titleKey: 'users' },        props: true,
     },
     // Назначение ролей. Маршрут был закомментирован вместе с API
     // (PUT /api/user/chroll/{id}), поэтому роль нельзя было назначить
@@ -86,7 +89,7 @@ const routes = [
         path: '/user/chrole/:idEdit',
         component: () => import('../Pages/User/UserChrole.vue'),
         name: 'user.chroll',
-        meta: { permission: ['users.permissions'] },
+        meta: { permission: ['users.permissions'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.users', to: '/user/list' }, { key: 'users.chrole.title' }], titleKey: 'users' },
         props: route => ({ idEdit: Number(route.params.idEdit) }),
     },
     //
@@ -98,14 +101,14 @@ const routes = [
         path: '/permissions',
         component: () => import('../Pages/Permissions/PermissionsManager.vue'),
         name: 'permissions.manage',
-        meta: { permission: ['users.permissions', 'users.view'] },
+        meta: { permission: ['users.permissions', 'users.view'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.permissions' }], titleKey: 'permissions' },
     },
     //
     // Блок групп
     //
     {
         path: '/groups/list',
-        meta: { permission: ['groups.view', 'users.view'] },
+        meta: { permission: ['groups.view', 'users.view'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.groups' }], titleKey: 'groups' },
         component: () => import('../Pages/GroupList.vue'),
         name: 'groups.index'
     },
@@ -113,12 +116,12 @@ const routes = [
         path: '/groups/add',
         component: () => import('../Pages/Group/CreateGroup.vue'),
         name: 'groups.create',
-        meta: { permission: ['groups.manage'] },    },
+        meta: { permission: ['groups.manage'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.groups', to: '/groups/list' }, { key: 'groups.create.title' }], titleKey: 'groups' },    },
     {
         path: '/groups/edit/:idEdit',
         component: () => import('../Pages/Group/GroupItemEdit.vue'),
         name: 'groups.update',
-        meta: { permission: ['groups.manage'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
+        meta: { permission: ['groups.manage'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.groups', to: '/groups/list' }, { key: 'groups.edit.title' }], titleKey: 'groups' },        props: route => ({ idEdit: Number(route.params.idEdit) }),
     },
     // {
     //     path: '/groups',
@@ -131,7 +134,7 @@ const routes = [
     // старый контроллер
     {
         path: '/courses/list',
-        meta: { permission: ['courses.view'] },
+        meta: { permission: ['courses.view'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.courses' }], titleKey: 'courses' },
         component: () => import('../Pages/Courses.vue'),
         name: 'courses.list',
         //props: true // разрешение на передачу данных через router.parms
@@ -176,16 +179,16 @@ const routes = [
         path: '/course',
         component: () => import('../Pages/Course/RegisterCourse.vue'),
         name: 'course.store',
-        meta: { permission: ['courses.manage'] },    },
+        meta: { permission: ['courses.manage'], titleKey: 'courses' },    },
     {
         path: '/course/:idEdit',
         component: () => import('../Pages/Course/UpdateCourse.vue'),
         name: 'course.update',
-        meta: { permission: ['courses.manage'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
+        meta: { permission: ['courses.manage'], titleKey: 'courses' },        props: route => ({ idEdit: Number(route.params.idEdit) }),
     },
     {
         path: '/classes',
-        meta: { permission: ['content.manage'] },
+        meta: { permission: ['content.manage'], titleKey: 'classes' },
         component: () => import('../Pages/Course/AddClass.vue'),
         name: 'air.store',
 
@@ -202,17 +205,17 @@ const routes = [
         // courses.view тут был ошибкой: обучаемый им владеет, поэтому
         // OR-проверка пропускала его и позволяла открыть редактирование
         // чужих категорий, хотя бэкенд на запись всё равно отдаёт 403.
-        meta: { permission: ['categories.manage'] },    },
+        meta: { permission: ['categories.manage'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.categories' }], titleKey: 'categories' },    },
     {
         path: '/register-categories',
         component: () => import('../Pages/Category/RegisterCategory.vue'),
         name: 'categories.store',
-        meta: { permission: ['categories.manage', 'courses.manage'] },    },
+        meta: { permission: ['categories.manage', 'courses.manage'], titleKey: 'categories' },    },
     {
         path: '/categories/:idEdit',
         component: () => import('../Pages/Category/UpdateCategory.vue'),
         name: 'categories.update',
-        meta: { permission: ['categories.manage', 'courses.manage'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
+        meta: { permission: ['categories.manage', 'courses.manage'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.categories', to: '/categories' }, { key: 'categories.edit.title' }], titleKey: 'categories' },        props: route => ({ idEdit: Number(route.params.idEdit) }),
         //props: true
     },
     //
@@ -222,10 +225,10 @@ const routes = [
         path: '/files/add',
         component: () => import('../Pages/FileLoadSimple.vue'),
         name: 'files.simple',
-        meta: { permission: ['files.upload', 'courses.manage'] },    },
+        meta: { permission: ['files.upload', 'courses.manage'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.files' }], titleKey: 'files' },    },
     {
         path: '/calendar',
-        meta: { permission: ['exams.manage', 'grading.manage'] },
+        meta: { permission: ['exams.manage', 'grading.manage'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.calendar' }], titleKey: 'calendar' },
         component: () => import('../Pages/EventCalendar.vue'),
         name: 'calendar',
     },
@@ -244,18 +247,21 @@ const routes = [
         // Отдельная страница вместо админской формы записи групп
         // (/group/learning, право users.courses), которая отдавала 403.
         path: '/my/learning',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.myLearning' }], titleKey: 'myLearning' },
         component: () => import('../Pages/Learning/MyLearningPlan.vue'),
         name: 'learning.plan',
     },
     {
         // Экзамены обучаемого: что назначено, когда открыто, сколько попыток.
         path: '/my/exams',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.exams' }], permission: ['exams.take', 'exams.manage'], titleKey: 'exams' },
         component: () => import('../Pages/Exam/ExamList.vue'),
         name: 'exams.mine',
     },
     {
         // Прохождение экзамена.
         path: '/exams/:idEdit',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.exams', to: '/my/exams' }, { key: 'exams.runner.title' }], permission: ['exams.take', 'exams.manage'], titleKey: 'exams' },
         component: () => import('../Pages/Exam/ExamRunner.vue'),
         name: 'exams.take',
         props: route => ({ idEdit: Number(route.params.idEdit) }),
@@ -264,12 +270,13 @@ const routes = [
         // Дашборд обучаемого в структуре классического LMS:
         // показатели, дедлайны, экзамены, мои курсы.
         path: '/dashboard',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.dashboard' }], titleKey: 'dashboard' },
         component: () => import('../Pages/Dashboard/TraineeDashboard.vue'),
         name: 'dashboard',
     },
     {
         path: '/auk',
-        meta: { permission: ['courses.view'] },
+        meta: { permission: ['courses.view'], titleKey: 'dashboard' },
         component: () => import('../Pages/User/UserPage.vue'),
         name: 'index',
     },
@@ -278,7 +285,7 @@ const routes = [
         path: '/upload-gift',
         component: () => import('../Pages/Gift/GiftImportForm.vue'),
         name: 'upload-gift',
-        meta: { permission: ['questions.manage'] },    },
+        meta: { permission: ['questions.manage'], titleKey: 'questionbank' },    },
     {
         path: '/questions',
         // Прохождение экзамена — exams.take (обучаемый),
@@ -301,7 +308,7 @@ const routes = [
             idCategory: toIntOrNull(route.query.idCategory),
         }),
         name: 'questions.main',
-        meta: { permission: ['questions.view', 'questions.manage'] },    },
+        meta: { permission: ['questions.view', 'questions.manage'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.questionbank' }], titleKey: 'questionbank' },    },
     {
         path: '/questions-main/:idEdit',
         component: () => import('../Pages/Gift/QuestionEdit.vue'),

@@ -1,6 +1,5 @@
 <template>
   <v-progress-linear v-if="isLoading" color="primary" indeterminate></v-progress-linear>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css" />
 
   <v-card color="#f5f5f5">
     <v-row dense no-gutters>

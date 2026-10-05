@@ -98,4 +98,28 @@ class CourseVisibility
 
         return $query;
     }
+
+    /**
+     * Идентификаторы курсов, видимых актору.
+     *
+     * Нужен там, где скоуп требуется подставить в ЧУЖОЙ запрос — например
+     * поиск по темам (aukstructures) ограничивается курсами, а сам
+     * restrictToEnrolled() умеет править только запрос по courses.
+     * Пустой результат означает «не виден ни один курс»: вызывающий
+     * обязан трактовать это как пустую выдачу, а не как «показать всё».
+     *
+     * @return array<int,int>
+     */
+    public static function visibleCourseIds(?User $actor): array
+    {
+        $query = Course::query()->select('courses.id');
+
+        if ($actor !== null) {
+            self::restrictToEnrolled($query, $actor);
+        }
+
+        return $query->pluck('courses.id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
 }

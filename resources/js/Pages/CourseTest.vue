@@ -1,15 +1,4 @@
 <template>
-  <link
-    rel="stylesheet"
-    href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css"
-  />
-  <!-- <div class="courses">
-    <div class="hero is-info">
-      <div class="hero-body has-text-centered">
-        <h1 class="title">Страница курса</h1>
-      </div>
-    </div>
-  </div> -->
 
   <iframe :srcdoc="content" width="100%"  frameborder="0" style="margin-top:-64px; height: 1024px">
   </iframe>

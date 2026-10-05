@@ -38,10 +38,13 @@ const i18n = createI18n({
 /**
  * Настоящий стор вместо мока.
  *
- * Левый компонент использует mapState('Auth', ...), поэтому подмена
+ * Левый компонент использует mapGetters('Auth', ...), поэтому подмена
  * $store объектом без state падала с «Cannot read properties of undefined
- * (reading '_modulesNamespaceMap')». Модуль повторяет контракт геттера
- * hasPermission стора приложения: достаточно ЛЮБОГО совпадения (OR).
+ * (reading '_modulesNamespaceMap')».
+ *
+ * Модуль повторяет контракт геттера can стора приложения: массив — AND,
+ * строка — OR. Именно can использует меню с тех пор, как требования
+ * пунктов стали читаться из meta.permission маршрутов.
  */
 const authModule = slugs => ({
   namespaced: true,
@@ -53,9 +56,19 @@ const authModule = slugs => ({
   getters: {
     permissionSet: state => new Set(state.permissionSlugs),
     isSuperAdmin: () => false,
+    // Семантика геттера can из AuthModule: массив — AND (все нужны),
+    // строка — OR. Меню зовёт can([...]), как роутер-гард.
+    can: state => (...perms) => {
+      const required = perms.flat().filter(Boolean).map(String)
+      if (required.length === 0) return true
+      if (Array.isArray(perms[0])) {
+        return required.every(slug => state.permissionSlugs.includes(slug))
+      }
+      return required.some(slug => state.permissionSlugs.includes(slug))
+    },
+    // Оставлен для страниц, которые ещё пользуются старым геттером.
     hasPermission: state => required => {
       const wanted = (Array.isArray(required) ? required : [required]).filter(Boolean).map(String)
-      // Пункт без требований доступен всем — как в сторе приложения.
       if (wanted.length === 0) return true
       return wanted.some(slug => state.permissionSlugs.includes(slug))
     },
@@ -94,8 +107,13 @@ describe('Боковое меню: видимость по правам', () => 
     expect(list).not.toContain('Пользователи')
     expect(list).not.toContain('Группы')
     expect(list).not.toContain('Права доступа')
-    // Запись групп на курсы — методическая операция.
+    // Запись групп на курсы — методическая операция (users.courses).
+    // Требование берётся из маршрута /group/learning/:idEdit?.
     expect(list).not.toContain('Учебный план')
+    // «Классы», «Календарь» и «Банк вопросов» — тоже методические.
+    expect(list).not.toContain('Классы')
+    expect(list).not.toContain('Календарь')
+    expect(list).not.toContain('Банк вопросов')
   })
 
   it('не оставляет пустую группу «Управление пользователями»', () => {
@@ -108,16 +126,18 @@ describe('Боковое меню: видимость по правам', () => 
   })
 
   it('инструктору показывает методические пункты', () => {
+    // Права инструктора по role_matrix, включая exams.manage,
+    // grading.manage, questions.view/manage и content.manage.
     const wrapper = mountMenu([
       'courses.view', 'courses.manage', 'content.manage', 'files.upload',
-      'categories.manage', 'groups.view', 'users.view', 'users.courses',
-      'questions.view', 'exams.take',
+      'categories.manage', 'groups.view', 'users.view',
+      'questions.view', 'questions.manage', 'exams.take', 'exams.manage',
+      'grading.manage',
     ])
     const list = titles(wrapper)
 
     expect(list).toContain('Файлы')
     expect(list).toContain('Категории')
-    expect(list).toContain('Учебный план')
     expect(list).toContain('Экзамены')
 
     // Права доступа инструктору доступны, но ограниченно: он управляет
@@ -125,16 +145,28 @@ describe('Боковое меню: видимость по правам', () => 
     // (PermissionScope). Поэтому пункт в меню есть.
     expect(list).toContain('Права доступа')
 
-    // А вот банк вопросов и календарь — только для тех, кто ведёт
-    // методику полностью; в списке прав инструктора их нет.
-    expect(list).not.toContain('Банк вопросов')
-    expect(list).not.toContain('Календарь')
+    // Банк вопросов и календарь инструктору ПОКАЗАНЫ: в role_matrix у
+    // него есть questions.view/manage, exams.manage и grading.manage, и
+    // теперь меню сверяется с маршрутом, а не с legacy-алиасом
+    // "manage-users", которого у него не было. Раньше пункт скрывался
+    // из-за расхождения, а не из-за отсутствия прав.
+    expect(list).toContain('Банк вопросов')
+    expect(list).toContain('Календарь')
+
+    // Запись групп на курсы требует users.courses, а в role_matrix
+    // инструктора этого права нет — пункт скрыт.
+    expect(list).not.toContain('Учебный план')
   })
 
   it('администратору остаётся полное меню', () => {
+    // Стаб не эмулирует isSuperAdmin, поэтому набор прав должен быть
+    // таким, какой реально получает администратор. Пункт «Файлы»
+    // требует files.upload|courses.manage — раньше в меню он был помечен
+    // content.manage, и проверка проходила случайно.
     const wrapper = mountMenu([
       'content.manage', 'categories.manage', 'users.view', 'users.courses',
       'users.permissions', 'groups.view', 'exams.take', 'courses.view',
+      'files.upload', 'courses.manage', 'users.create',
     ])
     const list = titles(wrapper)
 
@@ -146,15 +178,17 @@ describe('Боковое меню: видимость по правам', () => 
   })
 
   it('ни один пункт без требований не ведёт в 403 для обучаемого', () => {
-    // Пункт, у которого contentType не задан или содержит «пробел»,
-    // считался доступным всем. Проверяем, что таких пунктов в меню нет:
-    // каждый пункт либо виден обучаемому, либо требует право, которого у
-    // него нет.
+    // Пункт, у которого требования не заданы, считался доступным всем.
+    // Проверяем, что таких пунктов в меню нет: каждый пункт либо виден
+    // обучаемому, либо требует право, которого у него нет.
     const trainee = ['courses.view', 'content.view', 'exams.take', 'dictionaries.view']
     const wrapper = mountMenu(trainee)
 
     const visible = titles(wrapper)
-    const forbiddenForTrainee = ['Файлы', 'Категории', 'Пользователи', 'Группы', 'Учебный план', 'Права доступа']
+    const forbiddenForTrainee = [
+      'Файлы', 'Категории', 'Пользователи', 'Группы', 'Учебный план',
+      'Права доступа', 'Классы', 'Календарь', 'Банк вопросов', 'Регистрация',
+    ]
 
     visible.forEach(title => {
       expect(forbiddenForTrainee).not.toContain(title)

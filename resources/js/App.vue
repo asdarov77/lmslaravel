@@ -4,12 +4,7 @@ const { t } = useI18n({ useScope: "global" });
 </script>
 
 <template>
-  <!-- <link
-    rel="stylesheet"
-    href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css"
-  /> -->
-
-  <!-- <link href="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css" rel="stylesheet" /> -->
+  
   <v-app
     >
     <v-app-bar color="primary" prominence="prominent" v-show="courseItemShow">
@@ -20,12 +15,18 @@ const { t } = useI18n({ useScope: "global" });
       ></v-app-bar-nav-icon>
       <!-- tag="span" // in app-bar-title ?-->
       <v-app-bar-title>
-        <router-link
-          to="/"
-          style="cursor: pointer; color: white; text-decoration: none"
-          >{{ $t("app.title") }}
+        <router-link to="/" class="app__brand" :aria-label="$t('app.title')">
+          <app-brand :full="true" />
         </router-link>
       </v-app-bar-title>
+      <!--
+          Глобальный поиск. Скрыт для гостя: /api/search требует
+          авторизации, и кнопка без смысла только вводила бы в заблуждение.
+      -->
+      <global-search v-if="loggedIn" class="app__search" />
+
+      <theme-toggle class="app__theme" />
+
       <!--~~~~ профиль пользователя ~~~~-->
       <account-menu> </account-menu>
     </v-app-bar>
@@ -42,19 +43,32 @@ const { t } = useI18n({ useScope: "global" });
       <left-side-menu v-if="loggedIn "></left-side-menu>
     </v-navigation-drawer>
     <v-main>
-      <v-container fluid>
+      <v-container fluid class="app__content">
+        <!--
+            Крошки живут в каркасе, а не в каждой странице: уровни
+            объявлены в meta маршрута, и раздел не должен угадывать
+            структуру сам. На страницах без meta.breadcrumbs компонент
+            ничего не рисует.
+        -->
+        <breadcrumbs />
         <router-view></router-view>
       </v-container>
     </v-main>
-    <v-footer app bottom fixed padless width="100%" style="z-index: 999"  v-show='courseItemShow'
-    >      
-      <div class="container mx-auto flex justify-between items-center">      
-        <p>&copy; 2023 Dinamika</p>            
-    </div>
-      <v-col class="text-right">
-        <v-btn size="x-small" @click="changeEn" class="right">eng</v-btn>
-        <v-btn size="x-small" @click="changeRu" class="right">rus</v-btn>
-      </v-col>
+    <!--
+        Футер собран на классах дизайн-системы. Раньше здесь стояли
+        `container mx-auto flex justify-between items-center` — это
+        Tailwind и Bulma одновременно, и ни того, ни другого в проекте
+        нет: строка копирайта и переключатель языка просто стояли
+        друг под другом без всякой раскладки.
+    -->
+    <v-footer app bottom fixed padless width="100%" class="app__footer" v-show="courseItemShow">
+      <div class="app__footer-inner">
+        <p class="app__copyright">&copy; 2023 Dinamika</p>
+        <div class="app__langs">
+          <v-btn size="x-small" variant="text" @click="changeEn">eng</v-btn>
+          <v-btn size="x-small" variant="text" @click="changeRu">rus</v-btn>
+        </div>
+      </div>
     </v-footer>
   </v-app>
 </template>
@@ -63,9 +77,14 @@ const { t } = useI18n({ useScope: "global" });
 import { mapGetters, mapState } from 'vuex';
 import LeftSideMenu from './Pages/Navigation/LeftSideMenu.vue';
 import AccountMenu from './Pages/Navigation/AccountMenu.vue';
+import Breadcrumbs from './components/ui/Breadcrumbs.vue';
+import GlobalSearch from './components/ui/GlobalSearch.vue';
+import ThemeToggle from './components/ui/ThemeToggle.vue';
+import AppBrand from './components/ui/AppBrand.vue';
 
 
 export default {
+  components: { AppBrand, Breadcrumbs, GlobalSearch, ThemeToggle },
   mounted() {
     //console.log("mounted");
     const hist = this.$router.options.history;

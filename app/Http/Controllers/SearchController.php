@@ -459,10 +459,40 @@ class SearchController extends Controller
     }
 
 
+    /**
+     * Поиск по содержимому приватных файлов курса.
+     *
+     * Маршрут висел только на auth:sanctum, а сам поиск берёт aircraft и
+     * path прямо из тела запроса и читает `private/{aircraft}/{path}`.
+     * То есть любой вошедший, зная (или перебрав) идентификатор
+     * самолёта, получал фрагменты учебного материала ЧУЖОГО курса —
+     * включая те, которые его группе не назначены.
+     *
+     * Теперь требуется право на управление контентом (content.manage)
+     * либо courses.manage: это методическая операция, а не чтение
+     * материала обучаемым. Для обучаемого поиск по материалам идёт
+     * через /api/search, который ограничен его курсами.
+     */
     public function search(Request $request)
     {
+        $actor = $request->user();
+
+        if (! $actor || ! ($actor->hasPermission('content.manage') || $actor->hasPermission('courses.manage'))) {
+            abort(403, 'Поиск по содержимому курсов доступен только тем, кто управляет контентом');
+        }
+
         $searchTerm = strtolower($request->input('query'));
-        $aircraftPath = Aircraft::find($request->input('aircraft'))->path;
+
+        $aircraft = Aircraft::find($request->input('aircraft'));
+
+        // Раньше здесь стояло `Aircraft::find(...)->path` без проверки
+        // результата: несуществующий aircraft давал «Attempt to read
+        // property on null» и 500.
+        if (! $aircraft) {
+            abort(422, 'Не указан существующий самолёт');
+        }
+
+        $aircraftPath = $aircraft->path;
         $directory = "private/{$aircraftPath}/{$request->input('path')}/";
         $matches = [];
 
@@ -482,7 +512,11 @@ class SearchController extends Controller
                     $filename = basename($file);
                     $filename = trim($filename);
                     $link = Link::where('link', $filename)->first();
-                    if ($link) $aukstructureId = $link->aukstructure_id;
+                    // Раньше переменная объявлялась только внутри
+                    // `if ($link)`, а использовалась в ответе всегда:
+                    // для файла без записи в links шла PHP-Notice и
+                    // itemId отсутствовал вовсе.
+                    $aukstructureId = $link?->aukstructure_id;
                     $aukstructure = $link ? $link->aukstructure : Aukstructure::whereHas('links', function ($query) use ($filename) {
                         $query->where('link', $filename);
                     })->first();
@@ -498,15 +532,20 @@ class SearchController extends Controller
                         'file' => $file,
                         'title' => $title,
                         'itemId'  => $aukstructureId,
-
                         'highlightedNodes' => $highlightedHtml,
-                        //'originalNodes' => $highlightedHtml['originalText'],
-                        //    /'originalXpath' => $highlightedHtml['originalXpath'],
                     ];
                 }
             }
         }
-        return response()->json($matches);
+        // Конверт обязателен: весь api проходит через
+        // ApiResponseEnvelope, а фронт разбирает ответ через
+        // unwrapResponse.
+        return response()->json([
+            'success' => true,
+            'data' => $matches,
+            'error' => null,
+            'meta' => null,
+        ]);
     }
 
 

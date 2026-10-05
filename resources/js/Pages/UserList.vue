@@ -181,7 +181,7 @@ export default {
   computed: {
     ...mapGetters("User", ["users"]),
     ...mapState("User", ["allGroups"]),
-    ...mapGetters("Auth", ["hasPermission"]),
+    ...mapGetters("Auth", ["can"]),
 
     allUsers() {
       return this.users ?? [];
@@ -212,12 +212,12 @@ export default {
      * UI не нужно — там канонический slug.
      */
     canEdit() {
-      return this.hasPermission(["users.update", "manage-users"]);
+      return this.can(...['users.update', 'manage-users']);
     },
 
     /** Раздел прав открыт администратору и инструктору. */
     canSeePermissions() {
-      return this.hasPermission(["users.permissions", "users.view"]);
+      return this.can(...['users.permissions', 'users.view']);
     },
 
     /**
@@ -227,7 +227,7 @@ export default {
      * самих прав.
      */
     canAssignRoles() {
-      return this.hasPermission(["users.permissions"]);
+      return this.can('users.permissions');
     },
 
     pendingUser() {

@@ -15,6 +15,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\GroupController;
 use App\Http\Controllers\FilesController;
+use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\GiftController;
@@ -344,7 +345,17 @@ Route::get('/private/{aircraft}/{auk}/{path}', [PrivateController::class, 'htmle
 
 Route::get('/userauks', [UsersCoursesController::class, 'index'])->middleware('auth:sanctum');
 //---------------------блок работы со статическими файлами контента ---------------
-Route::post('/search-files/', [SearchController::class, 'search'])->middleware('auth:sanctum');
+// Поиск по содержимому приватных файлов курса — методическая операция.
+// Раньше маршрут висел только на auth:sanctum, и любой вошедший читал
+// фрагменты учебного материала чужого курса, указав aircraft и path
+// в теле запроса.
+Route::post('/search-files/', [SearchController::class, 'search'])
+    ->middleware(['auth:sanctum', 'permission:content.manage,courses.manage']);
+
+// Глобальный поиск по LMS: курсы, темы, специальности и — по правам —
+// группы, люди и банк вопросов. Область видимости — по CourseVisibility,
+// то есть так же, как у каталога курсов.
+Route::get('/search', [GlobalSearchController::class, 'index'])->middleware('auth:sanctum');
 Route::post('/get-content/', [SearchController::class, 'get_file_content'])->middleware('auth:sanctum'); // возможно удалим
 //-------------------------------------------------------------
 

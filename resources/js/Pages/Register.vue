@@ -61,11 +61,9 @@
             v-model="password_confirmation"
             type="password"
           ></v-text-field>
-          <v-container v-if="errors.length" class="has-text-centered">
-            <p v-for="error in errors" v-bind:key="error">
-              {{ error }}
-            </p>
-          </v-container>
+          <v-alert v-if="errors.length" type="error" density="compact" class="mb-4">
+            <div v-for="error in errors" :key="error">{{ error }}</div>
+          </v-alert>
           <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>
         </v-form>
       </v-card-text>
@@ -100,14 +98,15 @@ export default {
   computed: {
     ...mapState("User", ["totalUsers", "allGroups"]),
     ...mapGetters("User", ["groups"]),
-    ...mapGetters("Auth", ["hasPermission"]),
+    ...mapGetters("Auth", ["can"]),
 
     /**
      * Право назначать роль есть у администратора и инструктора.
      * Публичному посетителю остаётся «Обучаемый».
      */
     mayAssignRole() {
-      return this.hasPermission(["users.create"]);
+      // can(), а не hasPermission(): один новый стиль проверки вместо двух.
+      return this.can('users.create');
     },
 
     /** Группу назначает тот же набор ролей — она определяет учебный план. */

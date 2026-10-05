@@ -543,3 +543,97 @@
   text-align: center;
   padding: var(--sp-2);
 }
+
+/* ============================================================
+   Каркас приложения (App.vue)
+
+   Раньше каркас опирался на классы, которых в проекте нет:
+   в шапке — инлайновый style, в футере — `container mx-auto flex
+   justify-between items-center` (Tailwind и Bulma одновременно).
+   Из-за этого футер не раскладывался: копирайт и переключатель
+   языка стояли друг под другом, а `--app-footer-h` в CSS считался
+   по высоте, которой на самом деле не было.
+   ============================================================ */
+
+.app__brand {
+  /* Не #fff: в тёмной теме primary светлый (#7aa7e8), и белый текст на
+     нём давал контраст 2.46 при норме 4.5. */
+  color: var(--c-on-primary);
+  text-decoration: none;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app__brand:hover,
+.app__brand:focus-visible {
+  text-decoration: underline;
+}
+
+/* Ширина рабочей области ограничена токеном: на широком мониторе
+   таблицы и карточки растягивались на всю страницу и становились
+   нечитаемыми. */
+/*
+   Селектор с .v-container обязателен: у Vuetify правило
+   `.v-container.v-container--fluid { max-width: 100% }` — два класса,
+   и оно побеждает одиночный `.app__content`. Из-за этого рабочая
+   область оставалась во всю ширину окна, а таблицы на широком
+   мониторе растягивались и становились нечитаемыми.
+*/
+.v-container.app__content {
+  max-width: var(--w-content-max);
+  margin: 0 auto;
+  padding: var(--sp-4) var(--sp-4) 0;
+}
+
+.app__footer {
+  border-top: 1px solid var(--c-border, var(--c-surface-3));
+  background: var(--c-surface);
+}
+
+.app__footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: var(--w-content-max);
+  margin: 0 auto;
+  padding: var(--sp-2) var(--sp-4);
+}
+
+.app__copyright {
+  margin: 0;
+  color: var(--c-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.app__langs {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+@media (max-width: 640px) {
+  .app__footer-inner {
+    justify-content: center;
+  }
+}
+
+/* Глобальный поиск в шапке. На узких экранах подсказка сжимается,
+   поэтому нижняя граница кнопки остаётся на всю доступную ширину. */
+.app__search {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin-left: auto;
+}
+
+@media (max-width: 960px) {
+  .app__search .u-search__hint,
+  .app__search .u-search__kbd {
+    display: none;
+  }
+}

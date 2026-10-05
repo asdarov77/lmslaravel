@@ -41,21 +41,61 @@ async function auth(page) {
   return token
 }
 
+
+/**
+ * Создать период обучения для календаря и вернуть функцию уборки.
+ *
+ * Раньше тесты календаря работали на «ambient-данных» — записанных
+ * в базе группах, и пропускали себя через test.skip(), если таких
+ * не было. В итоге проверка либо не выполнялась вовсе, либо падала
+ * там, где ждала сетку: при пустом календаре FullCalendar не рисует
+ * ячейки дней, и `.fc-daygrid-day` не появлялся. Теперь данные
+ * создаёт сам тест и удаляет по завершении.
+ */
+async function makePeriod(page, token) {
+  const headers = { Authorization: 'Bearer ' + token }
+
+  const groupRes = await page.request.post(BASE + '/api/groups', {
+    headers,
+    data: { groupname: `E2E Календарь ${Date.now()}` },
+  })
+  expect(groupRes.status(), 'создание группы для календаря').toBe(201)
+  const groupId = (await groupRes.json()).data.id
+
+  const courses = (await (await page.request.get(BASE + '/api/courses', { headers })).json()).data
+  test.skip(!courses || courses.length === 0, 'в базе нет ни одного курса')
+  const course = courses[0]
+
+  const learningRes = await page.request.post(BASE + '/api/learning', {
+    headers,
+    data: {
+      group_id: groupId,
+      entries: [{ course_id: course.id, parent_id: null }],
+      category_id: course.categories?.[0]?.id ?? null,
+      typeOfLesson: 'Лекция',
+      study_from: new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10),
+      study_to: new Date(Date.now() + 10 * 864e5).toISOString().slice(0, 10),
+    },
+  })
+  expect(learningRes.status(), 'создание периода обучения').toBe(201)
+
+  return async () => {
+    // Порядок важен: записи группы удаляются каскадом вместе с
+    // группой, но явная уборка не оставляет ничего при отказе
+    // каскада в будущей версии схемы.
+    await page.request.delete(BASE + `/api/groups/${groupId}`, { headers })
+  }
+}
+
 test.describe('Календарь обучения', () => {
   test('периоды отображаются полосами в пределах карточки, клик открывает детали', async ({ page }) => {
     const errors = []
     page.on('pageerror', e => errors.push(e.message.split('\n')[0]))
 
     const token = await auth(page)
+    const cleanup = await makePeriod(page, token)
 
-    // Если периодов нет, проверять нечего — календарь покажет пустое
-    // состояние, и оно покрыто отдельной проверкой.
-    const feed = await page.request.get(BASE + '/api/calendar', {
-      headers: { Authorization: 'Bearer ' + token },
-    })
-    const periods = (await feed.json())?.data?.events ?? []
-    test.skip(periods.length === 0, 'в базе нет ни одного периода обучения')
-
+    try {
     await page.goto(BASE + '/#/calendar', { waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(3500)
 
@@ -114,6 +154,9 @@ test.describe('Календарь обучения', () => {
     await page.waitForTimeout(600)
 
     expect(errors, 'ошибок JS быть не должно').toEqual([])
+    } finally {
+      await cleanup()
+    }
   })
 
   test('пустое состояние объясняет, что делать', async ({ page }) => {
@@ -150,9 +193,17 @@ test.describe('Календарь обучения', () => {
     // Раньше по клику по дате открывался prompt() и событие добавлялось
     // только в память. События приходят из записей групп, поэтому и
     // создавать их здесь нельзя: календарь показывает, а не планирует.
-    await auth(page)
+    const token = await auth(page)
+    const cleanup = await makePeriod(page, token)
+
+    try {
     await page.goto(BASE + '/#/calendar', { waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(3000)
+
+    // Сетка нужна обязательно: при пустом календаре FullCalendar не
+    // рисует ячейки дней, и выделение диапазона просто нечего было бы
+    // проверять.
+    await expect(page.locator('.fc-daygrid-day').first()).toBeVisible()
 
     const before = await page.locator('.fc-daygrid-event').count()
 
@@ -172,5 +223,8 @@ test.describe('Календарь обучения', () => {
 
     // prompt() в этом сценарии означал бы диалог ввода — его быть не должно.
     expect(await page.locator('.fc .fc-highlight').count()).toBe(0)
+    } finally {
+      await cleanup()
+    }
   })
 })

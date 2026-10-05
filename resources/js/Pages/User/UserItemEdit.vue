@@ -187,12 +187,9 @@
       empty-option
     ></v-select> -->
 
-    <v-container class="notification is-danger" v-if="errors.length">
-      <!--class="has-text-centered"> -->
-      <p v-for="error in errors" v-bind:key="error">
-        {{ error }}
-      </p>
-    </v-container>
+    <v-alert v-if="errors.length" type="error" density="compact" class="mb-4">
+            <div v-for="error in errors" :key="error">{{ error }}</div>
+          </v-alert>
     <!-- <v-dialog v-model="dialogReg">
       <UserLearning :idEdit="user.id" @submitForm="this.dialogReg = false" @cancelBtn="cancelBtnRegistration"></UserLearning>
     </v-dialog> -->
@@ -232,11 +229,11 @@ export default {
   computed: {
     ...mapState('User', ['allGroups', 'user']),
     //...mapGetters('User', ['users','groups']),
-    ...mapGetters('Auth', ['hasPermission']),
+    ...mapGetters('Auth', ['can']),
 
     /** Раздел прав открыт администратору и инструктору — остальным кнопка не нужна. */
     canSeePermissions() {
-      return this.hasPermission(['users.permissions', 'users.view'])
+      return this.can(...['users.permissions', 'users.view'])
     },
 
     /**
@@ -376,8 +373,11 @@ export default {
   margin-top: 20px;
 }
 
+/* Фон через токен, а не константой: зашитый #f4f4f4 оставался
+     светлым и в тёмной теме, а цвет подписи задаёт Vuetify —
+     получалось белым по белому (контраст 1.1). */
 .multiselect {
-  background-color: #f4f4f4;
+  background-color: var(--c-surface-3);
   height: 56px;
   border: none;
   box-shadow: 0 3px 1px -2px var(--v-shadow-key-umbra-opacity, rgba(0, 0, 0, 0.2)), 0 2px 2px 0 var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.14)), 0 1px 5px 0 var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.12));
@@ -389,17 +389,17 @@ export default {
 }
 
 .multiselect-search {
-  background-color: #f4f4f4;
+  background-color: var(--c-surface-3);
 
 }
 
 .multiselect-placeholder {
   font-weight: normal;
-  color: black;
+  color: var(--c-text-secondary);
 }
 
 .v-field {
-  background-color: #f4f4f4;
+  background-color: var(--c-surface-3);
 }
 
 .multiselect-option.is-selected, .multiselect-option.is-selected.is-pointed {
