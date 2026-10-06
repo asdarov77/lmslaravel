@@ -366,8 +366,17 @@ test.describe('Боковое меню', () => {
     await page.goto(BASE + '/#/classes', { waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(2000)
 
-    // Пункт «Учебный план» вместо несуществовавшего /user/learning
-    await expect(page.getByText('Учебный план').first()).toBeVisible()
+    // Пункт «Учебный план» (/my/learning) помечен onlyFor: 'trainee':
+    // маршрут открыт любому вошедшему, но у администратора записей на
+    // курсы нет и страница открылась бы пустой. В меню его быть не
+    // должно — это и проверяет count ниже.
+    //
+    // Скоуп именно на боковое меню: такая же подпись есть в меню профиля,
+    // и getByText() без скоупа попадал в неё, а не в навигацию.
+    await expect(
+      page.locator('[data-test="nav-item"]', { hasText: 'Учебный план' }),
+      'у администратора личного учебного плана в меню нет',
+    ).toHaveCount(0)
     await expect(page.getByText('user learning')).toHaveCount(0)
 
     // Подписи уникальны: раньше два пункта были «Курсы», из-за чего
@@ -376,7 +385,7 @@ test.describe('Боковое меню', () => {
     // «Управление пользователями». Пункт «Мои курсы» лежит в свёрнутой
     // группе, поэтому считаем все v-list-item-title, а не видимые.
     const titles = await page
-      .locator('.v-navigation-drawer .v-list-item-title')
+      .locator('[data-test="nav-item"]')
       .allInnerTexts()
       .catch(() => [])
 
@@ -396,14 +405,14 @@ test.describe('Боковое меню', () => {
         'пункт «Мои курсы» убран в пользу «Личный кабинет»'
       ).toBe(0)
       expect(count('Личный кабинет'), 'пункт «Личный кабинет» есть').toBe(1)
-      // «Моё обучение» — личный учебный план. Управляющему он не нужен
+      // «Учебный план» — личный учебный план. Управляющему он не нужен
       // и раньше вёл в пустую страницу: маршрут /my/learning открыт
       // любому авторизованному, а записей на курсы у методиста нет.
       // Пункт помечен onlyFor: 'trainee'; тест заходит под
       // администратором, значит пункта быть не должно.
       expect(
-        count('Моё обучение'),
-        'управляющему пункт «Моё обучение» не показывается'
+        count('Учебный план'),
+        'управляющему пункт «Учебный план» не показывается'
       ).toBe(0)
 
       const seen = new Set()
@@ -425,12 +434,32 @@ test.describe('Боковое меню', () => {
     await page.goto(BASE + '/#/classes', { waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(2000)
 
-    await page.getByText('Учебный план').first().click()
-    await page.waitForTimeout(2000)
+    /*
+     * Ссылки проверяем БЕЗ перехода по каждому пункту: переход по всем
+     * ~18 пунктам с перезагрузкой не укладывается в таймаут теста.
+     *
+     * Вместо этого сверяем href каждого пункта (ловит ссылку в никуда) и
+     * выполняем ОДИН переход — чтобы убедиться, что страница открывается
+     * без ошибок в консоли.
+     */
+    const links = await page
+      .locator('[data-test="nav-item"]')
+      .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('href')))
+
+    expect(links.length, 'в меню есть пункты').toBeGreaterThan(0)
+    expect(
+      links.filter((href) => !href || href.includes('undefined')),
+      'у пункта меню пустая ссылка',
+    ).toEqual([])
+
+    await page.locator('[data-test="nav-item"]').first().click()
+    await page.waitForTimeout(1500)
 
     // Регресс: /user/learning открывал страницу 404
     const body = await page.locator('body').innerText()
+
     expect(body).not.toMatch(/Страница не найдена/i)
+    }
 
     expect(errors, 'ошибок JS быть не должно:\n' + errors.join('\n')).toEqual([])
   })

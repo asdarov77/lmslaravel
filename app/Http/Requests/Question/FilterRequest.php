@@ -4,6 +4,10 @@ namespace App\Http\Requests\Question;
 
 use Illuminate\Foundation\Http\FormRequest;
 
+/**
+ * Валидация фильтров банка вопросов. Все параметры nullable|int, чтобы пустые
+ * фильтры фронта давали пустой список, а не 422.
+ */
 class FilterRequest extends FormRequest
 {
     /**

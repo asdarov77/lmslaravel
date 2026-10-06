@@ -5,6 +5,13 @@ namespace App\Http\Middleware;
 use Illuminate\Http\Middleware\TrustProxies as Middleware;
 use Illuminate\Http\Request;
 
+/**
+ * Доверяет заголовкам X-Forwarded-* от прокси.
+ *
+ * Список доверенных прокси не задан (null): доверять заголовкам от любого
+ * источника нельзя, их достаточно указать явно, когда приложение встанет за
+ * nginx или балансировщиком.
+ */
 class TrustProxies extends Middleware
 {
     /**

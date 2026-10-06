@@ -3,6 +3,11 @@ namespace App\Lyx;
 
 use App\Lyx\LyxToHtml;
 
+/**
+ * Подраздел LyX.
+ *
+ * Часть мёртвого конвертера app/Lyx (см. LyxParser).
+ */
 class LyxSubsection
 {
     public $title = '';

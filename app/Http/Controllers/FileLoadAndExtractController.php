@@ -8,6 +8,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use ZipArchive;
 
+/**
+ * Загрузка zip курса и его распаковка.
+ *
+ * Архив кладётся на диск private, затем ZipArchive распаковывает его в
+ * config('app.courses_path') — тот же путь, который читают AircraftController
+ * (списки папок) и nginx (internal-location). Отсюда правило: место хранения
+ * меняется одной настройкой, а не в трёх местах кода.
+ */
 class FileLoadAndExtractController extends Controller
 {
     public function upload(Request $request)

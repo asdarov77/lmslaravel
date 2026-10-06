@@ -23,16 +23,22 @@
 import GradeSettings from './GradeSettings.vue';
 import GradeSettings1 from './GradeSettings1.vue';
 import GradeSettings2 from './GradeSettings2.vue';
+import ContentDeliverySettings from './ContentDeliverySettings.vue';
+import TutorSettings from './TutorSettings.vue';
 
 export default {
     data() {
         return {
             activeTab: 0,
             settings: [
-                { category: 'Оценки', component: GradeSettings },
+                { category: this.$t('settings.delivery.tab'), component: ContentDeliverySettings },
+                { category: this.$t('settings.tutor.tab'), component: TutorSettings },
+                // Ниже — заглушки: компоненты есть, содержания в них нет.
+                { category: 'Оценки (в разработке)', component: GradeSettings },
                 { category: 'настройки1', component: GradeSettings1 },
                 { category: 'настройки2', component: GradeSettings2 },
-                // Добавьте остальные категории настроек и соответствующие компоненты
+                // Остальные категории настроек добавляются здесь
+                // вместе со своим компонентом.
             ]
         };
     },

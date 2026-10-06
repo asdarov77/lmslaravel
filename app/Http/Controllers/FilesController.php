@@ -10,6 +10,13 @@ use App\Models\User;
 use GrahamCampbell\ResultType\Success;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Загрузка пользовательских файлов: POST /api/files/add.
+ *
+ * Валидирует массив image (до 20 файлов по 20 МБ), сохраняет в uploads/{name}
+ * и пишет запись в таблицу files с типом по расширению. Остальные методы
+ * на маршрутах не смонтированы.
+ */
 class FilesController extends Controller
 {
 

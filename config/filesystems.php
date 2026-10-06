@@ -66,8 +66,19 @@ return [
             // Источник истины — config('app.courses_path'), чтобы не было
             // двух независимых определений одного пути.
             'root' => rtrim(dirname(rtrim((string) config('app.courses_path'), '/')), '/'),
-            'url' => env('APP_URL').'/storage/private',
-            'visibility' => 'public',
+            // visibility private, а не public: файлы контента пишутся
+            // файлами, которые веб-сервер не должен отдавать напрямую.
+            // Доступ к материалу — только через подписанный путь
+            // /api/private/... с проверкой HMAC в middleware.
+            //
+            // url здесь был '/storage/private'. Он не использовался кодом,
+            // но вводил в заблуждение: каталог контента лежит внутри
+            // storage/app/public, поэтому команда `php artisan storage:link`
+            // (обычный шаг деплоя) создаёт public/storage -> storage/app/public
+            // и открывает весь материал по адресу /storage/private/<...>
+            // БЕЗ проверки подписи. То есть одна команда деплоя отключала
+            // всю защиту. url убран: для этого диска его быть не должно.
+            'visibility' => 'private',
         ],
 
     ],

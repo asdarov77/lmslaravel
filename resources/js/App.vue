@@ -86,10 +86,10 @@ import AppBrand from './components/ui/AppBrand.vue';
 export default {
   components: { AppBrand, Breadcrumbs, GlobalSearch, ThemeToggle },
   mounted() {
-    //console.log("mounted");
     const hist = this.$router.options.history;
 
   },
+
   methods: {
     checkLeftSideMenu(){
       // Раньше здесь было сравнение user.role !== 'Обучаемый' по строке.
@@ -133,6 +133,7 @@ watch: {
     if(this.$route.name !== "courses.item") this.courseItemShow=true;
     if(this.$route.name !== 'courses.itemmani') this.courseItemManiShow=true;
   },
+
 }  
 };
 

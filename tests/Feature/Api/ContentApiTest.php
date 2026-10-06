@@ -140,6 +140,14 @@ class ContentApiTest extends TestCase
 
     // --------------------------------------------------------------- SETTINGS
 
+    /**
+     * Список настроек отдаётся массивом.
+     *
+     * В счёт входят content_delivery и tutor_enabled: их создают
+     * миграции, потому что переключатели должны существовать сразу после
+     * обновления кода, а не после визита в админку. Раньше миграций не
+     * было, и утверждение было ровно «2».
+     */
     public function test_settings_index_returns_array()
     {
         $this->admin();
@@ -149,7 +157,15 @@ class ContentApiTest extends TestCase
         $json = $this->getJson('/api/settings')->json();
 
         $this->assertIsArray($json['data']);
-        $this->assertCount(2, $json['data']);
+
+        $names = collect($json['data'])->pluck('name');
+
+        // Две фикстуры плюс две настройки из миграций: способ раздачи
+        // материалов и включение тренажёра. Обе создаются миграцией,
+        // чтобы переключатели существовали сразу после обновления кода.
+        $this->assertCount(4, $json['data'], 'две фикстуры плюс настройки из миграций');
+        $this->assertTrue($names->contains('content_delivery'), 'настройка раздачи должна отдаваться в списке');
+        $this->assertTrue($names->contains('tutor_enabled'), 'настройка тренажёра должна отдаваться в списке');
     }
 
     /**

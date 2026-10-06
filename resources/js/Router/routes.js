@@ -33,8 +33,18 @@ const routes = [
         name: 'login',
     },
     {
+        /*
+         * Публичная регистрация: права намеренно не заданы. Если
+         * потребовать users.create, анонимный посетитель не сможет
+         * зарегистрироваться (гвард уводит на /login) — форма станет
+         * недоступна извне. Поэтому пункт убран из меню, а не право
+         * добавлено в маршрут.
+         */
         path: '/reg',
-        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.reguser' }], titleKey: 'regist' },
+        meta: {
+            breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.reguser' }],
+            titleKey: 'regist',
+        },
         component: () => import('../Pages/Register.vue'),
         name: 'regist'
 
@@ -221,6 +231,35 @@ const routes = [
     //
     // Блок файлов
     //
+    {
+        // Тренажёр: самоподготовка по материалам назначенных курсов.
+        // Право tutor.use проверяется и в меню, и на маршруте, и в
+        // контроллере: маршрут без проверки был бы дырой, меню без
+        // проверки — просто лишним пунктом у тех, кому нельзя.
+        path: '/tutor',
+        component: () => import('../Pages/Tutor/TutorMain.vue'),
+        name: 'tutor.index',
+        meta: {
+            permission: ['tutor.use'],
+            titleKey: 'tutor.title',
+            breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.tutor' }],
+        },
+    },
+    {
+        // Окно тренировки. Сессия живёт на сервере, поэтому адрес с
+        // идентификатором сессии можно сохранить и вернуться позже.
+        path: '/tutor/run/:session',
+        component: () => import('../Pages/Tutor/TutorRunner.vue'),
+        name: 'tutor.runner',
+        meta: {
+            permission: ['tutor.use'],
+            titleKey: 'tutor.runner',
+            breadcrumbs: [
+                { key: 'app.title', to: '/' },
+                { key: 'app.menu.tutor', to: '/tutor' },
+            ],
+        },
+    },
     {
         // Витрина курсов с самостоятельной записью. Отдельна от
         // /courses/list — там учебный план (только назначенное).

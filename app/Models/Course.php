@@ -10,6 +10,20 @@ use App\Models\User;
 use App\Models\Aircraft;
 use App\Models\Aukstructure;
 
+/**
+ * Курс (courses).
+ *
+ * belongsTo категория и самолёт, hasMany модули (aukstructures) и учебные
+ * записи (group2learnings), manyToMany инструкторы и студенты через
+ * course_instructors / course_students, manyToMany специальности через
+ * category_course.
+ *
+ * Алиасы name=title и description=short_description в $appends существуют для
+ * API v1: фронт v1 и внутренний код зовут одно поле по-разному.
+ *
+ * Один курс может быть привязан к нескольким специальностям — поэтому право на
+ * материал определяется парой (курс, специальность), а не курсом.
+ */
 class Course extends Model
 {
     use HasFactory;

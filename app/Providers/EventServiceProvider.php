@@ -7,6 +7,10 @@ use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Event;
 
+/**
+ * Регистрация слушателей событий. Явных слушателей нет: побочные эффекты
+ * выполняются в хуках моделей (User::saving, Permission::booted).
+ */
 class EventServiceProvider extends ServiceProvider
 {
     /**

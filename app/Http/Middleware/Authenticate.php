@@ -4,6 +4,12 @@ namespace App\Http\Middleware;
 
 use Illuminate\Auth\Middleware\Authenticate as Middleware;
 
+/**
+ * Алиас `auth`.
+ *
+ * Возвращает null из redirectTo: в API нет страницы логина, и без этого
+ * Laravel падал с «Route [login] not defined» вместо ответа 401.
+ */
 class Authenticate extends Middleware
 {
     /**

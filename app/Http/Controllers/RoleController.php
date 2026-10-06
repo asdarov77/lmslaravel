@@ -9,6 +9,15 @@ use App\Support\PermissionCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
+/**
+ * CRUD ролей (/api/role).
+ *
+ * Роли, присутствующие в config('permissions.role_matrix'), считаются
+ * системными: правка и удаление запрещены (403). При создании такой роли права
+ * подставляются из матрицы через syncWithoutDetaching.
+ *
+ * Удаление роли, у которой есть пользователи, запрещено (409).
+ */
 class RoleController extends Controller
 {
     /**

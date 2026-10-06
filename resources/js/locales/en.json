@@ -25,14 +25,16 @@
       "courses": "Courses",
       "classes": "Classes",
       "logout": "Logout",
-      "learning": "Learning plan",
+      "learning": "Course assignment",
       "exams": "Exams",
       "questionbank": "Question bank",
       "mycourses": "My courses",
-      "userSection": "User management",
-      "myLearning": "My learning",
+      "myLearning": "Study plan",
       "dashboard": "Dashboard",
-      "catalog": "Course catalog"
+      "catalog": "Course catalog",
+      "tutor": "Tutor",
+      "settings": "Settings",
+      "grades": "Grading scales"
     },
     "buttons": {
       "cancel": "cancel",
@@ -124,7 +126,17 @@
       "reguser": "New user",
       "classes": "Classes",
       "login": "Sign in",
-      "regist": "Registration"
+      "regist": "Registration",
+      "tutor": {
+        "title": "Self-study",
+        "runner": "Training"
+      }
+    },
+    "nav": {
+      "learning": "Learning",
+      "catalog": "Catalog",
+      "staff": "Teaching",
+      "admin": "Administration"
     }
   },
   "login": {
@@ -718,5 +730,121 @@
     "failed": "Action failed",
     "open": "Open course",
     "noViewHint": "The course catalog requires the courses.view permission"
+  },
+  "settings": {
+    "delivery": {
+      "tab": "Content delivery",
+      "intro": "How the web server serves course files. In both modes access is decided by the signature: the application verifies it, and only the user it was issued for receives the file.",
+      "switchLabel": "Serve materials through nginx",
+      "switchHint": "Off — Laravel reads and serves the file. On — Laravel only verifies the signature and returns a header; nginx serves the file.",
+      "nginxWarning": "nginx mode works only if the web server config has an internal location with the internal directive. Until it exists, materials will not open: responses will be empty.",
+      "current": "Current mode",
+      "source": "Value source",
+      "source_settings": "Database setting (this page)",
+      "source_config": "PRIVATE_CONTENT_DELIVERY environment variable",
+      "internal": "nginx internal location",
+      "workerHint": "Why switch: in php mode every byte of material passes through PHP and occupies a worker for the whole transfer. In nginx mode the web server opens the file itself, and PHP is not involved.",
+      "loadFailed": "Failed to load the delivery mode",
+      "saveFailed": "Failed to save the delivery mode"
+    },
+    "tutor": {
+      "tab": "Tutor",
+      "intro": "Local question generation from course materials. The tutor does not affect grades: the exam is taken separately from the imported question bank.",
+      "switchLabel": "Enable the tutor",
+      "switchHint": "Off — trainees see no Tutor menu item. On — it appears, but questions require a running local engine.",
+      "engine": "AI engine status",
+      "url": "Address",
+      "model": "Model",
+      "installed": "installed",
+      "notInstalled": "not installed",
+      "models": "Models installed",
+      "embeddings": "Embeddings",
+      "queue": "Queue",
+      "queueAsync": "background",
+      "queueSync": "synchronous — generation inside the request",
+      "engineDown": "The engine does not respond. Start Ollama: ollama serve",
+      "noProbe": "Could not probe the engine",
+      "materials": "Prepared materials",
+      "noMaterials": "No materials yet. Indexing runs from the course page.",
+      "enableFirst": "Enable the tutor first: indexing without it is pointless.",
+      "genericError": "Could not save settings",
+      "status": {
+        "pending": "pending",
+        "indexed": "ready",
+        "empty": "no text",
+        "failed": "failed"
+      }
+    }
+  },
+  "tutor": {
+    "menu": "Tutor",
+    "title": "Self-study",
+    "runner": "Training",
+    "intro": "Questions on your course materials prepared by a local model. The score does not affect your learning result: the exam is taken separately.",
+    "disabled": "The tutor is switched off. An administrator can enable it in settings.",
+    "engineDown": "The AI engine is unavailable. Training is not possible until it is running.",
+    "modelMissing": "Model {model} is not installed. Run: ollama pull {model}",
+    "materials": "Materials",
+    "chunks": "Fragments: {n}",
+    "noMaterialsTitle": "No materials",
+    "noMaterialsText": "An instructor prepares the materials. Ask them if the course is not ready yet.",
+    "start": "Start",
+    "startFailed": "Could not start the session",
+    "stats": "Tutor statistics",
+    "correctPercent": "correct answers",
+    "answers": "answers",
+    "sessions": "sessions",
+    "correct": "correct",
+    "engine": "AI engine",
+    "model": "Model",
+    "backcheck": "Grounding check",
+    "embeddings": "Embeddings",
+    "yes": "on",
+    "no": "off",
+    "queue": "Queue",
+    "queueAsync": "background",
+    "queueSync": "synchronous (generation inside the request)",
+    "generating": "Preparing questions from the material…",
+    "syncQueueHint": "The queue is synchronous: questions are prepared during the request. This takes up to a minute and depends on the model and CPU load.",
+    "workerStalled": "The tutor is waiting for a queue worker: the job is queued but `php artisan queue:work` is not running. Start it in a separate terminal — questions will appear on their own.",
+    "exhaustedTitle": "No more questions",
+    "exhaustedText": "You have gone through all prepared questions. New ones appear after the next batch.",
+    "progress": "Question {done}",
+    "yourAnswer": "Your answer",
+    "check": "Check",
+    "next": "Next question",
+    "back": "Back to materials",
+    "reference": "Reference answer",
+    "sourceQuote": "Confirmation in the material",
+    "showReference": "Show reference",
+    "genericError": "Something went wrong",
+    "type": {
+      "mcq": "Multiple choice",
+      "short": "Short answer",
+      "open": "Open answer"
+    },
+    "verdict": {
+      "correct": "Correct",
+      "partial": "Partly correct",
+      "wrong": "Incorrect",
+      "ungraded": "Not graded"
+    }
+  },
+  "account": {
+    "anon": "User",
+    "noRole": "No role assigned",
+    "items": {
+      "profile": "Profile",
+      "plan": "Study plan",
+      "settings": "Settings"
+    },
+    "roles": {
+      "Обучаемый": "Trainee",
+      "Инструктор": "Instructor",
+      "Администратор": "Administrator",
+      "admin": "Administrator",
+      "instructor": "Instructor",
+      "trainee": "Trainee"
+    }
   }
 }

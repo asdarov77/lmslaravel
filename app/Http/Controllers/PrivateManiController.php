@@ -19,6 +19,12 @@ use Laravel\Sanctum\NewAccessToken;
 use Laravel\Sanctum\PersonalAccessToken;
 
 
+/**
+ * Мёртвый контроллер: маршрут закомментирован.
+ *
+ * Содержит рекурсивный разбор imsmanifest.xml и отдачу самого манифеста.
+ * Функциональность переехала в AircraftController и CourseController.
+ */
 class PrivateManiController extends Controller
 {
 

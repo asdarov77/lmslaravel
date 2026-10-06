@@ -6,6 +6,14 @@ use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
+/**
+ * CRUD справочника специальностей.
+ *
+ * Чтение открыто любому авторизованному (с CourseVisibility::restrictCategoriesToEnrolled),
+ * запись защищена маршрутом: categories.manage или courses.manage.
+ * Поддерживает алиас name <-> title, потому что фронт и старые данные
+ * называют поле по-разному.
+ */
 class CategoryController extends Controller
 {
     /**

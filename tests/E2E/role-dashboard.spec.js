@@ -120,7 +120,7 @@ test.describe('Личный кабинет по роли', () => {
       const instructorMenu = await instructor.page.evaluate(() =>
         [...document.querySelectorAll('nav .v-list-item')].map(n => n.innerText.trim())
       )
-      expect(instructorMenu, 'управляющему не нужен «Моё обучение»').not.toContain('Моё обучение')
+      expect(instructorMenu, 'управляющему не нужен «Учебный план»').not.toContain('Учебный план')
 
       // --- обучаемый: свой кабинет ------------------------------------
       const trainee = await session(browser, { fio: traineeFio, password: PASSWORD })
@@ -134,7 +134,7 @@ test.describe('Личный кабинет по роли', () => {
       const traineeMenu = await trainee.page.evaluate(() =>
         [...document.querySelectorAll('nav .v-list-item')].map(n => n.innerText.trim())
       )
-      expect(traineeMenu, 'обучаемому доступно «Моё обучение»').toContain('Моё обучение')
+      expect(traineeMenu, 'обучаемому доступно «Учебный план»').toContain('Учебный план')
 
       for (const s of [instructor, trainee]) await s.ctx.close()
       expect(errors, 'ошибок JS быть не должно').toEqual([])

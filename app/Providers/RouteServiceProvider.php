@@ -8,6 +8,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 
+/**
+ * Монтирование маршрутов и HOME.
+ *
+ * routes/api.php подключается ОДИН раз под префиксом 'api', версионирование
+ * сделано вложенной группой prefix('v1'). Отсюда маршруты вида '/v1/login',
+ * а не '/api/v1/login'. Константа HOME указывает на '/home' — при смене
+ * стартовой страницы поправить и RedirectIfAuthenticated.
+ */
 class RouteServiceProvider extends ServiceProvider
 {
     public const HOME = '/home';

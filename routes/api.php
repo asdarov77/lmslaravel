@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CityController;
 use App\Http\Controllers\PrivateController;
+use App\Http\Controllers\TutorController;
 use App\Http\Controllers\PrivateManiController;
 use App\Http\Controllers\Group2learningController;
 use App\Http\Controllers\LessonsController;
@@ -446,7 +447,61 @@ Route::post('/grade-boundary', [GradeBoundaryController::class, 'store'])->middl
 Route::put('/grade-boundary/{grade-boundary}', [GradeBoundaryController::class, 'update'])->middleware(['auth:sanctum', 'permission:settings.manage']);
 Route::patch('/grade-boundary/{grade-boundary}', [GradeBoundaryController::class, 'update'])->middleware(['auth:sanctum', 'permission:settings.manage']);
 Route::delete('/grade-boundary/{grade-boundary}', [GradeBoundaryController::class, 'destroy'])->middleware(['auth:sanctum', 'permission:settings.manage']);
-Route::apiResource('settings', SettingsController::class)->only(['index', 'show'])->middleware('auth:sanctum')->whereNumber('setting');
+// Переключатель способа раздачи приватного контента (php | nginx).
+//
+// Регистрируется ДО apiResource('settings'), иначе PUT /settings/content-delivery
+// перехватил бы маршрут /settings/{setting} с setting='content-delivery' и
+// правило settings.manage не сработало бы. Ниже whereNumber('setting') стоит
+// только на apiResource, поэтому конфликта с порядком регистрации нет.
+// ---------------------------------------------------------------- ТРЕНАЖЁР
+//
+// Локальная генерация вопросов по материалам курсов.
+//
+// Права проверяются в контроллере (tutor.use / tutor.manage), а не
+// middleware: у тренажёра два разных права на два разных действия,
+// и право методиста на индексацию не должно открывать ему подготовку
+// сессий, а право обучаемого — индексацию.
+//
+// Порядок регистрации важен: '/tutor/sessions/{session}/next-question'
+// объявлен ДО '/tutor/sessions/{session}', иначе статический сегмент
+// ушёл бы в параметр и маршрут перестал бы совпадать.
+Route::prefix('v1/tutor')->middleware('auth:sanctum')->group(function () {
+    Route::get('/health', [TutorController::class, 'health']);
+
+    Route::get('/materials', [TutorController::class, 'materials']);
+    Route::post('/sessions', [TutorController::class, 'startSession']);
+
+    // Статический сегмент раньше параметра.
+    Route::get('/sessions/{session}/next-question', [TutorController::class, 'nextQuestion']);
+    Route::get('/sessions/{session}', [TutorController::class, 'sessionShow']);
+    Route::post('/sessions/{session}/finish', [TutorController::class, 'finishSession']);
+
+    Route::post('/items/{item}/answer', [TutorController::class, 'answer']);
+
+    Route::get('/stats', [TutorController::class, 'stats']);
+
+    // Методистские методы. Право проверяется в контроллере.
+    Route::prefix('admin')->group(function () {
+        Route::get('/materials', [TutorController::class, 'adminMaterials']);
+        Route::post('/materials/index', [TutorController::class, 'indexMaterial']);
+    });
+});
+
+// Настройки тренажёра: вкл/выкл и диагностика движка.
+// Регистрируются до /settings/{setting}, иначе перехватятся параметром.
+Route::get('/settings/tutor', [SettingsController::class, 'tutor'])
+    ->middleware(['auth:sanctum', 'permission:settings.manage']);
+Route::put('/settings/tutor', [SettingsController::class, 'updateTutor'])
+    ->middleware(['auth:sanctum', 'permission:settings.manage']);
+Route::get('/settings/tutor/probe', [SettingsController::class, 'tutorProbe'])
+    ->middleware(['auth:sanctum', 'permission:settings.manage']);
+
+Route::get('/settings/content-delivery', [SettingsController::class, 'contentDelivery'])
+    ->middleware(['auth:sanctum', 'permission:settings.manage']);
+Route::put('/settings/content-delivery', [SettingsController::class, 'updateContentDelivery'])
+    ->middleware(['auth:sanctum', 'permission:settings.manage']);
+
+Route::apiResource('settings', SettingsController::class)->only(['index', 'show'])->middleware(['auth:sanctum', 'permission:settings.manage'])->whereNumber('setting');
 Route::post('/settings', [SettingsController::class, 'store'])->middleware(['auth:sanctum', 'permission:settings.manage']);
 Route::put('/settings/{setting}', [SettingsController::class, 'update'])->middleware(['auth:sanctum', 'permission:settings.manage'])->whereNumber('setting');
 Route::patch('/settings/{setting}', [SettingsController::class, 'update'])->middleware(['auth:sanctum', 'permission:settings.manage'])->whereNumber('setting');

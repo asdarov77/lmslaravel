@@ -10,6 +10,15 @@ use App\Models\Course;
 use App\Models\User;
 use App\Models\Question;
 
+/**
+ * Специальность (categories).
+ *
+ * $guarded = [] — писать можно всё. Для справочника это осознанно, но
+ * опасно: массовое присваивание без валидации, и любой маршрут записи должен
+ * быть защищён правами categories.manage / courses.manage.
+ *
+ * Алиас name=title — по той же причине, что и в Course.
+ */
 class Category extends Model
 {
     use HasFactory;

@@ -101,6 +101,21 @@ return [
         // Публикация — отдельное право от manage: в LMS (Moodle/Canvas)
         // автор может редактировать черновик, но публикация требует
         // отдельного допуска.
+        // --- Тренажёр (локальная генерация вопросов) ---------------------
+        // tutor.use отделён от courses.view намеренно: видеть каталог
+        // и тренироваться по назначенным курсам — разные действия.
+        // Иначе право на просмотр курсов молча включало бы генерацию
+        // вопросов сторонней моделью.
+        'tutor.use' => [
+            'name' => 'Тренажёр: самоподготовка по назначенным курсам',
+            'group' => 'courses',
+            'legacy' => ['use-tutor'],
+        ],
+        'tutor.manage' => [
+            'name' => 'Тренажёр: индексация материалов и контроль качества',
+            'group' => 'courses',
+            'legacy' => ['manage-tutor'],
+        ],
         'courses.publish' => [
             'name' => 'Публикация и снятие с публикации курса',
             'group' => 'courses',
@@ -220,9 +235,11 @@ return [
             'grading.manage', 'progress.view',
             'files.upload', 'content.view', 'content.manage',
             'dictionaries.view', 'reports.view', 'users.view',
+            'tutor.use', 'tutor.manage',
         ],
         'Обучаемый' => [
             'courses.view', 'exams.take', 'content.view', 'dictionaries.view',
+            'tutor.use',
         ],
     ],
 ];

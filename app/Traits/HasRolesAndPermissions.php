@@ -8,6 +8,20 @@ use App\Models\User;
 use App\Support\PermissionCatalog;
 use Illuminate\Support\Facades\Cache;
 
+/**
+ * Эффективные права пользователя.
+ *
+ * Состав: прямые назначения (permissions_users) ∪ права ролей
+ * (permissions_roles) ∪ legacy-алиасы каталога.
+ *
+ * Ключевое: config('permissions.role_matrix') подмешивается ТОЛЬКО когда у
+ * пользователя нет ни ролей, ни прямых прав (см. matrixPermissionSlugs). Это
+ * миграционная заплатка для баз, где связи ещё не заведены. Если бы матрица
+ * применялась всегда, отзыв права у роли обходился бы ею молча.
+ *
+ * Вычисление кэшируется на время запроса: один и тот же набор считается в
+ * сотне мест, а пересчёт дергал бы БД.
+ */
 trait HasRolesAndPermissions
 {
     /**

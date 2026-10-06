@@ -26,6 +26,12 @@ use Symfony\Component\DomCrawler\Crawler;
 
 
 
+/**
+ * Методический поиск по HTML-файлам каталога курса с подсветкой найденного.
+ *
+ * Требует content.manage или courses.manage — проверка продублирована и в коде,
+ * и на маршруте. Ищет по диску public, то есть по РАСПАКОВАННЫМ материалам.
+ */
 class SearchController extends Controller
 {
     // public function search(Request $request)

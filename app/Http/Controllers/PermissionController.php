@@ -10,6 +10,14 @@ use Illuminate\Support\Facades\Gate;
 use App\Support\PermissionCatalog;
 use App\Support\PermissionScope;
 
+/**
+ * CRUD справочника прав и каталог прав по разделам из config/permissions.php.
+ *
+ * Изменение правлено только правом users.permissions, и системные slug
+ * запрещены к переименованию (PermissionCatalog::isProtected): middleware
+ * и role_matrix ссылаются на slug буквально, переименование молча отняло бы
+ * права у всех.
+ */
 class PermissionController extends Controller
 {
     /**

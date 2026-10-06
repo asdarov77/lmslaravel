@@ -4,6 +4,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 
+/**
+ * Справочник городов: читает resources/js/Pages/User/city.json и отдаёт его
+ * как JSON. База данных не используется.
+ */
 class CityController extends Controller
 {
       public function index() {

@@ -4,6 +4,14 @@ namespace App\Http\Filters;
 
 use Illuminate\Database\Eloquent\Builder;
 
+/**
+ * База фильтров: принимает queryParams, вызывает before() и затем коллбэки по
+ * ключам, которые реально присутствуют в queryParams.
+ *
+ * Проверка «ключ присутствует» вместо «значение не пустое» — из неё следует,
+ * что фильтр с пустой строкой не применяется, и это же позволяет отличать
+ * «не фильтровали» от «отфильтровали по пустому».
+ */
 abstract class AbstractFilter implements FilterInterface
 {
     /** @var array */

@@ -12,6 +12,22 @@ use Laravel\Sanctum\HasApiTokens;
 
 
 
+/**
+ * Пользователь (users).
+ *
+ * Два неочевидных решения:
+ *
+ *  - Роль нормализуется из ДВУХ источников: колонка users.role и связь
+ *    role_user. Источники независимы: chroll синхронизирует только role_user и
+ *    колонку не трогает. Раньше пользователь, которому роль выдали через UI,
+ *    считался «без роли» — не получал базовых прав и видел пустой экран.
+ *  - fio собирается из ФИО в хуке saving, поэтому это поле нельзя задавать
+ *    напрямую в обход хука (mass-assignment не спасёт).
+ *
+ * isAdmin/isInstructor/isTrainee/isSuperAdmin — четыре разных ответа на
+ * вопросы Gate и middleware. isSuperAdmin дополнительно ловит связь role_user
+ * в try/catch: если таблицы ролей нет, падать нельзя.
+ */
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable, HasRolesAndPermissions;

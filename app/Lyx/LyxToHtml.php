@@ -5,6 +5,11 @@ namespace App\Lyx;
 use PhpParser\Node\Stmt\Label;
 use PhpParser\PrettyPrinter\Standard;
 
+/**
+ * Преобразование дерева LyX в HTML.
+ *
+ * Часть мёртвого конвертера app/Lyx (см. LyxParser).
+ */
 class LyxToHtml
 {
     public $body = '';

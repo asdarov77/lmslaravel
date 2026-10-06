@@ -11,6 +11,13 @@ use App\Policies\Group2learningPolicy;
 
 
 
+/**
+ * CRUD учебных записей «группа записана на курс в рамках специальности».
+ *
+ * store делегирует AuthController::group2learning: валидация и транзакция
+ * должны быть в одном месте, иначе массовая запись и одиночная разойдутся.
+ * Область видимости — Group2learningPolicy::scopeQuery.
+ */
 class Group2learningController extends Controller
 {
     /**

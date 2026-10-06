@@ -4,6 +4,15 @@ use Closure;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Factory as AuthFactory;
 
+/**
+ * Алиас `custom`.
+ *
+ * Сверяет хеш пароля, сохранённый в сессии, с текущим пользователем. При
+ * расхождении делает logout с полной очисткой сессии: смена пароля не должна
+ * оставлять старую сессию рабочей.
+ *
+ * Запрос без сессии пропускается как есть — это публичные маршруты.
+ */
 class CustomAuthenticateSessionMiddleware
 {
     /**

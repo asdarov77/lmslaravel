@@ -5,6 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\GradeBoundary;
 use Illuminate\Http\Request;
 
+/**
+ * Границы оценочных шкал (/api/grade-boundary).
+ *
+ * ВНИМАНИЕ: store меняет boundary записи, найденной по ПОРЯДКОВОЙ ПОЗИЦИИ
+ * (skip/take), а не по id. Это не опечатка, а сознательное поведение под
+ * порядок шкалы, но правка по id здесь невозможна.
+ *
+ * Методов show/update/destroy нет, хотя apiResource их генерирует: такой запрос
+ * вернёт 500, а не 404.
+ */
 class GradeBoundaryController extends Controller
 {
     public function index()

@@ -5,6 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Загруженные пользователем файлы (files), belongsTo user.
+ *
+ * Используется как file_id в материалах тренажёра. $guarded = [] — валидация
+ * загрузки в контроллере (FilesController).
+ */
 class File extends Model
 {
 

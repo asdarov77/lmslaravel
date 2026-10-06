@@ -6,15 +6,19 @@ import { dirname, resolve } from 'node:path'
 import { createRouter, createMemoryHistory } from 'vue-router'
 
 import routes from '../../resources/js/Router/routes'
+import { navigationSections } from '../../resources/js/navigation'
 import ru from '../../resources/js/locales/ru.json'
 import en from '../../resources/js/locales/en.json'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '../..')
-const menuSource = readFileSync(
-  resolve(root, 'resources/js/Pages/Navigation/LeftSideMenu.vue'),
-  'utf8'
-)
+/*
+ * Пункты меню разбираются из navigation.js, а не из исходника
+ * компонента: конфигурация вынесена из шаблона намеренно (см.
+ * resources/js/navigation.js), и тест, читающий LeftSideMenu.vue,
+ * проверял бы уже несуществующий код.
+ */
+const menuSource = readFileSync(resolve(root, 'resources/js/navigation.js'), 'utf8')
 
 /**
  * Ссылки бокового меню должны вести на существующие маршруты.
@@ -37,16 +41,10 @@ const menuSource = readFileSync(
  */
 const flat = (routes || []).flat(Infinity).filter(Boolean)
 
-/** Пункты меню в порядке объявления: пары { link, title }. */
-const menuItems = (() => {
-  const items = []
-  // Блоки computed menuContent / menuUsers: от title: ... до link: "..."
-  const blockRe = /title:\s*(?:this\.\$t\("([^"]+)"\)|"([^"]+)")\s*,\s*\n\s*link:\s*"([^"]+)"/g
-  for (const m of menuSource.matchAll(blockRe)) {
-    items.push({ i18nKey: m[1] ?? null, literal: m[2] ?? null, link: m[3] })
-  }
-  return items
-})()
+/** Все пункты меню из конфига, в порядке секций. */
+const menuItems = navigationSections.flatMap((section) =>
+  section.items.map((item) => ({ i18nKey: item.titleKey ?? null, literal: null, link: item.link, section: section.key }))
+)
 
 /** Существующие пути роутера как есть (с параметрами и без). */
 const routePaths = flat.map(r => r.path).filter(Boolean)
@@ -131,36 +129,53 @@ describe('боковое меню: подписи уникальны (регре
 })
 
 describe('боковое меню: заголовок группы не дублирует подпись пункта', () => {
-  /**
-   * Регресс: заголовок аккордеона был захардкожен как «Пользователи» —
-   * так же назывался пункт /user/list. Vuetify строит id узла из
-   * заголовка, поэтому в консоли было «Multiple nodes with the same ID».
+  /*
+   * Заголовки секций берутся из i18n.
+   *
+   * Регресс, который закрывает этот файл: заголовок единственной группы
+   * был захардкожен как «Пользователи» — так же назывался пункт
+   * /user/list. Vuetify строит id узла из заголовка, и в консоли было
+   * «Multiple nodes with the same ID».
+   *
+   * Групп стало несколько (Обучение / Каталог / Методический кабинет /
+   * Управление), и проверка теперь идёт по каждой секции.
    */
-  const groupTitleKey = (() => {
-    // Блок аккордеона: <v-list-group value="true"> ... v-slot:activator ...
-    const group = menuSource.slice(menuSource.indexOf('<v-list-group'))
-    const activator = group.slice(0, group.indexOf('</v-list-group>'))
-    const m = activator.match(/:title="\$t\('([^']+)'\)/)
-    return m ? m[1] : null
-  })()
+  const sectionKeys = navigationSections.map((section) => section.key)
 
-  it('заголовок группы берётся из i18n, а не из литерала', () => {
-    expect(groupTitleKey, 'заголовок группы должен быть ключом перевода').toBeTruthy()
-    expect(ru.app.menu[groupTitleKey.split('.').pop()]).toBeTruthy()
-    expect(en.app.menu[groupTitleKey.split('.').pop()]).toBeTruthy()
+  it('у каждой секции есть подпись в обоих языках', () => {
+    expect(sectionKeys.length).toBeGreaterThan(1)
+
+    sectionKeys.forEach((key) => {
+      expect(ru.app.nav[key], 'нет подписи секции в ru: ' + key).toBeTruthy()
+      expect(en.app.nav[key], 'нет подписи секции в en: ' + key).toBeTruthy()
+    })
   })
 
-  it('заголовок группы отличается от подписей всех пунктов меню', () => {
-    const groupTitle = ru.app.menu[groupTitleKey.split('.').pop()].trim()
-    const itemTitles = menuItems.map(i =>
-      (i.i18nKey ? ru.app.menu[i.i18nKey.split('.').pop()] : i.literal).trim()
-    )
+  it('подпись секции не совпадает с подписью её пунктов', () => {
+    sectionKeys.forEach((key) => {
+      const sectionTitle = ru.app.nav[key].trim()
+      const itemTitles = navigationSections
+        .filter((section) => section.key === key)
+        .flatMap((section) => section.items)
+        .map((item) => ru.app.menu[item.titleKey.split('.').pop()].trim())
 
-    expect(itemTitles).not.toContain(groupTitle)
+      expect(itemTitles, 'подпись секции совпала с пунктом: ' + sectionTitle)
+        .not.toContain(sectionTitle)
+    })
   })
 
-  it('в исходнике нет захардкоженного заголовка группы', () => {
-    expect(menuSource).not.toMatch(/v-list-group[\s\S]{0,600}title="Пользователи"/)
+  it('подписи секций уникальны', () => {
+    // Две секции с одинаковым заголовком визуально сливаются: у
+    // пользователя не остаётся границы между блоками меню.
+    const titles = sectionKeys.map((key) => ru.app.nav[key].trim())
+
+    expect(new Set(titles).size).toBe(titles.length)
+  })
+
+  it('в конфиге нет захардкоженных названий секций', () => {
+    // Название секции обязано быть ключом перевода, иначе английский
+    // интерфейс остаётся с русскими заголовками блоков.
+    expect(menuSource).not.toMatch(/title:\s*['"][А-Яа-я]/)
   })
 })
 

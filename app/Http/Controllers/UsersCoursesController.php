@@ -8,6 +8,12 @@ use App\Models\Course;
 use App\Models\Group;
 use App\Models\Groups;
 
+/**
+ * Отладочный GET /api/userauks.
+ *
+ * Печатает ФИО через echo и не возвращает тело. Оставлен для ручной
+ * диагностики, в проде использоваться не должен.
+ */
 class UsersCoursesController extends Controller
 {
     /**

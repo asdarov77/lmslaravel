@@ -5,6 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Роль (roles: rolename + slug).
+ *
+ * Права берутся из pivot permissions_roles. Одноимённая колонка rights удалена
+ * миграцией намеренно: пока она существовала, часть кода читала права из неё и
+ * получала пустоту, хотя роль была настроена.
+ */
 class Role extends Model
 {
     use HasFactory;

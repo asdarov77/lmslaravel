@@ -11,6 +11,14 @@ use App\Policies\ExamPolicy;
 use App\Policies\Group2learningPolicy;
 use App\Policies\QuestionBankPolicy;
 use App\Policies\UserPolicy;
+/**
+ * Регистрация политик и Gate::before.
+ *
+ * Gate::before возвращает true ТОЛЬКО для суперадмина и null во всех
+ * остальных случаях: null, а не false, иначе он перебил бы остальные
+ * политики и каждый запрос проходил бы как разрешённый или как запрещённый
+ * без их участия.
+ */
 class AuthServiceProvider extends ServiceProvider
 {
     /**

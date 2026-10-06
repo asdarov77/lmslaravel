@@ -7,6 +7,14 @@ use Illuminate\Database\Eloquent\Model;
 use App\Models\Course;
 
 
+/**
+ * Тип воздушного судна (aircrafts: title + path).
+ *
+ * Поле path задаёт каталог контента private/<путь>: по нему находятся и
+ * список папок (AircraftController), и материалы (PrivateController), и
+ * internal-location nginx. Переименование path здесь ломает выдачу сразу у
+ * всех курсов этого типа.
+ */
 class Aircraft extends Model
 {
     use HasFactory;

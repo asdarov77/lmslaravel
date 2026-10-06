@@ -4,6 +4,11 @@ namespace App\Lyx;
 use App\Lyx\LyxSection;
 use App\Lyx\LyxToHtml;
 
+/**
+ * Глава LyX — второй уровень вложенности (книга → глава → раздел).
+ *
+ * Часть мёртвого конвертера app/Lyx (см. LyxParser).
+ */
 class LyxChapter
 {
     public $title = '';

@@ -7,6 +7,13 @@ use App\Support\CourseVisibility;
 
 use Illuminate\Http\Request;
 
+/**
+ * «Учебный план»: список курсов для текущего пользователя.
+ *
+ * Отличие от CourseController — область видимости жёстко сужена через
+ * CourseVisibility::restrictToEnrolled, поэтому обучаемый видит только курсы
+ * своей группы. Нечисловые фильтры отбрасываются с 422, а не молча игнорируются.
+ */
 class CoursesListController extends Controller
 {
 //   public function getCourses(Request $request)

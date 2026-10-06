@@ -21,6 +21,18 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * CRUD курсов (/api/course, /api/v1/courses) и точки входа материала.
+ *
+ * Здесь сталкиваются три разных вопроса, и их важно не путать:
+ *  - список курсов ограничен CourseVisibility (обучаемый видит подписки
+ *    своей группы);
+ *  - открытие материала решает CourseAccess — записан ли пользователь;
+ *  - сами байты файла отдаёт PrivateController по подписанному пути.
+ *
+ * index: CourseFilter + CourseVisibility::restrictToEnrolled + пагинация.
+ * show: CourseAccess::authorizeOpen. destroy удаляет каталог по path_hash.
+ */
 class CourseController extends Controller
 {
     /**

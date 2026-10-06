@@ -118,11 +118,20 @@ test.describe('Глобальный поиск', () => {
       await page.locator('[data-test="search-input"] input').fill(query)
       await page.waitForTimeout(1800)
 
+      /*
+       * Ищем именно СВОЙ курс среди результатов, а не первый попавшийся.
+       *
+       * Запрос берётся по первым символам названия, а в базе есть штатные
+       * курсы с тем же началом («Конструкция вертолета…»). Порядок выдачи
+       * при равном совпадении не гарантирован, и проверка «первый
+       * результатор» делала тест нестабильным: он падал не из-за поломки
+       * поиска, а из-за чужого курса в выдаче.
+       */
       const results = page.locator('[data-test="search-result"]')
-      await expect(results.first(), 'курс найден').toBeVisible()
-      await expect(results.first()).toContainText(course.title.slice(0, 20))
+      const ours = results.filter({ hasText: course.title.slice(0, 20) })
 
-      await results.first().click()
+      await expect(ours.first(), 'курс найден').toBeVisible()
+      await ours.first().click()
       await page.waitForTimeout(2000)
       expect(page.url(), 'переход на страницу курса').toContain(`/courses/desc/${course.id}`)
 

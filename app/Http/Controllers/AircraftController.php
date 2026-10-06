@@ -16,6 +16,14 @@ use App\Support\PrivateContent;
 use Illuminate\Support\Str;
 
 
+/**
+ * Папки-классы и импорт самолёта.
+ *
+ * Списки папок читаются из config('app.courses_path') с отсевом служебных
+ * каталогов (GIFT, orig, app…). Импорт строит Aircraft, Course, Aukstructure,
+ * Link, Category и pivot-таблицы из imsmanifest.xml В ОДНОЙ ТРАНЗАКЦИИ —
+ * иначе половина импортированного самолёта осталась бы без модулей.
+ */
 class AircraftController extends Controller
 {
   /**

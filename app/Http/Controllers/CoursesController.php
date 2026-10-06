@@ -6,6 +6,13 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
+/**
+ * Мёртвый контроллер: на маршрутах не смонтирован.
+ *
+ * Сканировал каталог public_path() + config('app.courses_path') и разбирал
+ * файлы .lyx через App\Lyx\LyxParser. Функциональность переехала в
+ * AircraftController (импорт из imsmanifest.xml).
+ */
 class CoursesController extends Controller
 {
     public function index()

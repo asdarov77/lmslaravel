@@ -11,6 +11,16 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 
 
+/**
+ * CRUD групп (/api/groups).
+ *
+ * Чтение открыто любому авторизованному с разделением по строке role ==
+ * «Администратор»: это строковое сравнение, а не проверка прав, и при смене
+ * формата ролей сломается молча.
+ *
+ * destroy сначала удаляет учебные записи группы — внешнего ключа в БД нет,
+ * поэтому порядок важен.
+ */
 class GroupController extends Controller
 {
     /**

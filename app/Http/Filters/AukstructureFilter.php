@@ -3,6 +3,9 @@
 namespace App\Http\Filters;
 use Illuminate\Database\Eloquent\Builder;
 
+/**
+ * Фильтры выборки Aukstructure по course_id, parent_id и type.
+ */
 class AukstructureFilter extends AbstractFilter
 {
     public const COURSE_ID = 'course_id';

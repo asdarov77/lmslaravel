@@ -7,6 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 
 
 
+/**
+ * Модуль курса (aukstructures) с самоссылкой parent/children.
+ *
+ * Иерархия используется в LessonsController для построения дерева тем и в
+ * Exam как пара отбора вопросов вместе со специальностью.
+ */
 class Aukstructure extends Model
 {
     use HasFactory;

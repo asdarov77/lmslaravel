@@ -7,6 +7,13 @@ use Illuminate\Database\Eloquent\Builder;
 
 
 
+/**
+ * Добавляет scopeFilter, делегирующий применение фильтров из app/Http/Filters
+ * (FilterInterface::apply) к Builder.
+ *
+ * Общий механизм фильтрации списков. Права здесь не проверяются: область
+ * видимости добавляется отдельно в контроллере.
+ */
 trait Filterable
 {
       /**

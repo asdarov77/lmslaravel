@@ -7,6 +7,16 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
 
+/**
+ * POST /api/clear-database — очистка таблиц контента.
+ *
+ * DELETE выполняется в порядке, ОБРАТНОМ цепочкам внешних ключей, в одной
+ * транзакции. Пользователей, группы, роли и права не трогает: чистится
+ * содержимое обучения, а не настройки доступа.
+ *
+ * Требует system.maintenance — одно из двух прав, которые инструктору выдать
+ * нельзя (см. PermissionScope::ADMIN_ONLY_SLUGS).
+ */
 class ClearDBController extends Controller
 {
     /**

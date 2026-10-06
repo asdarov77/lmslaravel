@@ -6,6 +6,14 @@ use App\Models\Group;
 use App\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
+/**
+ * Устаревшая политика групп на строковых ролях (isAdmin()/isInstructor()),
+ * без учёта каталога прав.
+ *
+ * Реальные правила для групп живут в Group2learningPolicy и middleware
+ * permission:groups.manage. Сигнатуры view/create/update/delete не принимают
+ * саму модель, поэтому политика фактически не вызывается.
+ */
 class GroupPolicy
 {
     use HandlesAuthorization;

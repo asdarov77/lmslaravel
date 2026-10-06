@@ -6,6 +6,24 @@ namespace App\Http;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 
+/**
+ * Стек middleware.
+ *
+ * Неочевидные решения:
+ *
+ *  - StartSession убран из глобального стека. Иначе на каждый запрос
+ *    создавался файл сессии, а Auth::login() в этом проекте не
+ *    вызывается — сессии копились впустую.
+ *  - В группе api нет EnsureFrontendRequestsAreStateful: иначе сессия
+ *    получила бы приоритет над Bearer-токеном, и проверки прав видели бы
+ *    не того пользователя.
+ *  - throttle:api закомментирован. Ограничения частоты запросов на API
+ *    фактически нет, несмотря на configureRateLimiting() в
+ *    RouteServiceProvider. Это осознанное «пока не трогаем», а не
+ *    забытый middleware.
+ *  - VerifyCsrfToken в стеке отсутствует: CSRF для API не нужен, но
+ *    и для веб-оболочки проверка выключена — см. сам класс.
+ */
 class Kernel extends HttpKernel
 {
     /**

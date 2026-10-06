@@ -7,6 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 use App\Models\Course;
 use App\Models\User;
 
+/**
+ * Учебная группа (groups).
+ *
+ * Точка привязки всех проверок области видимости: «своя группа» в
+ * CourseVisibility, UserPolicy, Group2learningPolicy, CalendarController
+ * определяется через неё.
+ */
 class Group extends Model
 {
     use HasFactory;
