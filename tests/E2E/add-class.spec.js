@@ -459,7 +459,6 @@ test.describe('Боковое меню', () => {
     const body = await page.locator('body').innerText()
 
     expect(body).not.toMatch(/Страница не найдена/i)
-    }
 
     expect(errors, 'ошибок JS быть не должно:\n' + errors.join('\n')).toEqual([])
   })

@@ -28,7 +28,18 @@ class ContentNginxConfigCommand extends Command
     public function handle(): int
     {
         $root = rtrim((string) ($this->option('root') ?: base_path()), '/');
-        $diskRoot = rtrim(str_replace('\\', '/', config('filesystems.disks.private.root')), '/');
+        /*
+         * Корень контента = корень диска private + PREFIX ('private').
+         *
+         * X-Accel-Redirect собирается из относительного пути БЕЗ префикса
+         * 'private/' (см. PrivateContent::accelUri), поэтому alias должен
+         * указывать именно на каталог private, а не на корень диска.
+         * С alias в корень диска nginx искал бы 'storage/app/public/<самолёт>/...'
+         * вместо 'storage/app/public/private/<самолёт>/...' и отдавал 404 на
+         * каждый материал — при этом остальные проверки проходили.
+         */
+        $diskRoot = rtrim(str_replace('\\', '/', config('filesystems.disks.private.root')), '/')
+            .'/'.trim(PrivateContent::PREFIX, '/');
         $internal = (string) config('private_content.accel_internal', '/_protected-content');
         $marker = ContentDelivery::accelMarker();
 

@@ -102,7 +102,7 @@ test.describe('Календарь обучения', () => {
     await expect(page.locator('.u-page__title')).toContainText('Календарь')
 
     // 1. События нарисованы (не демо-заглушки).
-    await expect(page.locator('.fc-daygrid-event').first()).toBeVisible()
+    await expect(page.locator('.fc-daygrid-event.cal-event--period').first()).toBeVisible()
     await expect(page.locator('body')).not.toContainText('All-day event')
     await expect(page.locator('body')).not.toContainText('Timed event')
 
@@ -115,16 +115,48 @@ test.describe('Календарь обучения', () => {
     expect(scroll.overflow, 'у страницы не должно быть горизонтальной прокрутки').toBe(false)
     expect(scroll.columns, 'в календаре семь колонок недели').toBe(7)
 
-    // 3. Период показан полосой: событие длиннее одного дня.
-    const barWidth = await page.evaluate(() => {
-      const ev = document.querySelector('.fc-daygrid-event')
-      return ev ? Math.round(ev.getBoundingClientRect().width) : 0
+    /*
+     * 3. Период показан полосой ШИРЕ ОДНОГО ДНЯ.
+     *
+     * Сравниваем с шириной ячейки дня, а не с «150 пикселей». Пиксельный
+     * порог зависел от того, на какой неделе оказался период: запись идёт
+     * от 3 дней назад, поэтому в понедельник она начиналась в прошлой неделе,
+     * и видимая часть полосы была узкой при полностью корректной отрисовке.
+     * Смысл проверки — «период длиннее одного дня», и именно его она и
+     * проверяет.
+     */
+    const sizes = await page.evaluate(() => {
+      /*
+       * Период обучения, а не первое событие подряд: дедлайны тоже
+       * рисуются полосами и занимают ровно одну ячейку.
+       *
+       * Берём САМЫЙ ШИРОКИЙ из показанных периодов, а не первый. В базе
+       * есть чужие записи, в том числе однодневные периоды (совпадающие
+       * start и end), и порядок событий в DOM зависит от даты начала.
+       * Проверка «первый период шире ячейки» измеряла чужую запись и
+       * падала безотносительно к отрисовке. Смысл проверки — «период
+       * длиннее одного дня рисуется шире ячейки», и он проверяется по
+       * максимуму: отрисовка верна, если такой период нашёлся.
+       */
+      const bars = [...document.querySelectorAll('.fc-daygrid-event.cal-event--period')]
+        .map((e) => e.getBoundingClientRect().width)
+      const day = document.querySelector('.fc-daygrid-day')
+      return {
+        bars: bars.map(Math.round),
+        widest: bars.length ? Math.round(Math.max(...bars)) : 0,
+        day: day ? Math.round(day.getBoundingClientRect().width) : 0,
+      }
     })
-    expect(barWidth, 'полоса периода заметно шире одной ячейки').toBeGreaterThan(150)
+    expect(sizes.bars.length, 'периоды показаны полосами').toBeGreaterThan(0)
+    expect(sizes.day, 'ячейка дня найдена').toBeGreaterThan(0)
+    expect(
+      sizes.widest,
+      `есть период шире ячейки дня ${sizes.day}px (ширины: ${sizes.bars.join(', ')})`,
+    ).toBeGreaterThan(sizes.day)
 
     // 4. Подпись читаема: светлый текст на тёмной полосе.
     const colors = await page.evaluate(() => {
-      const ev = document.querySelector('.fc-daygrid-event')
+      const ev = document.querySelector('.fc-daygrid-event.cal-event--period')
       if (!ev) return null
       const cs = getComputedStyle(ev)
       return { bg: cs.backgroundColor, color: cs.color }
@@ -140,7 +172,7 @@ test.describe('Календарь обучения', () => {
     ).toBeGreaterThan(0.25)
 
     // 5. Клик открывает карточку периода с данными.
-    await page.locator('.fc-daygrid-event').first().click()
+    await page.locator('.fc-daygrid-event.cal-event--period').first().click()
     await page.waitForTimeout(1200)
 
     const dialog = page.locator('.v-overlay__content .calendar__detail-title').first()
@@ -205,7 +237,7 @@ test.describe('Календарь обучения', () => {
     // проверять.
     await expect(page.locator('.fc-daygrid-day').first()).toBeVisible()
 
-    const before = await page.locator('.fc-daygrid-event').count()
+    const before = await page.locator('.fc-daygrid-event.cal-event--period').count()
 
     // Выделяем диапазон мышью по сетке.
     const cell = page.locator('.fc-daygrid-day').nth(10)
@@ -218,7 +250,7 @@ test.describe('Календарь обучения', () => {
     }
     await page.waitForTimeout(1500)
 
-    const after = await page.locator('.fc-daygrid-event').count()
+    const after = await page.locator('.fc-daygrid-event.cal-event--period').count()
     expect(after, 'выделение дат не должно добавлять события').toBe(before)
 
     // prompt() в этом сценарии означал бы диалог ввода — его быть не должно.

@@ -80,7 +80,10 @@ export default {
           this.alert = true;
           this.snackbarText = "Успешный вход";
           this.alertType = "success";
-          this.$router.push('/')
+          // После входа ведём в кабинет, а не на '/': корневой адрес
+          // теперь редиректит на /dashboard, и лишний редирект только
+          // показывал бы в адресной строке '/', а не '/dashboard'.
+          this.$router.push('/dashboard')
         })
         .catch((error) => {
           console.error(error)

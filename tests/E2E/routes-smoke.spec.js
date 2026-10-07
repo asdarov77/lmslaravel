@@ -48,7 +48,6 @@ const ROUTES = [
   { name: 'загрузка файлов', hash: '/files/add' },
   { name: 'календарь', hash: '/calendar' },
   { name: 'обучение группы', hash: '/group/learning/{group}' },
-  { name: 'аук структура', hash: '/auk' },
   { name: 'загрузка подарков', hash: '/upload-gift' },
   { name: 'вопросы', hash: '/questions' },
   { name: 'вопросыmain', hash: '/questions-main' },

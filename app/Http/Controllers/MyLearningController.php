@@ -195,6 +195,22 @@ class MyLearningController extends Controller
                         ->filter(fn ($e) => $e->stateFor($user)['available'])
                         ->count(),
                 ],
+                /*
+                 * «Продолжить обучение»: один конкретный курс, который
+                 * имеет смысл открыть прямо сейчас.
+                 *
+                 * Порядок выбора: сначала те, где обучаемый уже был
+                 * (по таблице favorites), потом — ближайшие по сроку.
+                 * Это осознанно НЕ «первый в списке»: план отсортирован по
+                 * датам начала, и в начале семестра первым стоял бы курс,
+                 * который открывать позже всего.
+                 *
+                 * Точного процента по темам нет и не выдумывается: favorites
+                 * хранит посещения на уровне курса, а не модуля. Поэтому
+                 * возвращается признак started, а процент остаётся общим
+                 * по плану (progress.percent).
+                 */
+                'continue' => $this->continueLearning($plan, $visits, $today),
                 'progress' => [
                     // Доля курсов, к которым обучаемый хотя бы раз открыл
                     // материалы. Для пустого плана — 0, а не деление на ноль.
@@ -204,6 +220,47 @@ class MyLearningController extends Controller
                 ],
             ],
         ]);
+    }
+
+    /**
+     * Курс, который обучаемому стоит открыть следующим.
+     *
+     * @param  \Illuminate\Support\Collection<int, Group2learning>  $plan
+     * @param  \Illuminate\Support\Collection<int, int>  $visits
+     * @return array{course_id: int, title: string|null, module_title: string|null, status: string, started: bool, due_at: string|null}|null
+     */
+    private function continueLearning($plan, $visits, Carbon $today): ?array
+    {
+        $open = $plan->filter(function ($r) use ($today) {
+            $to = $this->date($r->study_to);
+
+            return $this->status($this->date($r->study_from), $to) !== 'completed'
+                && ($to === null || $to >= $today);
+        });
+
+        if ($open->isEmpty()) {
+            return null;
+        }
+
+        $ordered = $open->sortBy(function ($r) use ($visits, $today) {
+            $started = (int) ($visits[$r->course_id] ?? 0) > 0 ? 0 : 1;
+            $due = $this->date($r->deadline) ?? $this->date($r->study_to);
+
+            return [$started, $due === null ? PHP_INT_MAX : abs($today->diffInDays($due, false))];
+        })->values();
+
+        $row = $ordered->first();
+
+        return [
+            'course_id' => (int) $row->course_id,
+            'title' => $row->course?->title,
+            'module_title' => $row->parent_id
+                ? \App\Models\Aukstructure::whereKey($row->parent_id)->value('title')
+                : null,
+            'status' => $this->status($this->date($row->study_from), $this->date($row->study_to)),
+            'started' => (int) ($visits[$row->course_id] ?? 0) > 0,
+            'due_at' => ($this->date($row->deadline) ?? $this->date($row->study_to))?->toDateString(),
+        ];
     }
 
     /**

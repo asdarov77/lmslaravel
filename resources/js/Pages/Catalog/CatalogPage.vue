@@ -155,7 +155,7 @@
 import PageHeader from '../../components/ui/PageHeader.vue'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import AppToast from '../../components/ui/AppToast.vue'
-import { mapGetters } from 'vuex'
+import { mapGetters, mapState } from 'vuex'
 import { fetchCatalog, enrollCourse, unenrollCourse } from '../../api/catalog.api'
 import { asArray, unwrapResponse } from '../../api/envelope'
 
@@ -192,7 +192,8 @@ export default {
   }),
 
   computed: {
-    ...mapGetters('Auth', ['can', 'user']),
+    ...mapState('Auth', ['user']),
+    ...mapGetters('Auth', ['can']),
 
     categoryItems() {
       return asArray(this.categories)

@@ -97,7 +97,7 @@
 <script>
 import PageHeader from '../../components/ui/PageHeader.vue'
 import AppToast from '../../components/ui/AppToast.vue'
-import { mapGetters } from 'vuex'
+import { mapGetters, mapState } from 'vuex'
 import { fetchDashboardSummary } from '../../api/dashboard.api'
 import { unwrapResponse } from '../../api/envelope'
 
@@ -126,7 +126,8 @@ export default {
   }),
 
   computed: {
-    ...mapGetters('Auth', ['user', 'can']),
+    ...mapState('Auth', ['user']),
+    ...mapGetters('Auth', ['can']),
 
     userName() {
       return this.user?.fio || this.user?.name || ''

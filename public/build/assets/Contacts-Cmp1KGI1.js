@@ -1,0 +1,1 @@
+import{_ as e,f as o,b as n,o as s}from"./app-CdJA8BiZ.js";const a={name:"contacts"};function c(r,t,p,l,f,_){return s(),o("div",null,[...t[0]||(t[0]=[n("h2",null," Contacts page ",-1)])])}const u=e(a,[["render",c]]);export{u as default};

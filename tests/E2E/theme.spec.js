@@ -70,7 +70,7 @@ const snapshot = (page) =>
       cardText: cs(card)?.color ?? null,
       stored: localStorage.getItem('ui-theme'),
       icon: document.querySelector('[data-test="theme-toggle"] .v-icon')?.className.match(/mdi-\S+/)?.[0],
-      brand: getComputedStyle(document.querySelector('.app__brand')).color,
+      brand: cs(document.querySelector('.app__brand'))?.color ?? null,
       // Фон под брендом: он лежит в шапке, а не на фоне приложения.
       // Раньше проверка сравнивала цвет текста с фоном страницы, из-за
       // чего читаемость считалась неверно в обе стороны.
@@ -157,19 +157,30 @@ test.describe('Тема оформления', () => {
     await page.evaluate(() => localStorage.setItem('ui-theme', 'dark'))
 
     const routes = [
+      ['/#/categories', 'категории'],
       ['/#/', 'главная'],
       ['/#/groups/list', 'группы'],
       ['/#/courses/list', 'курсы'],
-      ['/#/categories', 'категории'],
       ['/#/my/learning', 'моё обучение'],
       ['/#/dashboard', 'кабинет'],
       ['/#/calendar', 'календарь'],
     ]
 
-    for (const [hash, name] of routes) {
-      await page.goto(BASE + hash, { waitUntil: 'domcontentloaded' })
-      await page.reload({ waitUntil: 'domcontentloaded' })
-      await page.waitForTimeout(1300)
+    for (const [i, [hash, name]] of routes.entries()) {
+      /*
+       * Первый маршрут открываем полной перезагрузкой — только так
+       * application boot читает ui-theme из LocalStorage. Дальше идём
+       * обычной навигацией по хэшу: тема уже применена к работающему
+       * приложению, а полная перезагрузка на каждом маршруте занимала
+       * столько времени, что оболочка не успевала смонтироваться и
+       * снапшот снимался с null вместо элемента (падение выглядело как
+       * проблема темы, хотя тема была применена верно).
+       */
+      const target = i === 0 ? `${BASE}/?t=boot${hash}` : BASE + hash
+
+      await page.goto(target, { waitUntil: 'domcontentloaded' })
+      await page.locator('.app__brand').first().waitFor({ state: 'attached', timeout: 30000 })
+      await page.waitForTimeout(400)
 
       const s = await snapshot(page)
       expect(s.html, `${name}: тёмная тема применена`).toBe('dark')

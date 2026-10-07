@@ -93,7 +93,7 @@ describe('Заголовок документа', () => {
 
   it('у ключевых разделов объявлен titleKey', () => {
     for (const [path, key] of [
-      ['/', 'home'], ['/user/list', 'users'], ['/groups/list', 'groups'],
+      ['/user/list', 'users'], ['/groups/list', 'groups'],
       ['/courses/list', 'courses'], ['/categories', 'categories'],
       ['/dashboard', 'dashboard'], ['/my/exams', 'exams'],
       ['/calendar', 'calendar'], ['/questions-main', 'questionbank'],
@@ -101,6 +101,14 @@ describe('Заголовок документа', () => {
       expect(routes, `маршрут ${path}`).toContain(`path: '${path}'`)
       expect(routes, `у ${path} должен быть titleKey`).toContain(`titleKey: '${key}'`)
     }
+
+    /*
+     * Корневой адрес больше не открывает свою страницу: это редирект на
+     * /dashboard, где заголовок уже объявлен. Проверять у него
+     * titleKey: 'home' бессмысленно — заголовка документа для отдельной
+     * страницы '/' не существует, есть только целевой маршрут.
+     */
+    expect(routes, "'/ редиректит на кабинет").toContain("redirect: { name: 'dashboard' }")
   })
 
   it('titleKey лежит в meta, а не внутри объекта крошки', () => {

@@ -66,6 +66,45 @@ test.describe('Логин и сессия', () => {
     expect(user, 'данные пользователя сохранены').toBeTruthy()
   })
 
+  /*
+   * Куда ведёт вход и корневой адрес.
+   *
+   * Раньше после входа был router.push('/'), а '/' открывал Home.vue —
+   * страницу-переключатель ролей, дублировавшую меню. Теперь '/' это
+   * редирект на /dashboard, где RoleDashboard сам выбирает вид по роли,
+   * поэтому проверяем все три сценария: вход через форму, корневой адрес
+   * у авторизованного и корневой адрес у гостя.
+   */
+  test('после входа открывается кабинет, а не главная', async ({ page }) => {
+    await loginViaForm(page)
+    await page.waitForTimeout(1500)
+
+    expect(page.url(), 'после входа должен быть /dashboard').toContain('/dashboard')
+    await expect(
+      page.getByText(/Личный кабинет|Кабинет/).first(),
+      'открылся кабинет',
+    ).toBeVisible()
+  })
+
+  test('корневой адрес авторизованного ведёт в кабинет', async ({ page }) => {
+    await auth(page)
+
+    await page.goto(BASE + '/#/', { waitUntil: 'domcontentloaded' })
+    await page.waitForTimeout(2000)
+
+    expect(page.url(), "'/' должен редиректить на /dashboard").toContain('/dashboard')
+  })
+
+  test('гость на корневом адресе попадает на вход', async ({ page }) => {
+    await page.context().clearCookies()
+    await page.addInitScript(() => window.localStorage.clear())
+
+    await page.goto(BASE + '/#/', { waitUntil: 'domcontentloaded' })
+    await page.waitForTimeout(2000)
+
+    expect(page.url(), 'гость должен оказаться на /login').toContain('/login')
+  })
+
   test('неверный пароль не создаёт сессию', async ({ page }) => {
     await page.goto(HASH + '/login', { waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(700)
@@ -178,8 +217,18 @@ test.describe('CRUD категории через UI', () => {
     const catId = (await created.json()).data.id
 
     await page.goto(HASH + '/categories', { waitUntil: 'domcontentloaded' })
-    await page.waitForTimeout(1000)
-    await expect(page.locator('body')).toContainText(title)
+
+    /*
+     * Ждём строку в таблице, а не фиксированную секунду.
+     *
+     * Список подгружается запросом, и под нагрузкой полного прогона
+     * (Ollama, dev-сервер, vite) он не успевал за 1000 мс. Тогда тест
+     * падал на «текст не найден» при полностью рабочем приложении.
+     */
+    await expect(
+      page.locator('tbody tr', { hasText: title }),
+      'созданная категория появилась в списке',
+    ).toBeVisible({ timeout: 20000 })
 
     const newTitle = title + ' (изменена)'
 

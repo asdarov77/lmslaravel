@@ -167,21 +167,83 @@ test.describe('раздел управления правами', () => {
     }
   })
 
+  /*
+   * Об��аемый не попадает в раздел прав.
+   *
+   * Пользователь создаётся здесь, а не берётся «первым обучаемым из
+   * базы»: такой поиск цеплялся за чужого человека, у которого могли
+   * оказаться свои прямые права (в боевой базе остался пользователь с
+   * выданными tutor.use/tutor.manage), и проверка падала на данных,
+   * которых тест не создавал. Прямые права вдобавок отключают ролевую
+   * матрицу — такой пользователь видит меньше, и «проверка закрытости»
+   * проверяла бы не то.
+   */
   test('обучаемый не попадает в раздел прав', async ({ page }) => {
     const { token } = await auth(page, 'Администратор')
+    const headers = { Authorization: 'Bearer ' + token }
+    let groupId = null
+    let userId = null
 
-    const listRes = await page.request.get(BASE + '/api/user/list', {
-      headers: { Authorization: 'Bearer ' + token }
-    })
-    const trainee = await findUserByRole(page, token, 'Обучаемый')
-    test.skip(!trainee, 'нет обучаемого с известным паролем')
+    try {
+      const groupRes = await page.request.post(BASE + '/api/groups', {
+        headers,
+        data: { groupname: `E2E Права ${Date.now()}` },
+      })
+      expect(groupRes.status(), 'создание группы').toBe(201)
+      groupId = (await groupRes.json()).data.id
 
-    await auth(page, trainee.fio)
-    await page.goto(`${BASE}/#/permissions`, { waitUntil: 'domcontentloaded' })
-    await page.waitForTimeout(3000)
+      const fio = `E2Е Права ${Date.now()}`
+      const reg = await page.request.post(BASE + '/api/register', {
+        headers,
+        data: { fio, password: '123', password_confirmation: '123', group_id: groupId },
+      })
+      expect(reg.status(), 'регистрация обучаемого').toBe(201)
+      userId = (await reg.json()).data.user?.id ?? null
 
-    await expect(page).toHaveURL(/#\/403/)
-    await expect(page.locator('[data-test="perm-user"]')).toHaveCount(0)
+      // Права берём у ответа /api/v1/me, а не у роли: именно по
+      // эффективному набору guard решает, пускать в раздел или нет.
+      const traToken = await apiLogin(page, { fio, password: '123' })
+      expect(traToken, 'вход обучаемого').toBeTruthy()
+
+      const me = await (
+        await page.request.get(BASE + '/api/v1/me', {
+          headers: { Authorization: 'Bearer ' + traToken },
+        })
+      ).json()
+      expect(
+        me.data.permission_slugs,
+        'обучаемому не должны достаться права на раздел прав',
+      ).not.toContain('users.permissions')
+
+      const ctx = page.context()
+      await ctx.addInitScript(
+        ([t, u]) => {
+          localStorage.clear()
+          localStorage.setItem('token', t)
+          localStorage.setItem('user', u)
+        },
+        [traToken, JSON.stringify(me.data.user)],
+      )
+
+      await page.goto(`${BASE}/#/permissions`, { waitUntil: 'domcontentloaded' })
+
+      /*
+       * Ждём редирект, а не фиксированные три секунды: решение принимает
+       * guard роутера, и до подтягивания прав с сервера он может ещё
+       * не сработать.
+       */
+      await expect(page, 'обучаемого уводит на страницу отказа').toHaveURL(/#\/403/, {
+        timeout: 20000,
+      })
+      await expect(page.locator('[data-test="perm-user"]')).toHaveCount(0)
+    } finally {
+      if (userId) {
+        await page.request.delete(`${BASE}/api/users/${userId}`, { headers }).catch(() => {})
+      }
+      if (groupId) {
+        await page.request.delete(`${BASE}/api/groups/${groupId}`, { headers }).catch(() => {})
+      }
+    }
   })
 
   test('пункт меню виден администратору и инструктору, но не обучаемому', async ({ page }) => {

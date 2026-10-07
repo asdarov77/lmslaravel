@@ -1,25 +1,36 @@
 <template>
-  <v-list density="compact" nav>
-    <template v-for="section in visibleSections" :key="section.key">
-      <v-list-subheader
-        v-if="section.showHeader"
-        class="u-nav__subheader"
-        data-test="nav-section"
-      >
-        {{ section.title }}
-      </v-list-subheader>
+  <!--
+    Навигация обёрнута в <nav> намеренно.
 
-      <v-list-item
-        v-for="item in section.items"
-        :key="item.key"
-        :to="item.link"
-        :prepend-icon="item.icon"
-        :title="item.title"
-        color="primary"
-        data-test="nav-item"
-      />
-    </template>
-  </v-list>
+    Без него список пунктов не является навигационной областью: скринридер
+    не может её перечислить как «навигацию», а тесты, ищущие пункты по
+    `nav .v-list-item`, получали пустой массив и падали на ровном месте.
+    Проп `nav` у v-list даёт только класс оформления, элемент <nav> не
+    появляется.
+  -->
+  <nav :aria-label="$t('app.menu.main')" class="u-nav">
+     <v-list density="compact" nav>
+      <template v-for="section in visibleSections" :key="section.key">
+        <v-list-subheader
+          v-if="section.showHeader"
+          class="u-nav__subheader"
+          data-test="nav-section"
+        >
+          {{ section.title }}
+        </v-list-subheader>
+
+        <v-list-item
+          v-for="item in section.items"
+          :key="item.key"
+          :to="item.link"
+          :prepend-icon="item.icon"
+          :title="item.title"
+          color="primary"
+          data-test="nav-item"
+        />
+      </template>
+    </v-list>
+  </nav>
 </template>
 
 <script>

@@ -1,0 +1,1 @@
+import{_ as o,f as s,b as n,a,F as r,r as c,o as l}from"./app-CdJA8BiZ.js";const _={};function m(f,e){const t=c("v-select");return l(),s(r,null,[e[0]||(e[0]=n("h1",null,"About",-1)),a(t,{label:"Вид занятия",items:["Лекция","Практическое занятие","Самостоятельная подготовка"]})],64)}const p=o(_,[["render",m]]);export{p as default};

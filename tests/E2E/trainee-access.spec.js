@@ -165,7 +165,19 @@ test.describe("Обучаемый: доступ к своему учебному
             await page.goto(`${HASH}/my/learning`, {
                 waitUntil: "domcontentloaded",
             });
-            await page.waitForTimeout(1800);
+
+            /*
+             * Ждём именно навигацию, а не фиксированное время.
+             *
+             * Пункты меню появляются только после того, как стор забрал
+             * права с сервера (GET /api/v1/me). Под нагрузкой полного
+             * прогона этого не успевало за 1800 мс, и проверка получала
+             * пустой массив при исправном приложении.
+             */
+            await page
+                .locator("nav [data-test=\"nav-item\"]")
+                .first()
+                .waitFor({ state: "visible", timeout: 20000 });
             await expectNotForbidden(page);
 
             const menu = await page.evaluate(() =>
@@ -249,11 +261,14 @@ test.describe("Обучаемый: доступ к своему учебному
             await page.goto(`${HASH}/questions`, {
                 waitUntil: "domcontentloaded",
             });
-            await page.waitForTimeout(2000);
-            const onForbidden = await page.evaluate(() =>
-                /В доступе отказано/i.test(document.body.innerText),
-            );
-            expect(onForbidden, "банк вопросов обучаемому закрыт").toBe(true);
+
+            // Ждём появления отказа, а не фиксированное время: решение
+            // принимает guard, и до подтягивания прав с сервера он
+            // может ещё не сработать.
+            await expect(
+                page.locator("body"),
+                "банк вопросов обучаемому закрыт",
+            ).toContainText(/В доступе отказано/i, { timeout: 20000 });
 
             // Личный кабинет отдаёт реальные данные.
             await page.goto(`${HASH}/dashboard`, {

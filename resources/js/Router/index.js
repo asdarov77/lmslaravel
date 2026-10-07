@@ -23,7 +23,19 @@ const router = createRouter({
 
 // Флаг «права уже синхронизированы с сервером» для текущей жизни
 // приложения (перезагрузка страницы сбрасывает его намеренно).
-let permissionsSynced = false
+/*
+ * Токен, для которого права уже синхронизированы.
+ *
+ * Раньше здесь был булев флаг на всё время жизни страницы, и это была
+ * утечка прав: при смене пользователя без перезагрузки (logout → вход
+ * другим человеком) новый сеанс продолжал работать с правами
+ * предыдущего. Гвард видел у старого пользователя users.permissions и
+ * пускал нового в раздел прав, которого у него нет.
+ *
+ * Теперь сравнивается именно токен: сменилась сессия — права
+ * перезапрашиваются.
+ */
+let syncedToken = null
 
 router.beforeEach(async (to , from, next) => {
         // Раньше здесь стояло localStorage.getItem("token") напрямую:
@@ -58,8 +70,8 @@ router.beforeEach(async (to , from, next) => {
         // новые права, а сессия (токен) живёт дольше, чем перелогин,
         // меню остаётся «укороченным», пока не дернем GET /api/v1/me.
         // Флаг синхронизации — на сессию жизни приложения (не в LS).
-        if (!permissionsSynced && TokenService.getToken()) {
-            permissionsSynced = true
+        if (token && syncedToken !== token) {
+            syncedToken = token
             await store.dispatch('Auth/fetchCurrentUser').catch(() => null)
         }
 

@@ -157,6 +157,59 @@ class ContentDeliveryTest extends TestCase
 
     // --- Режим nginx -------------------------------------------------
 
+    /**
+     * Сгенерированный фрагмент nginx указывает на каталог private.
+     *
+     * Регресс: команда подставляла alias от корня диска
+     * (storage/app/public), тогда как X-Accel-Redirect собирается из
+     * относительного пути БЕЗ префикса 'private/'. nginx искал файл на
+     * уровень выше и отдавал 404 на КАЖДЫЙ материал — при том, что все
+     * проверки подписи и internal проходили. Расхождение было видно
+     * только на живых запросах.
+     */
+    public function test_generated_nginx_config_points_alias_at_private_dir(): void
+    {
+        $root = rtrim((string) config('filesystems.disks.private.root'), '/');
+        $expected = $root.'/'.trim(PrivateContent::PREFIX, '/');
+
+        $path = tempnam(sys_get_temp_dir(), 'nginx-conf').'.conf';
+
+        try {
+            $this->artisan('content:nginx-config', ['--path' => $path])->assertExitCode(0);
+
+            $snippet = (string) file_get_contents($path);
+
+            $this->assertStringContainsString('alias '.$expected.'/;', $snippet);
+
+            // Корень диска без каталога private в alias быть не должен.
+            $this->assertStringNotContainsString('alias '.$root.'/;', $snippet);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    public function test_generated_nginx_config_marks_the_proxy_header(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'nginx-conf').'.conf';
+
+        try {
+            $this->artisan('content:nginx-config', ['--path' => $path])->assertExitCode(0);
+
+            $snippet = (string) file_get_contents($path);
+
+            // Без метки приложение не отдаёт X-Accel-Redirect и падает
+            // обратно на PHP — то есть режим nginx не работает вовсе.
+            $this->assertStringContainsString(
+                'proxy_set_header '.ContentDelivery::ACCEL_HEADER,
+                $snippet
+            );
+            $this->assertStringContainsString(ContentDelivery::accelMarker(), $snippet);
+            $this->assertStringContainsString('internal;', $snippet);
+        } finally {
+            @unlink($path);
+        }
+    }
+
     public function test_nginx_mode_returns_empty_body_and_accel_header(): void
     {
         $this->enableNginx();

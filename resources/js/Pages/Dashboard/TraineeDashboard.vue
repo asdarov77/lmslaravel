@@ -33,6 +33,43 @@
     </div>
 
     <div class="dash__grid">
+      <!--
+        Продолжить обучение.
+
+        Первый экран после входа, поэтому он идёт первым: конкретный курс
+        и кнопка, ведущая в него. Список всего плана ниже по странице —
+        он отвечает на другой вопрос («что вообще назначено»).
+      -->
+      <section v-if="continueItem" class="u-card dash__panel dash__continue" data-test="dash-continue">
+        <h2 class="u-card__title">{{ $t("dashboard.continueTitle") }}</h2>
+        <p class="u-page__subtitle">{{ continueHint }}</p>
+
+        <div class="dash__continue-body">
+          <div>
+            <span class="dash__list-title">{{ continueItem.title }}</span>
+            <span class="dash__list-sub">
+              {{ continueItem.module_title || continueItem.aircraft }}
+            </span>
+          </div>
+          <span class="u-badge" :class="statusBadge(continueItem.status)">
+            {{ $t(`plan.status.${continueItem.status}`) }}
+          </span>
+        </div>
+
+        <v-btn
+          class="mt-4"
+          color="primary"
+          :to="{
+            name: 'courses.itemmani',
+            query: { idEdit: continueItem.course_id },
+          }"
+          data-test="dash-continue-go"
+        >
+          {{ $t("dashboard.continueAction") }}
+          <v-icon end icon="mdi-arrow-right" size="16" aria-hidden="true"></v-icon>
+        </v-btn>
+      </section>
+
       <!-- Прогресс обучения -->
       <section class="u-card dash__panel">
         <h2 class="u-card__title">{{ $t("dashboard.progress") }}</h2>
@@ -187,6 +224,22 @@ export default {
 
     progressPercent() {
       return this.summary?.progress?.percent ?? 0;
+    },
+
+    /** Курс, который стоит открыть следующим (см. backend continue). */
+    continueItem() {
+      return this.summary?.continue ?? null;
+    },
+
+    /*
+     * Подсказка под заголовком зависит от того, начал ли обучаемый этот
+     * курс: «начать» и «продолжить» — разные обещания, и обещать
+     * продолжение тому, кто ещё не открывал курс, нечестно.
+     */
+    continueHint() {
+      return this.continueItem?.started
+        ? this.$t("dashboard.continueStartedHint")
+        : this.$t("dashboard.continueNewHint");
     },
 
     /**

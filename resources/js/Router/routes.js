@@ -20,10 +20,19 @@ const toIntOrNull = value => {
 
 const routes = [
 
+    /*
+     * Корневой адрес — вход в кабинет.
+     *
+     * Раньше здесь открывался Home.vue со списком ролей-переключателей.
+     * Страница была не «домом», а диспетчером с дублирующим меню, и
+     * после входа пользователь попадал не туда, куда ожидал. Теперь '/'
+     * редиректит на /dashboard, где RoleDashboard сам выбирает вид по
+     * роли. Старые закладки и кнопки «на главную» продолжают работать.
+     */
     {
         path: '/',
-        meta: { titleKey: 'home' },
-        component: () => import('../Pages/Home.vue'),
+        redirect: { name: 'dashboard' },
+        meta: { titleKey: 'dashboard' },
         name: 'home'
     },
     {
@@ -328,12 +337,12 @@ const routes = [
         component: () => import('../Pages/Dashboard/RoleDashboard.vue'),
         name: 'dashboard',
     },
-    {
-        path: '/auk',
-        meta: { permission: ['courses.view'], titleKey: 'dashboard' },
-        component: () => import('../Pages/User/UserPage.vue'),
-        name: 'index',
-    },
+    /*
+     * Маршрут /auk («Мои курсы») удалён вместе с User/UserPage.vue:
+     * это была та же таблица учебного плана, но без оформления, а
+     * пункт меню уже убрали как дубликат личного кабинета. Актуальный
+     * список назначений — /my/learning.
+     */
     //--------------------------- блок вопросов-----------------------------------
     {
         path: '/upload-gift',

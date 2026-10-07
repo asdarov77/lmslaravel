@@ -145,4 +145,101 @@ test.describe('Личный кабинет по роли', () => {
       await admin.ctx.close()
     }
   })
+
+  /*
+   * «Продолжить обучение» — первый блок кабинета обучаемого.
+   *
+   * Проверяем не только наличие карточки, но и что кнопка ведёт в
+   * материалы курса, а не в 404: маршрут курса требует параметр
+   * idEdit, и с неверным именем параметра vue-router бросает «Missing
+   * required param» прямо в рендере — карточка молча исчезает.
+   */
+  test('карточка «Продолжить обучение» ведёт в материалы курса', async ({ browser }) => {
+    /*
+     * Фикстура строится целиком: без неё проверять нечего.
+     *
+     * Чужого обучаемого с планом нельзя зайти — пароль неизвестен, а
+     * опираться на конкретного пользователя из боевой базы нельзя: он
+     * может быть перезаписан. Поэтому создаём группу, записываем её на
+     * курс, регистрируем обучаемого и заходим уже под ним.
+     *
+     * Порядок важен: уборка — в конце, ПОСЛЕ проверок. Раньше фикстура
+     * удалялась в finally до входа обучаемого, и тест падал на «логин не
+     * прошёл» для пользователя, которого только что удалили.
+     */
+    const admin = await session(browser, ADMIN)
+    const headers = { Authorization: 'Bearer ' + admin.token }
+    let groupId = null
+    let userId = null
+    // Вне try: курс нужен и в фикстуре, и в проверках после неё.
+    let courses = []
+    let trainee = null
+
+    try {
+      const groupRes = await admin.page.request.post(BASE + '/api/groups', {
+        headers,
+        data: { groupname: `E2E Продолжить ${unique()}` },
+      })
+      expect(groupRes.status(), 'создание группы').toBe(201)
+      groupId = (await groupRes.json()).data.id
+
+      courses = (await (await admin.page.request.get(BASE + '/api/courses', { headers })).json()).data
+      test.skip(!courses?.length, 'в базе нет ни одного курса')
+
+      const learning = await admin.page.request.post(BASE + '/api/learning', {
+        headers,
+        data: {
+          group_id: groupId,
+          entries: [{ course_id: courses[0].id, parent_id: null }],
+          category_id: courses[0].categories?.[0]?.id ?? null,
+          typeOfLesson: 'Лекция',
+          study_from: new Date(Date.now() - 864e5).toISOString().slice(0, 10),
+          study_to: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10),
+        },
+      })
+      expect(learning.status(), 'запись группы на курс').toBe(201)
+
+      const fio = `E2Е Продолжить ${unique()}`
+      const reg = await admin.page.request.post(BASE + '/api/register', {
+        headers,
+        data: { fio, password: PASSWORD, password_confirmation: PASSWORD, group_id: groupId },
+      })
+      expect(reg.status(), 'регистрация обучаемого').toBe(201)
+      userId = (await reg.json()).data.user?.id ?? null
+
+      trainee = await session(browser, { fio, password: PASSWORD })
+
+      await trainee.page.goto(HASH + '/dashboard', { waitUntil: 'domcontentloaded' })
+      await trainee.page.waitForTimeout(2500)
+
+      const card = trainee.page.locator('[data-test="dash-continue"]')
+      await expect(card, 'карточка показана при непустом плане').toBeVisible()
+      await expect(card).toContainText(/Продолжить обучение/)
+      await expect(card).toContainText(courses[0].title)
+
+      // Регресс: маршрут курса требует параметр idEdit. С неверным именем
+      // vue-router бросает «Missing required param» прямо в рендере, и
+      // карточка исчезает целиком.
+      await trainee.page.locator('[data-test="dash-continue-go"]').click()
+      await trainee.page.waitForTimeout(2500)
+
+      expect(trainee.page.url(), 'кнопка ведёт в материалы курса').toContain('courses/itemmani')
+      expect(trainee.page.url(), 'передан идентификатор курса').toContain(`idEdit=${courses[0].id}`)
+
+      const text = await body(trainee.page)
+      expect(text, 'материалы открылись, а не 404').not.toMatch(/Страница не найдена/i)
+    } finally {
+      // Убираем за собой даже при падении проверок.
+      if (trainee) {
+        await trainee.ctx.close()
+      }
+      if (userId) {
+        await admin.page.request.delete(`${BASE}/api/users/${userId}`, { headers }).catch(() => {})
+      }
+      if (groupId) {
+        await admin.page.request.delete(`${BASE}/api/groups/${groupId}`, { headers }).catch(() => {})
+      }
+      await admin.ctx.close()
+    }
+  })
 })

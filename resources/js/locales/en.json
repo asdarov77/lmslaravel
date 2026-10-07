@@ -12,6 +12,7 @@
     "reguser": "reguser",
     "courses": "Courses",
     "menu": {
+      "main": "Main navigation",
       "home": "Home",
       "about": "About us",
       "contacts": "Contacts",
@@ -520,7 +521,11 @@
     "loadError": "Failed to load dashboard data",
     "deadlineToday": "Today",
     "deadlineTomorrow": "Tomorrow",
-    "deadlineInDays": "in {days} d"
+    "deadlineInDays": "in {days} d",
+    "continueTitle": "Continue learning",
+    "continueAction": "Open course",
+    "continueStartedHint": "You have already started this course — pick up where you left off.",
+    "continueNewHint": "The next course in your learning plan."
   },
   "calendar": {
     "title": "Training calendar",
@@ -845,6 +850,54 @@
       "admin": "Administrator",
       "instructor": "Instructor",
       "trainee": "Trainee"
+    }
+  },
+  "profile": {
+    "title": "Profile",
+    "subtitle": "Your details and access rights",
+    "openPlan": "Open learning plan",
+    "about": "About you",
+    "permissions": "Access rights",
+    "permissionsHint": "These determine which sections are available to you",
+    "noName": "Name not set",
+    "noFields": "No additional details filled in",
+    "noPermissions": "No rights assigned",
+    "roleAdmin": "Administrator",
+    "roleUnknown": "No role assigned",
+    "fields": {
+      "email": "Email",
+      "phone": "Phone",
+      "city": "City",
+      "country": "Country",
+      "organization": "Organization",
+      "position": "Position",
+      "rank": "Rank",
+      "specialization": "Specialization"
+    },
+    "roles": {
+      "admin": "Administrator",
+      "instructor": "Instructor",
+      "trainee": "Trainee"
+    },
+    "permCourses": "Courses",
+    "permUsers": "Users",
+    "permGroups": "Groups",
+    "permExams": "Exams",
+    "permQuestions": "Questions",
+    "permTutor": "Tutor",
+    "permContent": "Materials",
+    "permSystem": "System",
+    "perms": {
+      "courses_view": "view courses",
+      "courses_manage": "manage courses",
+      "content_view": "view materials",
+      "users_view": "view users",
+      "groups_view": "view groups",
+      "groups_manage": "manage groups",
+      "exams_take": "take exams",
+      "exams_manage": "manage exams",
+      "questions_view": "view questions",
+      "tutor_use": "tutor"
     }
   }
 }

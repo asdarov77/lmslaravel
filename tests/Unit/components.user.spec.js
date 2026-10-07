@@ -32,7 +32,6 @@ const i18n = createI18n({
 
 import UserItemEdit from '../../resources/js/Pages/User/UserItemEdit.vue'
 import Register from '../../resources/js/Pages/Register.vue'
-import UserPage from '../../resources/js/Pages/User/UserPage.vue'
 import GroupList from '../../resources/js/Pages/GroupList.vue'
 import ru from '../../resources/js/locales/ru.json'
 import en from '../../resources/js/locales/en.json'
@@ -306,21 +305,15 @@ describe('Register: создание пользователя', () => {
   })
 })
 
-// ---------------------------------------- РЕГРЕСС: /auk -> UserPage.vue
-
-describe('UserPage: рендер без pageerror', () => {
-  it('страница рендерится, даже когда user ещё не пришёл', () => {
-    // Раньше шаблон содержал {{ user.fio }} без guard'а: компонент без
-    // <script> вообще не определяет user, и рендер падал с
-    // «Cannot read properties of undefined (reading 'fio')».
-    http.get.mockResolvedValue(envelope(null))
-
-    expect(() => mountPage(UserPage)).not.toThrow()
-
-    const wrapper = mountPage(UserPage)
-    expect(wrapper.text()).toContain('Добро пожаловать')
-  })
-})
+/*
+ * РЕГРЕСС удалённой страницы /auk.
+ *
+ * Здесь был тест «UserPage рендерится без pageerror». Он относился к
+ * странице, которой больше нет: /auk показывал ту же таблицу
+ * учебного плана, но без оформления, и был удалён вместе с пунктом
+ * меню. Тест на удалённый файл не возвращается — если /auk вернут,
+ * вернётся и регресс.
+ */
 
 // --------------------- РЕГРЕСС: пустой выпадающий список групп (v-select)
 

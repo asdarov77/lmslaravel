@@ -12,6 +12,7 @@
     "reguser": "Новый пользователь",
     "courses": "Курсы",
     "menu": {
+      "main": "Основная навигация",
       "home": "Главная страница",
       "about": "О нас",
       "contacts": "Контакты",
@@ -520,7 +521,11 @@
     "loadError": "Не удалось загрузить данные кабинета",
     "deadlineToday": "Сегодня",
     "deadlineTomorrow": "Завтра",
-    "deadlineInDays": "через {days} дн."
+    "deadlineInDays": "через {days} дн.",
+    "continueTitle": "Продолжить обучение",
+    "continueAction": "Открыть курс",
+    "continueStartedHint": "Вы уже начинали этот курс — возвращайтесь с того места, где остановились.",
+    "continueNewHint": "Следующий курс вашего учебного плана."
   },
   "calendar": {
     "title": "Календарь обучения",
@@ -845,6 +850,54 @@
       "admin": "Администратор",
       "instructor": "Инструктор",
       "trainee": "Обучаемый"
+    }
+  },
+  "profile": {
+    "title": "Профиль",
+    "subtitle": "Ваши данные и права в системе",
+    "openPlan": "Открыть учебный план",
+    "about": "О себе",
+    "permissions": "Права доступа",
+    "permissionsHint": "Определяют, какие разделы вам доступны",
+    "noName": "Имя не указано",
+    "noFields": "Дополнительные данные не заполнены",
+    "noPermissions": "Права не назначены",
+    "roleAdmin": "Администратор",
+    "roleUnknown": "Роль не назначена",
+    "fields": {
+      "email": "Эл. почта",
+      "phone": "Телефон",
+      "city": "Город",
+      "country": "Страна",
+      "organization": "Организация",
+      "position": "Должность",
+      "rank": "Звание",
+      "specialization": "Специализация"
+    },
+    "roles": {
+      "admin": "Администратор",
+      "instructor": "Инструктор",
+      "trainee": "Обучаемый"
+    },
+    "permCourses": "Курсы",
+    "permUsers": "Пользователи",
+    "permGroups": "Группы",
+    "permExams": "Экзамены",
+    "permQuestions": "Вопросы",
+    "permTutor": "Тренажёр",
+    "permContent": "Материалы",
+    "permSystem": "Система",
+    "perms": {
+      "courses_view": "просмотр курсов",
+      "courses_manage": "управление курсами",
+      "content_view": "просмотр материалов",
+      "users_view": "просмотр пользователей",
+      "groups_view": "просмотр групп",
+      "groups_manage": "управление группами",
+      "exams_take": "сдача экзаменов",
+      "exams_manage": "управление экзаменами",
+      "questions_view": "просмотр вопросов",
+      "tutor_use": "тренажёр"
     }
   }
 }
