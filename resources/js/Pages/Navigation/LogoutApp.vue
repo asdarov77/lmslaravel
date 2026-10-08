@@ -21,7 +21,6 @@ export default {
   },
   methods: {
     logout() {
-      //console.log("logout");
         this.$store.dispatch('Auth/logout')
         .then(() => { 
         this.$store.dispatch('Ui/logout');                   

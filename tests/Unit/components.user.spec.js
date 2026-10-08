@@ -35,9 +35,19 @@ import Register from '../../resources/js/Pages/Register.vue'
 import GroupList from '../../resources/js/Pages/GroupList.vue'
 import ru from '../../resources/js/locales/ru.json'
 import en from '../../resources/js/locales/en.json'
+import { toastItems, clear } from '../../resources/js/composables/useToast'
 
 // Конверт ровно такой, как отдаёт middleware ApiResponseEnvelope
 const envelope = data => ({ data: { success: true, data, error: null, meta: null } })
+/*
+ * Уведомления ушли в общую очередь composables/useToast, поэтому тесты
+ * смотрят её и очищают после себя: очередь переживает тест, и
+ * сообщение из одного утекло бы в следующий.
+ */
+
+const shownToasts = () => toastItems.map(({ type, text }) => ({ type, text }))
+const clearToasts = () => clear()
+
 
 const tick = () => new Promise(r => setTimeout(r, 0))
 
@@ -299,7 +309,8 @@ describe('Register: создание пользователя', () => {
     await wrapper.vm.submitForm()
     await tick()
 
-    expect(wrapper.vm.alertType).toBe('error')
+    expect(shownToasts().some((t) => t.type === 'error')).toBe(true)
+    clearToasts()
 
     expect(errors.join(' ')).not.toMatch(/Cannot read propert/)
   })

@@ -113,15 +113,14 @@
       </article>
     </div>
 
-    <AppToast v-model="alert" :type="alertType" :text="alertText"></AppToast>
   </div>
 </template>
 
 <script>
 import PageHeader from "../../components/ui/PageHeader.vue";
 import EmptyState from "../../components/ui/EmptyState.vue";
-import AppToast from "../../components/ui/AppToast.vue";
 import learningApi from "../../api/learning.api";
+import { toast } from "../../composables/useToast";
 
 /**
  * Учебный план обучаемого.
@@ -135,16 +134,13 @@ import learningApi from "../../api/learning.api";
 export default {
   name: "MyLearningPlan",
 
-  components: { PageHeader, EmptyState, AppToast },
+  components: { PageHeader, EmptyState },
 
   data() {
     return {
       items: [],
       loading: false,
       status: "all",
-      alert: false,
-      alertType: "success",
-      alertText: "",
     };
   },
 
@@ -246,9 +242,7 @@ export default {
     },
 
     notify(text, type = "success") {
-      this.alertText = text;
-      this.alertType = type;
-      this.alert = true;
+      toast.byType(type, text);
     },
   },
 };

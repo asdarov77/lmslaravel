@@ -4,6 +4,22 @@ import routes from './routes';
 import { TokenService } from '../services/storage.service';
 import store from '../Store';
 import { onUnauthorizedHandler } from '../api/httpClient';
+import NProgress from 'nprogress';
+import 'nprogress/nprogress.css';
+
+/*
+ * Полоса перехода между страницами.
+ *
+ * Раньше при переходе между маршрутами не было никакой индикации:
+ * пользователь кликал по пункту меню и ждал, пока страница
+ * перерисуется. Теперь сверху идёт тонкая полоса.
+ */
+NProgress.configure({
+  showSpinner: false,
+  trickleSpeed: 200,
+  minimum: 0.08,
+  easing: 'ease',
+});
 
 // Слой API не импортирует роутер (иначе возникает цикл
 // httpClient -> Router -> Store -> модули -> api -> httpClient).
@@ -38,6 +54,7 @@ const router = createRouter({
 let syncedToken = null
 
 router.beforeEach(async (to , from, next) => {
+  NProgress.start();
         // Раньше здесь стояло localStorage.getItem("token") напрямую:
         // при недоступном хранилище (about:blank, sandbox, приватный
         // режим) исключение всплывало как pageerror. TokenService
@@ -88,6 +105,7 @@ router.beforeEach(async (to , from, next) => {
         }
 
         next()
+  NProgress.done()
 })
 
 export default router

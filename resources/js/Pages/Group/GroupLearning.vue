@@ -170,12 +170,10 @@
       ></ButtonGroup>
     </v-card-actions>
 
-    <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>
   </v-card>
 </template>
 
 <script>
-import AppToast from "../../components/ui/AppToast.vue";
 import { mapState } from "vuex";
 import $api from "../../api/httpClient";
 import { asArray, unwrapArray, unwrapResponse, numericQuery } from "../../api/envelope";
@@ -186,7 +184,7 @@ import "vue3-treeselect/dist/vue3-treeselect.css";
 
 export default {
   name: "GroupLearning",
-  components: { AppToast, ButtonGroup, Treeselect },
+  components: { ButtonGroup, Treeselect },
 
   props: {
     /** Группа из маршрута. Не обязательна: группу можно выбрать в форме. */
@@ -199,9 +197,6 @@ export default {
       fieldErrors: {},
       loading: true,
       saving: false,
-      alert: false,
-      alertType: "",
-      snackbarText: "",
 
       // Форма хранится локально, а не в сторе: state.group — это
       // редактируемая группа, смешивать её с формой записи нельзя.
@@ -422,9 +417,7 @@ export default {
       if (this.saving) return;
 
       if (!this.validate()) {
-        this.alert = true;
-        this.alertType = "error";
-        this.snackbarText = "Проверьте заполнение формы";
+        toast.error(this.$t("groupLearning.checkForm"));
         return;
       }
 
@@ -456,18 +449,14 @@ export default {
           deadline: this.form.deadline || null,
         });
 
-        this.alert = true;
-        this.alertType = "success";
-        this.snackbarText = "Группа записана на курсы";
+        toast.success(this.$t("groupLearning.enrolled"));
         // Уходим только после успеха. Раньше redirect стоял в finally,
         // поэтому и неудачное сохранение выбрасывало на список групп,
         // и сообщение об ошибке пользователь уже не видел.
         this.$router.push("/groups/list");
       } catch (error) {
         this.collectErrors(error);
-        this.alert = true;
-        this.alertType = "error";
-        this.snackbarText = this.errors[0] || "Не удалось сохранить запись";
+        toast.error(this.errors[0] || this.$t("groupLearning.saveFailed"));
       } finally {
         this.saving = false;
       }
@@ -484,7 +473,7 @@ export default {
 
 <style>
 .v-card-text {
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .vue-treeselect__control {

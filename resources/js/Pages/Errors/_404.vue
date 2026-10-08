@@ -11,9 +11,3 @@
     </v-card>
   </v-container>
 </template>
-
-<script>
-export default {
-  name: 'NotFound'
-}
-</script>

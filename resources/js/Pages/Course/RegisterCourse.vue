@@ -108,7 +108,6 @@ export default {
       //     .post("/api/course", formData)
 
       //     .then((response) => {
-      //       console.log(response.data);
       //        this.$router.push("/courses/list");
             
       //     })
@@ -120,11 +119,9 @@ export default {
       //           );
       //         }
 
-      //         console.log(JSON.stringify(error.response.data));
       //       } else if (error.message) {
       //         this.errors.push("Something went wrong. Please try again");
 
-      //         console.log(JSON.stringify(error));
       //       }
       //     });
        }

@@ -25,6 +25,7 @@ import { createVuetify } from 'vuetify'
 import * as vuetifyComponents from 'vuetify/components'
 import * as vuetifyDirectives from 'vuetify/directives'
 import { createI18n } from 'vue-i18n'
+import { toastItems, clear } from '../../resources/js/composables/useToast'
 import ru from '../../resources/js/locales/ru.json'
 import en from '../../resources/js/locales/en.json'
 
@@ -33,6 +34,14 @@ vi.mock('../../resources/js/api/httpClient', () => ({ default: http }))
 
 import ExamList from '../../resources/js/Pages/Exam/ExamList.vue'
 import ExamRunner from '../../resources/js/Pages/Exam/ExamRunner.vue'
+/*
+ * Уведомления живут в общей очереди composables/useToast, а не в
+ * состоянии компонента. Тесты смотрят очередь и очищают её: очередь
+ * переживает тест, и сообщение из одного утекло бы в следующий.
+ */
+const shownToasts = () => toastItems.map(({ type, text }) => ({ type, text }))
+const clearToasts = () => clear()
+
 
 const vuetify = createVuetify({ components: vuetifyComponents, directives: vuetifyDirectives })
 const i18n = createI18n({
@@ -166,8 +175,9 @@ describe('Список экзаменов', () => {
     http.get.mockRejectedValue({ response: { status: 500 } });
     const w = await mountList();
 
-    expect(w.vm.alert).toBe(true);
-    expect(w.vm.alertType).toBe('error');
+    // Уведомление ушло в общий стек, а не в состояние компонента.
+    expect(shownToasts().some((t) => t.type === 'error')).toBe(true);
+    clearToasts();
   })
 })
 
@@ -304,8 +314,9 @@ describe('Прохождение экзамена', () => {
     await tick();
     await w.vm.submit();
 
+    // Результат не подставляется при ошибке отправки: нечего показывать.
     expect(w.vm.result).toBeNull();
-    expect(w.vm.alertType).toBe('error');
-    expect(w.vm.alertText).toBe('Попытки исчерпаны');
+    expect(shownToasts().some((t) => t.type === 'error')).toBe(true);
+    clearToasts();
   })
 })

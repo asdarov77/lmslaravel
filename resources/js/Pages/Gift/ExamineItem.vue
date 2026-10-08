@@ -42,7 +42,7 @@
 
         <!--                блок финальный результаты                -->
         <v-card v-if='isFinishExamClicked'>
-          <v-card-text class="text-center font-weight-bold" style="font-size: 20px;">Тестирование завершено</v-card-text>
+          <v-card-text class="text-center font-weight-bold" style="font-size: 1.25rem;">Тестирование завершено</v-card-text>
           <v-card-text>Всего вопросов: {{ questions.length }}</v-card-text>
           <v-card-text>Правильно отвечено: {{ correctAnswersCount }}</v-card-text>
           <v-card-text>Неправильно отвечено: {{ incorrectAnswersCount }}</v-card-text>
@@ -320,8 +320,6 @@ export default {
     nextQuestion() {
 
       //const nextId = this.current +1
-      //console.log(this.current, 'this.current')
-      //console.log(this.idEdit, "this.idEdit")
       this.goToQuestion(this.nextId);
       this.page = Math.ceil(this.nextId / this.pageSize);
     },

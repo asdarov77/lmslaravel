@@ -22,6 +22,7 @@ import ru from '../../resources/js/locales/ru.json'
 import en from '../../resources/js/locales/en.json'
 
 import CatalogPage from '../../resources/js/Pages/Catalog/CatalogPage.vue'
+import { toastItems, clear } from '../../resources/js/composables/useToast'
 
 const vuetify = createVuetify({ components: vuetifyComponents, directives: vuetifyDirectives })
 const i18n = createI18n({
@@ -31,6 +32,14 @@ const i18n = createI18n({
   fallbackLocale: 'ru',
   messages: { ru, en },
 })
+/*
+ * Уведомления ушли в общую очередь composables/useToast, поэтому тесты
+ * смотрят её и очищают после себя: очередь переживает тест, и
+ * сообщение из одного утекло бы в следующий.
+ */
+const shownToasts = () => toastItems.map(({ type, text }) => ({ type, text }))
+const clearToasts = () => clear()
+
 
 global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
 global.visualViewport = { addEventListener() {}, removeEventListener() {}, offsetLeft: 0, offsetTop: 0, width: 1024, height: 768, scale: 1 }
@@ -132,8 +141,8 @@ describe('CatalogPage: загрузка', () => {
     const wrapper = mountCatalog()
     await flush()
 
-    expect(wrapper.vm.alert).toBe(true)
-    expect(wrapper.vm.alertText).toBe('Каталог недоступен')
+    expect(shownToasts().map((t) => t.text)).toContain('Каталог недоступен')
+    clearToasts()
   })
 })
 
@@ -191,7 +200,8 @@ describe('CatalogPage: запись и отписка', () => {
 
     expect(enrollCourse).toHaveBeenCalledWith(2)
     expect(wrapper.vm.items.find(i => i.id === 2).enrolled).toBe(true)
-    expect(wrapper.vm.alertType).toBe('success')
+    expect(shownToasts().some((t) => t.type === 'success')).toBe(true)
+    clearToasts()
   })
 
   it('учитывает ответ сервера: повторная запись не меняет состояние наоборот', async () => {
@@ -214,8 +224,10 @@ describe('CatalogPage: запись и отписка', () => {
     await wrapper.vm.toggle(wrapper.vm.items.find(i => !i.enrolled))
 
     expect(wrapper.vm.items.find(i => i.id === 2).enrolled).toBe(false)
-    expect(wrapper.vm.alertType).toBe('error')
-    expect(wrapper.vm.alertText).toBe('Нет прав')
+    const shown = shownToasts()
+    expect(shown.some((t) => t.type === 'error')).toBe(true)
+    expect(shown.map((t) => t.text)).toContain('Нет прав')
+    clearToasts()
   })
 
   it('отписка снимает отметку', async () => {

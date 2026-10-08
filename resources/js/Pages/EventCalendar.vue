@@ -160,7 +160,7 @@
 
     <!-- Карточка периода по клику. Раньше клик по событию предлагал
          confirm() «удалить событие» — то есть демо-удаление из памяти. -->
-    <v-dialog v-model="detail" max-width="560">
+    <v-dialog v-model="detail" max-width="var(--modal-width)">
       <v-card v-if="selected">
         <v-card-title class="calendar__detail-title">{{ selected.course_title }}</v-card-title>
         <v-card-text>
@@ -233,7 +233,6 @@
       </v-card>
     </v-dialog>
 
-    <AppToast v-model="alert" :type="alertType" :text="alertText"></AppToast>
   </div>
 </template>
 
@@ -247,8 +246,8 @@ import ruLocale from "@fullcalendar/core/locales/ru";
 
 import PageHeader from "../components/ui/PageHeader.vue";
 import EmptyState from "../components/ui/EmptyState.vue";
-import AppToast from "../components/ui/AppToast.vue";
 import calendarApi from "../api/calendar.api";
+import { toast } from "../composables/useToast";
 
 /**
  * Календарь учебного процесса.
@@ -268,7 +267,7 @@ let uidCounter = 0;
 export default {
   name: "TrainingCalendar",
 
-  components: { PageHeader, EmptyState, AppToast, FullCalendar },
+  components: { PageHeader, EmptyState, FullCalendar },
 
   data() {
     const uid = `cal-${++uidCounter}`;
@@ -283,9 +282,6 @@ export default {
       loading: false,
       detail: false,
       selected: null,
-      alert: false,
-      alertType: "success",
-      alertText: "",
     };
   },
 
@@ -574,9 +570,7 @@ export default {
     },
 
     notify(text, type = "success") {
-      this.alertText = text;
-      this.alertType = type;
-      this.alert = true;
+      toast.byType(type, text);
     },
   },
 };

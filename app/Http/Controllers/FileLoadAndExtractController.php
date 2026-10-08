@@ -28,29 +28,51 @@ class FileLoadAndExtractController extends Controller
     ]);
 }
 
-public function extract(Request $request)
+    public function extract(Request $request)
 {
     $filePath = $request->input('filePath');
-    //$filePath ='TqFYliSLXKsq6mZ62x44mMqNgTuv6eJiNLbvjMZS.zip';
-        $path = storage_path('app/public/'. $filePath);
-        echo($path);
-    $dir = base_path();
-    echo($dir);
-    // Extract the contents of the ZIP archive
-     $zip = new ZipArchive;
-    if ($zip->open($path) === TRUE) {
-        //$zip->extractTo($dir);
-        $zip->extractTo(storage_path('app/public/private/'));
-        $zip->close();
-    } else {
+
+    // Архив лежит на диске 'private' по пути, который вернул upload(),
+    // поэтому абсолютный путь собирается из корня ЭТОГО диска, а не
+    // через storage_path(). Иначе после переноса контента за пределы
+    // public/ распаковка писала бы мимо courses_path.
+    $archive = Storage::disk('private')->path($filePath);
+
+    if (! is_file($archive)) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Архив не найден на диске'
+        ], 404);
+    }
+
+    $zip = new ZipArchive;
+
+    if ($zip->open($archive) !== true) {
         return response()->json([
             'status' => 'error',
             'message' => 'Failed to extract file'
         ], 500);
     }
 
+    // Каталог назначения — строго из конфига. Раньше здесь стоял
+    // storage_path('app/public/private/') мимо config('app.courses_path'),
+    // и после переноса материала распаковка молча создавала вторую
+    // копию курсов там, откуда их уже никто не читает.
+    $target = rtrim((string) config('app.courses_path'), '/');
+
+    if (! is_dir($target) && ! @mkdir($target, 0775, true) && ! is_dir($target)) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Не удалось создать каталог для материала: ' . $target
+        ], 500);
+    }
+
+    $zip->extractTo($target);
+    $zip->close();
+
     return response()->json([
-        'status' => 'success'
+        'status' => 'success',
+        'path' => $target
     ]);
 }
 

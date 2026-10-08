@@ -147,15 +147,14 @@
       {{ $t("catalog.noEnrollHint") }}
     </v-alert>
 
-    <AppToast v-model="alert" :type="alertType" :text="alertText" />
   </div>
 </template>
 
 <script>
 import PageHeader from '../../components/ui/PageHeader.vue'
 import EmptyState from '../../components/ui/EmptyState.vue'
-import AppToast from '../../components/ui/AppToast.vue'
 import { mapGetters, mapState } from 'vuex'
+import { toast } from '../../composables/useToast'
 import { fetchCatalog, enrollCourse, unenrollCourse } from '../../api/catalog.api'
 import { asArray, unwrapResponse } from '../../api/envelope'
 
@@ -174,7 +173,7 @@ const DEBOUNCE_MS = 300
 export default {
   name: 'CatalogPage',
 
-  components: { PageHeader, EmptyState, AppToast },
+  components: { PageHeader, EmptyState },
 
   data: () => ({
     items: [],
@@ -186,9 +185,6 @@ export default {
     loading: true,
     busyId: null,
     timer: null,
-    alert: false,
-    alertType: 'error',
-    alertText: '',
   }),
 
   computed: {
@@ -305,9 +301,7 @@ export default {
     },
 
     showMessage(text, type = 'success') {
-      this.alertText = text
-      this.alertType = type
-      this.alert = true
+      toast.byType(type, text)
     },
 
     showError(error) {

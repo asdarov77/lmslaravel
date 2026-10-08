@@ -49,7 +49,11 @@ export const navigationSections = [
       { key: 'classes', titleKey: 'app.menu.classes', link: '/classes', icon: 'mdi-file-tree-outline' },
       { key: 'questionbank', titleKey: 'app.menu.questionbank', link: '/questions-main', icon: 'mdi-help-circle-outline' },
       { key: 'categories', titleKey: 'app.menu.categories', link: '/categories', icon: 'mdi-domain' },
-      { key: 'files', titleKey: 'app.menu.files', link: '/files/add', icon: 'mdi-cloud-upload-outline' },
+      // Пункт ведёт в файловый менеджер, а не на страницу простой
+      // загрузки. /files/add остаётся отдельным маршрутом: его
+      // подключают формы курсов как компонент (FileLoadSimple.vue),
+      // и он не нужен как самостоятельный раздел.
+      { key: 'files', titleKey: 'app.menu.files', link: '/filemanager', icon: 'mdi-folder-multiple-outline' },
       { key: 'calendar', titleKey: 'app.menu.calendar', link: '/calendar', icon: 'mdi-calendar-month' },
       { key: 'learning', titleKey: 'app.menu.learning', link: '/group/learning', icon: 'mdi-account-group-outline' },
     ],
@@ -57,8 +61,8 @@ export const navigationSections = [
   {
     key: 'admin',
     items: [
-      { key: 'users', titleKey: 'app.menu.users', link: '/user/list', icon: 'mdi-account-multiple-outline' },
-      { key: 'groups', titleKey: 'app.menu.groups', link: '/groups/list', icon: 'mdi-account-group-outline' },
+      { key: 'users', titleKey: 'app.menu.users', link: '/user/list', icon: 'mdi-account-multiple-outline' , activeMatch: '/user' },
+      { key: 'groups', titleKey: 'app.menu.groups', link: '/groups/list', icon: 'mdi-account-group-outline' , activeMatch: '/groups' },
       { key: 'permissions', titleKey: 'app.menu.permissions', link: '/permissions', icon: 'mdi-shield-key-outline' },
       { key: 'settings', titleKey: 'app.menu.settings', link: '/settings/', icon: 'mdi-cog-outline' },
       { key: 'grades', titleKey: 'app.menu.grades', link: '/grade-boundary/', icon: 'mdi-percent-outline' },

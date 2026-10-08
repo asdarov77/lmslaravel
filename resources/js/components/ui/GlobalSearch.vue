@@ -15,7 +15,7 @@
 
     <v-dialog
       v-model="dialog"
-      max-width="720"
+      max-width="var(--modal-width-lg)"
       scrollable
       data-test="search-dialog"
       @after-enter="focusInput"

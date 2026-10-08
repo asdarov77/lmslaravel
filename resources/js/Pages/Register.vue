@@ -64,7 +64,6 @@
           <v-alert v-if="errors.length" type="error" density="compact" class="mb-4">
             <div v-for="error in errors" :key="error">{{ error }}</div>
           </v-alert>
-          <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>
         </v-form>
       </v-card-text>
       <v-card-actions>
@@ -77,11 +76,11 @@
 </template>
 
 <script>
-import AppToast from "../components/ui/AppToast.vue";
 import ButtonGroup from "../components/ButtonGroup.vue";
 import { mapState, mapGetters } from "vuex";
+import { toast } from "../composables/useToast";
 export default {
-  components: { AppToast,ButtonGroup },
+  components: { ButtonGroup },
   data() {
     return {
       fio: "",
@@ -89,10 +88,7 @@ export default {
       password: "",
       password_confirmation: "",
       errors: [],
-      alert: false,
-      alertType: "",
       overlay: false,
-      snackbarText: "",
     };
   },
   computed: {
@@ -125,8 +121,7 @@ export default {
     // Без catch() отклонённый запрос давал unhandled rejection и ронял
     // страницу регистрации. Пользователь всё равно может отправить форму.
     this.$store.dispatch("User/fetchGroups").catch(() => {
-      this.snackbarText = "Список групп недоступен: войдите в систему";
-      this.alertType = "warning";
+      toast.warning(this.$t("register.groupsUnavailable"));
     });
   },
   methods: {
@@ -153,28 +148,28 @@ export default {
           password_confirmation: this.password_confirmation,
         };
 
-        //console.log(formData,"formData");
         this.$store
           .dispatch("User/createUser", formData)
           .then(() => {
-            this.alert = true;
-            this.snackbarText = "Пользователь успешно создан";
-            this.alertType = "success";
+            toast.success(this.$t("register.created"));
           })
           .catch((error) => {
-            //console.error(error)
-            this.snackbarText = "Ошибка при создании пользователя";
-            this.alertType = "error";
+            toast.error(toast.fromError(error, this.$t("register.createFailed")));
           })
           .finally(() => {
-            // FIX ME вкючение оверлея и alert-а нивелируется переходом на пред.страницу
-            setTimeout(() => this.$router.back(), 3000);
+            /*
+             * Раньше здесь стоял setTimeout(3000): пауза нужна была,
+             * чтобы локальный тост успел отрисоваться ДО ухода со
+             * страницы. Сообщение переживает навигацию, поэтому ждать
+             * нечего, а пользователь три секунды смотрел на пустую
+             * форму с сообщением, которого уже не видно.
+             */
+            this.$router.back();
           });
       }
     },
     cancelBtnHead()
     {
-      //console.log('cancel');
       this.$router.go(-1);
     },
   },

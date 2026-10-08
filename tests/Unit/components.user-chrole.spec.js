@@ -18,6 +18,7 @@ import ru from '../../resources/js/locales/ru.json'
 import en from '../../resources/js/locales/en.json'
 
 import UserChrole from '../../resources/js/Pages/User/UserChrole.vue'
+import { toastItems, clear } from '../../resources/js/composables/useToast'
 
 const vuetify = createVuetify({ components: vuetifyComponents, directives: vuetifyDirectives })
 const i18n = createI18n({
@@ -27,6 +28,15 @@ const i18n = createI18n({
   fallbackLocale: 'ru',
   messages: { ru, en },
 })
+/*
+ * Уведомления ушли в общую очередь composables/useToast, поэтому тесты
+ * смотрят её и очищают после себя: очередь переживает тест, и
+ * сообщение из одного утекло бы в следующий.
+ */
+
+const shownToasts = () => toastItems.map(({ type, text }) => ({ type, text }))
+const clearToasts = () => clear()
+
 
 const get = vi.fn()
 const put = vi.fn()
@@ -160,9 +170,10 @@ describe('UserChrole: сохранение', () => {
     w.vm.selected = [1]
     await w.vm.submitForm()
 
-    expect(w.vm.alert).toBe(true)
-    expect(w.vm.alertType).toBe('error')
-    expect(w.vm.snackbarText).toBe('Нельзя менять собственные роли')
+    const shown = shownToasts()
+    expect(shown.some((t) => t.type === 'error')).toBe(true)
+    expect(shown.map((t) => t.text)).toContain('Нельзя менять собственные роли')
+    clearToasts()
     expect(push).not.toHaveBeenCalled()
   })
 
@@ -178,7 +189,8 @@ describe('UserChrole: сохранение', () => {
     await w.vm.submitForm()
 
     expect(w.vm.fieldError).toBe('Роль не найдена.')
-    expect(w.vm.snackbarText).toBe('Роль не найдена.')
+    expect(shownToasts().map((t) => t.text)).toContain('Роль не найдена.')
+    clearToasts()
   })
 
   it('ошибка загрузки ролей не роняет страницу', async () => {
@@ -192,8 +204,8 @@ describe('UserChrole: сохранение', () => {
     const w = factory()
     await vi.waitUntil(() => w.vm.loaded)
 
-    expect(w.vm.alert).toBe(true)
-    expect(w.vm.snackbarText).toBe('Нет доступа')
+    expect(shownToasts().map((t) => t.text)).toContain('Нет доступа')
+    clearToasts()
   })
 })
 

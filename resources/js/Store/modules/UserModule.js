@@ -128,9 +128,7 @@ const UserModule = {
           },
           // DELETE_GROUP(state, id) {
           //   const group_id = state.allGroups.findIndex(g => g.id === id)
-          //   console.log(state.allGroups.length)
           //   state.allGroups.splice(group_id, 1)
-          //   console.log(state.allGroups.length)
           // },
           // REMOVE_USER_GROUP(state, userIdx, group_id) {
           //   state.users[userIdx].groups.splice(group_id, 1)
@@ -164,7 +162,6 @@ const UserModule = {
         
             try {      
               const response = await fetchUser(id)
-              //console.log(response, 'fetchuser')          
               //commit('SET_TOTAL_USERS', response.data.length)      
               commit('SET_USER', unwrap(response))
               return Promise.resolve(response)
@@ -179,7 +176,6 @@ const UserModule = {
             try {
               //params = { ...params, exclude_by_name: 'SysAdmin' } 
               const response = await fetchGroups()
-              //console.log(response, 'groups')          
               const groups = asArray(unwrap(response))
               commit('SET_TOTAL_GROUPS', groups.length)
               commit('SET_ALL_GROUPS', groups)                     
@@ -192,7 +188,6 @@ const UserModule = {
             try {
               //params = { ...params, exclude_by_name: 'SysAdmin' } 
               const response = await fetchGroup(id)
-              //console.log(response, 'fetchGroup')
               commit('SET_GROUP', unwrap(response))      
               return Promise.resolve(response)
             } catch (error) {
@@ -242,7 +237,6 @@ const UserModule = {
           async fetchPermissions({ commit }) {
             try {
               const response = await fetchPermissions()
-              //console.log(response)
               commit('SET_ALL_PERMISSIONS', asArray(unwrap(response)))
               return Promise.resolve(response)
             } catch (error) {
@@ -286,7 +280,6 @@ const UserModule = {
               commit('SET_ALL_GROUPS', asArray(state.allGroups).concat(group ? [group] : []))
               return Promise.resolve(response)
             } catch (error) {
-            //console.log('error console', error)
               return Promise.reject(error)
             }
           },
@@ -321,7 +314,6 @@ const UserModule = {
           async chpassUser({ commit }, { id, data }) {
             try {
               const response = await chpassUser(id, data)
-              //console.log(response, 'chpassUser')
               commit('CHANGE_USER_PASSWORD', unwrap(response))
               return Promise.resolve(response)
             } catch (error) {
@@ -331,9 +323,7 @@ const UserModule = {
           // async removeUserGroup({ commit }, user, group_id) {
           //   try {
           //     const userIdx = state.users.findIndex(u => u.id === user.id)
-          //     console.log(state.users[userIdx])
           //     commit('REMOVE_USER_GROUP', userIdx, group_id)
-          //     console.log(state.users[userIdx])
           //     const response = await updateUser(user.id, state.users[userIdx])
           //     return Promise.resolve(response)
           //   } catch (error) {
@@ -343,9 +333,7 @@ const UserModule = {
           // async deleteGroupPermission({ commit }, group, permIdx) {
           //   try {
           //     const group_id = state.allGroups.findIndex(g => g.id === group.id)
-          //     console.log(state.allGroups[group_id])
           //     commit('DELETE_GROUP_PERMISSION', group_id, permIdx)
-          //     console.log(state.allGroups[group_id])
           //     const response = await updateGroup(group.id, state.allGroups[group_id])
           //     return Promise.resolve(response)
           //   } catch (error) {
@@ -358,7 +346,6 @@ const UserModule = {
     getters: {
 
         users(state) {
-            //console.log(state,'state+')
             return state.users.map(user => {
               return {
                 id: user.id,

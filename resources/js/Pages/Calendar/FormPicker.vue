@@ -27,13 +27,10 @@ export default {
   methods: {
     selectDate(curDate)
     {        
-       // console.log(curDate,"curDate")
     }
   },
   watch:{
     picked(value,oldValue) {        
-        //console.log(oldValue,"old Value");
-        //console.log(value,"new Value");
     }
 
   }

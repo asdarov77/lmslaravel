@@ -24,15 +24,13 @@
     <v-btn @click="toggleRemoveButtons" class="mr-2" color="error">{{ $t("questions.deleteAnswer") }}</v-btn>
     <v-btn v-if="saveChangesButtons" @click="saveChanges" class="mr-2" color="primary">{{ $t("questions.saveChanges") }}</v-btn>
   </v-form>
-  <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>
 </template>
 
 <script>
 import $api from "../../api/httpClient";
 import { unwrapResponse } from "../../api/envelope";
-import AppToast from "../../components/ui/AppToast.vue";
 export default {
-  components: { AppToast },
+  components: { },
   props:
       {
         idEdit: {
@@ -53,10 +51,7 @@ export default {
     
     //---- for popup
     isLoading: false,
-      alert: false,
-      alertType: "",
       overlay: false,
-      snackbarText: "",
       //    
     };
   },
@@ -78,7 +73,6 @@ export default {
           //this.correctAnswerIndex = this.editedQuestion.answers.findIndex(answer => answer.is_correct);
           this.correctAnswerIndex = this.editedQuestion.answers.findIndex(answer => answer.is_correct); //вариант без перемешивания
           //возвращается массив данных [ { ... } ], а не просто объект { ... }. Поэтому, чтобы присвоить данные из массива response.data переменной editedQuestion, вы должны использовать response.data[0], чтобы получить первый элемент массива.
-          //console.log(this.editedQuestion.question_text)
         })
         .catch(error => {
           console.log(error);
@@ -141,15 +135,23 @@ export default {
       this.saveChangesButtons = true
     },
     removeAnswer(index) {
-      if (this.correctAnswerIndex !== index) { // проверка что удаляемый ответ не является верным      
-      this.editedQuestion.answers.splice(index, 1);
-      this.toggleRemoveButtons()
-      this.saveChangesButtons = true
-    }
-    this.snackbarText = "Нельзя удалить правильный ответ";
-        this.alertType = "error";
-        this.alert = true;
+      /*
+       * Верный ответ удалять нельзя: вопрос без правильного варианта
+       * невозможно ни проверить, ни сохранить осмысленно.
+       *
+       * Раньше `return` стоял ПОСЛЕ блока условия, поэтому выполнение
+       * проваливалось мимо него: предупреждение «Нельзя удалить
+       * правильный ответ» появлялось даже при успешном удалении
+       * обычного варианта. Условие и выход теперь в одной ветке.
+       */
+      if (this.correctAnswerIndex === index) {
+        toast.warning(this.$t("questions.cannotRemoveCorrect"));
         return;
+      }
+
+      this.editedQuestion.answers.splice(index, 1);
+      this.toggleRemoveButtons();
+      this.saveChangesButtons = true;
     },
   }
 };

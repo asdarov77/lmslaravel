@@ -161,13 +161,12 @@
       </v-col>
     </v-row>
 
-    <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>
   </div>
 </template>
 
 <script>
-import AppToast from "../../components/ui/AppToast.vue";
 import { mapState, mapGetters } from "vuex";
+import { toast } from "../../composables/useToast";
 
 /**
  * Отдельная страница управления правами.
@@ -183,7 +182,6 @@ import { mapState, mapGetters } from "vuex";
  */
 export default {
   name: "PermissionsManager",
-  components: { AppToast },
 
   data() {
     return {
@@ -196,9 +194,6 @@ export default {
       saving: false,
       loading: false,
       loadError: "",
-      alert: false,
-      alertType: "",
-      snackbarText: "",
     };
   },
 
@@ -369,18 +364,16 @@ export default {
         // отклонил часть прав).
         await this.$store.dispatch("User/fetchManageableUsers");
         this.resetDraft();
-        this.snackbarText = this.$t("permissions.saved");
-        this.alertType = "success";
+        toast.success(this.$t("permissions.saved"));
       } catch (error) {
         const status = error?.response?.status;
-        this.snackbarText =
+        toast.error(
           status === 403
             ? this.$t("permissions.forbidden")
-            : this.$t("permissions.saveError");
-        this.alertType = "error";
+            : this.$t("permissions.saveError"),
+        );
       } finally {
         this.saving = false;
-        this.alert = true;
       }
     },
   },

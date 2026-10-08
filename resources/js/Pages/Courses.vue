@@ -169,7 +169,6 @@
       {{ $t("courses.delete.text", { name: pendingCourse?.title ?? '' }) }}
     </ConfirmDialog>
 
-    <AppToast v-model="toast.open" :type="toast.type" :text="toast.text" />
   </div>
 </template>
 
@@ -178,11 +177,10 @@ import { mapState } from "vuex";
 import PageHeader from "../components/ui/PageHeader.vue";
 import EmptyState from "../components/ui/EmptyState.vue";
 import ConfirmDialog from "../components/ui/ConfirmDialog.vue";
-import AppToast from "../components/ui/AppToast.vue";
 
 export default {
   name: "Courses",
-  components: { PageHeader, EmptyState, ConfirmDialog, AppToast },
+  components: { PageHeader, EmptyState, ConfirmDialog },
 
   data() {
     return {
@@ -194,7 +192,6 @@ export default {
       deleting: false,
       deleteDialog: false,
       pendingId: null,
-      toast: { open: false, text: "", type: "success" },
     };
   },
 
@@ -301,7 +298,7 @@ export default {
     },
 
     notify(text, type) {
-      this.toast = { open: true, text, type };
+      toast.byType(type, text);
     },
   },
 };

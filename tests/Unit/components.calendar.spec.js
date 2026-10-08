@@ -28,6 +28,7 @@ import { createVuetify } from 'vuetify'
 import * as vuetifyComponents from 'vuetify/components'
 import * as vuetifyDirectives from 'vuetify/directives'
 import { createI18n } from 'vue-i18n'
+import { toastItems, clear } from '../../resources/js/composables/useToast'
 import ru from '../../resources/js/locales/ru.json'
 import en from '../../resources/js/locales/en.json'
 
@@ -35,6 +36,18 @@ const http = vi.hoisted(() => ({ get: vi.fn() }))
 vi.mock('../../resources/js/api/httpClient', () => ({ default: http }))
 
 import EventCalendar from '../../resources/js/Pages/EventCalendar.vue'
+/*
+ * Хелперы для общей очереди уведомлений.
+ *
+ * Уведомления больше не живут в состоянии компонента (alert/alertType),
+ * они попадают в общий стек composables/useToast. Тесты смотрят его
+ * напрямую и очищают после себя: очередь переживает тест, иначе
+ * сообщение из одного теста попало бы в следующий.
+ */
+
+const shownToasts = () => toastItems.map(({ type, text }) => ({ type, text }))
+const clearToasts = () => clear()
+
 
 const vuetify = createVuetify({ components: vuetifyComponents, directives: vuetifyDirectives })
 const i18n = createI18n({
@@ -234,9 +247,11 @@ describe('Календарь обучения', () => {
     const wrapper = await mountCalendar()
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.vm.alert).toBe(true)
-    expect(wrapper.vm.alertType).toBe('error')
-    expect(wrapper.vm.alertText).not.toBe('')
+    // Уведомление теперь в общем стеке, а не в состоянии компонента:
+    // проверяем, что сервис получил сообщение, и очищаем очередь,
+    // чтобы она не протекла в следующий тест.
+    expect(shownToasts().some((t) => t.type === 'error' && t.text)).toBe(true)
+    clearToasts()
   })
 
   it('запрет доступа сообщается отдельным текстом', async () => {
@@ -245,8 +260,11 @@ describe('Календарь обучения', () => {
     const wrapper = await mountCalendar()
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.vm.alertType).toBe('error')
-    expect(wrapper.vm.alertText).toBe(wrapper.vm.$t('calendar.forbidden'))
+    // Текст запрета доступа — из перевода, а не сырой код ответа:
+    const shown = shownToasts()
+    expect(shown.some((t) => t.type === 'error')).toBe(true)
+    expect(shown.map((t) => t.text)).toContain(wrapper.vm.$t('calendar.forbidden'))
+    clearToasts()
   })
 
   it('форматирует даты без сдвига на сутки', async () => {

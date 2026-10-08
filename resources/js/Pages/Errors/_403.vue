@@ -1,19 +1,18 @@
 <template>
-  <v-container fluid>
-    <v-card>
-      <v-list>
-        <!-- В Vuetify 3 нет v-list-item-content: текст кладётся прямо в
-             v-list-item, а обёртка VListItemContent удалена. -->
-        <v-list-item>
-          <v-list-item-title class="text-h6">В доступе отказано</v-list-item-title>
-        </v-list-item>
-      </v-list>
-    </v-card>
-  </v-container>
+  <div class="u-page">
+    <!--
+      Заголовок страницы — только через PageHeader: раньше половина
+      страниц рисовала h1/h2 вручную, и заголовки выглядели по-разному.
+    -->
+    <PageHeader :title="$t('errors.forbidden')" :subtitle="$t('errors.forbiddenText')" />
+  </div>
 </template>
 
 <script>
+import PageHeader from '../../components/ui/PageHeader.vue'
+
 export default {
-  name: 'Forbidden'
+  name: 'Forbidden',
+  components: { PageHeader },
 }
 </script>

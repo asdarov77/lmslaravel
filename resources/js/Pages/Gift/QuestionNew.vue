@@ -56,7 +56,6 @@
         </v-col>
       </v-row>
     </v-form>
-    <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>
   </v-card> -->
 
   <!-- ############################################################################################################# -->
@@ -104,17 +103,15 @@
         </v-col>
       </v-row>
     </v-form>
-    <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>
   </v-card>
 </template>
 
 
 <script>
 import $api from "../../api/httpClient";
-import AppToast from "../../components/ui/AppToast.vue";
 import { required, minLength, minValue, between, oneOf } from 'vuelidate/lib/validators'
+import { toast } from "../../composables/useToast";
 export default {
-  components: { AppToast },
   props:
   {
     category_id: {
@@ -142,10 +139,7 @@ export default {
 
       //---- for popup
       isLoading: false,
-      alert: false,
-      alertType: "",
       overlay: false,
-      snackbarText: "",
       //isFormCorrect: false,
 
       questionRules: [
@@ -190,16 +184,21 @@ export default {
 
       this.$refs.form.validate()
         .then(isValid => {
-          //console.log(isValid, "isValid")
           if (isValid.valid) {
-            console.log("форма валидна")
             $api.post(`/api/questions/`, this.editedQuestion)
-              .then(response => {
-                console.log(response);
+              .then(() => {
+                toast.success(this.$t("questions.saved"));
                 this.$router.push({ name: 'questions.main' });
               })
+              /*
+               * Раньше здесь стоял только console.log(error): страница
+               * молчала при неудачном сохранении, пользователь нажимал
+               * «Сохранить» и не получал никакого ответа. Кроме того,
+               * объявленный в шаблоне AppToast не заполнялся никогда —
+               * уведомление было мёртвым.
+               */
               .catch(error => {
-                console.log(error);
+                toast.error(toast.fromError(error, this.$t("questions.saveFailed")));
               });
             this.saveChangesButtons = false
 

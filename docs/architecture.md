@@ -105,6 +105,7 @@ routes/api.php ─► middleware: auth:sanctum + permission:a,b (здесь «л
 | `app/Http/Controllers/PrivateController.php` | Выдача: полный ответ для `index.html`, поток для вложенных файлов, либо `X-Accel-Redirect`. Здесь же выдача подписанного префикса (`signedUrl`). |
 | `app/Support/ContentDelivery.php` | Режим выдачи: `php` или `nginx`. Читает `settings.content_delivery` с TTL 5 секунд. **X-Accel включается только если запрос помечен заголовком из `APP_KEY`** — иначе при `php artisan serve` Symfony отдал бы пустое тело со статусом 200. |
 | `app/Console/Commands/ContentNginxConfigCommand.php` | `content:nginx-config` — печатает готовый фрагмент nginx (внутренний путь, корень хранилища, метка) из тех же источников, что и приложение. |
+| `app/Console/Commands/RelocateContentCommand.php` | `content:relocate` — перенос каталога материала за пределы `public/`. Считает файлы и байты до и после, отказывается переносить внутрь `public/` или `storage/app/public`, умеет `--dry-run`. |
 | `app/Console/Commands/CheckPrivateContentExposure.php` | `content:check-exposure` — проверяет, что контент не отдаётся веб-сервером напрямую. |
 
 Три независимых слоя защиты: подпись → `realpath` → `internal`-location nginx.
@@ -113,6 +114,14 @@ routes/api.php ─► middleware: auth:sanctum + permission:a,b (здесь «л
 делает location недоступным снаружи (прямой запрос даёт 404). `secure_link`
 добавлять **не надо**: подпись наследуется относительными ссылками, а
 `secure_link` требует отдельного токена на каждый ресурс и ломает отрисовку.
+
+**Где лежит каталог контента.** `storage/app/courses/private/`, то есть
+вне `public/`. Раньше он был в `storage/app/public/private/`, и
+`php artisan storage:link` (обычный шаг деплоя) открывал весь материал по
+`/storage/private/...` без проверки подписи. Перенос выполнен командой
+`content:relocate`; путь задаётся `COURSES_PATH` (по умолчанию — новое
+место), и единственный потребитель этого пути в коде — сам конфиг, так
+что менять нужно `.env` и `alias` в nginx, а не код.
 
 ---
 
@@ -192,6 +201,36 @@ routes/api.php ─► middleware: auth:sanctum + permission:a,b (здесь «л
 | `app/Http/Controllers/CalendarController.php` | События календаря из периодов учебных записей и `deadline`. |
 | `app/GiftParser/GiftParser.php` | Разбор GIFT-файлов в пары вопрос/ответ. |
 | `app/Lyx/*` | Разбор и конвертация `.lyx` (LyX). Код мёртвый: контроллер, который его звал, на маршрутах не смонтирован. |
+
+---
+
+## 8.1. Файловый менеджер
+
+Подробно — `docs/file-manager.md`. Здесь только «за что отвечает класс».
+
+| Класс | За что отвечает |
+|---|---|
+| `app/Support/FileManager/EntryName.php` | Единственная проверка имени файла и папки. Запрещает разделители, NUL, ведущую/хвостовую точку. Отвергает, а не чистит: молчаливая очистка создала бы объект, которого пользователь не просил. |
+| `app/Support/FileManager/Location.php` | Арифметика путей и диск. **Не знает о базе**: что такое папка и кому она принадлежит, решает `FolderTree`. Проверка `isInsideUserRoot` сверяет `realpath` с корнем пользователя — это ловит симлинк, прошедший проверку имени. |
+| `app/Support/FileManager/FolderTree.php` | Дерево папок: кто чей, путь от корня, зацикливание, свободное имя. Родитель проверяется на принадлежность пользователю. |
+| `app/Support/FileManager/FileManagerService.php` | Операции над папками и файлами. Порядок «сначала диск, потом база» и откат зафиксированы здесь, а не в контроллере. |
+| `app/Support/FileManager/ChunkUploadService.php` | Протокол загрузки по частям. `init` идемпотентен по отпечатку файла — это докачка. Размер каждой части сверяется с ожидаемым, иначе объявленный размер ничем не ограничен. |
+| `app/Http/Controllers/FileManagerController.php` | Каталоги, папки, файлы, скачивание. Контроллер тонкий намеренно. |
+| `app/Http/Controllers/ChunkUploadController.php` | Приём частей. Отдельный от `FileManagerController`: у него другая форма запроса (тело — данные, а не JSON). |
+| `app/Console/Commands/FileLimitsCommand.php` | `files:limits`: сравнивает размер части с `post_max_size` и печатает готовые строки nginx. |
+| `app/Console/Commands/PruneFileUploadsCommand.php` | `files:prune-uploads`: убирает брошенные загрузки и их части. |
+
+**Почему файлы лежат вне `public/`.** Каталог `storage/app/public`
+попадает под корень веб-сервера через `php artisan storage:link`, и всё,
+что туда легло, становится доступно по адресу `/storage/…` без проверки
+прав. Старый `FilesController::upload` писал на диск по умолчанию, и одна
+смена `FILESYSTEM_DISK=public` тихо делала личные файлы доступными всем,
+у кого есть ссылка.
+
+**Что не ломает менеджер.** Старый `POST /api/files/add` и компонент
+`FileLoadSimple.vue` (его подключают формы курсов) продолжают работать;
+записи, созданные до менеджера, имеют `path = null` и менеджером не
+показываются.
 
 ---
 

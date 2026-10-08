@@ -190,9 +190,6 @@
     <v-alert v-if="errors.length" type="error" density="compact" class="mb-4">
             <div v-for="error in errors" :key="error">{{ error }}</div>
           </v-alert>
-    <!-- <v-dialog v-model="dialogReg">
-      <UserLearning :idEdit="user.id" @submitForm="this.dialogReg = false" @cancelBtn="cancelBtnRegistration"></UserLearning>
-    </v-dialog> -->
   </v-card>
 </template>
 
@@ -299,7 +296,6 @@ export default {
         //  $api
         //    .put(urlToUp, formData)
         //    .then((response) => {
-        //     console.log(formData);            
         //      //this.$router.push("/user/list");
         //      // this.$router.back();
         //    })
@@ -311,11 +307,9 @@ export default {
         //          );
         //        }
 
-        //        console.log(JSON.stringify(error.response.data));
         //      } else if (error.message) {
         //        this.errors.push("Something went wrong. Please try again");
 
-        //        console.log(JSON.stringify(error));
         //      }
         //    });
        }

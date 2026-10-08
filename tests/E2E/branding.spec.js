@@ -94,7 +94,12 @@ test.describe('Брендинг', () => {
 
     expect(await page.title()).toBe('LMS — Группы')
 
-    await page.locator('button:has-text("eng")').first().click()
+    /*
+     * Переключатель языка в футере — кнопки со значками RU/EN и
+     * aria-pressed. Раньше это был голый текст «eng/rus» без подписи
+     * для скринридера и без отметки текущего языка.
+     */
+    await page.getByRole('button', { name: 'English' }).click()
     await page.waitForTimeout(1200)
 
     // Заголовок обязан ехать за языком: хук маршрутизатора при смене
@@ -102,7 +107,7 @@ test.describe('Брендинг', () => {
     expect(await page.title()).toBe('LMS — Groups')
     await expect(page.locator('[data-test="app-brand"]')).toContainText('Learning management system')
 
-    await page.locator('button:has-text("rus")').first().click()
+    await page.getByRole('button', { name: 'Русский' }).click()
     await page.waitForTimeout(1200)
     expect(await page.title()).toBe('LMS — Группы')
   })

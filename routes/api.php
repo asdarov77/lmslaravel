@@ -17,6 +17,8 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\GroupController;
 use App\Http\Controllers\FilesController;
+use App\Http\Controllers\FileManagerController;
+use App\Http\Controllers\ChunkUploadController;
 use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\FavoriteController;
@@ -52,11 +54,11 @@ use Illuminate\Support\Facades\Storage;
 //Route::any('*','TestController@test');
 
 //
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 // Версионированный алиас логина. Путь указан БЕЗ префикса /api: файл уже
 // смонтирован под 'api', и раньше '/api/v1/login' давал '/api/api/v1/login'.
 // Алиас сохранён, чтобы не сломать клиентов, которые зовут /api/v1/login.
-Route::post('/v1/login', [AuthController::class, 'login'])->name('api.v1.login');
+Route::post('/v1/login', [AuthController::class, 'login'])->name('api.v1.login')->middleware('throttle:login');
 
 // Categories CRUD for the existing (unversioned) frontend, which calls /api/categories.
 // The v1-prefixed group below serves /api/v1/categories for the versioned clients.
@@ -133,7 +135,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     });
 });
 //Route::post('login', ['before' => 'throttle:2,5', 'uses' => 'AuthController@login']);
-Route::post('/register', [AuthController::class, 'register']);
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
 //
 // блок пользователей
 //
@@ -253,6 +255,66 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('/files/add', [FilesController::class, 'upload'])
         ->middleware('permission:files.upload,content.manage,courses.manage');
 });
+
+//
+// Файловый менеджер.
+//
+// Старый POST /files/add остаётся: он используется компонентом
+// FileLoadSimple.vue, который подключают страницы курсов. Менеджер его
+// не заменяет — у него другая модель (папки, перенос, докачка), и
+// ломать существующий сценарий незачем.
+//
+// Право одно на весь блок, а не на каждый маршрут: перечисление
+// прав в десяти строках разъезжается сам собой — добавили маршрут и
+// забыли middleware, и он стал доступен всем, кто вошёл. Здесь забыть
+// нельзя: маршрут без прав попал бы внутрь группы без них.
+//
+// Чтение закрыто тем же правом, что и запись. Файлы менеджера — личные
+// файлы пользователя, а не учебный контент: право content.view
+// («смотреть АУК») не даёт оснований видеть личные загрузки.
+//
+Route::middleware(['auth:sanctum', 'permission:files.upload,content.manage,courses.manage'])
+    ->prefix('filemanager')
+    ->group(function () {
+        // Содержимое каталога: папки, файлы, хлебные крошки, пределы.
+        Route::get('/', [FileManagerController::class, 'index'])->name('api.filemanager.index');
+
+        // Папки.
+        Route::get('/folders', [FileManagerController::class, 'folders'])->name('api.filemanager.folders.index');
+        Route::post('/folders', [FileManagerController::class, 'storeFolder'])->name('api.filemanager.folders.store');
+        Route::patch('/folders/{folder}', [FileManagerController::class, 'updateFolder'])
+            ->whereNumber('folder')->name('api.filemanager.folders.update');
+        Route::post('/folders/{folder}/move', [FileManagerController::class, 'moveFolder'])
+            ->whereNumber('folder')->name('api.filemanager.folders.move');
+        Route::delete('/folders/{folder}', [FileManagerController::class, 'destroyFolder'])
+            ->whereNumber('folder')->name('api.filemanager.folders.destroy');
+
+        // Файлы.
+        //
+        // Статические сегменты move/delete объявлены ПЕРЕД параметром
+        // {file}. whereNumber('file') их и не пустил бы, но порядок
+        // объявления в этом файле значим (см. заметку в начале), и
+        // полагаться только на whereNumber — значит оставить правило
+        // работать при первой же правке маршрута.
+        Route::post('/files/move', [FileManagerController::class, 'moveFiles'])->name('api.filemanager.files.move');
+        Route::post('/files/delete', [FileManagerController::class, 'destroyFiles'])->name('api.filemanager.files.destroy');
+        Route::patch('/files/{file}', [FileManagerController::class, 'updateFile'])
+            ->whereNumber('file')->name('api.filemanager.files.update');
+        Route::delete('/files/{file}', [FileManagerController::class, 'destroyFile'])
+            ->whereNumber('file')->name('api.filemanager.files.destroy');
+        Route::get('/files/{file}/download', [FileManagerController::class, 'download'])
+            ->whereNumber('file')->name('api.filemanager.download');
+
+        // Загрузка по частям: init / chunk / complete / abort.
+        Route::post('/uploads/init', [ChunkUploadController::class, 'init'])->name('api.filemanager.uploads.init');
+        Route::post('/uploads/{upload}/chunk', [ChunkUploadController::class, 'chunk'])
+            ->where('upload', '[a-f0-9]{40}')->name('api.filemanager.uploads.chunk');
+        Route::post('/uploads/{upload}/complete', [ChunkUploadController::class, 'complete'])
+            ->where('upload', '[a-f0-9]{40}')->name('api.filemanager.uploads.complete');
+        Route::delete('/uploads/{upload}', [ChunkUploadController::class, 'destroy'])
+            ->where('upload', '[a-f0-9]{40}')->name('api.filemanager.uploads.destroy');
+    });
+
 //
 // блок курсов старый
 //
@@ -489,6 +551,14 @@ Route::prefix('v1/tutor')->middleware('auth:sanctum')->group(function () {
 
 // Настройки тренажёра: вкл/выкл и диагностика движка.
 // Регистрируются до /settings/{setting}, иначе перехватятся параметром.
+// Уведомления пользователя (колокольчик в шапке).
+Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])
+    ->middleware('auth:sanctum');
+Route::post('/notifications/{notification}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])
+    ->middleware('auth:sanctum');
+Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])
+    ->middleware('auth:sanctum');
+
 Route::get('/settings/tutor', [SettingsController::class, 'tutor'])
     ->middleware(['auth:sanctum', 'permission:settings.manage']);
 Route::put('/settings/tutor', [SettingsController::class, 'updateTutor'])

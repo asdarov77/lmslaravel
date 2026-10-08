@@ -48,7 +48,12 @@
         </v-form>
       </v-card-text>
       <v-card-actions class="d-flex justify-space-between">
-        <v-btn @click="clearDatabase" :loading="clearing" :disabled="loading" class="mr-auto" color="error">
+        <!--
+          Кнопка только открывает диалог. Раньше она стирала 13 таблиц
+          контента одним кликом: промахнуться можно было легко, а
+          отменить было нечем.
+        -->
+        <v-btn @click="confirmClear = true" :disabled="loading" class="mr-auto" color="error">
           {{ $t("classes.clearData") }}
         </v-btn>
         <ButtonGroup
@@ -60,11 +65,24 @@
       </v-card-actions>
     </v-card>
   </v-col>
+
+  <ConfirmDialog
+    v-model="confirmClear"
+    :title="$t('classes.clearTitle')"
+    :confirm-text="$t('classes.clearConfirm')"
+    :cancel-text="$t('common.cancel')"
+    :busy="clearing"
+    @cancel="confirmClear = false"
+    @confirm="clearDatabase"
+  >
+    {{ $t("classes.clearText") }}
+  </ConfirmDialog>
 </template>
 
 <script>
 import { mapState, mapGetters } from "vuex";
 import ButtonGroup from "../../components/ButtonGroup.vue";
+import ConfirmDialog from "../../components/ui/ConfirmDialog.vue";
 import $api from "../../api/httpClient";
 import { unwrapArray, unwrapResponse } from "../../api/envelope";
 
@@ -134,6 +152,7 @@ export default {
   name: "AddClass",
   components: {
     ButtonGroup,
+    ConfirmDialog,
   },
   data() {
     return {
@@ -144,6 +163,9 @@ export default {
       path: "",
       loading: false,
       clearing: false,
+      // Диалог подтверждения очистки: без него кнопка стирала базу
+      // одним кликом.
+      confirmClear: false,
       progress: 0,
       progressColor: "blue",
       errorMessage: "",
@@ -286,6 +308,9 @@ export default {
         // список тегов возвращаем к исходному (раньше оставалась
         // урезанная копия без только что очищенных классов).
         this.tags = this.allTags;
+        // Диалог закрываем после ответа, а не до: при ошибке он
+        // остаётся открытым, чтобы можно было повторить или отменить.
+        this.confirmClear = false;
         this.successMessage = "База данных очищена";
         await this.loadTags();
         return true;

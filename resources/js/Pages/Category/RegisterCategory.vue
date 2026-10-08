@@ -37,7 +37,6 @@
       ></v-alert>
     </FormCard>
 
-    <AppToast v-model="toast.open" :type="toast.type" :text="toast.text" />
   </div>
 </template>
 
@@ -45,11 +44,11 @@
 import { mapState, mapGetters } from "vuex";
 import { asArray, extractFieldErrors } from "../../api/envelope";
 import FormCard from "../../components/ui/FormCard.vue";
-import AppToast from "../../components/ui/AppToast.vue";
+import { toast } from "../../composables/useToast";
 
 export default {
   name: "RegisterCategory",
-  components: { FormCard, AppToast },
+  components: { FormCard },
 
   data() {
     return {
@@ -58,7 +57,6 @@ export default {
       errors: [],
       fieldErrors: {},
       saving: false,
-      toast: { open: false, text: "", type: "success" },
     };
   },
 
@@ -110,7 +108,7 @@ export default {
           description: this.description.trim(),
         });
 
-        this.toast = { open: true, text: this.$t("categories.create.done"), type: "success" };
+        toast.success(this.$t("categories.create.done"));
         this.$router.push("/categories");
       } catch (error) {
         const { fields, general } = extractFieldErrors(
@@ -119,7 +117,7 @@ export default {
         );
         Object.assign(this.fieldErrors, fields);
         this.errors = general ? [general] : [];
-        this.toast = { open: true, text: general ?? "", type: "error" };
+        toast.error(general ?? "");
       } finally {
         this.saving = false;
       }

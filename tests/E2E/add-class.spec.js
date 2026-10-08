@@ -285,15 +285,21 @@ test.describe('Очистка базы данных', () => {
     await openClasses(page)
 
     const clearBtn = page.getByRole('button', { name: /очистить базу данных/i })
+    // За подтверждением в диалоге следует запрос.
     await expect(clearBtn).toBeVisible()
 
+    // Клик открывает подтверждение, запрос — только после него.
     await clearBtn.click()
+    await page.locator('.confirm-dialog').getByRole('button', { name: /^очистить$/i }).click()
 
     await expect(page.getByText('База данных очищена').first()).toBeVisible({ timeout: 30000 })
     expect(calls.length, 'ожидался один вызов /api/clear-database').toBe(1)
 
-    // Регресс: раньше результат не отображался вообще
-    const text = await page.locator('.v-card').innerText()
+    // Регресс: раньше результат не отображался вообще.
+    // Берём ПЕРВУЮ карточку: ConfirmDialog тоже является .v-card, и
+    // без .first() селектор перестал бы быть однозначным, когда диалог
+    // ещё не закрылся.
+    const text = await page.locator('.v-card').first().innerText()
     expect(text).toContain('База данных очищена')
 
     expect(errors, 'ошибок JS быть не должно:\n' + errors.join('\n')).toEqual([])
@@ -312,6 +318,8 @@ test.describe('Очистка базы данных', () => {
 
     await openClasses(page)
     await page.getByRole('button', { name: /очистить базу данных/i }).click()
+    // Запрос уходит только после подтверждения в диалоге.
+    await page.locator('.confirm-dialog').getByRole('button', { name: /^очистить$/i }).click()
 
     // Показывается текст ОТ СЕРВЕРА, а не только наш fallback:
     // это и есть проверка, что extractApiError разбирает конверт.
@@ -333,7 +341,9 @@ test.describe('Очистка базы данных', () => {
     })
 
     await openClasses(page)
+    // Кнопка больше не стирает базу сразу: сначала подтверждение.
     await page.getByRole('button', { name: /очистить базу данных/i }).click()
+    await page.locator('.confirm-dialog').getByRole('button', { name: /^очистить$/i }).click()
 
     // Глобальная политика httpClient: 403 -> маршрут /403. Фиксируем её
     // явно, чтобы «молчаливое игнорирование отказа» не прошло молча.
@@ -348,10 +358,15 @@ test.describe('Очистка базы данных', () => {
     await openClasses(page)
 
     const clearBtn = page.getByRole('button', { name: /очистить базу данных/i })
-    // Два быстрых клика подряд: второй должен быть заблокирован флагом
-    // clearing, а не отправлять второй запрос.
+    // За подтверждением в диалоге следует запрос.
     await clearBtn.click()
-    await clearBtn.click({ force: true }).catch(() => {})
+
+    // Подтверждаем в диалоге, затем жмём «Очистить» ещё раз, пока
+    // первый запрос в полёте: флаг clearing обязан заблокировать
+    // повторный запрос.
+    const confirmBtn = page.locator('.confirm-dialog').getByRole('button', { name: /^очистить$/i })
+    await confirmBtn.click()
+    await confirmBtn.click({ force: true }).catch(() => {})
     await page.waitForTimeout(3000)
 
     expect(calls.length, 'повторный клик не должен слать второй запрос').toBe(1)

@@ -17,7 +17,6 @@ const TokenService = {
 
   saveToken(accessToken) {
     safeSetItem(TOKEN_KEY, accessToken)
-    //console.log(accessToken,'accessToken')
   },
 
   removeToken() {

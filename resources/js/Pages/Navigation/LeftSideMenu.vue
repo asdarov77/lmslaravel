@@ -19,12 +19,19 @@
           {{ section.title }}
         </v-list-subheader>
 
+        <!--
+          Активность пункта и индикатор-полоса описаны в стилях ниже.
+          Раньше активный пункт отличался только синим текстом: на
+          плотном списке его было не найти взглядом.
+        -->
         <v-list-item
           v-for="item in section.items"
           :key="item.key"
           :to="item.link"
           :prepend-icon="item.icon"
           :title="item.title"
+          :active="isActive(item)"
+          class="u-nav__item"
           color="primary"
           data-test="nav-item"
         />
@@ -136,6 +143,33 @@ export default {
      * возвращало его же решение всем остальным — у обучаемого и
      * инструктора меню оказывалось пустым.
      */
+    /**
+     * Активен ли пункт.
+     *
+     * Сравнение по startsWith, а не по равенству: пункт «Пользователи»
+     * ведёт на /user/list, а открытая страница редактирования имеет
+     * адрес /user/edit/7. При точном сравнении пункт терял подсветку
+     * ровно тогда, когда пользователь вглубь раздела.
+     */
+    isActive(item) {
+      const current = this.$route?.path || "";
+
+      if (!current || !item?.link) return false;
+
+      if (current === item.link || current.startsWith(item.link + "/")) {
+        return true;
+      }
+
+      /*
+       * Поддерево раздела шире самой ссылки: /user/edit/7 — это тоже
+       * «Пользователи», хотя адрес не начинается с /user/list. Для
+       * таких пунктов в navigation.js задан activeMatch — префикс
+       * раздела. Без него пункт терял подсветку ровно тогда, когда
+       * пользователь ушёл вглубь раздела.
+       */
+      return Boolean(item.activeMatch) && current.startsWith(item.activeMatch + "/");
+    },
+
     fitsRole(item) {
       const only = item?.onlyFor
 
@@ -170,5 +204,34 @@ export default {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   opacity: 0.62;
+}
+
+/*
+ * Пункт навигации.
+ *
+ * Индикатор активного пункта сделан box-shadow, а не border-left:
+ * у v-list-item своя рамка, и border с нулевой шириной перебивался
+ * стилями Vuetify — полоса просто не появлялась (проверено в браузере:
+ * вычисленная ширина была 0px). inset-тень не конфликтует ни с чем.
+ */
+.u-nav__item {
+  box-shadow: inset 3px 0 0 transparent;
+}
+
+/* Наведение и активное состояние — из токенов, а не «как получится». */
+.u-nav__item:hover {
+  background-color: var(--c-primary-soft);
+}
+
+/*
+ * Активный пункт.
+ *
+ * Индикатор-полоса сбоку — устойчивее смены цвета текста: она видна
+ * и при плохом контрасте, и дальтонизме. Цвет текста оставлен
+ * синим по умолчанию Vuetify (color="primary" на v-list-item).
+ */
+.u-nav__item.v-list-item--active {
+  background-color: var(--c-primary-soft);
+  box-shadow: inset 3px 0 0 var(--c-primary);
 }
 </style>

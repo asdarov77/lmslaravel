@@ -42,7 +42,6 @@
       ></v-alert>
     </FormCard>
 
-    <AppToast v-model="toast.open" :type="toast.type" :text="toast.text" />
   </div>
 </template>
 
@@ -50,11 +49,11 @@
 import { mapState, mapGetters } from "vuex";
 import { asArray, extractFieldErrors } from "../../api/envelope";
 import FormCard from "../../components/ui/FormCard.vue";
-import AppToast from "../../components/ui/AppToast.vue";
+import { toast } from "../../composables/useToast";
 
 export default {
   name: "CreateGroup",
-  components: { FormCard, AppToast },
+  components: { FormCard },
 
   data() {
     return {
@@ -63,7 +62,6 @@ export default {
       errors: [],
       fieldErrors: {},
       saving: false,
-      toast: { open: false, text: "", type: "success" },
     };
   },
 
@@ -123,7 +121,7 @@ export default {
           groupdescription: this.groupdescription.trim(),
         });
 
-        this.toast = { open: true, text: this.$t("groups.create.done"), type: "success" };
+        toast.success(this.$t("groups.create.done"));
         this.$router.push("/groups/list");
       } catch (error) {
         // Раньше .finally() уводил назад в любом случае, поэтому
@@ -134,7 +132,7 @@ export default {
         );
         Object.assign(this.fieldErrors, fields);
         this.errors = general ? [general] : [];
-        this.toast = { open: true, text: general ?? "", type: "error" };
+        toast.error(general ?? "");
       } finally {
         this.saving = false;
       }

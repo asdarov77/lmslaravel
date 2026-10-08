@@ -159,10 +159,18 @@ const routes = [
         //props: true // разрешение на передачу данных через router.parms
     },
     {
-        // тестовый вариант открытия страницы(рабочий)
+        /*
+         * Открытие курса — рабочая страница просмотра.
+         *
+         * Раньше она называлась CourseTest.vue и комментарий над ней
+         * гласил «тестовый вариант открытия страницы(рабочий)». Название
+         * вводило в заблуждение: это не тестовая страница, а основной
+         * просмотр материала курса, и её удаление «как тестовой» сломало
+         * бы открытие курса целиком. Переименовано по назначению.
+         */
         path: '/courses/item/:idEdit',
         meta: { permission: ['courses.view', 'content.view'] },
-        component: () => import('../Pages/CourseTest.vue'),
+        component: () => import('../Pages/CourseItem.vue'),
         props: route => ({ idEdit: Number(route.params.idEdit) }),
         name: 'courses.item',
         //props: true // разрешение на передачу данных через router.parms
@@ -448,12 +456,16 @@ const routes = [
     //     name: 'auk.lern',
     // },
     //--------------------- конец удалить-------------
-    // пробный файловый менеджер
+    // Файловый менеджер.
+    //
+    // Права перечислены те же, что и на бэкенд-маршрутах /api/filemanager.
+    // Расхождение было бы хуже, чем лишнее право: пользователь увидел бы
+    // пункт меню, открыл страницу — и получил 403 на пустом экране
+    // (api-слой сам уводит на страницу «в доступе отказано»).
     {
         path: '/filemanager',
-        meta: { permission: ['files.upload', 'content.manage'] },
+        meta: { permission: ['files.upload', 'content.manage', 'courses.manage'] },
         component: () => import('../Pages/Filemanager/FileManager.vue'),
-        //props: route => ({ nameLyx: String(route.params.filemanager) }),
         name: 'filemanager',
     },
     {

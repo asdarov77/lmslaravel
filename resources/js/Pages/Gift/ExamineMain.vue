@@ -222,7 +222,6 @@
       @confirm="doDelete"
     ></ConfirmDialog>
 
-    <AppToast v-model="alert" :type="alertType" :text="alertText"></AppToast>
   </div>
 </template>
 
@@ -232,7 +231,7 @@ import { unwrapResponse, unwrapArray } from "../../api/envelope";
 import PageHeader from "../../components/ui/PageHeader.vue";
 import EmptyState from "../../components/ui/EmptyState.vue";
 import ConfirmDialog from "../../components/ui/ConfirmDialog.vue";
-import AppToast from "../../components/ui/AppToast.vue";
+import { toast } from "../../composables/useToast";
 
 let uidCounter = 0;
 
@@ -261,7 +260,7 @@ let uidCounter = 0;
 export default {
   name: "QuestionBank",
 
-  components: { PageHeader, EmptyState, ConfirmDialog, AppToast },
+  components: { PageHeader, EmptyState, ConfirmDialog },
 
   data() {
     return {
@@ -276,9 +275,6 @@ export default {
       deleting: false,
       confirmDelete: false,
       pendingDelete: null,
-      alert: false,
-      alertType: "success",
-      alertText: "",
     };
   },
 
@@ -464,9 +460,7 @@ export default {
     },
 
     notify(text, type = "success") {
-      this.alertText = text;
-      this.alertType = type;
-      this.alert = true;
+      toast.byType(type, text);
     },
   },
 };

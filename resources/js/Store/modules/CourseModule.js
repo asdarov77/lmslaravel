@@ -148,7 +148,6 @@ const CourseModule = {
     // UPDATE_CATEGORY(state, payload) {
     // state.categories = payload
     // const itemIdx = state.categories.findIndex(item => item.id === payload.id)
-    // console.log(itemIdx, 'itemIdx')
     // Object.keys(payload).forEach(key => {
     //   state.categories[itemIdx][key] = payload[key]
     // })
@@ -186,9 +185,7 @@ const CourseModule = {
     },
     // DELETE_GROUP(state, id) {
     //   const group_id = state.allGroups.findIndex(g => g.id === id)
-    //   console.log(state.allGroups.length)
     //   state.allGroups.splice(group_id, 1)
-    //   console.log(state.allGroups.length)
     // },
     // REMOVE_USER_GROUP(state, userIdx, group_id) {
     //   state.users[userIdx].groups.splice(group_id, 1)
@@ -291,7 +288,6 @@ const CourseModule = {
 
       try {
         const response = await fetchAircrafts()
-        //console.log(response)
         const aircrafts = asArray(unwrap(response))
         commit('SET_TOTAL_AIRCRAFTS', aircrafts.length)
         commit('SET_AIRCRAFTS', aircrafts)
@@ -305,7 +301,6 @@ const CourseModule = {
 
       try {
         const response = await fetchAircraft(id)
-        //console.log(response, 'fetchCourse+++')
         commit('SET_AIRCRAFT', unwrap(response))
         return Promise.resolve(response)
       } catch (error) {
@@ -332,7 +327,6 @@ const CourseModule = {
       try {
         //params = { ...params, exclude_by_name: 'SysAdmin' } 
         const response = await fetchCategories()
-        //console.log(response, 'категории')          
         const categories = asArray(unwrap(response))
         commit('SET_TOTAL_CATEGORIES', categories.length)
         commit('SET_ALL_CATEGORIES', categories)
@@ -359,7 +353,6 @@ const CourseModule = {
     // async fetchPermissions({ commit }, params) {
     //   try {
     //     const response = await fetchPermissions(params)
-    //     console.log(response)
     //     commit('SET_ALL_PERMISSIONS', response.data)
     //     return Promise.resolve(response)
     //   } catch (error) {
@@ -398,7 +391,6 @@ const CourseModule = {
     async createCategory({ commit, state }, data) {
       try {
         const response = await createCategory(data)
-        //console.log(response,'createCategory response')
         const category = unwrap(response)
         commit('SET_ALL_CATEGORIES', asArray(state.categories).concat(category ? [category] : []))
         return Promise.resolve(response)
@@ -444,9 +436,7 @@ const CourseModule = {
     // async removeUserGroup({ commit }, user, group_id) {
     //   try {
     //     const userIdx = state.users.findIndex(u => u.id === user.id)
-    //     console.log(state.users[userIdx])
     //     commit('REMOVE_USER_GROUP', userIdx, group_id)
-    //     console.log(state.users[userIdx])
     //     const response = await updateUser(user.id, state.users[userIdx])
     //     return Promise.resolve(response)
     //   } catch (error) {
@@ -456,9 +446,7 @@ const CourseModule = {
     // async deleteGroupPermission({ commit }, group, permIdx) {
     //   try {
     //     const group_id = state.allGroups.findIndex(g => g.id === group.id)
-    //     console.log(state.allGroups[group_id])
     //     commit('DELETE_GROUP_PERMISSION', group_id, permIdx)
-    //     console.log(state.allGroups[group_id])
     //     const response = await updateGroup(group.id, state.allGroups[group_id])
     //     return Promise.resolve(response)
     //   } catch (error) {

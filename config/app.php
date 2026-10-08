@@ -239,11 +239,27 @@ return [
 
     ],
 //    'courses_path' => env('COURSES_PATH', '/usr/local/share/courses'),
-    // Контент курсов (АУК): storage/app/public/private по умолчанию.
-    // Раньше здесь был жёстко прописан абсолютный путь машины разработчика
-    // (/home/<user>/repo/lmslaravel/...), из-за чего на любом другом хосте
-    // и в тестах импорт и отдача контента падали с 404. Путь можно
-    // переопределить переменной COURSES_PATH (с завершающим слэшем или без).
-    'courses_path' => rtrim((string) env('COURSES_PATH', storage_path('app/public/private')), '/') . '/',
+    /*
+     * Контент курсов (АУК).
+     *
+     * Раньше здесь был жёстко прописан абсолютный путь машины разработчика
+     * (/home/<user>/repo/lmslaravel/...), из-за чего на любом другом хосте
+     * и в тестах импорт и отдача контента падали с 404.
+     *
+     * Каталог ВНЕ storage/app/public — не по вкусу, а по существу.
+     * storage/app/public попадает под корень веб-сервера через
+     * `php artisan storage:link` (обычный шаг деплоя), и материал,
+     * лежащий там, становится доступен по адресу /storage/private/...
+     * БЕЗ проверки HMAC-подписи: одна команда деплоя отключала всю
+     * защиту приватного контента. Перенос выполнен командой
+     * `php artisan content:relocate`, каталог проверен командой
+     * `php artisan content:check-exposure`.
+     *
+     * Путь можно переопределить переменной COURSES_PATH (с завершающим
+     * слэшем или без) — например, чтобы держать контент на отдельном
+     * томе. Порядок такой: сначала content:relocate, потом COURSES_PATH,
+     * потом alias в nginx (php artisan content:nginx-config).
+     */
+    'courses_path' => rtrim((string) env('COURSES_PATH', storage_path('app/courses/private')), '/') . '/',
     'private_path' => env('PRIVATE_PATH', 'api/private/'),
 ];

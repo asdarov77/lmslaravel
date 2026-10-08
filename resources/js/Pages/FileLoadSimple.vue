@@ -35,7 +35,6 @@ export default {
   methods: {
     onFileSelected(e) {      
       let files = Array.from(e.target.files);
-      //console.log(files);
       this.filesOrder = files.slice(); // текущая очередь    
 
       // this.image = files;

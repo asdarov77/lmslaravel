@@ -34,8 +34,8 @@ class ContentNginxConfigCommand extends Command
          * X-Accel-Redirect собирается из относительного пути БЕЗ префикса
          * 'private/' (см. PrivateContent::accelUri), поэтому alias должен
          * указывать именно на каталог private, а не на корень диска.
-         * С alias в корень диска nginx искал бы 'storage/app/public/<самолёт>/...'
-         * вместо 'storage/app/public/private/<самолёт>/...' и отдавал 404 на
+         * С alias в корень диска nginx искал бы 'courses/<самолёт>/...'
+         * вместо 'courses/private/<самолёт>/...' и отдавал 404 на
          * каждый материал — при этом остальные проверки проходили.
          */
         $diskRoot = rtrim(str_replace('\\', '/', config('filesystems.disks.private.root')), '/')
@@ -85,10 +85,11 @@ class ContentNginxConfigCommand extends Command
 
         # 3. Приватный контент недоступен и обычным location.
         #
-        # Корень диска private лежит внутри публичной папки
-        # (storage/app/public), поэтому после `php artisan storage:link`
-        # путь /storage/app/public/private/... открыл бы все курсы
-        # вообще без подписи. Закрываем явно.
+        # Каталог контента вынесен за пределы storage/app/public
+        # (storage/app/courses/private), поэтому symlink storage:link
+        # его больше не открывает. Блок остаётся: пользовательские файлы
+        # и всё прочее из storage/app/public по-прежнему не должны
+        # отдаваться напрямую.
         location ^~ /storage {
             return 404;
         }

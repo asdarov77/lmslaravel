@@ -47,7 +47,6 @@
       ></v-alert>
     </FormCard>
 
-    <AppToast v-model="toast.open" :type="toast.type" :text="toast.text" />
   </div>
 </template>
 
@@ -55,11 +54,11 @@
 import { mapState, mapGetters } from "vuex";
 import { asArray, extractFieldErrors } from "../../api/envelope";
 import FormCard from "../../components/ui/FormCard.vue";
-import AppToast from "../../components/ui/AppToast.vue";
+import { toast } from "../../composables/useToast";
 
 export default {
   name: "GroupItemEdit",
-  components: { FormCard, AppToast },
+  components: { FormCard },
 
   props: {
     idEdit: { type: Number, required: true },
@@ -71,7 +70,6 @@ export default {
       fieldErrors: {},
       saving: false,
       loading: false,
-      toast: { open: false, text: "", type: "success" },
     };
   },
 
@@ -127,13 +125,13 @@ export default {
           },
         });
 
-        this.toast = { open: true, text: this.$t("groups.edit.done"), type: "success" };
+        toast.success(this.$t("groups.edit.done"));
         this.$router.push("/groups/list");
       } catch (error) {
         const { fields, general } = extractFieldErrors(error, this.$t("groups.edit.errors.generic"));
         Object.assign(this.fieldErrors, fields);
         this.errors = general ? [general] : [];
-        this.toast = { open: true, text: general ?? "", type: "error" };
+        toast.error(general ?? "");
       } finally {
         this.saving = false;
       }

@@ -150,7 +150,13 @@
     "closeBtn": "Close",
     "errorMessages": "Your username or password is incorrect",
     "enterCardTitle": "Login with electronic card",
-    "formCardTitle": "Unique card identifier"
+    "formCardTitle": "Unique card identifier",
+    "success": "Signed in",
+    "networkError": "Network or CORS error. Check your connection.",
+    "wrongPassword": "Wrong password",
+    "tooManyRequests": "Too many requests. Try again later.",
+    "serverError": "Server error",
+    "unknownError": "Unknown error"
   },
   "status": {
     "rotor": {
@@ -270,8 +276,10 @@
     "toTop": "Back to top",
     "alreadyFavorite": "Already in favorites",
     "favoriteError": "Failed to update favorites",
-    "favoriteRemoved": "Removed from favorites",
-    "noResults": "No results"
+    "favoriteRemoved": "Removed from favourites",
+    "noResults": "No results",
+    "searchMinChars": "Type at least three characters",
+    "favoriteRestore": "Restore"
   },
   "groups": {
     "list": {
@@ -337,7 +345,9 @@
     "refresh": "Refresh",
     "roleUnknown": "We could not determine your role. Please contact an administrator.",
     "goHome": "Go home",
-    "breadcrumbs": "Breadcrumbs"
+    "breadcrumbs": "Breadcrumbs",
+    "language": "Language",
+    "density": "Density"
   },
   "users": {
     "list": {
@@ -430,6 +440,90 @@
       }
     }
   },
+  "files": {
+    "title": "Files",
+    "subtitle": "Upload, folders, moving and renaming. Large files are uploaded in parts with resume.",
+    "root": "Files",
+    "actions": {
+      "upload": "Upload",
+      "newFolder": "New folder",
+      "refresh": "Refresh list",
+      "download": "Download",
+      "rename": "Rename",
+      "move": "Move",
+      "delete": "Delete"
+    },
+    "folder": {
+      "create": "New folder",
+      "created": "Folder “{name}” created."
+    },
+    "field": {
+      "name": "Name"
+    },
+    "rename": {
+      "title": "Rename"
+    },
+    "renamed": "Renamed to “{name}”.",
+    "moved": "Moved.",
+    "deleted": "Deleted.",
+    "table": {
+      "title": "Folder contents",
+      "caption": "Files and folders in the current folder",
+      "name": "Name",
+      "size": "Size",
+      "modified": "Modified",
+      "items": "{n} items",
+      "emptySize": "0 B"
+    },
+    "empty": {
+      "title": "This folder is empty",
+      "text": "Upload a file or create a folder."
+    },
+    "drop": {
+      "hint": "Drag files here or press “Upload”.",
+      "limit": "Up to {size} per file."
+    },
+    "selection": {
+      "count": "selected: {n}",
+      "item": "Select {name}"
+    },
+    "queue": {
+      "title": "Uploads",
+      "queued": "{n} file(s) queued.",
+      "queuedShort": "queued",
+      "uploading": "uploading, {percent}%",
+      "done": "uploaded",
+      "failed": "failed",
+      "cancelled": "cancelled",
+      "cancel": "Cancel",
+      "cancelAll": "Cancel all",
+      "clear": "Clear finished",
+      "progress": "Upload progress"
+    },
+    "move": {
+      "title": "Move",
+      "target": "Destination folder",
+      "root": "Files (root)",
+      "submit": "Move"
+    },
+    "delete": {
+      "fileTitle": "Delete file",
+      "folderTitle": "Delete folder",
+      "manyTitle": "Delete {n} items",
+      "text": "“{name}” will be deleted permanently.",
+      "textMany": "{n} items will be deleted. This cannot be undone.",
+      "confirmNonEmpty": "Folder “{name}” is not empty. Press “Delete” again to delete it together with its contents."
+    },
+    "errors": {
+      "load": "Failed to load the file list.",
+      "save": "Failed to save changes.",
+      "move": "Failed to move.",
+      "delete": "Failed to delete.",
+      "download": "Failed to download the file.",
+      "emptyName": "Enter a name.",
+      "tooBig": "File exceeds the size limit ({size}): {names}. The rest were uploaded."
+    }
+  },
   "courses": {
     "list": {
       "title": "Courses",
@@ -461,16 +555,25 @@
     }
   },
   "groupLearning": {
-    "title": "Enroll user groups in courses"
+    "title": "Enroll user groups in courses",
+    "checkForm": "Please check the form fields",
+    "enrolled": "The group is enrolled in the courses",
+    "saveFailed": "Failed to save the record"
   },
   "classes": {
     "title": "Add class",
-    "clearData": "Clear data"
+    "clearData": "Clear data",
+    "clearTitle": "Clear the database?",
+    "clearText": "All courses, topics, questions and their links will be deleted. This cannot be undone.",
+    "clearConfirm": "Clear"
   },
   "questions": {
     "addAnswer": "Add answer",
     "deleteAnswer": "Delete answer",
-    "saveChanges": "Save changes"
+    "saveChanges": "Save changes",
+    "cannotRemoveCorrect": "The correct answer cannot be removed",
+    "saved": "Question saved",
+    "saveFailed": "Failed to save the question"
   },
   "plan": {
     "title": "Learning plan",
@@ -779,6 +882,10 @@
         "empty": "no text",
         "failed": "failed"
       }
+    },
+    "grades": {
+      "tab": "Grades",
+      "comingSoon": "Grades are in progress"
     }
   },
   "tutor": {
@@ -899,5 +1006,40 @@
       "questions_view": "view questions",
       "tutor_use": "tutor"
     }
+  },
+  "courseItem": {
+    "loadError": "Failed to load the course material"
+  },
+  "user": {
+    "chpass": {
+      "mismatch": "Passwords do not match",
+      "success": "Password changed",
+      "error": "Failed to change the password"
+    }
+  },
+  "register": {
+    "groupsUnavailable": "Group list unavailable: please sign in",
+    "created": "User created",
+    "createFailed": "Failed to create the user"
+  },
+  "http": {
+    "sessionExpired": "Session expired, please sign in again",
+    "forbidden": "Not enough rights for this action",
+    "notFound": "Requested data was not found",
+    "serverError": "Server error",
+    "unavailable": "Service is temporarily unavailable"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "markAll": "Mark all as read",
+    "empty": "No notifications"
+  },
+  "errors": {
+    "forbidden": "Access denied",
+    "forbiddenText": "You do not have permission to view this page. If you believe this is an error, contact your administrator.",
+    "notFound": "Page not found",
+    "notFoundText": "The requested page does not exist or has been moved.",
+    "serverError": "Server error",
+    "serverErrorText": "Something went wrong on our end. Please try again later."
   }
 }

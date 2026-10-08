@@ -155,7 +155,9 @@ class AircraftController extends Controller
   /**
    * Импортирует самолёт и все его АУК из каталога контента в БД.
    *
-   * Источник: config('app.courses_path') (= storage/app/public/private).
+   * Источник: config('app.courses_path')
+   * (по умолчанию storage/app/courses/private — за пределами public/, иначе
+   * материал открывается через symlink storage:link мимо проверки подписи).
    * Для каждой папки-АУК читается imsmanifest.xml, из которого создаются
    * категории, курс, структура АУК и ссылки на материалы; затем
    * подтягиваются вопросы из папки GIFT.

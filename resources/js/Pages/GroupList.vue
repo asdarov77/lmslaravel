@@ -133,7 +133,6 @@
       {{ $t('groups.delete.text', { name: pendingGroup?.groupname ?? '' }) }}
     </ConfirmDialog>
 
-    <AppToast v-model="toast.open" :type="toast.type" :text="toast.text" />
   </div>
 </template>
 
@@ -142,11 +141,10 @@ import { mapState, mapGetters } from "vuex";
 import PageHeader from "../components/ui/PageHeader.vue";
 import DataTable from "../components/ui/DataTable.vue";
 import ConfirmDialog from "../components/ui/ConfirmDialog.vue";
-import AppToast from "../components/ui/AppToast.vue";
 
 export default {
   name: "GroupList",
-  components: { PageHeader, DataTable, ConfirmDialog, AppToast },
+  components: { PageHeader, DataTable, ConfirmDialog },
 
   data() {
     return {
@@ -155,7 +153,6 @@ export default {
       deleting: false,
       deleteDialog: false,
       pendingId: null,
-      toast: { open: false, text: "", type: "success" },
     };
   },
 
@@ -225,7 +222,7 @@ export default {
     },
 
     notify(text, type) {
-      this.toast = { open: true, text, type };
+      toast.byType(type, text);
     },
   },
 };

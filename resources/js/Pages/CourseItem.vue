@@ -61,7 +61,6 @@ export default {
     ...mapGetters('Course', ['categories','courses']),
   },
   async mounted() {
-    //console.log("mounted",this.idEdit, "этот курс");
     // Раньше промис не обрабатывался: при несуществующем id API отдаёт 404,
     // отклонение превращалось в unhandled rejection и роняло страницу.
     try {

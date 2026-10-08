@@ -22,7 +22,6 @@
             v-model="password_confirmation"
             type="password"
           ></v-text-field>
-          <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>
           <v-alert v-if="errors.length" type="error" density="compact" class="mb-4">
             <div v-for="error in errors" :key="error">{{ error }}</div>
           </v-alert>
@@ -37,10 +36,9 @@
 </template>
 
 <script>
-import AppToast from "../../components/ui/AppToast.vue";
 import { mapState, mapGetters } from "vuex";
+import { toast } from "../../composables/useToast";
 export default {
-  components: { AppToast },
   props: ["idEdit"],
   data() {
     return {
@@ -48,14 +46,9 @@ export default {
       password_confirmation: "",
       errors: [],
 
-      alert: false,
-      alertType: "",
-      overlay: false,
-      snackbarText: "",
     };
   },
   mounted() {
-    //console.log(this.idEdit, "idEdit")
   },
   computed: {
     ...mapState("User", ["user"]),
@@ -65,11 +58,10 @@ export default {
     submitForm: function () {
       if (this.password !== this.password_confirmation) {
         this.errors.push("пароли не совпадают");
-        this.alert = true;
-        this.snackbarText = "пароли не совпадают";
-        this.alertType = "error";
-        setTimeout(() => this.$router.back(), 3000);
+        toast.error(this.$t("user.chpass.mismatch"));
+        return;
       }
+
       if (!this.errors.length) {
         const formData = {
           password: this.password,
@@ -78,17 +70,21 @@ export default {
         this.$store
           .dispatch("User/chpassUser", { id: this.idEdit, data: formData })
           .then(() => {
-            this.snackbarText = "пароль успешно изменен";
-            this.alertType = "success";
+            toast.success(this.$t("user.chpass.success"));
           })
           .catch((error) => {
             console.error(error);
-            this.snackbarText = "ошибка смены пароля";
-            this.alertType = "error";
+            toast.error(toast.fromError(error, this.$t("user.chpass.error")));
           })
+          /*
+           * Возврат на страницу сделан с задержкой: раньше она нужна
+           * была, чтобы тост успел отрисоваться на этой странице. Тост
+           * живёт в общем стеке и переживает навигацию, поэтому ждать
+           * ничего не нужно — иначе пользователь секунду смотрит на
+           * пустую страницу.
+           */
           .finally(() => {
-            this.alert = true;
-            setTimeout(() => this.$router.back(), 3000);
+            this.$router.back();
           });
       }
     },

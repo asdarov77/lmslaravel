@@ -210,7 +210,6 @@
       </v-col>
     </v-row>
   </v-card>
-  <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>
 </template>
 
 <!-- <script> -->
@@ -219,16 +218,16 @@
 const apiUrl = import.meta.env.VITE_APP_URL;
 import $api from "../api/httpClient";
 import { unwrapResponse, unwrapArray, unwrapField, numericQuery } from "../api/envelope";
-import AppToast from "../components/ui/AppToast.vue";
 import { mapState, mapGetters } from "vuex";
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { faTimes } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import { toast } from "../composables/useToast";
 library.add(faTimes);
 
 export default {
   components: {
-    AppToast, FontAwesomeIcon
+    FontAwesomeIcon
 
   },
 
@@ -286,10 +285,7 @@ export default {
       error: '',
       //---- for popup
       isLoading: false,
-      alert: false,
-      alertType: "",
       overlay: false,
-      snackbarText: "",
       //
       // избранное
       favorites: [],
@@ -307,7 +303,6 @@ export default {
     //   const iframe = this.$refs.myIframe;
     //   const iframeDoc = iframe.contentDocument;
     // iframe.addEventListener('load', () => {
-    //   console.log('слушатель highlightNodes')
     //   this.highlightNodes(iframe);
     // });
     //const iframe = this.$refs.myIframe;
@@ -349,13 +344,11 @@ export default {
     $api
       .get(apiUrl + "/api/course", { params: numericQuery({ course_id: this.idEdit, category_id: this.idCategory }) })
       .then((response) => {
-        //console.log(response.data[0].aircraft_id, "air");
         const course = unwrapArray(response)[0] || {};
         // Раньше здесь был course.title без fallback: при пустом ответе
         // titleauk становился undefined, и шаблон падал на
         // titleauk.toUpperCase() с «Cannot read properties of undefined».
         this.titleauk = course.title || "";
-        //console.log(response[0].title, "response");
         this.aukstructures = course.aukstructures || []; // получаем с backEnd все aukstruct для построения меню левого       
 
         // фильтруем по категориям
@@ -395,11 +388,9 @@ export default {
 
   watch: {
     link(newLink, oldLink) {
-      // console.log('Link has changed:', oldLink, '->', newLink);
       // Вызов метода loadContent для загрузки нового контента
     },
     activeId(newVal, oldVal) {
-      //console.log("active",this.activeId)
     },
     getFirstAukId: function (newVal, oldVal) {
       // вызываем метод getlink с новым значением
@@ -547,10 +538,8 @@ export default {
     //   const iframe = event.currentTarget;
     //   iframe.style.height = (iframe.contentWindow.document.body.scrollHeight + 20) + 'px';
     // // Добавьте здесь свой код, который нужно выполнить после загрузки iframe
-    // console.log('Iframe загружен!');
     //   if(this.showSearch) {
     //   const iframeDoc = iframe.contentDocument;
-    //   console.log(iframeDoc)
     //   setTimeout(() => {
     //   this.highlightNodes(iframeDoc);    
     // }, 100)
@@ -579,7 +568,6 @@ export default {
 
       // Replace old node with new node
       node.parentNode.replaceChild(newContent, node);
-      // console.log(node.parentNode.replaceChild(newContent, node), 'replace')
     },
 
     // onIframeLoaded() {
@@ -609,7 +597,6 @@ export default {
       // Отмечаем модуль посещённым сразу, а не после загрузки контента:
       // долгая загрузка не должна оставлять пункт «непосещённым».
       this.markVisited(item_id);
-      //console.log('getlink')      
       try {
         // Контент курсов отдаётся по подписи, а не по auth:sanctum:
         // вложенные ресурсы (CSS/JS/картинки) браузер запрашивает напрямую,
@@ -665,7 +652,6 @@ export default {
 
 
     // method(hlHtml) {
-    //   console.log('method')
     //   //console.log(hltml, 'hltml')
     //   setTimeout(() => {
     //     const iframe = this.$refs.myIframe;
@@ -686,7 +672,6 @@ export default {
     //         }
     //       });
     //     } catch (e) {
-    //       console.log(e);
     //     }
     //     // console.log(highlight,'highlight')
     //     iframeDoc.body.innerHTML = dom.documentElement.innerHTML;
@@ -701,7 +686,6 @@ export default {
       this.getlink(item); // загружаем в iframe содержимое файла статического html
 
       //await this.onIframeLoaded();
-      //console.log(hlHtml, "подсвеченный");
 
       //this.method(hlHtml)
 
@@ -709,24 +693,19 @@ export default {
         const iframe = this.$refs.myIframe;
         const iframeDoc = iframe.contentDocument;
         const dom = new DOMParser().parseFromString(iframeDoc.body.innerHTML, 'text/html');
-        //console.log(dom, "dom");        
         try {
           hlHtml.forEach((highlighted) => {
             const nodeToReplace = dom.evaluate(highlighted.originalXpath, dom, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-            //console.log(nodeToReplace, 'node')
-            //     console.log(highlighted.originalXpath, 'оригинальный xpath');
             if (nodeToReplace) {
               const parentNode = nodeToReplace.parentNode;
               //const highlightedTextCon = document.createElement('span');
               //highlightedTextCon.style.backgroundColor = 'yellow';
-              //console.log(highlighted.highlightedText, 'highlighted.highlightedText')
               parentNode.innerHTML = highlighted.highlightedText;
             }
           });
         } catch (e) {
           console.log(e);
         }
-        // console.log(highlight,'highlight')
         iframeDoc.body.innerHTML = dom.documentElement.innerHTML;
         this.highlightNodes(iframeDoc);
 
@@ -737,9 +716,7 @@ export default {
     ///-------------------------------------------скроллинг --------------------------------------------------------------
 
     highlightNodes(iframe) {
-      //console.log(iframe.querySelectorAll('.highlighted'),'iframe')
       this.highlighted = Array.from(iframe.querySelectorAll('.highlighted'));
-      //console.log(this.highlighted, 'highlighted');
       this.currentHighlight = 0
       this.scrollToHighlight(this.highlighted[this.currentHighlight]);
     },
@@ -770,7 +747,6 @@ export default {
 
     scrollToNext() {
       if (this.highlighted.length > 0) {
-        //console.log("к следующему")
         this.currentHighlight = (this.currentHighlight + 1) % this.highlighted.length;
         this.scrollToHighlight(this.highlighted[this.currentHighlight]);
       } else {
@@ -779,7 +755,6 @@ export default {
     },
     scrollToPrev() {
       if (this.highlighted.length > 0) {
-        //console.log("к предыдующему")
         this.currentHighlight = (this.currentHighlight - 1 + this.highlighted.length) % this.highlighted.length;
         this.scrollToHighlight(this.highlighted[this.currentHighlight]);
       } else {
@@ -790,7 +765,6 @@ export default {
 
 
     showthumb(item_id) {
-      // console.log(item_id)
       // У узла может не быть DOM-элемента (например, у первого элемента
       // списка рендер скрыт условием index !== 0) — раньше это давало
       // TypeError при наведении мыши.
@@ -804,7 +778,6 @@ export default {
       node.style.transform = "scale(1.03)";
     },
     hidethumb(item_id) {
-      //console.log(item_id, 'вышел')
       const node = document.getElementById(item_id);
       if (!node) return;
       node.style.border = "none";
@@ -820,7 +793,6 @@ export default {
         .get(apiUrl + "/api/getfirstauk/" + course_id)
         .then((response) => {
           this.firstId = unwrapResponse(response);
-          //console.log(this.firstId,"this.firstId")
           this.getlink(this.firstId);
         });
     },
@@ -857,7 +829,6 @@ export default {
 
     addToFavorites(course_id) {
       const activeTitle = this.aukstructures.find(item => item.id === course_id)?.title;
-      // console.log(activeTitle, "activeTitle")
       $api
         .post(apiUrl + '/api/favorites/add', { course_id: course_id, title: activeTitle })
         .then(response => {
@@ -870,19 +841,18 @@ export default {
           const message =
             error?.response?.data?.error?.message || error?.response?.data?.error || "";
 
+          // 400 здесь — «уже в избранном»: это не поломка, а
+          // повторное действие, поэтому сообщение информационное.
           if (error?.response?.status === 400) {
-            this.alert = true;
-            this.alertType = "info";
-            this.snackbarText =
+            toast.info(
               typeof message === "string" && message
                 ? message
-                : this.$t("courseManifest.alreadyFavorite");
+                : this.$t("courseManifest.alreadyFavorite"),
+            );
             return;
           }
 
-          this.alert = true;
-          this.alertType = "error";
-          this.snackbarText = this.$t("courseManifest.favoriteError");
+          toast.error(this.$t("courseManifest.favoriteError"));
         });
     },
 
@@ -891,11 +861,42 @@ export default {
         this.favorites = unwrapField(response, 'favorites') || [];
       });
     },
+    /*
+     * Удаление из избранного — обратимое, поэтому диалог подтверждения
+     * здесь был бы лишним трением: достаточно одного нажатия, чтобы
+     * вернуть. Вместо него сообщение с действием «Вернуть»: отмена
+     * доступна прямо в тосте.
+     *
+     * Диалог остаётся для необратимых действий (см. AddClass.vue и
+     * списки групп, категорий, курсов, пользователей).
+     */
     removeFavorite(id) {
+      const removed = this.favorites.find((f) => f.id === id)
+
       $api
-        .delete(apiUrl + `/api/favorites/${id}`).then(() => {
+        .delete(apiUrl + `/api/favorites/${id}`)
+        .then(() => {
           this.getFavorites();
+
+          toast.success(this.$t("courseManifest.favoriteRemoved"), {
+            action: {
+              label: this.$t("courseManifest.favoriteRestore"),
+              handler: () => this.restoreFavorite(removed),
+            },
+          });
         });
+    },
+
+    /** Возврат удалённого избранного — обработчик кнопки в тосте. */
+    restoreFavorite(removed) {
+      if (!removed) return;
+
+      $api
+        .post(apiUrl + "/api/favorites/add", {
+          course_id: removed.course_id,
+          title: removed.title,
+        })
+        .then(() => this.getFavorites());
     },
     async search() {
       const formData = {
@@ -904,9 +905,7 @@ export default {
 
       }
       if (this.searchTerm.length < 3) {
-        this.snackbarText = "..не меньше трех символов";
-        this.alertType = "error";
-        this.alert = true;
+        toast.warning(this.$t("courseManifest.searchMinChars"));
         return;
       }
 
@@ -914,7 +913,6 @@ export default {
 
         .then(response => {
           this.matchingFiles = unwrapArray(response);
-          //         console.log(response, "кол-во")
         })
         .catch(error => {
           console.log(error);
@@ -972,7 +970,7 @@ export default {
 }
 
 .cm-toolbar__current {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: #555;
   max-width: 320px;
   overflow: hidden;
@@ -993,7 +991,7 @@ export default {
   color: #444;
   cursor: pointer;
   font: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1;
   transition: background-color .15s ease-in-out, color .15s ease-in-out;
 }
@@ -1034,7 +1032,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 0.875rem;
   margin-bottom: 6px;
 }
 
@@ -1056,7 +1054,7 @@ export default {
 }
 
 .cm-favorites__title {
-  font-size: 14px;
+  font-size: 0.875rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1064,7 +1062,7 @@ export default {
 
 .cm-favorites__empty {
   margin: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: #777;
 }
 
@@ -1161,7 +1159,7 @@ export default {
 }
 
 .search-files__total-results {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: #666;
 }
 </style>

@@ -122,7 +122,7 @@ class AuthController extends Controller
 
         $user = User::create([
             'fio' => $fields['fio'],
-            'password' => bcrypt($fields['password'])
+            'password' => \Illuminate\Support\Facades\Hash::make($fields['password'])
         ]);
         $user->group_id = $mayAssignRole ? ($fields['group_id'] ?? null) : null;
         $user->role = $role;
@@ -330,7 +330,7 @@ class AuthController extends Controller
         ]);
 
         $user = User::create(array_merge($fields, [
-            'password' => bcrypt($fields['password']),
+            'password' => \Illuminate\Support\Facades\Hash::make($fields['password']),
         ]));
 
         // Права новому пользователю назначаются через
@@ -457,7 +457,7 @@ class AuthController extends Controller
         // сотруднику чужой группы.
         $this->authorize('changePassword', $user);
 
-        $user->password = bcrypt(request('password'));
+        $user->password = \Illuminate\Support\Facades\Hash::make(request('password'));
         $user->save();
         // json(), а не response(): иначе ответ уходит без конверта
         return response()->json($user->fresh(), 201);

@@ -90,14 +90,13 @@
       </section>
     </div>
 
-    <AppToast v-model="alert" :type="alertType" :text="alertText"></AppToast>
   </div>
 </template>
 
 <script>
 import PageHeader from '../../components/ui/PageHeader.vue'
-import AppToast from '../../components/ui/AppToast.vue'
 import { mapGetters, mapState } from 'vuex'
+import { toast } from '../../composables/useToast'
 import { fetchDashboardSummary } from '../../api/dashboard.api'
 import { unwrapResponse } from '../../api/envelope'
 
@@ -112,7 +111,7 @@ import { unwrapResponse } from '../../api/envelope'
 export default {
   name: 'ManagerDashboard',
 
-  components: { PageHeader, AppToast },
+  components: { PageHeader },
 
   data: () => ({
     role: null,
@@ -120,9 +119,6 @@ export default {
     attention: [],
     recent: [],
     loading: true,
-    alert: false,
-    alertType: 'error',
-    alertText: '',
   }),
 
   computed: {
@@ -167,9 +163,9 @@ export default {
       this.attention = Array.isArray(data.attention) ? data.attention : []
       this.recent = Array.isArray(data.recent) ? data.recent : []
     } catch (error) {
-      this.alertText = this.messageOf(error) || this.$t('manager.failed')
-      this.alertType = 'error'
-      this.alert = true
+      // Уведомление ушло в общий стек: оно переживает переход на
+      // другую страницу, а раньше умирало вместе с компонентом.
+      toast.error(this.messageOf(error) || this.$t('manager.failed'))
     } finally {
       this.loading = false
     }

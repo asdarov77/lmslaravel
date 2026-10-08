@@ -75,95 +75,123 @@
   flex-wrap: wrap;
 }
 
-/* --------------------------------- кнопки -------------------------------- */
-.u-btn {
+/*
+ * Кнопки.
+ *
+ * Раньше здесь была вторая система кнопок — .u-btn с ролями
+ * primary/secondary/ghost/danger. Она не используется НИГДЕ: в
+ * разметке ни одного класса u-btn не осталось, все кнопки — это v-btn
+ * с темой Vuetify, читающей те же токены.
+ *
+ * Две параллельные системы кнопок — прямой путь к тому, что одна
+ * кнопка выглядит иначе в зависимости от того, кто её написал.
+ * Поэтому параллельная система удалена, а роли задаются через
+ * variant/color у v-btn: primary — color="primary", вторичное
+ * действие — variant="text" или "outlined", опасное — color="error".
+ */
+
+/*
+ * Значок языка.
+ *
+ * Общий для футера и страницы входа: раньше язык в футере был парой
+ * текстовых кнопок «eng/rus», а на странице входа — отдельным
+ * компонентом, и два переключателя выглядели по-разному.
+ *
+ * Состояние «включено» задаётся фоном из токенов, а не только
+ * насыщенностью текста: иначе активный язык не читается.
+ */
+.lang-badge {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-2);
-  height: 36px;
-  padding: 0 var(--sp-4);
+  justify-content: center;
+  min-width: 26px;
+  height: 20px;
+  padding: 0 5px;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: 4px;
   font: inherit;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  line-height: 1;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   cursor: pointer;
-  white-space: nowrap;
-  transition: background-color var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
-}
-
-.u-btn:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-.u-btn:disabled,
-.u-btn[aria-disabled='true'] {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-/* Семантические роли, а не цвета палитры: «опасное действие» одинаково
-   выглядит в любом разделе. */
-.u-btn--primary {
-  background: var(--c-primary);
-  color: var(--c-on-primary);
-}
-
-.u-btn--primary:hover:not(:disabled) {
-  background: var(--c-primary-hover);
-}
-
-.u-btn--primary:active:not(:disabled) {
-  background: var(--c-primary-active);
-}
-
-.u-btn--secondary {
-  background: var(--c-surface);
-  color: var(--c-text);
-  border-color: var(--c-border-strong);
-}
-
-.u-btn--secondary:hover:not(:disabled) {
-  background: var(--c-surface-3);
-  border-color: var(--c-text-muted);
-}
-
-.u-btn--ghost {
   background: transparent;
   color: var(--c-text-secondary);
 }
 
-.u-btn--ghost:hover:not(:disabled) {
-  background: var(--c-surface-3);
-  color: var(--c-text);
+.lang-badge--on {
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  border-color: var(--c-primary-soft);
 }
 
-.u-btn--danger {
-  background: var(--c-danger);
-  color: var(--c-text-inverse);
+.lang-badge:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
 }
 
-.u-btn--danger:hover:not(:disabled) {
-  filter: brightness(0.93);
+/*
+ * Скелетон загрузки.
+ *
+ * Раньше пока грузились данные, страница оставалась пустой — это
+ * выглядело как «приложение зависло». Теперь вместо пустоты рисуется
+ * скелетон с пульсацией.
+ */
+.app__skeleton {
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
 }
 
-.u-btn--sm {
-  height: 30px;
-  padding: 0 var(--sp-3);
-  font-size: var(--fs-xs);
+.app__skeleton-bar {
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--c-skeleton);
+  animation: app-skeleton-pulse 1.4s ease-in-out infinite;
 }
 
-.u-btn--icon {
-  width: 36px;
-  padding: 0;
-  justify-content: center;
+.app__skeleton-line {
+  height: 14px;
+  border-radius: 4px;
+  background: var(--c-skeleton);
+  animation: app-skeleton-pulse 1.4s ease-in-out infinite;
 }
 
-.u-btn--icon.u-btn--sm {
-  width: 30px;
+.app__skeleton-line--w80 { width: 80%; }
+.app__skeleton-line--w60 { width: 60%; }
+
+@keyframes app-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/*
+ * Учебный режим (страница курса).
+ *
+ * На странице курса шапка и футер не нужны: это полноэкранный просмотр
+ * материала. Раньше они скрывались через v-show по флагу, и при переходе
+ * на страницу курса мигали. Теперь это вариант раскладки: класс
+ * app--course на v-app скрывает их через CSS.
+ */
+.app--course .v-app-bar,
+.app--course .app__footer {
+  display: none;
+}
+
+/*
+ * Плотность интерфейса.
+ *
+ * Раньше плотность была зашита в токенах, и пользователь не мог её
+ * изменить. Теперь есть переключатель в шапке, и плотность задаётся
+ * через data-атрибут на <html>.
+ */
+:root[data-density='compact'] {
+  --sp-1: 2px;
+  --sp-2: 4px;
+  --sp-3: 8px;
+  --sp-4: 12px;
+  --sp-5: 16px;
+  --sp-6: 24px;
 }
 
 /* -------------------------------- карточки ------------------------------- */

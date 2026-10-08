@@ -55,7 +55,8 @@ return [
 // Диск с контентом курсов (АУК).
 // КРИТИЧНО: root схлопывался в storage_path('app/'.env('PRIVATE_PATH')), а
 // переменной PRIVATE_PATH в .env нет — env() возвращал null, и root был
-// равен storage/app/. Контент же лежит в storage/app/public/private/.
+// равен storage/app/. Контент же лежит по courses_path (storage/app/courses/private/),
+// поэтому root и есть его родитель.
 // В итоге Storage::exists('private/<самолёт>/<АУК>/imsmanifest.xml') и
 // отдача index.html всегда смотрели в несуществующий storage/app/private/
 // и возвращали 404: ни импорт курсов в БД, ни просмотр материалов не работали.

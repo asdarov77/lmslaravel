@@ -36,7 +36,6 @@
         {{ $t("users.chrole.selfForbidden") }}
       </v-alert>
 
-      <AppToast v-model="alert" :type="alertType" :text="snackbarText" />
     </FormCard>
   </div>
 </template>
@@ -44,9 +43,9 @@
 <script>
 import PageHeader from "../../components/ui/PageHeader.vue";
 import FormCard from "../../components/ui/FormCard.vue";
-import AppToast from "../../components/ui/AppToast.vue";
 import $api from "../../api/httpClient";
 import { asArray, unwrapArray, unwrapResponse } from "../../api/envelope";
+import { toast } from "../../composables/useToast";
 
 /**
  * Назначение ролей пользователя.
@@ -63,7 +62,7 @@ import { asArray, unwrapArray, unwrapResponse } from "../../api/envelope";
  * Доступ — users.permissions, как у управления правами.
  */
 export default {
-  components: { PageHeader, FormCard, AppToast },
+  components: { PageHeader, FormCard },
   props: {
     idEdit: { type: Number, required: true },
   },
@@ -76,9 +75,6 @@ export default {
       loaded: false,
       saving: false,
       fieldError: "",
-      alert: false,
-      alertType: "error",
-      snackbarText: "",
     };
   },
   computed: {
@@ -133,9 +129,7 @@ export default {
       }
     },
     showMessage(text, type = "success") {
-      this.snackbarText = text;
-      this.alertType = type;
-      this.alert = true;
+      toast.byType(type, text);
     },
     showError(error) {
       const data = error?.response?.data;

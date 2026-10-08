@@ -33,11 +33,20 @@ import AuthModule from '../../resources/js/Store/modules/AuthModule'
 import ru from '../../resources/js/locales/ru.json'
 import en from '../../resources/js/locales/en.json'
 import PermissionsManager from '../../resources/js/Pages/Permissions/PermissionsManager.vue'
+import { toastItems, clear } from '../../resources/js/composables/useToast'
 
 const vuetify = createVuetify({ components: vuetifyComponents, directives: vuetifyDirectives })
 // globalInjection нужен, чтобы this.$t в Options API-шаблоне работал
 // под тестом: в юнит-тестах плагин ставится явно, а не приложением.
 const i18n = createI18n({ legacy: false, globalInjection: true, locale: 'ru', messages: { ru, en } })
+/*
+ * Уведомления ушли в общую очередь composables/useToast: тесты смотрят
+ * её и очищают после себя, иначе очередь переживёт тест и утечёт в
+ * следующий.
+ */
+const shownToasts = () => toastItems.map(({ type, text }) => ({ type, text }))
+const clearToasts = () => clear()
+
 
 const envelope = data => ({ data: { success: true, data, error: null, meta: null } })
 
@@ -293,7 +302,8 @@ describe('PermissionsManager: сохранение', () => {
     await wrapper.vm.save()
 
     expect(put).toHaveBeenCalledWith('/api/user/chperm/10', { permission_id: [] })
-    expect(wrapper.vm.snackbarText).toBe('Права сохранены')
+    expect(shownToasts().map((t) => t.text)).toContain('Права сохранены')
+    clearToasts()
   })
 
   it('при 403 показывает понятный текст, а не молчит', async () => {
@@ -305,8 +315,13 @@ describe('PermissionsManager: сохранение', () => {
     wrapper.vm.selectUser(10)
     await wrapper.vm.save()
 
-    expect(wrapper.vm.snackbarText).toBe('Недостаточно прав для изменения прав этого пользователя')
-    expect(wrapper.vm.alertType).toBe('error')
+    // Обе проверки — по одному снимку очереди: очистка между ними
+    // стирала бы сообщение, и вторая проверка видела бы пустую очередь.
+    const shown = shownToasts()
+
+    expect(shown.map((t) => t.text)).toContain('Недостаточно прав для изменения прав этого пользователя')
+    expect(shown.some((t) => t.type === 'error')).toBe(true)
+    clearToasts()
   })
 })
 

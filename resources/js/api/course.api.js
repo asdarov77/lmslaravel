@@ -11,8 +11,6 @@ const fetchCourse = (id) => httpClient.get(`/api/course/${id}`)
 // const fetchCourseByAir = (id,) => httpClient.get(`/api/course/`,data)
 //-------------------------------------------------------------------
 const fetchCourseByCourseAndCategory = (course_id, category_id) => {
-  //console.log(course_id,"courseId");
-  //console.log(category_id,"categoryId");
   return httpClient.get('/api/course', { params: numericQuery({ course_id, category_id }) });
 };
 const fetchCourseByCourse = (course_id) => {

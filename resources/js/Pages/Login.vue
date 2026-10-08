@@ -33,19 +33,18 @@
         <v-btn v-on:click="loginForm" color="primary">{{ $t("login.submitBtn") }}</v-btn>
       </v-card-actions>
     </v-card>
-    <AppToast v-model="alert" :type="alertType" :text="snackbarText"></AppToast>  
   </v-col>
 </template>
 
 <script>
 import LanguageSelector from '../components/LanguageSelector.vue'
+import { toast } from '../composables/useToast'
 //import { LanguageService } from '../services/language.service'
-import AppToast from "../components/ui/AppToast.vue";
 //import * as storage from "../Store/index.js";
 export default {
   // name: "LoginComponent",
     components: {
-    LanguageSelector, AppToast
+    LanguageSelector
   },
   data() {    
     return {
@@ -55,9 +54,7 @@ export default {
       errors: [],
 
       alert: false,
-        alertType: "",
         overlay: false,      
-        snackbarText: "", 
     }
   },
   beforeDestroy() {
@@ -77,9 +74,7 @@ export default {
       await this.$store
         .dispatch('Auth/login', formData)
         .then(() => {    
-          this.alert = true;
-          this.snackbarText = "Успешный вход";
-          this.alertType = "success";
+          toast.success(this.$t("login.success"));
           // После входа ведём в кабинет, а не на '/': корневой адрес
           // теперь редиректит на /dashboard, и лишний редирект только
           // показывал бы в адресной строке '/', а не '/dashboard'.
@@ -87,26 +82,24 @@ export default {
         })
         .catch((error) => {
           console.error(error)
-          // Безопасная обработка ошибок (защита от CORS и network ошибок)
-          if (!error.response) {
-            this.snackbarText = "Ошибка сети или CORS. Проверьте подключение к серверу.";
-            this.alertType = "error";
-          } else if (error.response.status === 401) {
-             this.snackbarText = "Неверный пароль";              
-             this.alertType = "error";              
-          } else if (error.response.status === 429) {
-             this.snackbarText = "Слишком много запросов. Попробуйте позже.";              
-             this.alertType = "error";              
-          } else if (error.response.status === 500) {
-             this.snackbarText = "Ошибка сервера";              
-             this.alertType = "error";              
+          /*
+           * Разбор по коду ответа, а не одно общее сообщение: «ошибка
+           * сети» и «неверный пароль» требуют от пользователя разных
+           * действий, и раньше он получал одну строку на все случаи.
+           */
+          const status = error?.response?.status;
+
+          if (!error?.response) {
+            toast.error(this.$t("login.networkError"));
+          } else if (status === 401) {
+            toast.error(this.$t("login.wrongPassword"));
+          } else if (status === 429) {
+            toast.error(this.$t("login.tooManyRequests"));
+          } else if (status >= 500) {
+            toast.error(this.$t("login.serverError"));
           } else {
-             this.snackbarText = "Произошла ошибка: " + (error.message || "Неизвестная ошибка");
-             this.alertType = "error";
+            toast.error(toast.fromError(error, this.$t("login.unknownError")));
           }
-        })
-        .finally(() => {
-          this.alert = true;
         });
     },
   },
