@@ -1,1 +1,31 @@
-(empty)
+# Laravel
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitignore
+/storage/framework/views/*
+/storage/framework/cache/*
+/storage/logs/*
+!/storage/logs/.gitignore
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
+.phpunit.result.cache
+.phpunit.cache/
+
+# Окружение: .env может содержать ключи приложения и пароли от БД.
+# Файл уже отслеживается в этом репозитории, поэтому правило не влияет на
+# уже добавленный файл — новые машины не будут его коммитить.
+/.env
+
+# Node
+/node_modules
+/vendor
+
+# Инструменты и отчёты
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/.vscode/
+/.idea/
+
+# Сборка public/build остаётся под контролем версий: ассеты нужны для
+# запуска без dev-сервера Vite.
