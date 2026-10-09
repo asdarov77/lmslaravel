@@ -140,6 +140,7 @@
 
       <div class="u-table-wrap">
         <table class="u-table">
+          <caption class="u-sr-only">{{ $t('bank.title') }}</caption>
           <thead>
             <tr>
               <th class="u-table__num">#</th>

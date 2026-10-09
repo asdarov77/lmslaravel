@@ -13,7 +13,7 @@
         </label>
       </li>
     </ul>
-    <button @click="nextQuestion">Следующий вопрос</button>
+    <button @click="nextQuestion">{{ $t('gift.nextQuestion') }}</button>
   </div>
 </template>
 

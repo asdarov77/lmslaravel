@@ -2,7 +2,7 @@
   <v-col cols="12" sm="8" md="4">
     <v-card class="elevation-12 mx-auto">
       <v-toolbar color="primary">
-        <v-toolbar-title>Редактирование курса </v-toolbar-title>
+        <v-toolbar-title>{{ $t('courses.editTitle') }}</v-toolbar-title>
       </v-toolbar>
       <v-card-text>
         <v-form v-on:@submit.prevent="submitForm">
@@ -54,7 +54,7 @@
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn v-on:click="submitForm" color="primary">Сохранить</v-btn>
+        <v-btn v-on:click="submitForm" color="primary">{{ $t('common.save') }}</v-btn>
       </v-card-actions> </v-card
     >
   </v-col>

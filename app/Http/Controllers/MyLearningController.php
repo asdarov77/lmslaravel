@@ -123,6 +123,50 @@ class MyLearningController extends Controller
         $started = $courses->filter(fn ($id) => (int) ($visits[$id] ?? 0) > 0)->count();
 
         /*
+         * Прогресс по урокам вместо «открывал или нет».
+         *
+         * Раньше started считалty по favorites, где хранились только
+         * посещения материалов курса: один открытый урок из двадцати
+         * давал те же 100%, что и полностью пройденный курс. Теперь
+         * процент — среднее по lesson_progress, то есть по фактически
+         * открытым урокам.
+         */
+        $lessonProgress = $user
+            ? \App\Models\LessonProgress::where('user_id', $user->id)
+                ->whereIn('course_id', $courses)
+                ->get(['course_id', 'percent'])
+                ->groupBy('course_id')
+                ->map(fn ($rows) => (int) round($rows->avg('percent')))
+            : collect();
+
+        /*
+         * Где остановился обучаемый: последний просмотренный урок и
+         * файл внутри него. Без этого «продолжить» всегда открывало
+         * курс с начала, хотя человек знает, где остановился.
+         */
+        $resumePoints = $user
+            ? \App\Models\LessonProgress::where('user_id', $user->id)
+                ->whereIn('course_id', $courses)
+                ->orderByDesc('last_viewed_at')
+                ->orderByDesc('updated_at')
+                ->get()
+                // groupBy + first, а не mapWithKeys: у курса несколько
+                // уроков, и mapWithKeys оставлял бы ПОСЛЕДНЮЮ строку
+                // в порядке выборки, то есть самый старый просмотр —
+                // «продолжить» уводило бы к началу курса.
+                ->groupBy('course_id')
+                ->map(fn ($rows) => $rows->first())
+            : collect();
+
+        $lessonTotals = $courses->isEmpty()
+            ? collect()
+            : \App\Models\Aukstructure::whereIn('course_id', $courses)
+                ->select('course_id')
+                ->selectRaw('count(*) as total')
+                ->groupBy('course_id')
+                ->pluck('total', 'course_id');
+
+        /*
          * Экзамены: попытки пользователя.
          *
          * Раньше считалось по test_results, куда ничего не писалось:
@@ -210,16 +254,62 @@ class MyLearningController extends Controller
                  * возвращается признак started, а процент остаётся общим
                  * по плану (progress.percent).
                  */
-                'continue' => $this->continueLearning($plan, $visits, $today),
+                'continue' => $this->continueLearning($plan, $visits, $today, $resumePoints, $lessonProgress),
                 'progress' => [
-                    // Доля курсов, к которым обучаемый хотя бы раз открыл
-                    // материалы. Для пустого плана — 0, а не деление на ноль.
-                    'percent' => $courses->count()
-                        ? (int) round($started / $courses->count() * 100)
-                        : 0,
+                    /*
+                     * Процент по плану считается по урокам, а не по
+                     * курсам: иначе один открытый урок делал весь план
+                     * «на 100%». Знаменатель — сумма уроков всех курсов
+                     * плана, поэтому измерение у всех одно.
+                     */
+                    'percent' => $this->planPercent($lessonProgress, $lessonTotals),
+                    // Сколько уроков плана пройдено и сколько всего.
+                    'lessons_completed' => $this->completedLessons($user, $courses),
+                    'lessons_total' => (int) $lessonTotals->sum(),
                 ],
             ],
         ]);
+    }
+
+    /**
+     * Процент плана по урокам.
+     *
+     * @param  \Illuminate\Support\Collection<int, int>  $progress  процент по каждому курсу
+     * @param  \Illuminate\Support\Collection<int, int>  $totals  сколько уроков в каждом курсе
+     */
+    private function planPercent($progress, $totals): int
+    {
+        $total = (int) $totals->sum();
+
+        if ($total === 0) {
+            return 0;
+        }
+
+        // Считаем взвешенно по урокам: у курса на 10 уроков вклад в
+        // десять раз больше, чем у курса с одним. Усреднение по курсам
+        // завышало результат на коротких курсах.
+        $sum = 0;
+
+        foreach ($totals as $courseId => $lessonCount) {
+            $sum += (int) ($progress[$courseId] ?? 0) * (int) $lessonCount;
+        }
+
+        return (int) round($sum / $total);
+    }
+
+    /** Сколько уроков плана отмечено завершёнными. */
+    private function completedLessons(?User $user, $courses): int
+    {
+        if ($user === null || $courses->isEmpty()) {
+            return 0;
+        }
+
+        return \App\Models\LessonProgress::where('user_id', $user->id)
+            ->whereIn('course_id', $courses)
+            ->where(function ($q) {
+                $q->whereNotNull('completed_at')->orWhere('percent', '>=', 100);
+            })
+            ->count();
     }
 
     /**
@@ -227,9 +317,10 @@ class MyLearningController extends Controller
      *
      * @param  \Illuminate\Support\Collection<int, Group2learning>  $plan
      * @param  \Illuminate\Support\Collection<int, int>  $visits
-     * @return array{course_id: int, title: string|null, module_title: string|null, status: string, started: bool, due_at: string|null}|null
+     * @param  \Illuminate\Support\Collection<int, LessonProgress>  $resumePoints  последний урок по курсу
+     * @return array{course_id: int, title: string|null, module_title: string|null, status: string, started: bool, due_at: string|null, percent: int, resume_lesson_id: int|null, resume_file: string|null}|null
      */
-    private function continueLearning($plan, $visits, Carbon $today): ?array
+    private function continueLearning($plan, $visits, Carbon $today, $resumePoints, $lessonProgress): ?array
     {
         $open = $plan->filter(function ($r) use ($today) {
             $to = $this->date($r->study_to);
@@ -242,11 +333,17 @@ class MyLearningController extends Controller
             return null;
         }
 
-        $ordered = $open->sortBy(function ($r) use ($visits, $today) {
+        $ordered = $open->sortBy(function ($r) use ($visits, $today, $resumePoints) {
+            // Первым идёт курс, где обучаемый уже что-то открывал и
+            // не закончил: это и есть «продолжить с последней точки».
+            $partiallyDone = $resumePoints->get($r->course_id) !== null
+                && ! $resumePoints->get($r->course_id)->isCompleted()
+                ? 0
+                : 1;
             $started = (int) ($visits[$r->course_id] ?? 0) > 0 ? 0 : 1;
             $due = $this->date($r->deadline) ?? $this->date($r->study_to);
 
-            return [$started, $due === null ? PHP_INT_MAX : abs($today->diffInDays($due, false))];
+            return [$partiallyDone, $started, $due === null ? PHP_INT_MAX : abs($today->diffInDays($due, false))];
         })->values();
 
         $row = $ordered->first();
@@ -260,6 +357,10 @@ class MyLearningController extends Controller
             'status' => $this->status($this->date($row->study_from), $this->date($row->study_to)),
             'started' => (int) ($visits[$row->course_id] ?? 0) > 0,
             'due_at' => ($this->date($row->deadline) ?? $this->date($row->study_to))?->toDateString(),
+            // Точка возврата: процент курса и последний открытый урок.
+            'percent' => (int) ($lessonProgress[$row->course_id] ?? 0),
+            'resume_lesson_id' => $resumePoints->get($row->course_id)?->lesson_id,
+            'resume_file' => $resumePoints->get($row->course_id)?->last_file,
         ];
     }
 

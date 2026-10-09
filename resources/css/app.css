@@ -19,6 +19,27 @@
 }
 
 /*
+ * Базовый кегль и шрифт.
+ *
+ * --font-family и --fs-base объявлены в tokens.css, но до этого нигде
+ * не применялись: Vuetify задаёт Roboto/16px в .v-application, и Inter
+ * с базовыми 15px до интерфейса не доходили (getComputedStyle показывал
+ * Roboto, 16px). Ставим оба здесь и перебиваем .v-application: у
+ * Vuetify селектор специфичнее одного селектора класса.
+ */
+html {
+  font-size: var(--fs-base);
+}
+
+body {
+  font-family: var(--font-family);
+}
+
+.v-application {
+  font-family: var(--font-family) !important;
+}
+
+/*
  * Компенсация закреплённого футера.
  *
  * Футер в App.vue — <v-footer app bottom fixed>, то есть position: fixed
@@ -663,5 +684,76 @@
   .app__search .u-search__hint,
   .app__search .u-search__kbd {
     display: none;
+  }
+}
+
+/* ==================================================================
+   ФОКУС — единый для всех интерактивных элементов.
+   Раньше фокус с клавиатуры был почти нигде не виден: браузерный
+   outline выглядел по-разному на кнопках, полях и чипах.
+   ================================================================== */
+:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ==================================================================
+   ПЛОТНОСТЬ — компактный режим влияет на таблицы и формы глобально.
+   Переключатель в шапке (App.vue) ставит data-density="compact" на
+   <html> через utils/density.js: раньше флаг менялся только в Vuex,
+   и переключатель не производил никакого эффекта.
+   ================================================================== */
+:root[data-density='compact'] .v-table {
+  --v-table-row-height: 36px;
+}
+
+:root[data-density='compact'] .u-field {
+  margin-bottom: var(--sp-3);
+}
+
+/* Кнопки в компактном режиме ниже обычных (40 -> 34): в плотных
+   таблицах и тулбарах строки действий иначе распирают высоту строки. */
+:root[data-density='compact'] .v-btn:not(.v-btn--icon) {
+  height: 34px;
+}
+
+/* ==================================================================
+   СКРОЛЛБАРЫ — тонкие, в цветах токенов. Раньше были системными
+   и выглядели чужеродно в тёмной теме.
+   ================================================================== */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--c-border-strong);
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--c-text-muted);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* ==================================================================
+   REDUCED MOTION — отключаем анимации для пользователей,
+   которые просили меньше движения в системе.
+   ================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

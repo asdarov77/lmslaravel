@@ -35,7 +35,10 @@
       "catalog": "Course catalog",
       "tutor": "Tutor",
       "settings": "Settings",
-      "grades": "Grading scales"
+      "grades": "Grading scales",
+      "certificates": "Certificates",
+      "gradebook": "Gradebook",
+      "announcements": "Announcements"
     },
     "buttons": {
       "cancel": "cancel",
@@ -131,7 +134,10 @@
       "tutor": {
         "title": "Self-study",
         "runner": "Training"
-      }
+      },
+      "certificates": "Certificates",
+      "gradebook": "Gradebook",
+      "announcements": "Announcements"
     },
     "nav": {
       "learning": "Learning",
@@ -522,7 +528,8 @@
       "download": "Failed to download the file.",
       "emptyName": "Enter a name.",
       "tooBig": "File exceeds the size limit ({size}): {names}. The rest were uploaded."
-    }
+    },
+    "uploadTitle": "File upload"
   },
   "courses": {
     "list": {
@@ -552,7 +559,9 @@
       "confirm": "Delete",
       "done": "Course deleted",
       "error": "Failed to delete the course"
-    }
+    },
+    "addTitle": "Add course",
+    "editTitle": "Edit course"
   },
   "groupLearning": {
     "title": "Enroll user groups in courses",
@@ -573,7 +582,8 @@
     "saveChanges": "Save changes",
     "cannotRemoveCorrect": "The correct answer cannot be removed",
     "saved": "Question saved",
-    "saveFailed": "Failed to save the question"
+    "saveFailed": "Failed to save the question",
+    "editTitle": "Edit question"
   },
   "plan": {
     "title": "Learning plan",
@@ -618,7 +628,7 @@
     "examPassed": "Passed",
     "examsEmpty": "No exams taken yet",
     "progress": "Learning progress",
-    "progressHint": "Share of courses whose materials you opened",
+    "progressHint": "Share of lessons completed across your courses",
     "openPlan": "Open learning plan",
     "goExams": "Go to exams",
     "loadError": "Failed to load dashboard data",
@@ -628,7 +638,10 @@
     "continueTitle": "Continue learning",
     "continueAction": "Open course",
     "continueStartedHint": "You have already started this course — pick up where you left off.",
-    "continueNewHint": "The next course in your learning plan."
+    "continueNewHint": "The next course in your learning plan.",
+    "continueProgress": "Lessons completed",
+    "resumeFrom": "Resume where you left off",
+    "lessonsProgress": "Lessons completed"
   },
   "calendar": {
     "title": "Training calendar",
@@ -662,7 +675,8 @@
     "kindAll": "All",
     "kindPeriod": "Study periods",
     "kindDeadline": "Deadlines",
-    "deadlinePrefix": "Due: "
+    "deadlinePrefix": "Due: ",
+    "date": "Date"
   },
   "exams": {
     "title": "Exams",
@@ -853,7 +867,8 @@
       "internal": "nginx internal location",
       "workerHint": "Why switch: in php mode every byte of material passes through PHP and occupies a worker for the whole transfer. In nginx mode the web server opens the file itself, and PHP is not involved.",
       "loadFailed": "Failed to load the delivery mode",
-      "saveFailed": "Failed to save the delivery mode"
+      "saveFailed": "Failed to save the delivery mode",
+      "stateTitle": "Current delivery state"
     },
     "tutor": {
       "tab": "Tutor",
@@ -881,11 +896,13 @@
         "indexed": "ready",
         "empty": "no text",
         "failed": "failed"
-      }
+      },
+      "diagnostics": "Tutor diagnostics"
     },
     "grades": {
       "tab": "Grades",
-      "comingSoon": "Grades are in progress"
+      "comingSoon": "Grades are in progress",
+      "title": "Grade scales"
     }
   },
   "tutor": {
@@ -940,7 +957,8 @@
       "partial": "Partly correct",
       "wrong": "Incorrect",
       "ungraded": "Not graded"
-    }
+    },
+    "engineState": "Engine state"
   },
   "account": {
     "anon": "User",
@@ -1008,7 +1026,8 @@
     }
   },
   "courseItem": {
-    "loadError": "Failed to load the course material"
+    "loadError": "Failed to load the course material",
+    "title": "Course description: {name}"
   },
   "user": {
     "chpass": {
@@ -1039,7 +1058,136 @@
     "forbiddenText": "You do not have permission to view this page. If you believe this is an error, contact your administrator.",
     "notFound": "Page not found",
     "notFoundText": "The requested page does not exist or has been moved.",
-    "serverError": "Server error",
+    "serverError": "Application server is unavailable. Contact your system administrator",
     "serverErrorText": "Something went wrong on our end. Please try again later."
+  },
+  "userCourse": {
+    "title": "Course page",
+    "class": "Class",
+    "category": "Category",
+    "date": "Date",
+    "passCourse": "Start course",
+    "passTest": "Start test",
+    "test": "Test",
+    "scores": "Test results",
+    "attempt": "Attempt",
+    "testName": "Test name",
+    "score": "Score",
+    "noTests": "No tests passed",
+    "scoresEmpty": "You have not taken any tests in this course",
+    "scoresEmptyText": "Results will appear here after your first attempt"
+  },
+  "gift": {
+    "results": "Results:",
+    "testing": "Testing",
+    "nextQuestion": "Next question",
+    "finishExam": "Finish testing",
+    "finished": "Testing completed"
+  },
+  "certificates": {
+    "pageTitle": "Certificates",
+    "pageHint": "A certificate is issued once every lesson is closed and all assigned exams are passed",
+    "tableTitle": "Plan courses",
+    "course": "Course",
+    "lessons": "Lessons",
+    "exams": "Exams",
+    "open": "Open",
+    "available": "Available",
+    "blocked": "Not finished",
+    "blockedHint": "Close all lessons and pass the exams",
+    "emptyTitle": "No certificates yet",
+    "emptyText": "A certificate will appear here after you finish a course",
+    "print": "Print / PDF",
+    "copyCode": "Copy code",
+    "codeCopied": "Code copied",
+    "organization": "Educational institution",
+    "title": "Certificate",
+    "issuedTo": "Issued to",
+    "courseCompleted": "for completing the course",
+    "module": "Module",
+    "period": "Study period",
+    "issuedAt": "Issued on",
+    "code": "Verification code",
+    "verifyHint": "The code confirms that this certificate is genuine",
+    "errorTitle": "Certificate unavailable",
+    "loadFailed": "Failed to load the certificate"
+  },
+  "gradebook": {
+    "title": "Gradebook",
+    "hint": "Grades are computed from the grading boundaries. A dot next to a grade means it was set by a teacher",
+    "group": "Group",
+    "course": "Course",
+    "student": "Student",
+    "average": "Average",
+    "caption": "Gradebook: students and exams",
+    "pickGroup": "Select a group",
+    "pickGroupText": "The gradebook is kept per group — select a group to see grades",
+    "noExams": "No exams",
+    "noExamsText": "No exams have been assigned to this group",
+    "export": "Export CSV",
+    "editorTitle": "Student grade",
+    "autoGrade": "Automatic grade",
+    "grade": "Grade",
+    "comment": "Comment",
+    "clear": "Remove manual grade",
+    "correct": "Correct",
+    "manualLegend": "teacher-entered grade"
+  },
+  "announcements": {
+    "title": "Announcements",
+    "hint": "Announcements addressed to you, your group or your courses",
+    "new": "Post",
+    "newTitle": "New announcement",
+    "editTitle": "Edit announcement",
+    "pinned": "Pinned",
+    "until": "until",
+    "emptyTitle": "No announcements",
+    "emptyText": "Announcements from the institution will appear here",
+    "fieldTitle": "Title",
+    "fieldBody": "Text",
+    "fieldPinned": "Pin to the top",
+    "fieldPublishedAt": "Publish from",
+    "fieldExpiresAt": "Valid until",
+    "fieldAll": "Everyone",
+    "fieldGroups": "Groups",
+    "fieldCourses": "Courses",
+    "fieldRoles": "Roles",
+    "confirmDelete": "The announcement will be removed for everyone who saw it.",
+    "groupsLabel": "groups: {n}",
+    "coursesLabel": "courses: {n}",
+    "rolesLabel": "roles: {n}"
+  },
+  "forum": {
+    "title": "Course questions",
+    "hint": "Ask a question to a teacher or to fellow trainees",
+    "ask": "Ask a question",
+    "filterAll": "All",
+    "filterUnanswered": "Unanswered",
+    "filterMine": "Mine",
+    "emptyTitle": "No questions yet",
+    "emptyText": "Ask the first question about this course",
+    "fieldTitle": "Question",
+    "fieldBody": "Details",
+    "fieldLesson": "Lesson",
+    "fieldPrivate": "My group only",
+    "pinned": "Pinned",
+    "solved": "Solved",
+    "locked": "Locked",
+    "private": "Private",
+    "staff": "Teacher",
+    "solution": "Marked as the solution",
+    "markSolution": "Mark as solution",
+    "pin": "Pin",
+    "lock": "Lock topic",
+    "answers": "Answers ({n})",
+    "noAnswers": "No answers yet",
+    "noAnswersText": "Be the first to answer",
+    "replyLabel": "Your answer",
+    "reply": "Reply",
+    "closedHint": "This topic is locked: no new answers are accepted",
+    "activity": "activity",
+    "notFoundTitle": "Topic not found",
+    "notFoundText": "It may have been deleted or is closed for your group",
+    "confirmDeleteTopic": "The topic and all its answers will be deleted permanently."
   }
 }

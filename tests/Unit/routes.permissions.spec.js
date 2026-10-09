@@ -52,6 +52,16 @@ const AUTH_ONLY_ROUTES = new Set([
   '/my', '/logout', '/datepicker',
   '/my/learning', '/dashboard',
   '/my/exams', '/exams/:idEdit',
+  // Сертификаты: область видимости задаёт CertificateController —
+  // он отдаёт только курсы из плана группы самого пользователя и
+  // закрывает чужой ответом 404. Навешивать content.view здесь так же
+  // произвольно, как для /my/exams.
+  '/my/certificates', '/my/certificates/:idEdit',
+  // Объявления: право announcements.manage нужно только на публикацию.
+  // Читать ленту может любой вошедший, а видимость объявления решает
+  // Announcement::visibilityFor — так же, как /my/exams не требует
+  // content.view.
+  '/announcements',
 ])
 
 const flat = (routes || []).flat(Infinity).filter(Boolean)

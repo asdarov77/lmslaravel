@@ -1,146 +1,138 @@
 <template>
   <div class="u-page">
     <FormCard
-      :title="$t('groups.create.title')"
-      :subtitle="$t('groups.create.subtitle')"
-      :busy="saving"
-      :submit-text="$t('common.create')"
+      :title="t('groups.create.title')"
+      :subtitle="t('groups.create.subtitle')"
+      :busy="form.submitting.value"
+      :submit-text="t('common.create')"
       @submit="submitForm"
-      @cancel="cancelBtnHead"
+      @cancel="cancel"
     >
-      <v-text-field
-        v-model="groupname"
-        :label="$t('groups.create.name')"
-        :placeholder="$t('groups.create.namePlaceholder')"
-        :error-messages="fieldErrors.groupname"
-        autofocus
-      ></v-text-field>
-
-      <v-textarea
-        v-model="groupdescription"
-        :label="$t('groups.create.description')"
-        :placeholder="$t('groups.create.descriptionPlaceholder')"
-        :error-messages="fieldErrors.groupdescription"
-        rows="3"
-        auto-grow
-      ></v-textarea>
-
       <!--
-        Ошибки сервера показываем явно.
-
-        Раньше здесь стоял <v-container class="notification is-danger">:
-        класс из Bulma, которого в приложении нет (Bulma грузится с CDN
-        лишь на пяти страницах), поэтому блок ошибок рендерился без
-        единого стиля — серверный 422 был виден как пустое место.
+        Общая ошибка сервера (не 422): показываем здесь, а не над каждым
+        полем. Ошибки конкретных полей useForm раскладывает по form.errors
+        и подсвечивает поле само.
       -->
       <v-alert
-        v-for="(error, index) in errors"
-        :key="index"
+        v-if="form.serverError.value"
         type="error"
-        class="mt-3"
-        :text="error"
-      ></v-alert>
-    </FormCard>
+        variant="tonal"
+        class="mb-4"
+        :text="form.serverError.value"
+      />
 
+      <FormField
+        :label="t('groups.create.name')"
+        :error="form.errors.groupname"
+        :required="form.isRequired('groupname')"
+        name="groupname"
+      >
+        <v-text-field
+          v-bind="form.bind('groupname')"
+          :placeholder="t('groups.create.namePlaceholder')"
+          autofocus
+        />
+      </FormField>
+
+      <FormField
+        :label="t('groups.create.description')"
+        :error="form.errors.groupdescription"
+        name="groupdescription"
+      >
+        <AutosizeTextarea
+          v-model="form.values.groupdescription"
+          :maxlength="255"
+          :rows="3"
+          :placeholder="t('groups.create.descriptionPlaceholder')"
+          @blur="form.validateField('groupdescription')"
+        />
+      </FormField>
+
+      <p v-if="form.draftSavedAt.value" class="u-draft-hint">
+        <v-icon icon="mdi-content-save-check-outline" size="16" aria-hidden="true" />
+        {{ t('common.draftSaved') }}
+      </p>
+    </FormCard>
   </div>
 </template>
 
-<script>
-import { mapState, mapGetters } from "vuex";
-import { asArray, extractFieldErrors } from "../../api/envelope";
-import FormCard from "../../components/ui/FormCard.vue";
-import { toast } from "../../composables/useToast";
+<script setup>
+import { useI18n } from 'vue-i18n'
+import { useStore } from 'vuex'
+import { useRouter } from 'vue-router'
+import FormCard from '../../components/ui/FormCard.vue'
+import FormField from '../../components/ui/FormField.vue'
+import AutosizeTextarea from '../../components/ui/fields/AutosizeTextarea.vue'
+import useForm from '../../composables/useForm'
+import useLeaveGuard from '../../composables/useLeaveGuard'
+import { required, maxLength, unique } from '../../composables/validation/rules'
+import { asArray } from '../../api/envelope'
+import { toast } from '../../composables/useToast'
 
-export default {
-  name: "CreateGroup",
-  components: { FormCard },
+/**
+ * Создание группы.
+ *
+ * Переведена на useForm (Фаза 2): вместо ручного `fieldErrors` —
+ * объект-схема; вместо `if (!this.errors.length)` (где массив ошибок
+ * нигде не наполнялся) — проверка правил до запроса; серверный 422
+ * раскладывается по полям, а не висит одним блоком; уход с формы
+ * требует подтверждения; длинное описание автосохраняется как черновик.
+ */
+const { t } = useI18n()
+const store = useStore()
+const router = useRouter()
 
-  data() {
-    return {
-      groupname: "",
-      groupdescription: "",
-      errors: [],
-      fieldErrors: {},
-      saving: false,
-    };
-  },
-
-  computed: {
-    ...mapState("User", ["allGroups", "users"]),
-    ...mapGetters("User", ["users", "groups"]),
-  },
-
-  methods: {
-    /**
-     * Клиентская валидация.
-     *
-     * Раньше проверка выглядела как `if (!this.errors.length)`, но
-     * массив errors нигде не наполнялся — условие всегда истинно, и
-     * пустая группа уходила на сервер. Теперь пустое имя — ошибка
-     * до запроса.
-     */
-    validate() {
-      this.errors = [];
-      this.fieldErrors = {};
-
-      if (this.groupname.trim() === "") {
-        this.fieldErrors.groupname = this.$t("groups.create.errors.nameRequired");
-      } else if (this.groupname.trim().length > 255) {
-        this.fieldErrors.groupname = this.$t("groups.create.errors.nameTooLong");
-      } else {
-        const exists = asArray(this.allGroups).some(
-          (group) =>
-            String(group.groupname ?? "").trim().toLowerCase() ===
-            this.groupname.trim().toLowerCase()
-        );
-
-        if (exists) {
-          this.fieldErrors.groupname = this.$t("groups.create.errors.nameTaken");
-        }
-      }
-
-      if (this.groupdescription.length > 255) {
-        this.fieldErrors.groupdescription = this.$t("groups.create.errors.descriptionTooLong");
-      }
-
-      return Object.keys(this.fieldErrors).length === 0;
+const form = useForm({
+  schema: {
+    groupname: {
+      initial: '',
+      rules: [
+        required(t('groups.create.errors.nameRequired')),
+        maxLength(255, t('groups.create.errors.nameTooLong')),
+        // Уникальность проверяем по уже загруженному списку групп.
+        unique(() => asArray(store.state.User.allGroups), {
+          by: 'groupname',
+          message: t('groups.create.errors.nameTaken'),
+        }),
+      ],
     },
-
-    async submitForm() {
-      if (this.saving) return;
-
-      this.errors = [];
-
-      if (!this.validate()) return;
-
-      this.saving = true;
-
-      try {
-        await this.$store.dispatch("User/createGroup", {
-          groupname: this.groupname.trim(),
-          groupdescription: this.groupdescription.trim(),
-        });
-
-        toast.success(this.$t("groups.create.done"));
-        this.$router.push("/groups/list");
-      } catch (error) {
-        // Раньше .finally() уводил назад в любом случае, поэтому
-        // при ошибке пользователь оказывался на списке без объяснения.
-        const { fields, general } = extractFieldErrors(
-          error,
-          this.$t("groups.create.errors.generic")
-        );
-        Object.assign(this.fieldErrors, fields);
-        this.errors = general ? [general] : [];
-        toast.error(general ?? "");
-      } finally {
-        this.saving = false;
-      }
-    },
-
-    cancelBtnHead() {
-      this.$router.back();
+    groupdescription: {
+      initial: '',
+      rules: [maxLength(255, t('groups.create.errors.descriptionTooLong'))],
     },
   },
-};
+
+  draftKey: 'groups.create',
+
+  onSubmit: async ({ values }) => {
+    await store.dispatch('User/createGroup', {
+      groupname: values.groupname.trim(),
+      groupdescription: values.groupdescription.trim(),
+    })
+
+    toast.success(t('groups.create.done'))
+    await router.push('/groups/list')
+  },
+})
+
+useLeaveGuard(() => form.dirty.value)
+
+const submitForm = () => {
+  form.submit()
+}
+
+const cancel = () => {
+  router.back()
+}
 </script>
+
+<style scoped>
+.u-draft-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+</style>

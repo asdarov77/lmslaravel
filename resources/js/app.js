@@ -10,6 +10,16 @@ import './bootstrap.js';
 // норме 4.5). Теперь наши стили подключаются последними.
 import 'vuetify/styles';
 
+// Шрифт Inter с кириллицей. Подключается до рендера, чтобы не было
+// вспышки системного шрифта (FOIT). Fallback — системный стек
+// из tokens.css, если сеть недоступна.
+import WebFontLoader from 'webfontloader';
+WebFontLoader.load({
+  google: {
+    families: ['Inter:wght@400;500;600;700'],
+  },
+});
+
 // Токены и базовые классы подключаются один раз на всё приложение.
 // До этого app.css был закомментирован в vite.config.mjs, и шаблоны
 // подтягивали его через @import внутри <style> — из-за чего стили

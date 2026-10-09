@@ -5,7 +5,7 @@
         <!-- В Vuetify 3 нет v-list-item-content: текст кладётся прямо в
              v-list-item, а обёртка VListItemContent удалена. -->
         <v-list-item>
-          <v-list-item-title class="text-h6">Страница не найдена</v-list-item-title>
+          <v-list-item-title class="text-h6">{{ $t('errors.notFound') }}</v-list-item-title>
         </v-list-item>
       </v-list>
     </v-card>

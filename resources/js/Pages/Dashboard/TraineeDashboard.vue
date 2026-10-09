@@ -56,6 +56,26 @@
           </span>
         </div>
 
+        <!-- Точная доля уроков: раньше процент считался по факту
+             открытия материалов и 1 из 20 уроков выглядел как 100%. -->
+        <div class="dash__continue-progress">
+          <v-progress-linear
+            :model-value="continueItem.percent || 0"
+            color="primary"
+            height="8"
+            rounded
+          ></v-progress-linear>
+          <span class="dash__continue-percent">{{ continueItem.percent || 0 }}%</span>
+        </div>
+
+        <!-- Счётчик уроков: процент сам по себе не объясняет, много это
+             или мало — «5%» может означать 1 из 20 уроков. -->
+        <p class="dash__continue-hint">
+          {{ $t("dashboard.lessonsProgress") }}: {{ lessonsDone }} / {{ lessonsTotal }}
+        </p>
+
+        <p v-if="resumeHint" class="dash__continue-hint">{{ resumeHint }}</p>
+
         <v-btn
           class="mt-4"
           color="primary"
@@ -65,7 +85,7 @@
           }"
           data-test="dash-continue-go"
         >
-          {{ $t("dashboard.continueAction") }}
+          {{ resumeHint ? $t("dashboard.resumeFrom") : $t("dashboard.continueAction") }}
           <v-icon end icon="mdi-arrow-right" size="16" aria-hidden="true"></v-icon>
         </v-btn>
       </section>
@@ -216,6 +236,32 @@ export default {
 
     upcoming() {
       return this.summary?.upcoming || [];
+    },
+
+    /**
+     * Подпись точки возврата.
+     *
+     * Показывается только когда сервер знает, какой урок и какой файл
+     * были последними: без этого кнопка обещала бы «продолжить с
+     * последнего места», а открывала бы курс с начала.
+     */
+    resumeHint() {
+      if (!this.continueItem?.resume_lesson_id) {
+        return "";
+      }
+
+      return this.continueItem.resume_file
+        ? `${this.$t("dashboard.resumeFrom")}: ${this.continueItem.resume_file}`
+        : this.$t("dashboard.resumeFrom");
+    },
+
+    /** Уроки всего и уроки с записанным прогрессом — для счётчика. */
+    lessonsDone() {
+      return this.summary?.progress?.lessons_completed ?? 0;
+    },
+
+    lessonsTotal() {
+      return this.summary?.progress?.lessons_total ?? 0;
     },
 
     progressPercent() {
@@ -425,6 +471,27 @@ export default {
   padding: 0;
   display: grid;
   gap: var(--sp-2);
+}
+
+.dash__continue-progress {
+  align-items: center;
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+.dash__continue-percent {
+  color: var(--c-text-muted);
+  flex: none;
+  font-size: 0.8125rem;
+  min-width: 3ch;
+  text-align: right;
+}
+
+.dash__continue-hint {
+  color: var(--c-text-muted);
+  font-size: 0.8125rem;
+  margin-top: var(--sp-2);
 }
 
 .dash__list-row {

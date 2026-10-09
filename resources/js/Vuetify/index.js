@@ -91,6 +91,8 @@ const vuetify = createVuetify({
           'on-error': token('c-text-inverse', '#ffffff'),
           'on-success': token('c-text-inverse', '#ffffff'),
           'on-warning': token('c-text-inverse', '#ffffff'),
+          accent: token('c-accent', '#0d9488'),
+          'on-accent': token('c-on-accent', '#ffffff'),
         },
         variables: {
           'border-color': token('c-border', '#dde1e6'),
@@ -120,6 +122,8 @@ const vuetify = createVuetify({
           'on-error': darkToken('c-text-inverse', '#1c2024'),
           'on-success': darkToken('c-text-inverse', '#1c2024'),
           'on-warning': darkToken('c-text-inverse', '#1c2024'),
+          accent: darkToken('c-accent', '#2dd4bf'),
+          'on-accent': darkToken('c-on-accent', '#042f2e'),
         },
         variables: {
           'border-color': darkToken('c-border', '#363c43'),
@@ -140,7 +144,7 @@ const vuetify = createVuetify({
   defaults: {
     VCard: {
       elevation: 0,
-      rounded: 'md',
+      rounded: 'xl',
     },
     VTextField: {
       variant: 'outlined',
@@ -167,15 +171,16 @@ const vuetify = createVuetify({
       color: 'primary',
     },
     VBtn: {
-      rounded: 'sm',
+      rounded: 'md',
       elevation: 0,
+      height: 40,
     },
     VAlert: {
-      rounded: 'md',
+      rounded: 'lg',
       variant: 'tonal',
     },
     VChip: {
-      rounded: 'sm',
+      rounded: 'pill',
     },
     VTable: {
       density: 'comfortable',

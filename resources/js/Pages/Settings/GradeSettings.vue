@@ -1,6 +1,11 @@
 <template>
   <div>
+    <!--
+      caption обязателен: без него скринридер не может озвучить
+      таблицу как «Таблица: название».
+    -->
     <table>
+      <caption class="u-sr-only">{{ $t('settings.grades.title') }}</caption>
       <thead>{{ newValue }}
         <tr>
           <th>Оценка</th>

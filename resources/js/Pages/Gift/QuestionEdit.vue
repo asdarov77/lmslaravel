@@ -1,7 +1,7 @@
 
 
 <template>  
-  <h2>Редактирование вопроса {{ idEdit }}</h2>
+  <PageHeader :title="$t('questions.editTitle', { id: idEdit })" />
   <v-form @submit="saveChanges">   
     <v-text-field v-model="editedQuestion.question_text" label="Текст вопроса" @input="checkChanges"></v-text-field>
     <v-row v-for="(answer, index) in editedQuestion.answers" :key="index">
@@ -29,8 +29,9 @@
 <script>
 import $api from "../../api/httpClient";
 import { unwrapResponse } from "../../api/envelope";
+import PageHeader from '../../components/ui/PageHeader.vue'
 export default {
-  components: { },
+  components: {PageHeader },
   props:
       {
         idEdit: {

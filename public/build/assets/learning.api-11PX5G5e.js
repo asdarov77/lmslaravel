@@ -1,1 +1,0 @@
-import{H as r,J as s,G as n}from"./app-BXTota_t.js";const t=()=>n.get("/api/my/learning"),e=()=>n.get("/api/my/dashboard"),p={fetchMyLearning:t,fetchMyDashboard:e,planItems:a=>s(a),dashboard:a=>r(a)||{}};export{p as l};

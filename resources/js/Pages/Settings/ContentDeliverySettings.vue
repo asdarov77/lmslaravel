@@ -26,22 +26,22 @@
       {{ $t('settings.delivery.nginxWarning') }}
     </v-alert>
 
-    <v-table density="compact" class="mt-6" data-test="delivery-state">
-      <tbody>
-        <tr>
-          <td class="text-medium-emphasis">{{ $t('settings.delivery.current') }}</td>
-          <td data-test="delivery-current">{{ mode || '—' }}</td>
-        </tr>
-        <tr>
-          <td class="text-medium-emphasis">{{ $t('settings.delivery.source') }}</td>
-          <td data-test="delivery-source">{{ $t(`settings.delivery.source_${source}`) }}</td>
-        </tr>
-        <tr>
-          <td class="text-medium-emphasis">{{ $t('settings.delivery.internal') }}</td>
-          <td><code>{{ internal }}</code></td>
-        </tr>
-      </tbody>
-    </v-table>
+    <DataTable
+      class="mt-6"
+      :title="$t('settings.delivery.stateTitle')"
+      :columns="stateColumns"
+      :rows="stateRows"
+      :row-key="(row) => row.id"
+      :caption="$t('settings.delivery.stateTitle')"
+    >
+      <template #cell-value="{ row }">
+        <span v-if="row.id === 'current'" data-test="delivery-current">{{ mode || '—' }}</span>
+        <span v-else-if="row.id === 'source'" data-test="delivery-source">
+          {{ $t(`settings.delivery.source_${source}`) }}
+        </span>
+        <code v-else>{{ internal }}</code>
+      </template>
+    </DataTable>
 
     <p class="text-caption text-medium-emphasis mt-4">
       {{ $t('settings.delivery.workerHint') }}
@@ -70,9 +70,11 @@
  */
 import $api from '../../api/httpClient'
 import { unwrapResponse } from '../../api/envelope'
+import DataTable from '../../components/ui/DataTable.vue'
 
 export default {
   name: 'ContentDeliverySettings',
+  components: { DataTable },
   data() {
     return {
       loading: true,
@@ -84,6 +86,19 @@ export default {
     }
   },
   computed: {
+    stateColumns() {
+      return [
+        { key: 'label', title: this.$t('settings.delivery.current'), width: '40%' },
+        { key: 'value', title: this.$t('settings.delivery.stateTitle') },
+      ]
+    },
+    stateRows() {
+      return [
+        { id: 'current', label: this.$t('settings.delivery.current'), value: this.mode },
+        { id: 'source', label: this.$t('settings.delivery.source'), value: this.source },
+        { id: 'internal', label: this.$t('settings.delivery.internal'), value: this.internal },
+      ]
+    },
     nginx() {
       return this.mode === 'nginx'
     },

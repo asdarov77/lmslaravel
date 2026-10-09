@@ -29,6 +29,11 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\AircraftController;
 use App\Http\Controllers\CoursesListController;
 use App\Http\Controllers\ManagerDashboardController;
+use App\Http\Controllers\CertificateController;
+use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\ForumController;
+use App\Http\Controllers\GradebookController;
+use App\Http\Controllers\LessonProgressController;
 use App\Http\Controllers\MyLearningController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ExamController;
@@ -198,6 +203,22 @@ Route::middleware(['auth:sanctum', 'permission:users.courses,create-tasks'])->gr
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/my/learning', [MyLearningController::class, 'plan']);
     Route::get('/my/dashboard', [MyLearningController::class, 'dashboard']);
+
+    // Прогресс по урокам курса. Раньше он жил в localStorage и терялся
+    // при смене устройства, поэтому «продолжить обучение» было видно
+    // только в том браузере, где урок уже открывали.
+    Route::get('/my/progress/{course}', [LessonProgressController::class, 'show'])
+        ->whereNumber('course');
+    Route::post('/my/progress', [LessonProgressController::class, 'store']);
+
+    // Сертификаты об окончании курса. Печатная HTML-страница, а не
+    // PDF-файл: генератора PDF в проекте нет, а печать браузером даёт
+    // тот же документ с тем же проверочным кодом.
+    Route::get('/my/certificates', [CertificateController::class, 'index']);
+    Route::get('/my/certificates/{course}', [CertificateController::class, 'show'])
+        ->whereNumber('course');
+    Route::delete('/my/progress/{lesson}', [LessonProgressController::class, 'destroy'])
+        ->whereNumber('lesson');
 
     // Сводка для администратора и инструктора. Отдельная от
     // /my/dashboard: там «моё обучение», а здесь «что происходит в
@@ -549,6 +570,44 @@ Route::prefix('v1/tutor')->middleware('auth:sanctum')->group(function () {
     });
 });
 
+// Объявления. Чтение ленты — любому вошедшему (видимость решает
+// Announcement::visibilityFor), публикация — по announcements.manage.
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/announcements', [AnnouncementController::class, 'index']);
+    Route::get('/announcements/audiences', [AnnouncementController::class, 'audiences']);
+    Route::post('/announcements', [AnnouncementController::class, 'store']);
+    Route::put('/announcements/{announcement}', [AnnouncementController::class, 'update'])
+        ->whereNumber('announcement');
+    Route::delete('/announcements/{announcement}', [AnnouncementController::class, 'destroy'])
+        ->whereNumber('announcement');
+});
+
+// Форум. Чтение и участие — по доступу к курсу (CourseAccess),
+// модерация — по forum.moderate.
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/forum/topics', [ForumController::class, 'index']);
+    Route::post('/forum/topics', [ForumController::class, 'storeTopic']);
+    Route::get('/forum/topics/{topic}', [ForumController::class, 'showTopic'])->whereNumber('topic');
+    Route::patch('/forum/topics/{topic}', [ForumController::class, 'updateTopic'])->whereNumber('topic');
+    Route::delete('/forum/topics/{topic}', [ForumController::class, 'destroyTopic'])->whereNumber('topic');
+    Route::post('/forum/topics/{topic}/posts', [ForumController::class, 'storePost'])->whereNumber('topic');
+    Route::delete('/forum/posts/{post}', [ForumController::class, 'destroyPost'])->whereNumber('post');
+});
+
+// Грейдбук преподавателя. Право grading.manage проверяется в
+// контроллере: журнал содержит персональные данные группы.
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/gradebook', [GradebookController::class, 'index']);
+    Route::put('/gradebook/cell', [GradebookController::class, 'updateCell']);
+    Route::get('/gradebook/export', [GradebookController::class, 'export']);
+});
+
+// Проверка кода сертификата — без авторизации: код и есть подтверждение.
+// Без этого «проверка» была бы недоступна тому, кому сертификат выдан:
+// у получателя нет аккаунта в системе.
+Route::get('/certificates/verify/{code}', [CertificateController::class, 'verify'])
+    ->where('code', '[A-Za-z0-9]{18}');
+
 // Настройки тренажёра: вкл/выкл и диагностика движка.
 // Регистрируются до /settings/{setting}, иначе перехватятся параметром.
 // Уведомления пользователя (колокольчик в шапке).
@@ -556,6 +615,10 @@ Route::get('/notifications', [\App\Http\Controllers\NotificationController::clas
     ->middleware('auth:sanctum');
 Route::post('/notifications/{notification}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])
     ->middleware('auth:sanctum');
+// Аватар пользователя.
+Route::post('/user/avatar', [\App\Http\Controllers\AuthController::class, 'updateAvatar'])
+    ->middleware('auth:sanctum');
+
 Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])
     ->middleware('auth:sanctum');
 

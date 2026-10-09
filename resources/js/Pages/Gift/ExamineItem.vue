@@ -7,7 +7,7 @@
 
   <v-card>
     <v-toolbar color="primary">
-      <v-toolbar-title>Тестирование </v-toolbar-title>
+      <v-toolbar-title>{{ $t('gift.testing') }}</v-toolbar-title>
     </v-toolbar>
     <v-row no-gutters>
       <v-col cols="8">
@@ -33,16 +33,16 @@
 
 
           <v-btn v-if='selectedAnswersLength !== questions.length' class="mt-3 mb-3 ml-3 mr-3" color="primary"
-            @click="nextQuestion">Следующий вопрос</v-btn>
+            @click="nextQuestion">{{ $t('gift.nextQuestion') }}</v-btn>
 
           <v-btn v-if='selectedAnswersLength === questions.length === !isFinishExamClicked' class="mt-3 mb-3 ml-3 mr-3"
-            @click="finishExam">Закончить тестирование</v-btn>
+            @click="finishExam">{{ $t('gift.finishExam') }}</v-btn>
         </v-sheet>
 
 
         <!--                блок финальный результаты                -->
         <v-card v-if='isFinishExamClicked'>
-          <v-card-text class="text-center font-weight-bold" style="font-size: 1.25rem;">Тестирование завершено</v-card-text>
+          <v-card-text class="text-center font-weight-bold" style="font-size: 1.25rem;">{{ $t('gift.finished') }}</v-card-text>
           <v-card-text>Всего вопросов: {{ questions.length }}</v-card-text>
           <v-card-text>Правильно отвечено: {{ correctAnswersCount }}</v-card-text>
           <v-card-text>Неправильно отвечено: {{ incorrectAnswersCount }}</v-card-text>

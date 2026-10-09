@@ -1,4 +1,5 @@
 import { LanguageService } from '../../services/language.service'
+import density from '../../utils/density'
 
 const UiModule = {
     namespaced: true,
@@ -6,8 +7,10 @@ const UiModule = {
 
         menudrawler: false,
         language: LanguageService.getLanguage(),
-        // Плотность интерфейса: default или compact.
-        density: 'default',
+        // Плотность интерфейса: default или compact. Начальное значение
+        // берётся из сохранённого выбора — иначе после перезагрузки
+        // переключатель показывал бы «обычную», хотя страница компактная.
+        density: density.read(),
         // errors: {}
     }),
     mutations: {

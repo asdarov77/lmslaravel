@@ -10,6 +10,19 @@
           <v-sheet class="mx-auto mt-0 mb-3" elevation=4 rounded=lg>
             <div class="text-center" :style="{ fontSize: '20px' }">{{ titleauk.toUpperCase() }}</div>
           </v-sheet>
+
+          <!-- Вопросы по курсу. Форум живёт внутри курса: отдельный
+               раздел в меню привёл бы в пустоту, потому что вопрос
+               без курса не имеет смысла. -->
+          <v-btn
+            block
+            variant="text"
+            prepend-icon="mdi-forum-outline"
+            :to="{ name: 'forum.list', params: { idEdit: idEdit } }"
+            data-test="course-forum-link"
+          >
+            {{ $t('forum.title') }}
+          </v-btn>
           <!-- Панель инструментов.
                      Регресс: здесь стояли фиксированные width:130px на трёх
                      иконках внутри колонки 4/12 (390px в ~30% ширины) плюс
@@ -219,16 +232,10 @@ const apiUrl = import.meta.env.VITE_APP_URL;
 import $api from "../api/httpClient";
 import { unwrapResponse, unwrapArray, unwrapField, numericQuery } from "../api/envelope";
 import { mapState, mapGetters } from "vuex";
-import { library } from '@fortawesome/fontawesome-svg-core';
-import { faTimes } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { toast } from "../composables/useToast";
-library.add(faTimes);
 
 export default {
   components: {
-    FontAwesomeIcon
-
   },
 
   props: {
@@ -254,6 +261,11 @@ export default {
       visitedIds: [],
       // Заголовок активного модуля для панели инструментов.
       activeTitle: "",
+      // Имя последнего открытого файла: по нему «продолжить»
+      // возвращает к нужному разделу, а не к началу курса.
+      activeFile: null,
+      // Документ пролистан до конца — урок засчитан как пройденный.
+      isScrolledToEnd: false,
       canScrollUp: false,
       filterByCategoryAukstructures: [],
       categories: {},
@@ -454,6 +466,43 @@ export default {
       this.persistVisited();
     },
 
+    /**
+     * Процент урока: 100, если материал пролистали до конца.
+     *
+     * Отдельного «пройти урок» в материалах нет — документ один
+     * большой HTML. Поэтому признак прохождения здесь такой же
+     * практический, как у видеоуроков: доскроллил до конца.
+     * Промежуточные значения не пишем: иначе один скролл создавал бы
+     * запись в базе на каждом кадре.
+     */
+    lessonPercent(itemId) {
+      if (this.isScrolledToEnd) {
+        return 100;
+      }
+
+      return this.visitedIds.includes(itemId) ? 0 : 0;
+    },
+
+    /**
+     * Отправляет серверный прогресс по уроку.
+     *
+     * Ошибка намеренно проглатывается: материал уже открыт, и падение
+     * фоновой записи не должно превращаться в сообщение об ошибке на
+     * странице. В localStorage копия остаётся как запасной вариант.
+     */
+    async saveProgress(itemId, percent) {
+      try {
+        await $api.post(`${apiUrl}/api/my/progress`, {
+          course_id: Number(this.idEdit),
+          lesson_id: Number(itemId),
+          percent,
+          last_file: this.activeFile || null,
+        }, { optional: true });
+      } catch (error) {
+        // Прогресс не критичен для показа материала.
+      }
+    },
+
     /** Ключ хранилища — по курсу: прогресс разных курсов не смешивается. */
     visitedKey() {
       return `course-manifest-visited:${this.idEdit}`;
@@ -503,6 +552,7 @@ export default {
         frame = window.requestAnimationFrame(() => {
           frame = null;
           this.canScrollUp = el.scrollTop > 240;
+          this.checkScrollEnd(el);
         });
       };
 
@@ -527,6 +577,26 @@ export default {
         }
       } catch (error) {
         // srcdoc-документ бывает недоступен (sandbox) — оставляем прошлую высоту.
+      }
+    },
+
+    /**
+     * Дошёл ли пользователь до конца материала.
+     *
+     * Кадр подгоняется под высоту документа, поэтому «конец
+     * документа» — это нижняя граница прокрутки страницы. Запас в
+     * 40px нужен из-за дробной высоты и субпиксельной раскладки.
+     * Отметка о выходе на конец отправляется один раз: при каждом
+     * движении колеса запрос не уходит.
+     */
+    checkScrollEnd(el) {
+      if (this.isScrolledToEnd) return;
+
+      const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+
+      if (distance <= 40) {
+        this.isScrolledToEnd = true;
+        this.saveProgress(this.activeId, 100);
       }
     },
 
@@ -594,9 +664,11 @@ export default {
       // Без сброса кнопка оставалась видимой: событие scroll не
       // срабатывает, когда позиция и так уже 0.
       this.canScrollUp = false;
+      this.isScrolledToEnd = false;
       // Отмечаем модуль посещённым сразу, а не после загрузки контента:
       // долгая загрузка не должна оставлять пункт «непосещённым».
       this.markVisited(item_id);
+      this.saveProgress(item_id, 0);
       try {
         // Контент курсов отдаётся по подписи, а не по auth:sanctum:
         // вложенные ресурсы (CSS/JS/картинки) браузер запрашивает напрямую,
@@ -612,6 +684,7 @@ export default {
         const aircraft = (target.aircraft || "").trim();
         const auk = (target.auk || "").trim();
         const file = (target.file || "").trim();
+        this.activeFile = file;
 
         if (!aircraft || !auk || !file) {
           this.contentHtml = "";
@@ -641,6 +714,10 @@ export default {
         const html = typeof contentResponse.data === "string" ? contentResponse.data : "";
         this.contentHtml = html ? '<base href="' + base + '" />' + html : "";
         this.link = this.contentHtml;
+        // Урок открыт и прочитан хотя бы частично: серверный прогресс
+        // нужен, чтобы «продолжить обучение» работало на другом
+        // устройстве, а не только в этом браузере.
+        this.saveProgress(item_id, this.lessonPercent(item_id));
       } catch (error) {
         console.log(error);
         this.contentHtml = "";

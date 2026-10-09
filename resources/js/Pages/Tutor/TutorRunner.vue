@@ -2,7 +2,7 @@
   <v-container class="tutor-runner">
     <v-row justify="space-between" align="center" class="mb-4">
       <v-col>
-        <h1 class="text-h6">{{ $t('tutor.runner') }}</h1>
+        <PageHeader :title="$t('tutor.runner')" />
         <p v-if="materialTitle" class="text-body-2 text-medium-emphasis">
           {{ materialTitle }}
         </p>
@@ -166,10 +166,11 @@ import {
 } from '../../api/tutor.api'
 import { unwrapResponse, metaField } from '../../api/envelope'
 import EmptyState from '../../components/ui/EmptyState.vue'
+import PageHeader from '../../components/ui/PageHeader.vue'
 
 export default {
   name: 'TutorRunner',
-  components: { EmptyState },
+  components: { EmptyState, PageHeader },
   data() {
     return {
       item: null,

@@ -26,8 +26,6 @@ const EXTERNAL_NOISE =
 /** @type {{name: string, hash: string, note?: string}[]} */
 const ROUTES = [
   { name: 'главная', hash: '/' },
-  { name: 'about', hash: '/about' },
-  { name: 'contacts', hash: '/contacts' },
   { name: 'личный кабинет', hash: '/my' },
   { name: 'список пользователей', hash: '/user/list' },
   { name: 'редактирование пользователя', hash: '/user/edit/{user}' },

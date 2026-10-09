@@ -2,7 +2,7 @@
   <v-col cols="12" sm="8" md="4">
     <v-card class="elevation-12 mx-auto" style="width: 1200px">
       <v-toolbar color="primary">
-        <v-toolbar-title>Описание курса {{ courses.title }} </v-toolbar-title>
+        <v-toolbar-title>{{ $t('courseItem.title', { name: courses.title }) }}</v-toolbar-title>
       </v-toolbar>
       <v-card-text>
         <v-form>

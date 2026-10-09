@@ -627,4 +627,33 @@ public function group2learning(Request $request)
         return response()->json($created, 201);
     }
 
+
+    /**
+     * Загрузка аватара пользователя.
+     *
+     * Файл сохраняется в uploads/avatars/{user_id}/, имя — hash, чтобы
+     * нельзя было перезаписать чужой файл или угадать путь.
+     */
+    public function updateAvatar(Request $request)
+    {
+        $request->validate([
+            'avatar' => ['required', 'file', 'image', 'max:2048'],
+        ]);
+
+        $user = $request->user();
+        $file = $request->file('avatar');
+
+        $path = $file->storeAs(
+            'avatars/' . $user->id,
+            hash('sha256', $user->id . time()) . '.' . $file->extension(),
+            'public'
+        );
+
+        $user->forceFill(['avatar' => $path])->save();
+
+        return response()->json([
+            'success' => true,
+            'data' => ['avatar' => $path],
+        ]);
+    }
 }

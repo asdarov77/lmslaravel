@@ -65,6 +65,17 @@ Route::post( 'secret', function(){
 // чтобы роутер на фронтенде мог обработать их сам.
 // Без этого прямые переходы и обновление страниц на вложенных
 // маршрутах (/course/16, /courses/list и т.п.) давали 404.
+/*
+ * Fallback не тянет сессионное middleware.
+ *
+ * Маршрут объявлен в группе web, а через него проходят и запросы к
+ * /api/*, для которых маршрут не нашёлся. StartSession и
+ * AuthenticateSession на таких запросах обращаются к сессионному
+ * guard'у, а у него нет метода viaRemember: неизвестный путь /api/*
+ * падал с 500 вместо честного 404. Сама проверка кода и разбора
+ * методов сессии не нужна, поэтому middleware снимаются точечно, а
+ * вся группа web — нет.
+ */
 Route::fallback(function () {
     if (request()->is('api/*')) {
         // Fallback регистрируется как обычный маршрут и срабатывает на
@@ -97,6 +108,13 @@ Route::fallback(function () {
     }
 
     return app(SinglePageController::class)->index();
-});
+})->withoutMiddleware([
+    // Сессия и её проверка на /api/* не нужны и вредны: guard по
+    // умолчанию здесь sanctum, у него нет viaRemember, и любой
+    // несуществующий путь /api/* отвечал 500 вместо 404.
+    \Illuminate\Session\Middleware\StartSession::class,
+    \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+    \Illuminate\Session\Middleware\AuthenticateSession::class,
+]);
 
 

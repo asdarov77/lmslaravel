@@ -126,10 +126,11 @@ describe('Breadcrumbs: отрисовка', () => {
   })
 
   it('на странице без meta.breadcrumbs ничего не рисует', async () => {
-    // Именно /about, а не '/': корневой адрес стал редиректом на
+    // Именно /login, а не '/': корневой адрес стал редиректом на
     // /dashboard, а у кабинета крошки есть. Проверка на '/' проверяла бы
-    // уже не то, что задумано, и проходила бы случайно.
-    const wrapper = await mountCrumbs('/about')
+    // уже не то, что задумано, и проходила бы случайно. /about больше
+    // не маршрут — статические страницы удалены.
+    const wrapper = await mountCrumbs('/login')
     expect(crumbsOf(wrapper)).toHaveLength(0)
     expect(wrapper.find('.u-crumbs').exists()).toBe(false)
   })

@@ -33,7 +33,11 @@ export const navigationSections = [
         onlyFor: 'trainee',
       },
       { key: 'tutor', titleKey: 'app.menu.tutor', link: '/tutor', icon: 'mdi-brain' },
+      { key: 'announcements', titleKey: 'app.menu.announcements', link: '/announcements', icon: 'mdi-bullhorn-outline' },
       { key: 'exams', titleKey: 'app.menu.exams', link: '/my/exams', icon: 'mdi-clipboard-check-outline' },
+      // Сертификаты видны только обучаемому: у методиста нет ни плана,
+      // ни закрытых уроков, и список был бы пустым.
+      { key: 'certificates', titleKey: 'app.menu.certificates', link: '/my/certificates', icon: 'mdi-certificate-outline', onlyFor: 'trainee' },
     ],
   },
   {
@@ -56,6 +60,11 @@ export const navigationSections = [
       { key: 'files', titleKey: 'app.menu.files', link: '/filemanager', icon: 'mdi-folder-multiple-outline' },
       { key: 'calendar', titleKey: 'app.menu.calendar', link: '/calendar', icon: 'mdi-calendar-month' },
       { key: 'learning', titleKey: 'app.menu.learning', link: '/group/learning', icon: 'mdi-account-group-outline' },
+      // Журнал оценок. Видимость определяется правом grading.manage
+      // из meta.permission маршрута, поэтому onlyFor здесь не нужен
+      // и был бы вредным: fitsRole понимает только 'manager'/'trainee',
+      // и любой другой список молчно показывал бы пункт всем.
+      { key: 'gradebook', titleKey: 'app.menu.gradebook', link: '/gradebook', icon: 'mdi-table-large' },
     ],
   },
   {

@@ -56,19 +56,7 @@ const routes = [
         },
         component: () => import('../Pages/Register.vue'),
         name: 'regist'
-
     },
-    {
-        path: '/about',
-        component: () => import('../Pages/About.vue'),
-        name: 'about'
-
-    },
-    {
-        path: '/contacts',
-        component: () => import('../Pages/Contacts.vue'),
-        name: 'contacts',
-        meta: { permission: ['users.view'] },    },
     {
         path: '/my',
         component: () => import('../Pages/MyAccount.vue'),
@@ -320,6 +308,21 @@ const routes = [
         name: 'learning.plan',
     },
     {
+        // Сертификаты обучаемого: какие курсы закрыты и что ещё мешает.
+        path: '/my/certificates',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.myLearning', to: '/my/learning' }, { key: 'certificates.pageTitle' }], titleKey: 'certificates' },
+        component: () => import('../Pages/Learning/CertificateList.vue'),
+        name: 'certificates.list',
+    },
+    {
+        // Сам сертификат: печатная страница с кодом проверки.
+        path: '/my/certificates/:idEdit',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.myLearning', to: '/my/learning' }, { key: 'certificates.pageTitle', to: '/my/certificates' }], titleKey: 'certificates' },
+        component: () => import('../Pages/Learning/CertificateView.vue'),
+        props: true,
+        name: 'certificates.view',
+    },
+    {
         // Экзамены обучаемого: что назначено, когда открыто, сколько попыток.
         path: '/my/exams',
         meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.exams' }], permission: ['exams.take', 'exams.manage'], titleKey: 'exams' },
@@ -353,11 +356,6 @@ const routes = [
      */
     //--------------------------- блок вопросов-----------------------------------
     {
-        path: '/upload-gift',
-        component: () => import('../Pages/Gift/GiftImportForm.vue'),
-        name: 'upload-gift',
-        meta: { permission: ['questions.manage'], titleKey: 'questionbank' },    },
-    {
         path: '/questions',
         // Прохождение экзамена — exams.take (обучаемый),
         // questions.view/manage — работа с банком вопросов (методист).
@@ -386,14 +384,7 @@ const routes = [
         props: route => ({ idEdit: Number(route.params.idEdit) }),
         name: 'question.edit',
         meta: { permission: ['questions.manage'] },    },
-    // {
-    //     path: '/questions-main/:idEdit?',
-    //     component: () => import('../Pages/Gift/QuestionEdit.vue'),
-    //     props: route => ({ idEdit: route.params.idEdit ? Number(route.params.idEdit) : null }),
-    //     name: 'question.edit'
-    // },
     {
-        //        path: '/questions/:idEdit',
         path: '/questions',
         meta: { permission: ['questions.view', 'questions.manage'] },
         component: () => import('../Pages/Gift/QuestionItem.vue'),
@@ -404,23 +395,7 @@ const routes = [
         }),
         name: 'question.item',
     },
-
-
-    // {
-    //     // тестовый вариант открытия страницы(манифест)
-    //     path: '/courses/itemmani',
-    //     component: () => import('../Pages/CourseManifest.vue'),
-    //     // props: route => ({ idEdit: Number(route.params.idEdit)}),
-    //     props: (route) => ({
-    //         idEdit: toIntOrNull(route.query.idEdit),
-    //         idCategory: toIntOrNull(route.query.idCategory),
-    //     }),
-    //     name: 'courses.itemmani',
-
-    // },
-
     {
-        //path: '/questions-main/new',
         path: '/questions-main/new/:category_id/:aukstructure_id',
         component: () => import('../Pages/Gift/QuestionNew.vue'),
         //props: route => ({ category_id: Number(route.params.category_id), aukstructure_id: Number(route.params.aukstructure_id) }),
@@ -434,28 +409,8 @@ const routes = [
         }),
         name: 'question.new',
         meta: { permission: ['questions.manage'] },    },
-    //--------------------------- конец блок вопросов-----------------------------------
+    //--------------------------- конец блока вопросов-----------------------------------
 
-    // удалить
-
-    // {
-    //     path: '/auk/',
-    //     component: () => import('../Pages/Test/index.vue'),
-    //     name: 'index',
-    // },
-    // {
-    //     path: '/auk/:auk',
-    //     component: () => import('../Pages/Test/courses.show.vue'),
-    //     props: route => ({ nameLyx: String(route.params.auk) }),
-    //     name: 'auk.show',
-    // },
-    // {
-    //     path: '/auk/:course/lern/:title',
-    //     component: () => import('../Pages/Test/courses.lern.vue'),
-    //     props: route => ({ course: String(route.params.course), title: String(route.params.title), }),
-    //     name: 'auk.lern',
-    // },
-    //--------------------- конец удалить-------------
     // Файловый менеджер.
     //
     // Права перечислены те же, что и на бэкенд-маршрутах /api/filemanager.
@@ -469,54 +424,44 @@ const routes = [
         name: 'filemanager',
     },
     {
-        path: '/datepicker',
-        component: () => import('../Pages/Calendar/FormPicker.vue'),
-        //props: route => ({ nameLyx: String(route.params.filemanager) }),
-        name: 'filemanager5',
-    },
-    // {
-    //     path: '/filemanager2/',
-    //     component: () => import('../Pages/Filemanager/FileManager2.vue'),
-    //     //props: route => ({ nameLyx: String(route.params.filemanager) }),
-    //     name: 'filemanager2',        
-    // },
-    // {
-    //     path: '/filemanager/:auk',
-    //     component: () => import('../Pages/Filemanager/FileManagerList.vue'),
-    //     props: route => ({ nameLyx: Object(route.params.auk) }),
-    //     name: 'filemanager.list',
-    // },
-
-
-
-
-    // {
-    //     path: '/auk/:auk',
-    //     component: () => import('../Pages/Test/courses.show.vue'),
-    //     props: route => ({ nameLyx: String(route.params.auk) }),
-    //     name: 'auk.show',
-    // },
-    // {
-    //     path: '/test/index',
-    //     component: () => import('../Pages/Test/courses.lern.chapter.vue'),
-    //     name: 'courses.lern.chapter',
-    // },
-    // {
-    //     //path: '/test/index',
-    //     component: () => import('../Pages/Test/courses.lern.chapter.section.vue'),
-    //     name: 'courses.lern.chapter.section',
-    // },
-    // {
-    //     //path: '/test/index',
-    //     component: () => import('../Pages/Test/courses.lern.chapter.section.subsection.vue'),
-    //     name: 'courses.lern.chapter.section.subsection',
-    // },
-    {
         path: '/user-course/:id',
         meta: { permission: ['users.courses'] },
         name: 'userCourse',
         component: () => import('../Pages/User/UserCourse.vue'),
         props: route => ({ id: Number(route.params.id) }),
+    },
+    // Объявления: лента видна всем вошедшим, публикация — по праву,
+    // которое проверяется в контроллере.
+    {
+        path: '/announcements',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.announcements' }], titleKey: 'announcements' },
+        component: () => import('../Pages/AnnouncementList.vue'),
+        name: 'announcements',
+    },
+    // Форум: список вопросов по курсу и сама тема. Маршрут курса
+    // вложен, а не отдельный раздел: вопрос без курса не имеет смысла,
+    // а раздел «Форум» в меню вёл бы в пустоту.
+    {
+        path: '/forum/course/:idEdit',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'forum.title' }], titleKey: 'forum' },
+        component: () => import('../Pages/Forum/ForumList.vue'),
+        props: true,
+        name: 'forum.list',
+    },
+    {
+        path: '/forum/topic/:idEdit',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'forum.title' }], titleKey: 'forum' },
+        component: () => import('../Pages/Forum/ForumTopic.vue'),
+        props: true,
+        name: 'forum.topic',
+    },
+    // Журнал оценок преподавателя: право grading.manage, иначе 403
+    // и пустая страница вместо понятного объяснения.
+    {
+        path: '/gradebook',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.gradebook' }], permission: ['grading.manage'], titleKey: 'gradebook' },
+        component: () => import('../Pages/Gradebook.vue'),
+        name: 'gradebook',
     },
     // блок настроек
     {
@@ -547,16 +492,6 @@ const routes = [
         name: '500',
         component: () => import('../Pages/Errors/_500.vue')
     },
-    // {
-    //     path: '/api/private/*',
-    //     name: 'redirected',
-    //     component: () => import('../Pages/Redirected.vue')
-    // },    
-    // {
-    //     path: '*',
-    //     redirect: '404'
-    //   },
-
 ]
 
 export default routes;

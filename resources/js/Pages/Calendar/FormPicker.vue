@@ -1,7 +1,7 @@
 
 
 <template>
-<h1>Date</h1>
+<h1>{{ $t('calendar.date') }}</h1>
 <Datepicker 
 v-model="picked" 
 inputFormat='yyyy-MM-dd'

@@ -1,5 +1,5 @@
 <template>
-  <h1>Загрузка файлов</h1>
+  <PageHeader :title="$t('files.uploadTitle')" />
 
   <v-file-input
     label="выбери файл"
@@ -21,10 +21,9 @@
 <script>
 
 import $api from '../api/httpClient'; 
+import PageHeader from '../components/ui/PageHeader.vue'
 export default {
-  components: {
-    
-  },
+  components: {PageHeader },
   data() {
     return {
       image: [],

@@ -277,7 +277,15 @@ class TraineeLearningAccessTest extends TestCase
         $this->assertSame(0, $data['exams']['attempts']);
     }
 
-    public function test_dashboard_counts_opened_materials_as_progress(): void
+    /**
+     * Открытие материала больше не делает курс пройденным на 100%.
+     *
+     * Раньше достаточно было одной записи в favorites, и процент по
+     * плану становился 100 — один открытый урок из двадцати выглядел
+     * как законченное обучение. Теперь процент считается по
+     * lesson_progress, то есть по реально пройденным урокам.
+     */
+    public function test_dashboard_does_not_treat_visit_as_completed_progress(): void
     {
         $trainee = $this->asUser([
             'role' => 'Обучаемый',
@@ -293,7 +301,44 @@ class TraineeLearningAccessTest extends TestCase
         $data = $this->getJson('/api/my/dashboard')->json('data');
 
         $this->assertSame(1, $data['courses']['started']);
-        $this->assertSame(100, $data['progress']['percent']);
+        $this->assertSame(0, $data['progress']['percent'], 'визит — это не пройденный урок');
+    }
+
+    public function test_dashboard_percent_follows_lesson_progress(): void
+    {
+        $trainee = $this->asUser([
+            'role' => 'Обучаемый',
+            'group_id' => $this->group->id,
+        ]);
+
+        $first = \App\Models\Aukstructure::factory()->create([
+            'course_id' => $this->assigned->id,
+            'type' => 1,
+        ]);
+        $second = \App\Models\Aukstructure::factory()->create([
+            'course_id' => $this->assigned->id,
+            'type' => 1,
+        ]);
+
+        \App\Models\LessonProgress::create([
+            'user_id' => $trainee->id,
+            'course_id' => $this->assigned->id,
+            'lesson_id' => $first->id,
+            'percent' => 100,
+            'completed_at' => now(),
+        ]);
+        \App\Models\LessonProgress::create([
+            'user_id' => $trainee->id,
+            'course_id' => $this->assigned->id,
+            'lesson_id' => $second->id,
+            'percent' => 50,
+        ]);
+
+        $data = $this->getJson('/api/my/dashboard')->json('data');
+
+        $this->assertSame(75, $data['progress']['percent']);
+        $this->assertSame(1, $data['progress']['lessons_completed']);
+        $this->assertSame(2, $data['progress']['lessons_total']);
     }
 
     public function test_learning_plan_of_other_group_is_not_exposed(): void

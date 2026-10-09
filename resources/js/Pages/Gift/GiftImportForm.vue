@@ -2,7 +2,7 @@
     <div>
       <input type="file" ref="fileInput" @change="onFileChange">
       <div v-if="results.length">
-        <h2>Результаты:</h2>
+        <h2>{{ $t('gift.results') }}</h2>
         <ul>
           <li v-for="(result, index) in results" :key="index">
             <h3>{{ result.question }}</h3>

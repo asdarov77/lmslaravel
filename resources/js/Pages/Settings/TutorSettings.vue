@@ -28,40 +28,28 @@
             {{ $t('settings.tutor.engineDown') }}
           </v-alert>
 
-          <v-table density="compact">
-            <tbody>
-              <tr>
-                <td>{{ $t('settings.tutor.url') }}</td>
-                <td>{{ health.url || '—' }}</td>
-              </tr>
-              <tr>
-                <td>{{ $t('settings.tutor.model') }}</td>
-                <td data-test="tutor-model">
-                  {{ health.model || '—' }}
-                  <v-chip
-                    v-if="health.available"
-                    size="x-small"
-                    class="ml-2"
-                    :color="health.model_present ? 'success' : 'warning'"
-                  >
-                    {{ health.model_present ? $t('settings.tutor.installed') : $t('settings.tutor.notInstalled') }}
-                  </v-chip>
-                </td>
-              </tr>
-              <tr>
-                <td>{{ $t('settings.tutor.models') }}</td>
-                <td>{{ (health.models || []).length }}</td>
-              </tr>
-              <tr>
-                <td>{{ $t('settings.tutor.embeddings') }}</td>
-                <td>{{ health.embeddings ? '✓' : '—' }}</td>
-              </tr>
-              <tr>
-                <td>{{ $t('settings.tutor.queue') }}</td>
-                <td>{{ health.async ? $t('settings.tutor.queueAsync') : $t('settings.tutor.queueSync') }}</td>
-              </tr>
-            </tbody>
-          </v-table>
+          <DataTable
+            :columns="healthColumns"
+            :rows="healthRows"
+            :row-key="(row) => row.id"
+            :caption="$t('settings.tutor.diagnostics')"
+            class="mt-3"
+          >
+            <template #cell-value="{ row }">
+              <template v-if="row.id === 'model'">
+                <span data-test="tutor-model">{{ health.model || '—' }}</span>
+                <v-chip
+                  v-if="health.available"
+                  size="x-small"
+                  class="ml-2"
+                  :color="health.model_present ? 'success' : 'warning'"
+                >
+                  {{ health.model_present ? $t('settings.tutor.installed') : $t('settings.tutor.notInstalled') }}
+                </v-chip>
+              </template>
+              <template v-else>{{ row.value }}</template>
+            </template>
+          </DataTable>
 
           <v-alert v-if="health.available && !health.model_present" type="info" density="compact" class="mt-3">
             <code>ollama pull {{ health.model }}</code>
@@ -122,9 +110,11 @@
  */
 import $api from '../../api/httpClient'
 import { unwrapResponse } from '../../api/envelope'
+import DataTable from '../../components/ui/DataTable.vue'
 
 export default {
   name: 'TutorSettings',
+  components: { DataTable },
   data() {
     return {
       enabled: false,
@@ -135,6 +125,28 @@ export default {
       saving: false,
       alert: null,
     }
+  },
+  computed: {
+    healthColumns() {
+      return [
+        { key: 'label', title: this.$t('settings.tutor.url'), width: '40%' },
+        { key: 'value', title: this.$t('settings.tutor.diagnostics') },
+      ]
+    },
+    healthRows() {
+      if (!this.health) return []
+      return [
+        { id: 'url', label: this.$t('settings.tutor.url'), value: this.health.url || '—' },
+        { id: 'model', label: this.$t('settings.tutor.model'), value: this.health.model || '—' },
+        { id: 'models', label: this.$t('settings.tutor.models'), value: (this.health.models || []).length },
+        { id: 'embeddings', label: this.$t('settings.tutor.embeddings'), value: this.health.embeddings ? '✓' : '—' },
+        {
+          id: 'queue',
+          label: this.$t('settings.tutor.queue'),
+          value: this.health.async ? this.$t('settings.tutor.queueAsync') : this.$t('settings.tutor.queueSync'),
+        },
+      ]
+    },
   },
   async mounted() {
     await this.load()

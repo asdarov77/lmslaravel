@@ -1,6 +1,6 @@
 <template>
   <v-container class="tutor-main">
-    <h1 class="text-h5 mb-1">{{ $t('tutor.title') }}</h1>
+    <PageHeader :title="$t('tutor.title')" />
     <p class="text-body-2 text-medium-emphasis mb-6">{{ $t('tutor.intro') }}</p>
 
     <!-- Состояние движка: показывается первым, потому что без него
@@ -129,26 +129,19 @@
         <v-card>
           <v-card-title>{{ $t('tutor.engine') }}</v-card-title>
           <v-card-text>
-            <v-table v-if="health" density="compact">
-              <tbody>
-                <tr>
-                  <td>{{ $t('tutor.model') }}</td>
-                  <td data-test="tutor-model">{{ health.model || '—' }}</td>
-                </tr>
-                <tr>
-                  <td>{{ $t('tutor.backcheck') }}</td>
-                  <td>{{ health.backcheck ? $t('tutor.yes') : $t('tutor.no') }}</td>
-                </tr>
-                <tr>
-                  <td>{{ $t('tutor.embeddings') }}</td>
-                  <td>{{ health.embeddings ? $t('tutor.yes') : $t('tutor.no') }}</td>
-                </tr>
-                <tr>
-                  <td>{{ $t('tutor.queue') }}</td>
-                  <td>{{ health.async ? $t('tutor.queueAsync') : $t('tutor.queueSync') }}</td>
-                </tr>
-              </tbody>
-            </v-table>
+            <DataTable
+              v-if="health"
+              :title="$t('tutor.engineState')"
+              :columns="healthColumns"
+              :rows="healthRows"
+              :row-key="(row) => row.id"
+              :caption="$t('tutor.engineState')"
+            >
+              <template #cell-value="{ row }">
+                <span v-if="row.id === 'model'" data-test="tutor-model">{{ health.model || '—' }}</span>
+                <template v-else>{{ row.value }}</template>
+              </template>
+            </DataTable>
             <v-skeleton-loader v-else type="table" />
           </v-card-text>
         </v-card>
@@ -178,10 +171,12 @@ import {
 } from '../../api/tutor.api'
 import { unwrapResponse } from '../../api/envelope'
 import EmptyState from '../../components/ui/EmptyState.vue'
+import PageHeader from '../../components/ui/PageHeader.vue'
+import DataTable from '../../components/ui/DataTable.vue'
 
 export default {
   name: 'TutorMain',
-  components: { EmptyState },
+  components: { EmptyState, PageHeader, DataTable },
   data() {
     return {
       health: null,
@@ -191,6 +186,29 @@ export default {
       startingId: null,
       alert: null,
     }
+  },
+  computed: {
+    healthColumns() {
+      return [
+        { key: 'label', title: this.$t('tutor.model'), width: '40%' },
+        { key: 'value', title: this.$t('tutor.engineState') },
+      ]
+    },
+    healthRows() {
+      if (!this.health) return []
+      const yes = this.$t('tutor.yes')
+      const no = this.$t('tutor.no')
+      return [
+        { id: 'model', label: this.$t('tutor.model'), value: this.health.model || '—' },
+        { id: 'backcheck', label: this.$t('tutor.backcheck'), value: this.health.backcheck ? yes : no },
+        { id: 'embeddings', label: this.$t('tutor.embeddings'), value: this.health.embeddings ? yes : no },
+        {
+          id: 'queue',
+          label: this.$t('tutor.queue'),
+          value: this.health.async ? this.$t('tutor.queueAsync') : this.$t('tutor.queueSync'),
+        },
+      ]
+    },
   },
   async mounted() {
     await Promise.all([this.loadHealth(), this.loadMaterials(), this.loadStats()])

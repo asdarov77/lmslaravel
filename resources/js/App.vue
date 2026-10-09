@@ -175,6 +175,7 @@ import ThemeToggle from './components/ui/ThemeToggle.vue';
 import AppBrand from './components/ui/AppBrand.vue';
 import ToastStack from './components/ui/ToastStack.vue';
 import NotificationBell from './components/ui/NotificationBell.vue';
+import density from './utils/density';
 
 
 /**
@@ -198,6 +199,10 @@ export default {
   components: { AppBrand, Breadcrumbs, GlobalSearch, ThemeToggle, ToastStack, NotificationBell },
   mounted() {
     const hist = this.$router.options.history;
+
+    // Плотность применяется к <html> при старте: без этого после
+    // перезагрузки состояние в Vuex и разметка расходились бы.
+    density.apply(this.density);
 
     // Ширина окна в состоянии обновляется здесь (см. viewportWidth в
     // data). Событие снимается в beforeUnmount, иначе при уходе со
@@ -234,6 +239,20 @@ export default {
     changeEn() {
       this.$store.commit("Ui/SET_LANGUAGE", "en");
       this.$i18n.locale = "en";
+    },
+
+    /*
+     * Переключение плотности.
+     *
+     * Раньше метод отсутствовал: кнопка в шапке вызывала
+     * несуществующий toggleDensity, а состояние density не было
+     * проброшено из Vuex. Внешне это выглядело как «кнопка не
+     * работает». Теперь выбор сохраняется, применяется к <html>
+     * (data-density) и отражается в Pinia/Vuex для иконки.
+     */
+    toggleDensity() {
+      const next = density.toggle();
+      this.$store.commit("Ui/SET_DENSITY", next);
     },
 
     checkLeftSideMenu(){
@@ -335,7 +354,7 @@ export default {
     },
 
     ...mapGetters("Auth", ["loggedIn", "isTrainee"]),
-    ...mapState("Ui", ["menudrawler", "language"]),
+    ...mapState("Ui", ["menudrawler", "language", "density"]),
     ...mapState("Auth", ["user"]),
 
   },
