@@ -14,22 +14,22 @@
             v-model="title"
           ></v-text-field>
           <v-text-field            
-            label="Краткое описание курса"
+            :label="$t('course.labelKratkoe-opisanie-kursa')"
             type="text"            
             v-model="shortdescription"
           ></v-text-field>
           <v-text-field            
-            label="Полное описание курса"
+            :label="$t('course.labelPolnoe-opisanie-kursa')"
             type="text"            
             v-model="longdescription"
           ></v-text-field>
           <!-- <v-text-field            
-            label="Категория курса"
+            :label="$t('course.labelKategoriya-kursa')"
             type="text"            
             v-model="something"
           ></v-text-field> -->
           <v-select            
-            label="Категория курса"
+            :label="$t('course.labelKategoriya-kursa')"
             type="text"
             :items="categories"
             v-model="value"
@@ -38,7 +38,7 @@
           ></v-select>
 
           <v-text-field            
-            label="Путь к курсу"
+            :label="$t('course.labelPut-k-kursu')"
             type="hyperlink"            
             v-model="path"
           ></v-text-field>

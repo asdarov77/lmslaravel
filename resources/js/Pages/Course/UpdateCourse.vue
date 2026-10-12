@@ -7,17 +7,17 @@
       <v-card-text>
         <v-form v-on:@submit.prevent="submitForm">
           <v-text-field
-            label="Полное название курса"
+            :label="$t('course.labelPolnoe-nazvanie-kursa')"
             type="text"
             v-model="course.title"
           ></v-text-field>
           <v-text-field
-            label="Краткое название курса"
+            :label="$t('course.labelKratkoe-nazvanie-kursa')"
             type="text"
             v-model="course.short_description"
           ></v-text-field>
           <v-select
-            label="Категория курса"
+            :label="$t('course.labelKategoriya-kursa')"
             type="text"
             v-model="course.categories"
             :items="categories"
@@ -26,17 +26,17 @@
             multiple
           ></v-select>
           <v-text-field
-            label="Полное описание курса"
+            :label="$t('course.labelPolnoe-opisanie-kursa')"
             type="text"
             v-model="course.long_description"
           ></v-text-field>
           <v-text-field
-            label="Путь курса"
+            :label="$t('course.labelPut-kursa')"
             type="text"
             v-model="course.path"
           ></v-text-field>
           <v-text-field
-            label="Путь hash курса"
+            :label="$t('course.labelPut-hash-kursa')"
             type="text"
             v-model="course.path_hash"
           ></v-text-field>
@@ -45,7 +45,7 @@
             hide-details
             true-value="да"
             false-value="нет"
-            :label="`Показать: ${show}`"
+            :label="$t('courses.showLabel', { value: show })"
           ></v-switch>
           <v-alert v-if="errors.length" type="error" density="compact" class="mb-4">
             <div v-for="error in errors" :key="error">{{ error }}</div>

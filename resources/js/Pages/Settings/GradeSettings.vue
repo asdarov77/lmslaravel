@@ -8,8 +8,8 @@
       <caption class="u-sr-only">{{ $t('settings.grades.title') }}</caption>
       <thead>{{ newValue }}
         <tr>
-          <th>Оценка</th>
-          <th>Граница</th>
+          <th>{{ $t('gradeSettings.grade') }}</th>
+          <th>{{ $t('gradeSettings.boundary') }}</th>
         </tr>
       </thead>
       <tbody>

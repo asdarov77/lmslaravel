@@ -42,6 +42,11 @@ async function session(browser, creds) {
       localStorage.clear()
       localStorage.setItem('token', t)
       localStorage.setItem('user', u)
+      // Тур первого входа: помечаем как пройденный. Его оверлей
+      // перехватывает клики по всей странице, и без этой отметки любой
+      // тест, кликающий по дашборду, падал бы из-за подсказки, а не
+      // из-за своей проверки.
+      localStorage.setItem('app:tour:trainee-dashboard', '1')
     },
     [token, JSON.stringify(user)]
   )

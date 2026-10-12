@@ -59,13 +59,33 @@ export function useLeaveGuard(
       if (ok) {
         bypass = true
         next()
-      } else {
-        next(false)
+
+        return
       }
+
+      next(false)
     })
   } catch (error) {
     // Компонент вне контекста роутера (тесты, изолированный рендер):
     // guard переходов недоступен, beforeunload всё равно работает.
+  }
+
+  /**
+   * Спросить подтверждение ДО программной навигации.
+   *
+   * Для кнопки «Отмена» (router.back()) это единственный рабочий
+   * вариант: браузер сдвигает историю мгновенно, и если guard потом
+   * отменяет переход, адресная строка остаётся на чужом маршруте, хотя
+   * на экране всё ещё форма. Подтверждаем заранее — тогда навигация
+   * либо не начинается вовсе, либо проходит.
+   */
+  const confirmLeave = async () => {
+    if (bypass || !isDirtyNow()) return true
+
+    const ok = await ask(message)
+    if (ok) bypass = true
+
+    return ok
   }
 
   // Закрытие/перезагрузка вкладки.
@@ -89,7 +109,7 @@ export function useLeaveGuard(
     window.removeEventListener('beforeunload', onBeforeUnload)
   })
 
-  return { bypassGuard, releaseGuard }
+  return { bypassGuard, releaseGuard, confirmLeave }
 }
 
 export default useLeaveGuard

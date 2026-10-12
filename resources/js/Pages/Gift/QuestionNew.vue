@@ -3,12 +3,12 @@
 <template >
   <!-- {{ editedQuestion.answers.length }} ------ -->
   <!-- {{ editedQuestion }} --- {{ correctAnswerIndex }} --длина ответов ---- {{ editedQuestion.answers.length }} -->
-  <!-- <v-card elevation="4" title="Редактирование вопроса">    
+  <!-- <v-card elevation="4" :title="$t('gift.editTitle')">    
 
     <v-form @submit.prevent="saveChanges" ref="form">
       <v-row class="ml-3 mr-3">
         <v-col cols="12">
-          <v-text-field v-model="editedQuestion.question_text" label="Текст вопроса" @input="checkChanges"
+          <v-text-field v-model="editedQuestion.question_text" :label="$t('gift.questionText')" @input="checkChanges"
             :rules="[value => value.length >= 10 || 'Текст не менее 10 символов']">
           </v-text-field>
         </v-col>
@@ -17,7 +17,7 @@
       <v-row v-for="(answer, index) in editedQuestion.answers" :key="index" class="ml-3 mr-3">
         <v-col cols="1">
           <v-radio-group v-model="editedQuestion.correctAnswerIndex">
-            <v-radio :label="'Ответ ' + (index + 1)" :value="index" @input="checkChanges()"
+            <v-radio :label="$t('gift.answerNumber', { n: index + 1 })" :value="index" @input="checkChanges()"
               :rules="[value => value.length >= 2 || 'Текст не менее 2 символов']">
             </v-radio>
           </v-radio-group>
@@ -28,7 +28,7 @@
 
         <v-col cols="11">
 
-          <v-text-field v-model="editedQuestion.answers[index].answer" label="Текст ответа" @input="updateCorrectAnswer()"
+          <v-text-field v-model="editedQuestion.answers[index].answer" :label="$t('gift.answerText')" @input="updateCorrectAnswer()"
             :rules="[
              
               value => {
@@ -60,12 +60,12 @@
 
   <!-- ############################################################################################################# -->
 
-  <v-card elevation="4" title="Редактирование вопроса"> {{ editedQuestion.answers }}
+  <v-card elevation="4" :title="$t('gift.editTitle')"> {{ editedQuestion.answers }}
 
     <v-form @submit.prevent="saveChanges" ref="form">
       <v-row class="ml-3 mr-3">
         <v-col cols="12">
-          <v-text-field v-model="editedQuestion.question_text" label="Текст вопроса" :rules=questionRules>
+          <v-text-field v-model="editedQuestion.question_text" :label="$t('gift.questionText')" :rules=questionRules>
           </v-text-field>
         </v-col>
       </v-row>
@@ -74,7 +74,7 @@
         <v-col cols="1">
           <v-radio-group v-model="editedQuestion.correctAnswerIndex" @change="updateCorrectAnswer"
             :rules=answerCountRules>
-            <v-radio :label="'Ответ ' + (index + 1)" :value="index">
+            <v-radio :label="$t('gift.answerNumber', { n: index + 1 })" :value="index">
             </v-radio>
           </v-radio-group>
         </v-col>
@@ -83,7 +83,7 @@
 
 
         <v-col cols="11">
-          <v-text-field v-model="editedQuestion.answers[index].answer" label="Текст ответа" :rules=answerRules>
+          <v-text-field v-model="editedQuestion.answers[index].answer" :label="$t('gift.answerText')" :rules=answerRules>
             <template v-slot:append>
               <v-btn v-if="showRemoveButtons" @click="removeAnswer(index)" icon color="error">
                 <v-icon>mdi-close</v-icon>

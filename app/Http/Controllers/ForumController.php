@@ -180,6 +180,60 @@ class ForumController extends Controller
         // обновляется на каждом ответе.
         $topic->forceFill(['last_activity_at' => Carbon::now()])->save();
 
+        // Уведомление автору темы. Ответ в теме, где человек ничего не
+        // спрашивал, не присылает ему ничего.
+        if ((int) $topic->author_id !== (int) $user->id) {
+            try {
+                \App\Support\Notifications::toUser(
+                    $topic->author,
+                    'forum_answer',
+                    'Новый ответ в вашей теме',
+                    mb_substr((string) $post->body, 0, 200),
+                    '/forum/topic/' . $topic->id,
+                    [
+                        'dedup_key' => 'forum_answer:' . $post->id,
+                        'topic_id' => $topic->id,
+                        'post_id' => $post->id,
+                    ]
+                );
+            } catch (\Throwable $e) {
+                // Ответ уже записан — сбой уведомления не должен
+                // превращать его в ошибку.
+                report($e);
+            }
+        }
+
+        /*
+         * Ответ преподавателя — особый случай: им ждут, и он означает
+         * «теперь можно сдавать». Поэтому такое уведомление получает
+         * не только автор вопроса, но и те, кто отвечал в теме и ждал
+         * разбора. Автору темы уведомление уже ушло выше — второй раз
+         * одно и то же в ленте только шумит.
+         */
+        if ($user->hasPermission('forum.moderate') && $post->from_staff) {
+            try {
+                $waiting = $topic->posts()
+                    ->with('author')
+                    ->where('author_id', '!=', $topic->author_id)
+                    ->where('author_id', '!=', $user->id)
+                    ->get()
+                    ->pluck('author')
+                    ->filter();
+
+                \App\Support\Notifications::toGroupUsers(
+                    $waiting,
+                    $user,
+                    'forum_staff_answer',
+                    'Преподаватель ответил в теме',
+                    $topic->title,
+                    '/forum/topic/' . $topic->id,
+                    ['dedup_key' => 'forum_staff_answer:' . $post->id]
+                );
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
         return response()->json([
             'data' => $this->presentPost($post->load('author:id,fio')),
         ], 201);
@@ -212,7 +266,13 @@ class ForumController extends Controller
             abort_unless((int) $post->forum_topic_id === (int) $topic->id, 422);
         }
 
-        $topic->fill(array_intersect_key($data, array_flip(['pinned', 'locked', 'solution_post_id'])));
+        /*
+         * forceFill, а не fill: solution_post_id не в $fillable модели
+         * (его ставит только сервер), и обычный fill молча его
+         * отбрасывал — тема выглядела нерешённой, хотя преподаватель
+         * отметил ответ.
+         */
+        $topic->forceFill(array_intersect_key($data, array_flip(['pinned', 'locked', 'solution_post_id'])));
         $topic->save();
 
         return response()->json(['data' => $this->presentTopic($topic->fresh())]);

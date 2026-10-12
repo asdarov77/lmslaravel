@@ -115,14 +115,17 @@ const form = useForm({
   },
 })
 
-useLeaveGuard(() => form.dirty.value)
+const { confirmLeave } = useLeaveGuard(() => form.dirty.value, { message: t('common.leaveConfirm') })
 
 const submitForm = () => {
   form.submit()
 }
 
-const cancel = () => {
-  router.back()
+const cancel = async () => {
+  // Подтверждаем ДО router.back(): браузер сдвигает историю мгновенно,
+  // и отменённый guard оставлял бы в адресной строке чужой маршрут,
+  // пока на экране ещё форма.
+  if (await confirmLeave()) router.back()
 }
 </script>
 

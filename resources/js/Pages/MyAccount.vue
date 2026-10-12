@@ -21,12 +21,57 @@
         <h2 class="u-card__title">{{ $t("profile.about") }}</h2>
 
         <div class="profile__identity">
-          <v-avatar color="primary" size="48" class="profile__avatar">
-            <span>{{ initials }}</span>
+          <v-avatar color="primary" size="64" class="profile__avatar">
+            <v-img v-if="avatarUrl" :src="avatarUrl" :alt="user?.fio || ''" cover />
+            <span v-else>{{ initials }}</span>
           </v-avatar>
           <div>
             <span class="profile__name">{{ user?.fio || $t("profile.noName") }}</span>
             <span class="profile__role">{{ roleLabel }}</span>
+
+            <!--
+              Загрузка аватара скрыта на узких экранах не из-за
+              декора, а потому что выбор файла на телефоне перекрывает
+              всю шапку; ссылка остаётся доступной с клавиатуры.
+            -->
+            <div class="profile__avatar-actions">
+              <v-btn
+                size="x-small"
+                variant="text"
+                prepend-icon="mdi-camera"
+                class="mt-1"
+                data-test="avatar-pick"
+                @click="pickAvatar"
+              >
+                {{ $t("profile.avatarChange") }}
+              </v-btn>
+              <v-btn
+                v-if="avatarUrl"
+                size="x-small"
+                variant="text"
+                color="error"
+                class="mt-1 ml-2"
+                data-test="avatar-remove"
+                @click="removeAvatar"
+              >
+                {{ $t("profile.avatarRemove") }}
+              </v-btn>
+
+              <!-- input скрыт, но не disabled: без него не работает
+                   и клавиатурная активация кнопки. -->
+              <input
+                ref="avatarInput"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                class="d-none"
+                data-test="avatar-input"
+                @change="onAvatarSelected"
+              />
+            </div>
+
+            <v-alert v-if="avatarError" type="error" density="compact" class="mt-2" data-test="avatar-error">
+              {{ avatarError }}
+            </v-alert>
           </div>
         </div>
 
@@ -75,6 +120,8 @@
 
 <script>
 import { mapGetters, mapState } from "vuex";
+import $api from "../api/httpClient";
+import { unwrapField } from "../api/envelope";
 import PageHeader from "../components/ui/PageHeader.vue";
 
 /**
@@ -106,6 +153,10 @@ export default {
       { key: "content", titleKey: "profile.permContent" },
       { key: "system", titleKey: "profile.permSystem" },
     ],
+    // Текст ошибки загрузки аватара: сервер вернёт 422 с перечнем
+    // правил, а человеку нужна одна понятная фраза.
+    avatarError: null,
+    uploadingAvatar: false,
   }),
 
   computed: {
@@ -115,6 +166,25 @@ export default {
     // state, и как геттер; берём геттер — он уже нормализует слаги.
     ...mapState("Auth", ["user", "permissionSlugs"]),
     ...mapGetters("Auth", ["roleSlugs", "isSuperAdmin"]),
+
+    /**
+     * Адрес аватара.
+     *
+     * Файл кладётся в storage/public, но раздаётся веб-сервером из
+     * /storage, а не из api: путь строим сами, потому что в ответе API
+     * лежит относительный путь вида avatars/12/abc.jpg.
+     */
+    avatarUrl() {
+      const path = this.user?.avatar;
+
+      if (!path) return null;
+
+      if (/^https?:/i.test(path)) return path;
+
+      const base = import.meta.env.VITE_STORAGE_URL || "/storage";
+
+      return `${base}/${String(path).replace(/^\/+/, "")}`;
+    },
 
     initials() {
       const fio = String(this.user?.fio || "").trim();
@@ -176,6 +246,60 @@ export default {
   },
 
   methods: {
+    /** Открывает системный диалог выбора файла. */
+    pickAvatar() {
+      this.avatarError = null;
+      this.$refs.avatarInput?.click();
+    },
+
+    /**
+     * Загрузка выбранного файла.
+     *
+     * Файл отправляется сразу, без отдельной кнопки «сохранить»:
+     * аватар — единственное, что меняется здесь, и лишний шаг только
+     * путает: человек нажимает «Сохранить» на аватаре и не понимает,
+     * почему ничего не происходит.
+     */
+    async onAvatarSelected(event) {
+      const file = event.target.files?.[0];
+
+      // Сбрасываем значение: повторный выбор того же файла иначе не
+      // вызовет change, и «замена аватара» выглядела бы сломанной.
+      event.target.value = "";
+
+      if (!file) return;
+
+      if (file.size > 2 * 1024 * 1024) {
+        this.avatarError = this.$t("profile.avatarTooBig");
+
+        return;
+      }
+
+      const form = new FormData();
+      form.append("avatar", file);
+
+      this.uploadingAvatar = true;
+      this.avatarError = null;
+
+      try {
+        const response = await $api.post("/api/user/avatar", form, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+
+        const path = unwrapField(response, 'avatar') ?? response?.data?.data?.avatar;
+        this.$store.commit("Auth/SET_USER_AVATAR", path);
+      } catch (error) {
+        this.avatarError = this.$t("profile.avatarFailed");
+      } finally {
+        this.uploadingAvatar = false;
+      }
+    },
+
+    /** Убирает аватар: возвращаем инициалы. */
+    removeAvatar() {
+      this.$store.commit("Auth/SET_USER_AVATAR", null);
+    },
+
     /**
      * Право показывается словом, а не slug'ом.
      *

@@ -41,7 +41,15 @@
           ничего не подсказывает. Список говорит, что делать, и ведёт
           прямо к записи.
       -->
-      <section class="u-card dash__panel">
+              <!-- Графики: динамика попыток и успеваемость по группам. -->
+        <MetricCharts
+          v-if="trends.attempts_by_month.length || trends.groups.length"
+          class="mt-4"
+          :months="trends.attempts_by_month"
+          :groups="trends.groups"
+        />
+
+<section class="u-card dash__panel">
         <h2 class="u-card__title">{{ $t('manager.attentionTitle') }}</h2>
         <p class="u-page__subtitle">{{ $t('manager.attentionHint') }}</p>
 
@@ -95,6 +103,7 @@
 
 <script>
 import PageHeader from '../../components/ui/PageHeader.vue'
+import MetricCharts from '../../components/ui/MetricCharts.vue'
 import { mapGetters, mapState } from 'vuex'
 import { toast } from '../../composables/useToast'
 import { fetchDashboardSummary } from '../../api/dashboard.api'
@@ -111,13 +120,15 @@ import { unwrapResponse } from '../../api/envelope'
 export default {
   name: 'ManagerDashboard',
 
-  components: { PageHeader },
+  components: { PageHeader, MetricCharts },
 
   data: () => ({
     role: null,
     stats: [],
     attention: [],
     recent: [],
+    // Ряды для графиков: приходят готовыми, считаются на сервере.
+    trends: { attempts_by_month: [], groups: [] },
     loading: true,
   }),
 
@@ -162,6 +173,10 @@ export default {
       this.stats = Array.isArray(data.stats) ? data.stats : []
       this.attention = Array.isArray(data.attention) ? data.attention : []
       this.recent = Array.isArray(data.recent) ? data.recent : []
+      this.trends = {
+        attempts_by_month: Array.isArray(data.trends?.attempts_by_month) ? data.trends.attempts_by_month : [],
+        groups: Array.isArray(data.trends?.groups) ? data.trends.groups : [],
+      }
     } catch (error) {
       // Уведомление ушло в общий стек: оно переживает переход на
       // другую страницу, а раньше умирало вместе с компонентом.

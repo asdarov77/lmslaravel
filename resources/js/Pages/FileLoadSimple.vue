@@ -2,7 +2,7 @@
   <PageHeader :title="$t('files.uploadTitle')" />
 
   <v-file-input
-    label="выбери файл"
+    :label="$t('common.labelVyberi-fayl')"
     @change="onFileSelected"
     show-size
     counter
@@ -13,8 +13,7 @@
   >
   </v-file-input>
   <v-btn v-on:click="sendFiles" class="button is-light" type="submit"
-    >Отправить
-  </v-btn>
+    >{{ $t('files.submit') }}</v-btn>
 </template>
 
 

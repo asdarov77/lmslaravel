@@ -31,6 +31,20 @@ const { t } = useI18n({ useScope: "global" });
       -->
       <global-search v-if="loggedIn" class="app__search" />
 
+      <!-- Палитра команд. Кнопка нужна и помимо Ctrl+K: человек не
+           знающий сочетания должен найти её обычным кликом. -->
+      <v-btn
+        v-if="loggedIn"
+        class="app__cmdk"
+        icon="mdi-command"
+        variant="text"
+        size="small"
+        :title="`${$t('cmdk.placeholder')} — ${$t('cmdk.hint')}`"
+        aria-label="$t('cmdk.hint')"
+        data-test="open-cmdk"
+        @click="paletteOpen = true"
+      />
+
       <notification-bell class="app__bell" />
 
       <theme-toggle class="app__theme" />
@@ -168,14 +182,17 @@ const { t } = useI18n({ useScope: "global" });
 <script>
 import { mapGetters, mapState } from 'vuex';
 import LeftSideMenu from './Pages/Navigation/LeftSideMenu.vue';
+import { navigationSections } from './navigation';
 import AccountMenu from './Pages/Navigation/AccountMenu.vue';
 import Breadcrumbs from './components/ui/Breadcrumbs.vue';
 import GlobalSearch from './components/ui/GlobalSearch.vue';
+import CommandPalette from './components/ui/CommandPalette.vue';
 import ThemeToggle from './components/ui/ThemeToggle.vue';
 import AppBrand from './components/ui/AppBrand.vue';
 import ToastStack from './components/ui/ToastStack.vue';
 import NotificationBell from './components/ui/NotificationBell.vue';
 import density from './utils/density';
+import theme from './utils/theme';
 
 
 /**
@@ -196,7 +213,64 @@ function readDrawer() {
 }
 
 export default {
-  components: { AppBrand, Breadcrumbs, GlobalSearch, ThemeToggle, ToastStack, NotificationBell },
+  components: { AppBrand, Breadcrumbs, GlobalSearch, ThemeToggle, ToastStack, NotificationBell, CommandPalette },
+
+  data() {
+    return {
+      // Палитра команд открывается по Ctrl/Cmd+K и по клику на строку
+      // подсказки поиска.
+      paletteOpen: false,
+    };
+  },
+
+  computed: {
+    /**
+     * Команды палитры строятся из меню.
+     *
+     * Отдельный список команд разошёлся бы с меню при первой же
+     * правке: пункт переехал или стал скрытым по правам, а палитра
+     * продолжала предлагать его. Меню — единственный источник.
+     */
+    paletteCommands() {
+      const commands = [];
+      let index = 0;
+
+      this.navigationSections.forEach((section) => {
+        section.items.forEach((item) => {
+          commands.push({
+            id: `nav-${index++}`,
+            title: item.title || item.titleKey,
+            icon: item.icon,
+            group: section.title,
+            route: { path: item.link },
+            keywords: [item.link, item.key].filter(Boolean).join(' '),
+          });
+        });
+      });
+
+      commands.push(
+        {
+          id: 'action-theme',
+          title: this.$t('app.theme.toggle'),
+          icon: 'mdi-theme-light-dark',
+          group: this.$t('cmdk.group.actions'),
+          action: () => this.toggleTheme(),
+          keywords: 'тема темаdark light тема оформления',
+        },
+        {
+          id: 'action-density',
+          title: this.$t('cmdk.group.actions') + ': ' + this.$t('ui.density.toggle'),
+          icon: 'mdi-format-line-spacing',
+          group: this.$t('cmdk.group.actions'),
+          action: () => this.toggleDensity(),
+          keywords: 'плотность интервал',
+        }
+      );
+
+      return commands;
+    },
+  },
+
   mounted() {
     const hist = this.$router.options.history;
 
@@ -232,6 +306,30 @@ export default {
   },
 
   methods: {
+    /**
+     * Выполнение команды палитры.
+     *
+     * Переходы делает сам компонент палитры (у команды задан route),
+     * а сюда попадают только команды-действия.
+     */
+    onCommandRun(command) {
+      if (typeof command?.action === 'function') {
+        command.action();
+      }
+    },
+
+    /**
+     * Переключение темы из палитры.
+     *
+     * Через utils/theme — тем же циклом light → dark → auto, что и у
+     * переключателя в шапке. Своя реализация дала бы расхождение:
+     * палитра переключала бы на «противоположное», а не на следующий
+     * режим, и человек получал бы разное поведение по разным кнопкам.
+     */
+    toggleTheme() {
+      theme.cycle(this.$vuetify?.theme);
+    },
+
     changeRu() {
       this.$store.commit("Ui/SET_LANGUAGE", "ru");
       this.$i18n.locale = "ru";

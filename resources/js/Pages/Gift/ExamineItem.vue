@@ -43,13 +43,13 @@
         <!--                блок финальный результаты                -->
         <v-card v-if='isFinishExamClicked'>
           <v-card-text class="text-center font-weight-bold" style="font-size: 1.25rem;">{{ $t('gift.finished') }}</v-card-text>
-          <v-card-text>Всего вопросов: {{ questions.length }}</v-card-text>
-          <v-card-text>Правильно отвечено: {{ correctAnswersCount }}</v-card-text>
-          <v-card-text>Неправильно отвечено: {{ incorrectAnswersCount }}</v-card-text>
+          <v-card-text>{{ $t('gift.totalQuestions', { n: questions.length }) }}</v-card-text>
+          <v-card-text>{{ $t('gift.correctCount') }}: {{ correctAnswersCount }}</v-card-text>
+          <v-card-text>{{ $t('gift.incorrectCount') }}: {{ incorrectAnswersCount }}</v-card-text>
 
           <my-progress class="text-center" :size="150" :strokeWidth="10" :progressColor="progressColor"
             :successPercentage="successPercentage" :progressIcon="progressIcon"></my-progress>
-          <h2>Оценка: {{ getGrade(successPercentage) }}</h2>
+          <h2>{{ $t('gift.grade') }}: {{ getGrade(successPercentage) }}</h2>
           <!-- <h3>Оценка: {{ grade }}</h3> -->
         </v-card>
         <!-- </div> -->

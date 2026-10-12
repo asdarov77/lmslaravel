@@ -36,6 +36,19 @@ const routes = [
         name: 'home'
     },
     {
+        // Восстановление пароля: публичные страницы, вход по токену из письма.
+        path: '/password/forgot',
+        meta: { titleKey: 'password' },
+        component: () => import('../Pages/Password/ForgotPassword.vue'),
+        name: 'password.forgot',
+    },
+    {
+        path: '/password/reset',
+        meta: { titleKey: 'password' },
+        component: () => import('../Pages/Password/ResetPassword.vue'),
+        name: 'password.reset',
+    },
+    {
         path: '/login',
         meta: { titleKey: 'login' },
         component: () => import('../Pages/Login.vue'),
@@ -438,22 +451,60 @@ const routes = [
         component: () => import('../Pages/AnnouncementList.vue'),
         name: 'announcements',
     },
+    /*
+     * Расписание обучаемого. Отдельная страница от /calendar: та
+     * отдаёт методисту фильтры по всем группам, а здесь контроллер
+     * сам подставляет группу пользователя, и чужие фильтры только
+     * вводили бы в заблуждение.
+     */
+    {
+        path: '/my/schedule',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.schedule' }], titleKey: 'schedule' },
+        component: () => import('../Pages/Schedule.vue'),
+        name: 'schedule.mine',
+    },
     // Форум: список вопросов по курсу и сама тема. Маршрут курса
     // вложен, а не отдельный раздел: вопрос без курса не имеет смысла,
     // а раздел «Форум» в меню вёл бы в пустоту.
     {
         path: '/forum/course/:idEdit',
-        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'forum.title' }], titleKey: 'forum' },
+        // Чтение форума — это чтение материала курса: отдельного права
+        // forum.view в каталоге нет, forum.moderate — про модерацию.
+        // Без meta.permission маршрут считался защищённым «по умолчанию»
+        // и guard не проверял его вовсе.
+        meta: { permission: ['content.view'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'forum.title' }], titleKey: 'forum' },
         component: () => import('../Pages/Forum/ForumList.vue'),
         props: true,
         name: 'forum.list',
     },
     {
         path: '/forum/topic/:idEdit',
-        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'forum.title' }], titleKey: 'forum' },
+        meta: { permission: ['content.view'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'forum.title' }], titleKey: 'forum' },
         component: () => import('../Pages/Forum/ForumTopic.vue'),
         props: true,
         name: 'forum.topic',
+    },
+    // Домашние задания: список и само задание с проверкой работ.
+    {
+        path: '/assignments',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.assignments' }], titleKey: 'assignments' },
+        component: () => import('../Pages/Assignment/List.vue'),
+        name: 'assignments.list',
+    },
+    {
+        path: '/assignments/:idEdit',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.assignments', to: '/assignments' }, { key: 'assignments.title' }], titleKey: 'assignments' },
+        component: () => import('../Pages/Assignment/Show.vue'),
+        props: true,
+        name: 'assignments.show',
+    },
+    // Отчёты и аналитика: право reports.view, инструктор видит
+    // только свою группу — границы применяются в контроллере.
+    {
+        path: '/reports',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.reports' }], permission: ['reports.view'], titleKey: 'reports' },
+        component: () => import('../Pages/Reports.vue'),
+        name: 'reports',
     },
     // Журнал оценок преподавателя: право grading.manage, иначе 403
     // и пустая страница вместо понятного объяснения.

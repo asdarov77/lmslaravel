@@ -34,6 +34,11 @@ export const navigationSections = [
       },
       { key: 'tutor', titleKey: 'app.menu.tutor', link: '/tutor', icon: 'mdi-brain' },
       { key: 'announcements', titleKey: 'app.menu.announcements', link: '/announcements', icon: 'mdi-bullhorn-outline' },
+      // Расписание в «Моё обучение» — только обучаемому: у методиста
+      // есть свой календарь по всем группам (/calendar).
+      // Задания видны и обучаемому (сдать работу), и методисту
+      // (проверить): доступность роли различается на странице.
+      { key: 'assignments', titleKey: 'app.menu.assignments', link: '/assignments', icon: 'mdi-clipboard-text-outline' },
       { key: 'exams', titleKey: 'app.menu.exams', link: '/my/exams', icon: 'mdi-clipboard-check-outline' },
       // Сертификаты видны только обучаемому: у методиста нет ни плана,
       // ни закрытых уроков, и список был бы пустым.
@@ -65,6 +70,9 @@ export const navigationSections = [
       // и был бы вредным: fitsRole понимает только 'manager'/'trainee',
       // и любой другой список молчно показывал бы пункт всем.
       { key: 'gradebook', titleKey: 'app.menu.gradebook', link: '/gradebook', icon: 'mdi-table-large' },
+      // Отчёты: видимость определяется правом reports.view из
+      // meta.permission маршрута.
+      { key: 'reports', titleKey: 'app.menu.reports', link: '/reports', icon: 'mdi-chart-box-outline' },
     ],
   },
   {

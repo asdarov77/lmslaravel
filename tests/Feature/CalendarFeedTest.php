@@ -65,6 +65,14 @@ class CalendarFeedTest extends TestCase
         $this->course->categories()->attach($this->category->id);
     }
 
+    /**
+     * Запись группы на курс.
+     *
+     * Даты считаются от сегодняшнего дня, а не заданы константами.
+     * С фиксированными датами тест «старел»: стоило календарю пересечь
+     * 11 октября, и период из активного становился завершённым — тест
+     * падал из-за календаря, а не из-за правки кода.
+     */
     private function enroll(array $attrs = []): Group2learning
     {
         return Group2learning::factory()->create(array_merge([
@@ -72,8 +80,8 @@ class CalendarFeedTest extends TestCase
             'group_id' => $this->group->id,
             'category_id' => $this->category->id,
             'parent_id' => null,
-            'study_from' => '2026-10-02',
-            'study_to' => '2026-10-11',
+            'study_from' => now()->subDays(2)->toDateString(),
+            'study_to' => now()->addDays(8)->toDateString(),
         ], $attrs));
     }
 
@@ -96,16 +104,20 @@ class CalendarFeedTest extends TestCase
         $this->assertSame('learning-'.$row->id, $event['id']);
         $this->assertSame('Курс А', $event['title']);
         $this->assertTrue($event['allDay']);
-        $this->assertSame('2026-10-02', $event['start']);
+        $this->assertSame(now()->subDays(2)->toDateString(), $event['start']);
         // end в FullCalendar не включается: последний день обучения
         // должен попасть в диапазон, поэтому +1 день.
-        $this->assertSame('2026-10-12', $event['end']);
+        $this->assertSame(
+            now()->addDays(9)->toDateString(),
+            $event['end'],
+            'end не входит в диапазон FullCalendar, поэтому +1 день'
+        );
 
         $props = $event['extendedProps'];
         $this->assertSame($this->group->id, $props['group_id']);
         $this->assertSame('Группа А', $props['group_name']);
-        $this->assertSame('2026-10-02', $props['study_from']);
-        $this->assertSame('2026-10-11', $props['study_to']);
+        $this->assertSame(now()->subDays(2)->toDateString(), $props['study_from']);
+        $this->assertSame(now()->addDays(8)->toDateString(), $props['study_to']);
         $this->assertSame('active', $props['status']);
         $this->assertSame(
             [$this->category->title],
@@ -265,7 +277,7 @@ class CalendarFeedTest extends TestCase
 
         $this->assertCount(
             1,
-            $this->getJson('/api/calendar?from=2026-10-10&to=2026-10-12')->json('data.events'),
+            $this->getJson('/api/calendar?from=' . now()->subDays(3)->toDateString() . '&to=' . now()->addDays(9)->toDateString())->json('data.events'),
             'период, пересекающий окно просмотра, обязан быть виден'
         );
 
@@ -328,7 +340,7 @@ class CalendarFeedTest extends TestCase
         // Дедлайн показывается ОТДЕЛЬНЫМ событием, а не украшением полосы
         // периода: в месячном и недельном виде полосы сливаются, и срок
         // сдачи не найти взглядом.
-        $this->enroll(['deadline' => '2026-10-20']);
+        $this->enroll(['deadline' => now()->addDays(9)->toDateString()]);
         $this->asUser(['role' => 'Администратор']);
 
         $events = collect($this->getJson('/api/calendar')->json('data.events'));
@@ -337,7 +349,7 @@ class CalendarFeedTest extends TestCase
 
         $deadline = $events->firstWhere('extendedProps.kind', 'deadline');
         $this->assertNotNull($deadline, 'метка срока сдачи присутствует');
-        $this->assertSame('2026-10-20', $deadline['start']);
+        $this->assertSame(now()->addDays(9)->toDateString(), $deadline['start']);
         $this->assertArrayNotHasKey(
             'end',
             $deadline,
@@ -350,7 +362,7 @@ class CalendarFeedTest extends TestCase
         $this->assertSame($this->group->id, $deadline['extendedProps']['group_id']);
 
         $period = $events->firstWhere('extendedProps.kind', 'period');
-        $this->assertSame('2026-10-12', $period['end'], 'полоса периода остаётся много­дневной');
+        $this->assertSame(now()->addDays(9)->toDateString(), $period['end']);
     }
 
     public function test_period_without_deadline_produces_single_event(): void
@@ -367,7 +379,7 @@ class CalendarFeedTest extends TestCase
 
     public function test_kind_filter_splits_periods_and_deadlines(): void
     {
-        $this->enroll(['deadline' => '2026-10-20']);
+        $this->enroll(['deadline' => now()->addDays(9)->toDateString()]);
         $this->asUser(['role' => 'Администратор']);
 
         $both = $this->getJson('/api/calendar')->json('data.events');
@@ -445,7 +457,7 @@ class CalendarFeedTest extends TestCase
 
     public function test_deadline_respects_scoping(): void
     {
-        $this->enroll(['deadline' => '2026-10-20']);
+        $this->enroll(['deadline' => now()->addDays(9)->toDateString()]);
         $this->enroll([
             'group_id' => $this->otherGroup->id,
             'course_id' => $this->otherCourse->id,

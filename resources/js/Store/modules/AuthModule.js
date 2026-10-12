@@ -85,6 +85,17 @@ const AuthModule = {
         SET_USER(state, user) {
             state.user = user;
         },
+        /**
+         * Обновляет только аватар.
+         *
+         * Отдельная мутация вместо SET_USER: после загрузки файла
+         * известен лишь путь к аватару, а перезаписывать им весь
+         * объект пользователя означало бы стереть права и роль,
+         * которых в ответе загрузки нет.
+         */
+        SET_USER_AVATAR(state, path) {
+            state.user = { ...(state.user || {}), avatar: path || null };
+        },
         SET_ROLE_SLUGS(state, slugs) {
             state.roleSlugs = Array.isArray(slugs)
                 ? [...new Set(slugs.map(canonicalRoleSlug).filter(Boolean))]

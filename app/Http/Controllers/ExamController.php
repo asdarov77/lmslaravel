@@ -255,15 +255,47 @@ class ExamController extends Controller
 
         $score = $total > 0 ? round($correct / $total, 4) : 0.0;
 
+        $passed = $score >= (float) $exam->passing_score;
+
         $attempt = ExamAttempt::create([
             'exam_id' => $exam->id,
             'user_id' => $actor->id,
             'total_count' => $total,
             'correct_count' => $correct,
             'score' => $score,
-            'passed' => $score >= (float) $exam->passing_score,
+            'passed' => $passed,
             'submitted_at' => now(),
         ]);
+
+        /*
+         * Уведомление о сдаче.
+         *
+         * Только что сданный экзамен и так на экране, поэтому
+         * уведомление получает преподаватель — это и есть смысл
+         * события: увидеть результат без проверки раздела. Неудачные
+         * попытки не отправляются, иначе лента забивалась бы шумом.
+         */
+        if ($passed) {
+            try {
+                \App\Support\Notifications::toPermission(
+                    'exams.manage',
+                    'exam_passed',
+                    'Экзамен сдан: ' . $exam->title,
+                    $actor->fio . ' сдал(а) экзамен: ' . (int) round($score * 100) . '%',
+                    '/exams/' . $exam->id,
+                    [
+                        'dedup_key' => 'exam_passed:' . $attempt->id,
+                        'exam_id' => $exam->id,
+                        'user_id' => $actor->id,
+                    ]
+                );
+            } catch (\Throwable $e) {
+                // Уведомление не должно ронять сдачу экзамена: результат
+                // уже записан, и из-за недоступности колокольчика он
+                // потерялся бы вместе с ответом 500.
+                report($e);
+            }
+        }
 
         return response()->json([
             'data' => [
@@ -273,7 +305,7 @@ class ExamController extends Controller
                 'score' => $score,
                 'passed' => $attempt->passed,
                 'passing_score' => (float) $exam->passing_score,
-            'question_limit' => $exam->question_limit,
+                'question_limit' => $exam->question_limit,
                 'attempts_left' => max(0, $exam->max_attempts - $exam->attempts()->where('user_id', $actor->id)->count()),
             ],
         ], 201);

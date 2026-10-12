@@ -6,7 +6,29 @@
           {{ $t("dashboard.greeting") }},
           <strong>{{ userName }}</strong>
         </p>
-      </template>
+      
+    <!--
+      Обзор интерфейса при первом входе.
+
+      Показывается один раз: факт прохождения хранится в localStorage
+      внутри OnboardingTour. Кнопка «показать снова» нужна, потому что
+      человек, пропустивший тур случайно, иначе не найдёт его больше
+      никогда.
+    -->
+    <OnboardingTour :steps="tourSteps" tour-key="trainee-dashboard" />
+
+    <v-btn
+      v-if="canRestartTour"
+      size="small"
+      variant="text"
+      class="mt-2"
+      prepend-icon="mdi-help-circle-outline"
+      data-test="tour-restart"
+      @click="restartTour"
+    >
+      {{ $t("onboarding.restart") }}
+    </v-btn>
+</template>
       <template #actions>
         <v-btn
           color="primary"
@@ -128,7 +150,7 @@
       </section>
 
       <!-- Экзамены -->
-      <section class="u-card dash__panel">
+      <section class="u-card dash__panel" data-test="my-exams">
         <h2 class="u-card__title">{{ $t("dashboard.exams") }}</h2>
         <p class="u-page__subtitle">{{ $t("dashboard.examsHint") }}</p>
 
@@ -161,7 +183,7 @@
       </section>
 
       <!-- Мои курсы: краткий список назначений -->
-      <section class="u-card dash__panel">
+      <section class="u-card dash__panel" data-test="my-plan">
         <h2 class="u-card__title">{{ $t("dashboard.myCourses") }}</h2>
         <p class="u-page__subtitle">{{ $t("dashboard.myCoursesHint") }}</p>
 
@@ -195,6 +217,7 @@
 
 <script>
 import { mapState } from "vuex";
+import OnboardingTour from "../../components/ui/OnboardingTour.vue";
 import PageHeader from "../../components/ui/PageHeader.vue";
 import learningApi from "../../api/learning.api";
 import { toast } from "../../composables/useToast";
@@ -210,7 +233,7 @@ import { toast } from "../../composables/useToast";
 export default {
   name: "TraineeDashboard",
 
-  components: { PageHeader },
+  components: { PageHeader, OnboardingTour },
 
   data() {
     return {
@@ -262,6 +285,22 @@ export default {
 
     lessonsTotal() {
       return this.summary?.progress?.lessons_total ?? 0;
+    },
+
+    /** Шаги тура приходят из локализации, а не из кода. */
+    tourSteps() {
+      return this.$t("onboarding.steps");
+    },
+
+    /** Кнопка «показать снова» — только после первого показа. */
+    canRestartTour() {
+      try {
+        return window.localStorage.getItem("app:tour:trainee-dashboard") === "1";
+      } catch (error) {
+        // Приватный режим: localStorage недоступен, кнопка просто не
+        // показывается — это лучше, чем кнопка, которая не работает.
+        return false;
+      }
     },
 
     progressPercent() {
@@ -327,6 +366,18 @@ export default {
   },
 
   methods: {
+    restartTour() {
+      try {
+        window.localStorage.removeItem("app:tour:trainee-dashboard");
+      } catch (error) {
+        // см. canRestartTour
+      }
+
+      // Ключ сброшен — ту�� заново откроется при следующей монтаже,
+      // а здесь просто перезагружаем шаги.
+      window.location.reload();
+    },
+
     async load() {
       try {
         // Сводка и список назначений идут параллельно: дашборд не должен

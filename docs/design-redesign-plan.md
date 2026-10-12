@@ -113,26 +113,26 @@
 ## Фаза 2 — Фреймворк сложных форм (2–3 недели) — ЯДРО запроса
 
 ### 2.1. Механика
-- [ ] Внедрить **vee-validate + zod** (или свой `useForm(schema)` composable, если хотим меньше зависимостей): схема определяет типы, required, min/max, кастомные async-правила (уникальность названия — уже есть вручную в CreateGroup).
-- [ ] Конвенция: каждая форма = объект-схема + `<FormCard>` + `<FormField>`; ручные `fieldErrors` запрещены.
-- [ ] Паттерны ошибок: подсветка поля, scroll-to-first-error, summary-алерт только для server-side/422; блокировка submit при невалидности; автосохранение черновиков длинных форм (localStorage + индикатор «Черновик сохранён»).
-- [ ] Dirty-guard: подтверждение ухода с несохранённой формы (единый `useLeaveGuard`).
+- [x] Внедрить **собственный `useForm(schema)`** (`resources/js/composables/useForm.js`) вместо zod/vee-validate — по той же логике «меньше зависимостей», что и с ChartsKit. Схема описывает типы, required, min/max и async-правила (уникальность названия — правило `unique` в `CreateGroup`). Библиотека правил: `composables/validation/rules.js` (required, minLength/maxLength/length, pattern, email, numeric, phone, min/max, oneOf, sameAs, unique, custom).
+- [x] Конвенция: каждая форма = объект-схема + `<FormCard>` + `<FormField>`; ручные `fieldErrors` запрещены. Эталон — `Pages/Group/CreateGroup.vue`.
+- [x] Паттерны ошибок: подсветка поля, scroll-to-first-error (по `data-field`), summary-алерт только для server-side/422; блокировка submit при невалидности и при повторном клике (флаг поднимается до async-валидации); автосохранение черновиков длинных форм (localStorage + индикатор «Черновик сохранён»).
+- [x] Dirty-guard: `useLeaveGuard` (`composables/useLeaveGuard.js`) — guard роутера + `beforeunload`, плюс `confirmLeave()` для программной навигации (кнопка «Отмена»): при отказе URL не уезжает на чужой маршрут.
 
-### 2.2. Библиотека «сложных» поведений полей
-- [ ] Masked input (ФИО, телефон +7, ИНН, дата DD.MM.YYYY).
-- [ ] Counter + авто-увеличение textarea (autosize) с `maxlength` из схемы.
-- [ ] Каскадные select (категория → тип → Aircraft) и remote-search autocomplete (пользователи, курсы) с debounce и состояниями loading/no-results.
-- [ ] Repeatable fields (варианты ответа вопроса, расписание занятия) с DnD-сортировкой (`vuedraggable`/нативный sortable).
-- [ ] Multi-select с чипами и группировкой (уже есть @vueform/multiselect — включить в систему, стилизовать под токены).
-- [ ] Date/time range picker с дедлайнами (для назначений/зачислений).
-- [ ] Rate-limited wizard-шаги: валидация выполняется при переходе шага, не при отправке.
+### 2.2. Библиотека «сложных» поведений полей (`components/ui/fields/`)
+- [x] Masked input (`MaskedField.vue` + `utils/mask.js`): телефон +7, дата DD.MM.YYYY, ИНН, СНИЛС, паспорт; маска идемпотентна, есть `unmask`/`digitsOnly`.
+- [x] Counter + авто-увеличение textarea (`AutosizeTextarea.vue`) с `maxlength` из схемы.
+- [x] Каскадные select (`CascadeSelect.vue` + `utils/cascade.js`: категория → тип → Aircraft, сброс младших уровней) и remote-search autocomplete (`RemoteAutocomplete.vue` + `useRemoteOptions`: debounce, отмена устаревших ответов, loading/no-results).
+- [x] Repeatable fields (`RepeatableFields.vue`): add/remove/duplicate, DnD-сортировка и перестановка с клавиатуры, immutable-операции (`utils/array.js`).
+- [x] Multi-select с чипами и группировкой (`MultiSelectField.vue`) — `@vueform/multiselect` перекрашен токенами темы.
+- [x] Date range picker (`DateRangeField.vue`) со связанными min/max.
+- [ ] Rate-limited wizard-шаги: валидация выполняется при переходе шага — механика есть в `StepperShell` (`beforeNext`), перенос на конструктор курса — в п. 3.3.
 
 ### 2.3. Миграция конкретных форм (порядок = приоритет)
-1. **Auth-блок** (`Login`, `Register`, `UserChpass`, восстановление пароля) — см. Фазу 3.
-2. **Конструктор курса** — объединить `RegisterCourse + UpdateCourse + AddClass` в один **wizard** (см. п. 3.3) с live-preview.
-3. **Банк вопросов** (`QuestionNew/Edit`, `ExamineMain`) — динамические варианты, предпросмотр теста, импорт CSV/Excel.
-4. **Пользователи/группы/права** (`UserItemEdit`, `CreateGroup`, `PermissionsManager`) — таблица прав с bulk-toggle, matrix-UX.
-5. **Настройки** (`TutorSettings`, `ContentDeliverySettings`) — секции с мгновенным сохранением и preflight-проверкой подключения.
+- [x] 1. **Auth-блок** (`Login`, `Register`, `UserChpass`, `ForgotPassword`, `ResetPassword`) — все пять переведены на `useForm`: правила вместо строк в массиве `errors`, 422 по полям, локализованные тексты, dirty-guard. Заодно: показать/скрыть пароль, проверка совпадения и минимальной длины в `ResetPassword`, `MultiSelectField` вместо сырого `@vueform/multiselect` в профиле, `MaskedField` для телефона. Починен guard роутера: `/password/forgot` и `/password/reset` больше не редиректят на вход (ссылка из письма работала в никуда).
+- [ ] 2. **Конструктор курса** — объединить `RegisterCourse + UpdateCourse + AddClass` в один **wizard** (см. п. 3.3) с live-preview.
+- [ ] 3. **Банк вопросов** (`QuestionNew/Edit`, `ExamineMain`) — динамические варианты, предпросмотр теста, импорт CSV/Excel.
+- [x] 4. **Пользователи/группы/права** — `CreateGroup`, `GroupItemEdit`, `Register`, `UserItemEdit` переведены на `useForm`; права остаются матрицей с немедленным сохранением (`PermissionsManager`), там bulk-toggle по группам уже есть.
+- [ ] 5. **Настройки** (`TutorSettings`, `ContentDeliverySettings`) — секции с мгновенным сохранением и preflight-проверкой подключения.
 
 ## Фаза 3 — Ре-дизайн ключевых экранов (3–4 недели)
 

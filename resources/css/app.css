@@ -680,6 +680,24 @@ body {
   margin-left: auto;
 }
 
+/*
+ * Кнопка палитры команд.
+ *
+ * margin-left: 0, а не auto: auto-отступ двигает блок к правому краю,
+ * и после него кнопка прилипала бы к теме, теряясь среди прочих
+ * иконок. Здесь нужен только отступ от поиска.
+ */
+.app__cmdk {
+  flex: none;
+  margin-left: var(--sp-1);
+  opacity: 0.75;
+}
+
+.app__cmdk:hover,
+.app__cmdk:focus-visible {
+  opacity: 1;
+}
+
 @media (max-width: 960px) {
   .app__search .u-search__hint,
   .app__search .u-search__kbd {

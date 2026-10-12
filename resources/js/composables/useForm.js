@@ -72,6 +72,9 @@ export function useForm({
   const submitting = ref(false)
   const submitted = ref(false)
   const serverError = ref(null)
+  /** Исходная ошибка отклонённого onSubmit — нужна вызывающему коду,
+   *  чтобы разобрать её по статусу (401/429/5xx), а не по тексту. */
+  const submitError = ref(null)
   const draftSavedAt = ref(null)
   const draftRestored = ref(false)
 
@@ -243,7 +246,10 @@ export function useForm({
     // уходила на сервер дважды.
     submitting.value = true
     serverError.value = null
+    submitError.value = null
     submitted.value = true
+
+    const previousBaseline = baseline
 
     try {
       if (!(await validate())) {
@@ -255,12 +261,24 @@ export function useForm({
 
       if (!onSubmit) return true
 
-      await onSubmit({ values: { ...values }, form: api })
+      // Снимаем «грязность» ДО onSubmit, а не после. Почти каждая форма
+      // в onSubmit уходит с другой страницы (router.push), а useLeaveGuard
+      // видел бы несохранённые изменения, спросил подтверждение и
+      // отменил редирект — то есть после успешного сохранения пользователь
+      // остался бы на форме.
       baseline = snapshot()
       clearDraft()
 
+      await onSubmit({ values: { ...values }, form: api })
+
       return true
     } catch (error) {
+      // Сохранения не вышло: изменения снова несохранённые. Возвращаем
+      // baseline и поднимаем черновик заново — иначе неудачная отправка
+      // стирала бы автосохранение и данные пропали бы при закрытии вкладки.
+      baseline = previousBaseline
+      if (draftStorageKey) saveDraft()
+
       // Ошибки 422 раскладываем по полям, общий текст — в serverError.
       // Раньше общий v-alert висел отдельно от полей, и было неясно,
       // какое именно поле сервер отверг.
@@ -269,6 +287,7 @@ export function useForm({
         errors[name] = message
       })
       serverError.value = general
+      submitError.value = error
       await nextTick()
       scrollToFirstError()
 
@@ -290,6 +309,7 @@ export function useForm({
     })
     submitted.value = false
     serverError.value = null
+    submitError.value = null
     clearDraft()
     baseline = snapshot()
   }
@@ -302,6 +322,7 @@ export function useForm({
     submitting,
     submitted,
     serverError,
+    submitError,
     draftSavedAt,
     draftRestored,
     dirty,

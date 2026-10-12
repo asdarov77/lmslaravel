@@ -1,0 +1,1 @@
+import{O as r,Q as s,h as n}from"./app-C_OQ-S--.js";const t=()=>n.get("/api/my/learning"),e=()=>n.get("/api/my/dashboard"),p={fetchMyLearning:t,fetchMyDashboard:e,planItems:a=>s(a),dashboard:a=>r(a)||{}};export{p as l};

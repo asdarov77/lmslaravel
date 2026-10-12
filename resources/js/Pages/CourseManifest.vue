@@ -31,7 +31,7 @@
                      за пределы колонки — шапка «ломалась» на разных ширинах.
                      Теперь это обычная flex-панель без фиксированных ширин
                      и отрицательных отступов. -->
-          <div class="cm-toolbar" role="toolbar" aria-label="Панель курса">
+          <div class="cm-toolbar" role="toolbar" aria-:label="$t('common.labelPanel-kursa')">
             <div class="cm-toolbar__group">
               <button type="button"
                 class="cm-tool"
@@ -106,7 +106,7 @@
 
           <v-row v-if="showSearch">
             <v-text-field class="ml-5 mr-5" :loading="loading" density="compact" v-model="searchTerm" variant="outlined"
-              rounded append-inner-icon="mdi-magnify" label="Поиск" @click:append-inner="search" @keyup.enter="search"
+              rounded append-inner-icon="mdi-magnify" :label="$t('common.labelPoisk')" @click:append-inner="search" @keyup.enter="search"
               hint="Введи искомый текст для поиска" clearable single-line>
             </v-text-field>
 
@@ -115,7 +115,7 @@
 
             <!--                                            рабочий вариант                           -->
             <!-- <div>
-              <ul v-if="matchingFiles.length > 0" class=" ml-2 mr-2 search-files__total-results">Всего найдено: {{
+              <ul v-if="matchingFiles.length > 0" class=" ml-2 mr-2 search-files__total-results">{{ $t('courseManifest.foundTotal') }} {{
                 matchingFiles.length }}
                 <v-btn-group>
                   <v-btn @click="scrollToPrev"><span>&#9650;</span></v-btn>
@@ -134,7 +134,7 @@
 
             <!--                                            рабочий эксперимент                           -->
             <div>
-              <ul v-if="matchingFiles.length > 0" class=" ml-2 mr-2 search-files__total-results">Всего найдено: {{
+              <ul v-if="matchingFiles.length > 0" class=" ml-2 mr-2 search-files__total-results">{{ $t('courseManifest.foundTotal') }} {{
                 matchingFiles.length }}
                 <v-btn-group>
                   <v-btn @click="scrollToPrev"><span>&#9650;</span></v-btn>
@@ -210,7 +210,7 @@
                  после первого же изменения состояния и оставался таким. -->
             <iframe class="hello px-5" :srcdoc="contentHtml" ref="myIframe" name="iframe_a"
               @load="onFrameLoad" :style="{ height: frameHeight }"
-              width="100%" scrolling="auto" title="Материал курса">
+              width="100%" scrolling="auto" :title="$t('courseManifest.material')">
             </iframe>
 
             <!-- <iframe class="hello px-5" :src="link" ref="myIframe" name="iframe_a" @load="updateDocHeight"  @load="onIframeLoaded" 

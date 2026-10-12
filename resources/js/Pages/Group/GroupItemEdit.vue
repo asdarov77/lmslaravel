@@ -1,145 +1,159 @@
 <template>
   <div class="u-page">
     <FormCard
-      :title="$t('groups.edit.title')"
-      :subtitle="group.groupname ? $t('groups.edit.subtitle', { name: group.groupname }) : ''"
-      :busy="saving"
+      :title="t('groups.edit.title')"
+      :subtitle="subtitle"
+      :busy="form.submitting.value"
       :loading="loading"
       @submit="submitForm"
-      @cancel="cancelBtnHead"
+      @cancel="cancel"
     >
-      <v-text-field
-        v-model="group.groupname"
-        :label="$t('groups.create.name')"
-        :error-messages="fieldErrors.groupname"
-        autofocus
-      ></v-text-field>
+      <FormField
+        :label="t('groups.create.name')"
+        name="groupname"
+        :error="form.errors.groupname"
+        :required="form.isRequired('groupname')"
+      >
+        <v-text-field
+          v-bind="form.bind('groupname')"
+          :placeholder="t('groups.create.namePlaceholder')"
+          autofocus
+        />
+      </FormField>
 
-      <v-textarea
-        v-model="group.groupdescription"
-        :label="$t('groups.create.description')"
-        :error-messages="fieldErrors.groupdescription"
-        rows="3"
-        auto-grow
-      ></v-textarea>
+      <FormField
+        :label="t('groups.create.description')"
+        name="groupdescription"
+        :error="form.errors.groupdescription"
+      >
+        <AutosizeTextarea
+          v-model="form.values.groupdescription"
+          :maxlength="255"
+          :rows="3"
+          :placeholder="t('groups.create.descriptionPlaceholder')"
+          @blur="form.validateField('groupdescription')"
+        />
+      </FormField>
 
-      <!-- Второе действие формы, а не кнопка цвета «green» внутри
-           карточки: раньше зелёная кнопка рядом с синей кнопкой
-           сохранения читалась как отдельное главное действие. -->
-      <div class="d-flex mt-2">
-        <v-btn
-          variant="tonal"
-          color="primary"
-          prepend-icon="mdi-school-outline"
-          :disabled="saving || !group.id"
-          :to="{ name: 'group.learning', params: { idEdit: group.id } }"
-        >
-          {{ $t("groups.edit.enroll") }}
-        </v-btn>
-      </div>
-
-      <v-alert
-        v-for="(error, index) in errors"
-        :key="index"
-        type="error"
-        class="mt-3"
-        :text="error"
-      ></v-alert>
+      <!--
+        Второе действие формы, а не кнопка цвета «green» внутри карточки:
+        раньше зелёная кнопка рядом с синей кнопкой сохранения читалась
+        как отдельное главное действие.
+      -->
+      <v-btn
+        variant="tonal"
+        color="primary"
+        prepend-icon="mdi-school-outline"
+        :disabled="form.submitting.value || !groupId"
+        :to="{ name: 'group.learning', params: { idEdit: groupId } }"
+      >
+        {{ t('groups.edit.enroll') }}
+      </v-btn>
     </FormCard>
-
   </div>
 </template>
 
-<script>
-import { mapState, mapGetters } from "vuex";
-import { asArray, extractFieldErrors } from "../../api/envelope";
-import FormCard from "../../components/ui/FormCard.vue";
-import { toast } from "../../composables/useToast";
+<script setup>
+import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useStore } from 'vuex'
+import { useRouter } from 'vue-router'
+import FormCard from '../../components/ui/FormCard.vue'
+import FormField from '../../components/ui/FormField.vue'
+import AutosizeTextarea from '../../components/ui/fields/AutosizeTextarea.vue'
+import useForm from '../../composables/useForm'
+import useLeaveGuard from '../../composables/useLeaveGuard'
+import { required, maxLength, unique } from '../../composables/validation/rules'
+import { asArray } from '../../api/envelope'
+import { toast } from '../../composables/useToast'
 
-export default {
-  name: "GroupItemEdit",
-  components: { FormCard },
+/**
+ * Редактирование группы.
+ *
+ * Переведена на useForm (Фаза 2) вместе с CreateGroup. Ключевое отличие
+ * правила уникальности: при правке сама группа не должна считаться
+ * дублем — без `ignore` правка названия всегда падала бы с «уже занято».
+ */
+const props = defineProps({
+  idEdit: { type: [Number, String], required: true },
+})
 
-  props: {
-    idEdit: { type: Number, required: true },
-  },
+const { t } = useI18n()
+const store = useStore()
+const router = useRouter()
 
-  data() {
-    return {
-      errors: [],
-      fieldErrors: {},
-      saving: false,
-      loading: false,
-    };
-  },
+const loading = ref(false)
 
-  computed: {
-    ...mapState("User", ["allGroups", "users", "group"]),
-    ...mapGetters("User", ["users", "groups"]),
-  },
+const groupId = computed(() => store.state.User.group?.id ?? Number(props.idEdit))
 
-  async created() {
-    this.loading = true;
-    await this.$store.dispatch("User/fetchGroup", this.idEdit).catch(() => {});
-    this.loading = false;
-  },
+const subtitle = computed(() => {
+  const name = store.state.User.group?.groupname
 
-  methods: {
-    validate() {
-      this.errors = [];
-      this.fieldErrors = {};
+  return name ? t('groups.edit.subtitle', { name }) : ''
+})
 
-      if (String(this.group.groupname ?? "").trim() === "") {
-        this.fieldErrors.groupname = this.$t("groups.create.errors.nameRequired");
-      } else {
-        const exists = asArray(this.allGroups).some(
-          (item) =>
-            item.id !== this.idEdit &&
-            String(item.groupname ?? "").trim().toLowerCase() ===
-              this.group.groupname.trim().toLowerCase()
-        );
-
-        if (exists) {
-          this.fieldErrors.groupname = this.$t("groups.create.errors.nameTaken");
-        }
-      }
-
-      return Object.keys(this.fieldErrors).length === 0;
+const form = useForm({
+  schema: {
+    groupname: {
+      initial: '',
+      rules: [
+        required(t('groups.create.errors.nameRequired')),
+        maxLength(255, t('groups.create.errors.nameTooLong')),
+        unique(() => asArray(store.state.User.allGroups), {
+          by: 'groupname',
+          // Без этого собственная группа считалась бы дубликатом.
+          ignore: () => Number(props.idEdit),
+          message: t('groups.create.errors.nameTaken'),
+        }),
+      ],
     },
-
-    async submitForm() {
-      if (this.saving) return;
-
-      this.errors = [];
-
-      if (!this.validate()) return;
-
-      this.saving = true;
-
-      try {
-        await this.$store.dispatch("User/updateGroup", {
-          id: this.idEdit,
-          data: {
-            groupname: this.group.groupname.trim(),
-            groupdescription: this.group.groupdescription.trim(),
-          },
-        });
-
-        toast.success(this.$t("groups.edit.done"));
-        this.$router.push("/groups/list");
-      } catch (error) {
-        const { fields, general } = extractFieldErrors(error, this.$t("groups.edit.errors.generic"));
-        Object.assign(this.fieldErrors, fields);
-        this.errors = general ? [general] : [];
-        toast.error(general ?? "");
-      } finally {
-        this.saving = false;
-      }
-    },
-
-    cancelBtnHead() {
-      this.$router.back();
+    groupdescription: {
+      initial: '',
+      rules: [maxLength(255, t('groups.create.errors.descriptionTooLong'))],
     },
   },
-};
+
+  draftKey: `groups.edit.${props.idEdit}`,
+
+  onSubmit: async ({ values }) => {
+    await store.dispatch('User/updateGroup', {
+      id: props.idEdit,
+      data: {
+        groupname: values.groupname.trim(),
+        groupdescription: values.groupdescription.trim(),
+      },
+    })
+
+    toast.success(t('groups.edit.done'))
+    await router.push('/groups/list')
+  },
+})
+
+const { confirmLeave } = useLeaveGuard(() => form.dirty.value, { message: t('common.leaveConfirm') })
+
+onMounted(async () => {
+  loading.value = true
+  await store.dispatch('User/fetchGroup', props.idEdit).catch(() => {})
+
+  // Заполняем форму только что загруженными данными. До этого пустые
+  // поля показывались как «форма без данных», а правило уникальности
+  // проверяло пустое имя по всему списку групп.
+  const group = store.state.User.group
+  if (group) {
+    form.values.groupname = group.groupname ?? ''
+    form.values.groupdescription = group.groupdescription ?? ''
+  }
+
+  loading.value = false
+  // Данные пришли — форма не «грязная», уходить можно без вопроса.
+  form.reset({ groupname: group?.groupname ?? '', groupdescription: group?.groupdescription ?? '' })
+})
+
+const submitForm = () => {
+  form.submit()
+}
+
+const cancel = async () => {
+  if (await confirmLeave()) router.back()
+}
 </script>

@@ -12,7 +12,7 @@
              жёстко зашитый /group/learning/1 — то есть записать можно было
              только группу №1, и непонятно было, какую именно. -->
         <v-select
-          label="Группа"
+          :label="$t('groupLearning.group')"
           type="text"
           :items="allGroups"
           v-model="form.group_id"
@@ -24,7 +24,7 @@
         ></v-select>
 
         <v-select
-          label="Класс"
+          :label="$t('groupLearning.class')"
           type="text"
           :items="aircrafts"
           v-model="form.aircraft_id"
@@ -36,7 +36,7 @@
         ></v-select>
 
         <v-select
-          label="Категории"
+          :label="$t('groupLearning.categories')"
           type="text"
           :items="catFilter"
           v-model="form.category_id"
@@ -63,7 +63,7 @@
         <treeselect
           v-if="form.aircraft_id && form.category_id"
           :key="treeselectKey"
-          placeholder="Курсы и модули"
+          :placeholder="$t('groupLearning.coursesPlaceholder')"
           :default-expand-level="1"
           v-model="form.course_ids"
           :options="options"
@@ -84,7 +84,7 @@
         <v-divider class="my-3"></v-divider>
 
         <v-select
-          label="Инструктор"
+          :label="$t('groupLearning.instructor')"
           type="text"
           :items="instructors"
           v-model="form.teacher"
@@ -98,7 +98,7 @@
              У строки нет поля id, поэтому модель всегда становилась
              undefined, и вид занятия молча не сохранялся. -->
         <v-select
-          label="Вид занятия"
+          :label="$t('groupLearning.lessonType')"
           type="text"
           :items="lessonTypes"
           v-model="form.typeOfLesson"
@@ -112,7 +112,7 @@
             <v-text-field
               type="date"
               v-model="form.study_from"
-              label="начало"
+              :label="$t('group.labelNachalo')"
               variant="outlined"
               :disabled="loading"
               :error-messages="fieldErrors.study_from"
@@ -122,7 +122,7 @@
             <v-text-field
               type="date"
               v-model="form.study_to"
-              label="конец"
+              :label="$t('group.labelKonec')"
               variant="outlined"
               :disabled="loading"
               :error-messages="fieldErrors.study_to"

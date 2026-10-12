@@ -3,15 +3,15 @@
 <template>  
   <PageHeader :title="$t('questions.editTitle', { id: idEdit })" />
   <v-form @submit="saveChanges">   
-    <v-text-field v-model="editedQuestion.question_text" label="Текст вопроса" @input="checkChanges"></v-text-field>
+    <v-text-field v-model="editedQuestion.question_text" :label="$t('gift.questionText')" @input="checkChanges"></v-text-field>
     <v-row v-for="(answer, index) in editedQuestion.answers" :key="index">
       <v-col cols="1">                      
         <v-radio-group v-model="correctAnswerIndex">
-          <v-radio :label="'Ответ ' + (index + 1)" :value="index" @input="checkChanges"></v-radio>
+          <v-radio :label="$t('gift.answerNumber', { n: index + 1 })" :value="index" @input="checkChanges"></v-radio>
         </v-radio-group>
       </v-col>
       <v-col cols="11">         
-        <v-text-field v-model="editedQuestion.answers[index].answer" label="Текст ответа" @input="checkChanges">
+        <v-text-field v-model="editedQuestion.answers[index].answer" :label="$t('gift.answerText')" @input="checkChanges">
           <template v-slot:append>
             <v-btn v-if="showRemoveButtons" @click="removeAnswer(index)" icon color="error">
               <v-icon>mdi-close</v-icon>

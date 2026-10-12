@@ -24,13 +24,13 @@
           <v-combobox
             v-model="path"
             :items="tags"
-            label="Выберите класс для добавления"
+            :label="$t('course.labelVyberite-klass-dlya-dobavleniya')"
             :disabled="loading"
             :rules="[rules.required]"
           ></v-combobox>
           <v-text-field
             :disabled="loading"
-            label="Описание"
+            :label="$t('course.labelOpisanie')"
             type="text"
             v-model="title"
             :rules="[rules.required]"

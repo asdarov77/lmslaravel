@@ -38,7 +38,10 @@
       "grades": "Grading scales",
       "certificates": "Certificates",
       "gradebook": "Gradebook",
-      "announcements": "Announcements"
+      "announcements": "Announcements",
+      "schedule": "Schedule",
+      "reports": "Reports",
+      "assignments": "Assignments"
     },
     "buttons": {
       "cancel": "cancel",
@@ -137,7 +140,12 @@
       },
       "certificates": "Certificates",
       "gradebook": "Gradebook",
-      "announcements": "Announcements"
+      "announcements": "Announcements",
+      "forum": "Forum",
+      "schedule": "Schedule",
+      "password": "Password recovery",
+      "reports": "Reports",
+      "assignments": "Assignments"
     },
     "nav": {
       "learning": "Learning",
@@ -162,7 +170,11 @@
     "wrongPassword": "Wrong password",
     "tooManyRequests": "Too many requests. Try again later.",
     "serverError": "Server error",
-    "unknownError": "Unknown error"
+    "unknownError": "Unknown error",
+    "fio": "Full name",
+    "fioRequired": "Enter your full name",
+    "password": "Password",
+    "passwordRequired": "Enter the password"
   },
   "status": {
     "rotor": {
@@ -285,7 +297,9 @@
     "favoriteRemoved": "Removed from favourites",
     "noResults": "No results",
     "searchMinChars": "Type at least three characters",
-    "favoriteRestore": "Restore"
+    "favoriteRestore": "Restore",
+    "material": "Course material",
+    "foundTotal": "Found total:"
   },
   "groups": {
     "list": {
@@ -353,7 +367,17 @@
     "goHome": "Go home",
     "breadcrumbs": "Breadcrumbs",
     "language": "Language",
-    "density": "Density"
+    "density": "Density",
+    "draftSaved": "Draft saved",
+    "draftRestored": "Unsaved draft restored",
+    "leaveConfirm": "The form has unsaved changes. Leave and lose them?",
+    "labelOpisanie-kursa": "course description",
+    "labelKorotkoe-opisanie": "short description",
+    "labelPolnoe-opisanie": "full description",
+    "labelKategorii": "categories",
+    "labelPanel-kursa": "Course panel",
+    "labelPoisk": "Search",
+    "labelVyberi-fayl": "choose a file"
   },
   "users": {
     "list": {
@@ -529,7 +553,9 @@
       "emptyName": "Enter a name.",
       "tooBig": "File exceeds the size limit ({size}): {names}. The rest were uploaded."
     },
-    "uploadTitle": "File upload"
+    "uploadTitle": "File upload",
+    "removeFile": "Remove {name}",
+    "submit": "Submit"
   },
   "courses": {
     "list": {
@@ -561,13 +587,23 @@
       "error": "Failed to delete the course"
     },
     "addTitle": "Add course",
-    "editTitle": "Edit course"
+    "editTitle": "Edit course",
+    "showLabel": "Show: {value}"
   },
   "groupLearning": {
     "title": "Enroll user groups in courses",
     "checkForm": "Please check the form fields",
     "enrolled": "The group is enrolled in the courses",
-    "saveFailed": "Failed to save the record"
+    "saveFailed": "Failed to save the record",
+    "group": "Group",
+    "class": "Class",
+    "categories": "Categories",
+    "instructor": "Instructor",
+    "lessonType": "Lesson type",
+    "coursesPlaceholder": "Courses and modules",
+    "labelNachalo": "start",
+    "labelKonets": "end",
+    "labelKursy-i-moduli": "Courses and modules"
   },
   "classes": {
     "title": "Add class",
@@ -827,6 +863,14 @@
     "attention": {
       "groupWithoutPlan": "Group without a study plan",
       "questionsWithoutCorrect": "Questions without a correct answer"
+    },
+    "trends": {
+      "attemptsTitle": "Exam attempts over time",
+      "attemptsHint": "Exam attempts per month and how many were passed",
+      "groupsTitle": "Performance by group",
+      "empty": "No data for charts yet",
+      "all": "all attempts",
+      "passed": "passed"
     }
   },
   "catalog": {
@@ -1023,23 +1067,60 @@
       "exams_manage": "manage exams",
       "questions_view": "view questions",
       "tutor_use": "tutor"
-    }
+    },
+    "avatarChange": "Change photo",
+    "avatarRemove": "Remove photo",
+    "avatarTooBig": "The file is larger than 2 MB. Choose a smaller image.",
+    "avatarFailed": "Could not upload the photo. Make sure it is an image."
   },
   "courseItem": {
     "loadError": "Failed to load the course material",
-    "title": "Course description: {name}"
+    "title": "Course description: {name}",
+    "labelPolnoe-opisanie": "full description",
+    "labelOpisanie-kursa": "course description",
+    "labelKratkoe-opisanie": "short description",
+    "labelKategorii": "categories"
   },
   "user": {
+    "groupsUnavailable": "Failed to load the group list",
+    "phoneInvalid": "Invalid phone number",
+    "updated": "Profile updated",
+    "cityNotFound": "No such city",
     "chpass": {
       "mismatch": "Passwords do not match",
       "success": "Password changed",
-      "error": "Failed to change the password"
-    }
+      "error": "Failed to change the password",
+      "tooShort": "The password must be at least 6 characters"
+    },
+    "labelParol": "Password",
+    "labelPovtorite-parol": "Repeat password",
+    "labelFio": "Full name",
+    "labelGruppa": "Group",
+    "labelTelefon": "Phone",
+    "labelStrana": "Country",
+    "labelOrganizaciya": "Organization",
+    "labelDolzhnost": "Position",
+    "labelVoinskoe-zvanie": "Military rank",
+    "labelSfera-deyatelnosti": "Field of activity",
+    "labelSpecializaciya": "Specialization",
+    "labelRazresheniya": "Permissions",
+    "city": "City",
+    "changePassword": "Change password",
+    "showPassword": "Show password",
+    "editTitle": "Edit user",
+    "labelSfery-deyatelnosti": "Field of activity",
+    "labelSpecializatsiya": "Specialization",
+    "labelOrganizatsiya": "Organization"
   },
   "register": {
     "groupsUnavailable": "Group list unavailable: please sign in",
+    "fioRequired": "Enter a full name",
     "created": "User created",
-    "createFailed": "Failed to create the user"
+    "createFailed": "Failed to create the user",
+    "fio": "Full name",
+    "group": "Group",
+    "password": "Password",
+    "passwordRepeat": "Repeat password"
   },
   "http": {
     "sessionExpired": "Session expired, please sign in again",
@@ -1051,7 +1132,13 @@
   "notifications": {
     "title": "Notifications",
     "markAll": "Mark all as read",
-    "empty": "No notifications"
+    "empty": "No notifications",
+    "types": {
+      "exam_passed": "Exam passed",
+      "forum_answer": "Reply in your topic",
+      "forum_staff_answer": "Teacher replied",
+      "announcement": "Announcement"
+    }
   },
   "errors": {
     "forbidden": "Access denied",
@@ -1082,7 +1169,15 @@
     "testing": "Testing",
     "nextQuestion": "Next question",
     "finishExam": "Finish testing",
-    "finished": "Testing completed"
+    "finished": "Testing completed",
+    "questionText": "Question text",
+    "answerText": "Answer text",
+    "answerNumber": "Answer {n}",
+    "editTitle": "Edit question",
+    "totalQuestions": "Total questions: {n}",
+    "correctCount": "Correct answers",
+    "incorrectCount": "Incorrect answers",
+    "grade": "Grade"
   },
   "certificates": {
     "pageTitle": "Certificates",
@@ -1189,5 +1284,174 @@
     "notFoundTitle": "Topic not found",
     "notFoundText": "It may have been deleted or is closed for your group",
     "confirmDeleteTopic": "The topic and all its answers will be deleted permanently."
+  },
+  "password": {
+    "forgotTitle": "Password recovery",
+    "forgotHint": "Enter the full name you use to sign in. If it is found, a password recovery link will be sent to the attached email.",
+    "sendLink": "Send link",
+    "forgotSent": "Check your inbox. If the name is found in the system, the email with the link has been sent.",
+    "backToLogin": "Back to sign in",
+    "requestFailed": "Could not send the request. Try again later.",
+    "resetTitle": "New password",
+    "resetFor": "Set a new password for",
+    "newPassword": "New password",
+    "confirmPassword": "Repeat password",
+    "savePassword": "Save password",
+    "resetFailed": "Could not change the password. The link may have expired.",
+    "labelFio": "Full name"
+  },
+  "schedule": {
+    "title": "My schedule",
+    "hint": "Study periods for your courses and submission deadlines",
+    "all": "All",
+    "periods": "Study",
+    "deadlines": "Deadlines",
+    "emptyTitle": "Schedule is empty",
+    "emptyText": "You are not enrolled in any course yet",
+    "listTitle": "All events",
+    "next": "Next up",
+    "deadline": "Due",
+    "deadlineTitle": "Submission deadline for this course",
+    "openCourse": "Open course"
+  },
+  "onboarding": {
+    "steps": [
+      {
+        "target": "[data-test=\"dash-continue\"]",
+        "title": "Continue learning",
+        "text": "The course you stopped at, with your exact lesson progress.",
+        "placement": "bottom"
+      },
+      {
+        "target": ".dash__stats",
+        "title": "Overview",
+        "text": "Courses, active subjects, progress and passed exams on one screen.",
+        "placement": "bottom"
+      },
+      {
+        "target": "[data-test=\"my-plan\"]",
+        "title": "Learning plan",
+        "text": "The full course list with periods and deadlines.",
+        "placement": "right"
+      },
+      {
+        "target": "[data-test=\"my-exams\"]",
+        "title": "Exams",
+        "text": "Assigned exams and attempt results.",
+        "placement": "right"
+      }
+    ],
+    "restart": "Show the tour again",
+    "restartTitle": "Take the interface tour again",
+    "skip": "Skip",
+    "prev": "Back",
+    "next": "Next",
+    "finish": "Done",
+    "understood": "Got it"
+  },
+  "group": {
+    "labelNachalo": "start",
+    "labelKonec": "end"
+  },
+  "gradeSettings": {
+    "grade": "Grade",
+    "boundary": "Boundary"
+  },
+  "category": {
+    "labelZagruzka": "Loading"
+  },
+  "course": {
+    "labelKategoriya-kursa": "Course category",
+    "labelKratkoe-nazvanie-kursa": "Short course name",
+    "labelKratkoe-opisanie-kursa": "Short course description",
+    "labelOpisanie": "Description",
+    "labelPolnoe-nazvanie-kursa": "Full course name",
+    "labelPolnoe-opisanie-kursa": "Full course description",
+    "labelPut-hash-kursa": "Course hash path",
+    "labelPut-k-kursu": "Course path",
+    "labelPut-kursa": "Course path",
+    "labelVyberite-klass-dlya-dobavleniya": "Select a class to add"
+  },
+  "active": "Active",
+  "completed": "Completed",
+  "planned": "Planned",
+  "cancel": "Cancel",
+  "save": "Save",
+  "edit": "Edit",
+  "delete": "Delete",
+  "added": "Added",
+  "confirm": "Confirm",
+  "change": "Change",
+  "submit": "Submit",
+  "blur": "blur",
+  "reports": {
+    "title": "Reports and analytics",
+    "hint": "Enrollments, pass rates and progress for the selected period",
+    "from": "From",
+    "to": "to",
+    "group": "Group",
+    "course": "Course",
+    "reset": "Reset",
+    "export": "Export CSV",
+    "enrollments": "Enrollments",
+    "passRate": "Pass rate",
+    "lessonProgress": "Lesson progress",
+    "newUsers": "New users",
+    "enrollmentTable": "Group enrollments",
+    "deadline": "Deadline",
+    "noData": "—",
+    "emptyTitle": "Nothing in the selected period",
+    "emptyText": "Change the period or reset the filters"
+  },
+  "cmdk": {
+    "group": {
+      "actions": "Actions"
+    },
+    "placeholder": "Type a command or section…",
+    "empty": "Nothing found",
+    "hint": "Ctrl + K"
+  },
+  "assignments": {
+    "title": "Assignments",
+    "hint": "Assignments for your group and submitted works",
+    "create": "New assignment",
+    "createTitle": "New assignment",
+    "emptyTitle": "No assignments yet",
+    "emptyText": "Assignments for your group will appear here",
+    "due": "Due",
+    "noDeadline": "No deadline",
+    "maxScore": "Max score",
+    "group": "Group",
+    "overdue": "Overdue",
+    "submitted": "Submitted",
+    "reviewed": "Reviewed",
+    "works": "Submissions: {n}",
+    "submitTitle": "Submit your work",
+    "uploadLabel": "Work file",
+    "commentLabel": "Comment",
+    "submit": "Submit",
+    "resend": "Submit again",
+    "overdueHint": "The deadline has passed; the work can no longer be submitted.",
+    "score": "Score",
+    "reviewTitle": "Submissions ({n})",
+    "noWorks": "No submissions yet",
+    "noWorksText": "Submitted work will appear here",
+    "student": "Student",
+    "file": "File",
+    "review": "Review",
+    "reviewAgain": "Edit grade",
+    "feedback": "Teacher feedback",
+    "notFoundTitle": "Assignment not found",
+    "notFoundText": "It may not be published yet or belongs to another group",
+    "statusActive": "Active",
+    "statusNoDeadline": "Active",
+    "anonymous": "Student",
+    "fieldTitle": "Title",
+    "fieldDescription": "Description",
+    "fieldCourse": "Course",
+    "fieldGroup": "Group",
+    "fieldDue": "Due date",
+    "fieldMaxScore": "Max score",
+    "fieldPublish": "Publish immediately"
   }
 }

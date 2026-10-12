@@ -12,6 +12,7 @@ const http = vi.hoisted(() => ({
 vi.mock('../../resources/js/api/httpClient', () => ({ default: http }))
 
 import { createStore } from 'vuex'
+import { createRouter, createMemoryHistory } from 'vue-router'
 import { createVuetify } from 'vuetify'
 import { createI18n } from 'vue-i18n'
 import * as components from 'vuetify/components'
@@ -87,18 +88,36 @@ const passthroughStub = name => ({
   template: '<div class="' + name.toLowerCase() + '-stub"></div>',
 })
 
-const mountPage = component =>
-  mount(component, {
+const mountPage = component => {
+  // Страницы на <script setup> берут стор и роутер через useStore()/useRouter(),
+  // которые читают их из provide, а не из $store/$router. Поэтому плагины
+  // обязаны стоять: одних mocks недостаточно — страница падала бы на
+  // undefined. Роутер создаётся на каждый вызов, чтобы состояние навигации
+  // не протекало между тестами.
+  const router = createRouter({
+    history: createMemoryHistory(),
+    // Страницы используют <router-link :to="{ name: ... }">. Без самих
+    // маршрутов useLink бросает «No match for {name: ...}» прямо в
+    // setup — это всплывало как unhandled rejection уже ПОСЛЕ успешных
+    // тестов и выглядело как «тесты зеленые, а ошибки есть».
+    routes: [
+      { path: '/:pathMatch(.*)*', name: 'catch-all', component: { template: '<div/>' } },
+      { path: '/dashboard', name: 'dashboard', component: { template: '<div/>' } },
+      { path: '/groups/edit/:idEdit', name: 'groups.update', component: { template: '<div/>' } },
+      { path: '/permissions', name: 'permissions.manage', component: { template: '<div/>' } },
+      { path: '/forgot', name: 'password.forgot', component: { template: '<div/>' } },
+    ],
+  })
+
+  return mount(component, {
     global: {
       // i18n ставится плагином: опция верхнего уровня осталась от
       // VTU v1 и молча игнорируется, из-за чего $t был недоступен.
-      plugins: [i18n],
+      plugins: [i18n, store, router],
       mocks: {
-        // provide: точка монтирования не ставит стор в $store,
-        // поэтому передаём его явно через mocks
         $store: store,
         $route: { params: { idEdit: '37' }, push: vi.fn(), back: vi.fn() },
-        $router: { push: vi.fn(), back: vi.fn() },
+        $router: { push: vi.fn(), back: vi.fn(), replace: vi.fn() },
       },
       stubs: {
         VTextField,
@@ -109,6 +128,7 @@ const mountPage = component =>
       },
     },
   })
+}
 
 // ------------------------------------------------- РЕГРЕСС: group_id-объект
 
@@ -126,8 +146,10 @@ describe('UserItemEdit: нормализация group_id', () => {
     await tick()
 
     // Имитируем то, что реально отдавал v-combobox вместо id.
-    // user берётся из стора (mapState), поэтому пишем в стор.
-    store.commit('User/SET_USER', { id: 37, fio: 'Тест', group_id: { id: 1, groupname: 'ducimus' } })
+    // После перевода на useForm значения живут в схеме формы, а не в
+    // store.state.User: править стор напрямую больше не влияет на форму.
+    wrapper.vm.form.values.group_id = { id: 1, groupname: 'ducimus' }
+    wrapper.vm.form.values.fio = 'Тест'
     await wrapper.vm.submitForm()
     await tick()
 
@@ -166,13 +188,10 @@ describe('UserItemEdit: нормализация group_id', () => {
     const wrapper = mountPage(UserItemEdit)
     await tick()
 
-    store.commit('User/SET_USER', {
-      id: 37,
-      fio: 'Полное Имя',
-      city: 'Москва',
-      position: 'Инженер',
-      group_id: 3,
-    })
+    wrapper.vm.form.values.fio = 'Полное Имя'
+    wrapper.vm.form.values.city = 'Москва'
+    wrapper.vm.form.values.position = 'Инженер'
+    wrapper.vm.form.values.group_id = 3
     await wrapper.vm.submitForm()
     await tick()
 
@@ -247,6 +266,16 @@ describe('GroupList: отрисовка без ошибок', () => {
 // ------------------------------------------------ РЕГРЕСС: форма создания
 
 describe('Register: создание пользователя', () => {
+  // Контракт страницы изменился вместе с переводом на useForm (Фаза 2):
+  // полей в data больше нет, значения живут в схеме формы, а ошибка
+  // «пароли не совпадают» показывается ПОД полем повторного ввода,
+  // а не в общем списке строк.
+  const fill = (wrapper, { fio, password, confirmation }) => {
+    wrapper.vm.form.values.fio = fio
+    wrapper.vm.form.values.password = password
+    wrapper.vm.form.values.password_confirmation = confirmation
+  }
+
   it('успешный ответ показывает диалог и кладёт пользователя в state', async () => {
     http.post.mockImplementation((url, payload) => {
       if (url === '/api/register') {
@@ -258,10 +287,7 @@ describe('Register: создание пользователя', () => {
     const wrapper = mountPage(Register)
     await tick()
 
-    // Register держит поля в собственных data, а не в сторе
-    wrapper.vm.fio = 'Новый Сотрудник'
-    wrapper.vm.password = 'secret123'
-    wrapper.vm.password_confirmation = 'secret123'
+    fill(wrapper, { fio: 'Новый Сотрудник', password: 'secret123', confirmation: 'secret123' })
     await wrapper.vm.submitForm()
     await tick()
 
@@ -275,27 +301,28 @@ describe('Register: создание пользователя', () => {
     const wrapper = mountPage(Register)
     await tick()
 
-    wrapper.vm.fio = 'Новый'
-    wrapper.vm.password = 'aaa'
-    wrapper.vm.password_confirmation = 'bbb'
+    fill(wrapper, { fio: 'Новый', password: 'secret123', confirmation: 'other456' })
     await wrapper.vm.submitForm()
     await tick()
 
     expect(http.post).not.toHaveBeenCalled()
-    expect(wrapper.vm.errors).toContain('пароли не совпадают')
+    // Ошибка принадлежит полю, а не общему списку строк в шаблоне.
+    expect(wrapper.vm.form.errors.password_confirmation).toBe('Пароли не совпадают')
+    // Первый пароль валиден по остальным правилам — иначе подсветились бы
+    // оба поля и ошибка «пароли не совпадают» потерялась бы среди прочих.
+    expect(wrapper.vm.form.errors.password).toBe('')
   })
 
   it('не отправляет форму без fio', async () => {
     const wrapper = mountPage(Register)
     await tick()
 
-    wrapper.vm.fio = ''
-    wrapper.vm.password = 'aaa'
-    wrapper.vm.password_confirmation = 'aaa'
+    fill(wrapper, { fio: '', password: 'secret123', confirmation: 'secret123' })
     await wrapper.vm.submitForm()
     await tick()
 
     expect(http.post).not.toHaveBeenCalled()
+    expect(wrapper.vm.form.errors.fio).toBe('Укажите ФИО')
   })
 
   it('ошибка не роняет страницу', async () => {
@@ -303,9 +330,7 @@ describe('Register: создание пользователя', () => {
     const wrapper = mountPage(Register)
     await tick()
 
-    wrapper.vm.fio = 'Ошибка'
-    wrapper.vm.password = 'secret123'
-    wrapper.vm.password_confirmation = 'secret123'
+    fill(wrapper, { fio: 'Ошибка', password: 'secret123', confirmation: 'secret123' })
     await wrapper.vm.submitForm()
     await tick()
 
@@ -370,8 +395,9 @@ describe('UserItemEdit: список групп для выпадающего м
     const wrapper = mountPage(UserItemEdit)
     await tick()
 
-    // v-select пишет выбранный id прямо в user.group_id
-    store.commit('User/SET_USER', { id: 37, fio: 'Тест', group_id: 2 })
+    // v-select пишет выбранный id в значения формы.
+    wrapper.vm.form.values.fio = 'Тест'
+    wrapper.vm.form.values.group_id = 2
     await wrapper.vm.submitForm()
     await tick()
 
@@ -379,7 +405,7 @@ describe('UserItemEdit: список групп для выпадающего м
     expect(payload.group_id).toBe(2)
   })
 
-  it('падение загрузки групп не роняет страницу и попадает в errors', async () => {
+  it('падение загрузки групп не роняет страницу и показывается тостом', async () => {
     http.get.mockImplementation(url => {
       if (url.startsWith('/api/user/list/')) {
         return Promise.resolve(envelope({ id: 37, fio: 'Тест', group_id: null }))
@@ -393,6 +419,12 @@ describe('UserItemEdit: список групп для выпадающего м
     const wrapper = mountPage(UserItemEdit)
     await tick()
 
-    expect(wrapper.vm.errors.join(' ')).toMatch(/групп/i)
+    // Раньше текст складывался в собственный массив errors компонента.
+    // После перевода на useForm ошибки живут в форме, а недоступность
+    // справочника групп сообщается тостом.
+    const warnings = shownToasts().filter((t) => t.type === 'warning')
+    expect(warnings.length).toBeGreaterThan(0)
+    expect(warnings.map((t) => t.text).join(' ')).toMatch(/групп/i)
+    clearToasts()
   })
 })

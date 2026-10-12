@@ -7,22 +7,22 @@
       <v-card-text>
         <v-form>
           <v-text-field            
-            label="описание курса"
+            :label="$t('common.labelOpisanie-kursa')"
             type="text"
             v-model="course.title"
           ></v-text-field>
           <v-text-field            
-            label="короткое описание"
+            :label="$t('common.labelKorotkoe-opisanie')"
             type="text"
             v-model="course.short_description"
           ></v-text-field>
           <v-text-field            
-            label="полное описание"
+            :label="$t('common.labelPolnoe-opisanie')"
             v-model="course.long_description"
             type="text"
           ></v-text-field>
             <v-select
-            label="категории"
+            :label="$t('common.labelKategorii')"
             type="text"            
             v-model="course.categories"
             multiple

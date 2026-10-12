@@ -53,7 +53,6 @@ const ROUTES = [
   { name: 'новый вопрос', hash: '/questions-main/new/{category}/{course}' },
   { name: 'grade-boundary', hash: '/grade-boundary/{course}' },
   { name: 'настройки', hash: '/settings/{course}' },
-  { name: 'datepicker', hash: '/datepicker' },
   { name: 'курсы пользователя', hash: '/user-course/{user}' },
   { name: '403', hash: '/403' },
   { name: '404', hash: '/404' },

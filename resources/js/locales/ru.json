@@ -38,7 +38,10 @@
       "grades": "Шкалы оценок",
       "certificates": "Сертификаты",
       "gradebook": "Журнал оценок",
-      "announcements": "Объявления"
+      "announcements": "Объявления",
+      "schedule": "Расписание",
+      "reports": "Отчёты",
+      "assignments": "Задания"
     },
     "buttons": {
       "cancel": "отмена",
@@ -137,7 +140,12 @@
       },
       "certificates": "Сертификаты",
       "gradebook": "Журнал оценок",
-      "announcements": "Объявления"
+      "announcements": "Объявления",
+      "forum": "Форум",
+      "schedule": "Расписание",
+      "password": "Восстановление пароля",
+      "reports": "Отчёты",
+      "assignments": "Задания"
     },
     "nav": {
       "learning": "Обучение",
@@ -162,7 +170,11 @@
     "wrongPassword": "Неверный пароль",
     "tooManyRequests": "Слишком много запросов. Попробуйте позже.",
     "serverError": "Ошибка сервера",
-    "unknownError": "Неизвестная ошибка"
+    "unknownError": "Неизвестная ошибка",
+    "fio": "ФИО",
+    "fioRequired": "Укажите ФИО",
+    "password": "Пароль",
+    "passwordRequired": "Укажите пароль"
   },
   "status": {
     "rotor": {
@@ -285,7 +297,9 @@
     "favoriteRemoved": "Убрано из избранного",
     "noResults": "Нет результатов",
     "searchMinChars": "Введите не меньше трёх символов",
-    "favoriteRestore": "Вернуть"
+    "favoriteRestore": "Вернуть",
+    "material": "Материал курса",
+    "foundTotal": "Всего найдено:"
   },
   "groups": {
     "list": {
@@ -353,7 +367,17 @@
     "goHome": "На главную",
     "breadcrumbs": "Хлебные крошки",
     "language": "Язык",
-    "density": "Плотность"
+    "density": "Плотность",
+    "draftSaved": "Черновик сохранён",
+    "draftRestored": "Восстановлен несохранённый черновик",
+    "leaveConfirm": "На форме есть несохранённые изменения. Уйти и потерять их?",
+    "labelOpisanie-kursa": "описание курса",
+    "labelKorotkoe-opisanie": "короткое описание",
+    "labelPolnoe-opisanie": "полное описание",
+    "labelKategorii": "категории",
+    "labelPanel-kursa": "Панель курса",
+    "labelPoisk": "Поиск",
+    "labelVyberi-fayl": "выбери файл"
   },
   "users": {
     "list": {
@@ -529,7 +553,9 @@
       "emptyName": "Введите имя.",
       "tooBig": "Файл больше допустимого размера ({size}): {names}. Загружены остальные."
     },
-    "uploadTitle": "Загрузка файлов"
+    "uploadTitle": "Загрузка файлов",
+    "removeFile": "Убрать {name}",
+    "submit": "Отправить"
   },
   "courses": {
     "list": {
@@ -561,13 +587,23 @@
       "error": "Не удалось удалить курс"
     },
     "addTitle": "Добавление курса",
-    "editTitle": "Редактирование курса"
+    "editTitle": "Редактирование курса",
+    "showLabel": "Показать: {value}"
   },
   "groupLearning": {
     "title": "Запись групп пользователей на курсы",
     "checkForm": "Проверьте заполнение формы",
     "enrolled": "Группа записана на курсы",
-    "saveFailed": "Не удалось сохранить запись"
+    "saveFailed": "Не удалось сохранить запись",
+    "group": "Группа",
+    "class": "Класс",
+    "categories": "Категории",
+    "instructor": "Инструктор",
+    "lessonType": "Вид занятия",
+    "coursesPlaceholder": "Курсы и модули",
+    "labelNachalo": "начало",
+    "labelKonets": "конец",
+    "labelKursy-i-moduli": "Курсы и модули"
   },
   "classes": {
     "title": "Добавление класса",
@@ -827,6 +863,14 @@
     "attention": {
       "groupWithoutPlan": "Группа без учебного плана",
       "questionsWithoutCorrect": "Вопросов без верного ответа"
+    },
+    "trends": {
+      "attemptsTitle": "Динамика попыток",
+      "attemptsHint": "Попытки экзаменов по месяцам и сколько из них успешных",
+      "groupsTitle": "Успеваемость по группам",
+      "empty": "Пока нет данных для графиков",
+      "all": "все попытки",
+      "passed": "сдано"
     }
   },
   "catalog": {
@@ -1023,23 +1067,60 @@
       "exams_manage": "управление экзаменами",
       "questions_view": "просмотр вопросов",
       "tutor_use": "тренажёр"
-    }
+    },
+    "avatarChange": "Сменить фото",
+    "avatarRemove": "Убрать фото",
+    "avatarTooBig": "Файл больше 2 МБ. Выберите изображение поменьше.",
+    "avatarFailed": "Не удалось загрузить фото. Проверьте, что это изображение."
   },
   "courseItem": {
     "loadError": "Не удалось открыть материал курса",
-    "title": "Описание курса {name}"
+    "title": "Описание курса {name}",
+    "labelPolnoe-opisanie": "полное описание",
+    "labelOpisanie-kursa": "описание курса",
+    "labelKratkoe-opisanie": "короткое описание",
+    "labelKategorii": "категории"
   },
   "user": {
+    "groupsUnavailable": "Не удалось загрузить список групп",
+    "phoneInvalid": "Некорректный номер телефона",
+    "updated": "Профиль обновлён",
+    "cityNotFound": "нет такого города",
     "chpass": {
       "mismatch": "Пароли не совпадают",
       "success": "Пароль успешно изменён",
-      "error": "Ошибка смены пароля"
-    }
+      "error": "Ошибка смены пароля",
+      "tooShort": "Пароль должен быть не короче 6 символов"
+    },
+    "labelParol": "Пароль",
+    "labelPovtorite-parol": "Повторите пароль",
+    "labelFio": "ФИО",
+    "labelGruppa": "Группа",
+    "labelTelefon": "Телефон",
+    "labelStrana": "Страна",
+    "labelOrganizaciya": "Организация",
+    "labelDolzhnost": "Должность",
+    "labelVoinskoe-zvanie": "Воинское звание",
+    "labelSfera-deyatelnosti": "Сфера деятельности",
+    "labelSpecializaciya": "Специализация",
+    "labelRazresheniya": "Разрешения",
+    "city": "Город",
+    "changePassword": "Сменить пароль",
+    "showPassword": "Показать пароль",
+    "editTitle": "Редактирование пользователя",
+    "labelSfery-deyatelnosti": "Сфера деятельности",
+    "labelSpecializatsiya": "Специализация",
+    "labelOrganizatsiya": "Организация"
   },
   "register": {
     "groupsUnavailable": "Список групп недоступен: войдите в систему",
+    "fioRequired": "Укажите ФИО",
     "created": "Пользователь успешно создан",
-    "createFailed": "Ошибка при создании пользователя"
+    "createFailed": "Ошибка при создании пользователя",
+    "fio": "ФИО",
+    "group": "Группа",
+    "password": "Пароль",
+    "passwordRepeat": "Повторите пароль"
   },
   "http": {
     "sessionExpired": "Сессия истекла, войдите заново",
@@ -1051,7 +1132,13 @@
   "notifications": {
     "title": "Уведомления",
     "markAll": "Прочитать все",
-    "empty": "Нет уведомлений"
+    "empty": "Нет уведомлений",
+    "types": {
+      "exam_passed": "Экзамен сдан",
+      "forum_answer": "Ответ в теме",
+      "forum_staff_answer": "Ответ преподавателя",
+      "announcement": "Объявление"
+    }
   },
   "errors": {
     "forbidden": "В доступе отказано",
@@ -1082,7 +1169,15 @@
     "testing": "Тестирование",
     "nextQuestion": "Следующий вопрос",
     "finishExam": "Закончить тестирование",
-    "finished": "Тестирование завершено"
+    "finished": "Тестирование завершено",
+    "questionText": "Текст вопроса",
+    "answerText": "Текст ответа",
+    "answerNumber": "Ответ {n}",
+    "editTitle": "Редактирование вопроса",
+    "totalQuestions": "Всего вопросов: {n}",
+    "correctCount": "Правильно отвечено",
+    "incorrectCount": "Неправильно отвечено",
+    "grade": "Оценка"
   },
   "certificates": {
     "pageTitle": "Сертификаты",
@@ -1189,5 +1284,174 @@
     "notFoundTitle": "Тема не найдена",
     "notFoundText": "Возможно, её удалили или она закрыта для вашей группы",
     "confirmDeleteTopic": "Тема и все ответы будут удалены безвозвратно."
+  },
+  "password": {
+    "forgotTitle": "Восстановление пароля",
+    "forgotHint": "Укажите ФИО, под которым вы входите в систему. Если оно найдено, ссылка для восстановления пароля будет отправлена на привязанную почту.",
+    "sendLink": "Отправить ссылку",
+    "forgotSent": "Проверьте почту. Если указанное ФИО найдено в системе, письмо со ссылкой уже отправлено.",
+    "backToLogin": "Вернуться ко входу",
+    "requestFailed": "Не удалось отправить запрос. Попробуйте позже.",
+    "resetTitle": "Новый пароль",
+    "resetFor": "Задайте новый пароль для",
+    "newPassword": "Новый пароль",
+    "confirmPassword": "Повторите пароль",
+    "savePassword": "Сохранить пароль",
+    "resetFailed": "Не удалось изменить пароль. Возможно, ссылка устарела.",
+    "labelFio": "ФИО"
+  },
+  "schedule": {
+    "title": "Моё расписание",
+    "hint": "Периоды обучения по вашим курсам и сроки сдачи",
+    "all": "Всё",
+    "periods": "Обучение",
+    "deadlines": "Сроки сдачи",
+    "emptyTitle": "Расписание пустое",
+    "emptyText": "Вы пока не записаны ни на один курс",
+    "listTitle": "Все события",
+    "next": "Ближайшее",
+    "deadline": "Срок",
+    "deadlineTitle": "Срок сдачи по этому курсу",
+    "openCourse": "Открыть курс"
+  },
+  "onboarding": {
+    "steps": [
+      {
+        "target": "[data-test=\"dash-continue\"]",
+        "title": "Продолжить обучение",
+        "text": "Здесь — курс, на котором вы остановились, и точная доля пройденных уроков.",
+        "placement": "bottom"
+      },
+      {
+        "target": ".dash__stats",
+        "title": "Сводка",
+        "text": "Курсы, активные предметы, прогресс и сданные экзамены — на одном экране.",
+        "placement": "bottom"
+      },
+      {
+        "target": "[data-test=\"my-plan\"]",
+        "title": "Учебный план",
+        "text": "Полный список курсов с периодами и сроками сдачи.",
+        "placement": "right"
+      },
+      {
+        "target": "[data-test=\"my-exams\"]",
+        "title": "Экзамены",
+        "text": "Назначенные экзамены и результаты попыток.",
+        "placement": "right"
+      }
+    ],
+    "restart": "Показать обзор",
+    "restartTitle": "Пройти обзор интерфейса заново",
+    "skip": "Пропустить",
+    "prev": "Назад",
+    "next": "Далее",
+    "finish": "Готово",
+    "understood": "Понятно"
+  },
+  "group": {
+    "labelNachalo": "начало",
+    "labelKonec": "конец"
+  },
+  "gradeSettings": {
+    "grade": "Оценка",
+    "boundary": "Граница"
+  },
+  "category": {
+    "labelZagruzka": "Загрузка"
+  },
+  "course": {
+    "labelKategoriya-kursa": "Категория курса",
+    "labelKratkoe-nazvanie-kursa": "Краткое название курса",
+    "labelKratkoe-opisanie-kursa": "Краткое описание курса",
+    "labelOpisanie": "Описание",
+    "labelPolnoe-nazvanie-kursa": "Полное название курса",
+    "labelPolnoe-opisanie-kursa": "Полное описание курса",
+    "labelPut-hash-kursa": "Путь hash курса",
+    "labelPut-k-kursu": "Путь к курсу",
+    "labelPut-kursa": "Путь курса",
+    "labelVyberite-klass-dlya-dobavleniya": "Выберите класс для добавления"
+  },
+  "active": "Активен",
+  "completed": "Завершён",
+  "planned": "Запланирован",
+  "cancel": "Отмена",
+  "save": "Сохранить",
+  "edit": "Изменить",
+  "delete": "Удалить",
+  "added": "Добавлено",
+  "confirm": "Подтвердить",
+  "change": "Изменить",
+  "submit": "Отправить",
+  "blur": "blur",
+  "reports": {
+    "title": "Отчёты и аналитика",
+    "hint": "Записи на курсы, успеваемость и прогресс за выбранный период",
+    "from": "Период с",
+    "to": "по",
+    "group": "Группа",
+    "course": "Курс",
+    "reset": "Сбросить",
+    "export": "Выгрузить CSV",
+    "enrollments": "Записей на курсы",
+    "passRate": "Успеваемость",
+    "lessonProgress": "Прогресс уроков",
+    "newUsers": "Новых пользователей",
+    "enrollmentTable": "Записи групп на курсы",
+    "deadline": "Дедлайн",
+    "noData": "—",
+    "emptyTitle": "За выбранный период ничего нет",
+    "emptyText": "Измените период или сбросьте фильтры"
+  },
+  "cmdk": {
+    "group": {
+      "actions": "Действия"
+    },
+    "placeholder": "Введите команду или раздел…",
+    "empty": "Ничего не найдено",
+    "hint": "Ctrl + K"
+  },
+  "assignments": {
+    "title": "Домашние задания",
+    "hint": "Задания вашей группы и сданные работы",
+    "create": "Создать задание",
+    "createTitle": "Новое домашнее задание",
+    "emptyTitle": "Заданий пока нет",
+    "emptyText": "Здесь появятся задания вашей группы",
+    "due": "Срок",
+    "noDeadline": "Без срока",
+    "maxScore": "Максимальный балл",
+    "group": "Группа",
+    "overdue": "Срок прошёл",
+    "submitted": "Работа сдана",
+    "reviewed": "Работа проверена",
+    "works": "Сдано работ: {n}",
+    "submitTitle": "Сдача работы",
+    "uploadLabel": "Файл работы",
+    "commentLabel": "Комментарий",
+    "submit": "Сдать работу",
+    "resend": "Сдать заново",
+    "overdueHint": "Срок сдачи прошёл. Работу сдать уже нельзя.",
+    "score": "Балл",
+    "reviewTitle": "Работы ({n})",
+    "noWorks": "Работ пока нет",
+    "noWorksText": "Сданные работы появятся здесь",
+    "student": "Обучаемый",
+    "file": "Файл",
+    "review": "Проверить",
+    "reviewAgain": "Изменить оценку",
+    "feedback": "Комментарий преподавателя",
+    "notFoundTitle": "Задание не найдено",
+    "notFoundText": "Возможно, оно ещё не опубликовано или выдано другой группе",
+    "statusActive": "Активно",
+    "statusNoDeadline": "Активно",
+    "anonymous": "Обучаемый",
+    "fieldTitle": "Название",
+    "fieldDescription": "Описание",
+    "fieldCourse": "Курс",
+    "fieldGroup": "Группа",
+    "fieldDue": "Срок сдачи",
+    "fieldMaxScore": "Максимальный балл",
+    "fieldPublish": "Опубликовать сразу"
   }
 }

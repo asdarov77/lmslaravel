@@ -31,8 +31,11 @@ use App\Http\Controllers\CoursesListController;
 use App\Http\Controllers\ManagerDashboardController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\AssignmentController;
+use App\Http\Controllers\ForgotPasswordController;
 use App\Http\Controllers\ForumController;
 use App\Http\Controllers\GradebookController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\LessonProgressController;
 use App\Http\Controllers\MyLearningController;
 use App\Http\Controllers\CalendarController;
@@ -59,6 +62,12 @@ use Illuminate\Support\Facades\Storage;
 //Route::any('*','TestController@test');
 
 //
+// Восстановление пароля. Отдельные публичные маршруты: токен одноразовый
+// и не зависит от сессии, а вход по токену тут неуместен.
+Route::post('/password/forgot', [ForgotPasswordController::class, 'forgot'])
+    ->middleware('throttle:forgot');
+Route::post('/password/reset', [ForgotPasswordController::class, 'reset']);
+
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 // Версионированный алиас логина. Путь указан БЕЗ префикса /api: файл уже
 // смонтирован под 'api', и раньше '/api/v1/login' давал '/api/api/v1/login'.
@@ -592,6 +601,29 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/forum/topics/{topic}', [ForumController::class, 'destroyTopic'])->whereNumber('topic');
     Route::post('/forum/topics/{topic}/posts', [ForumController::class, 'storePost'])->whereNumber('topic');
     Route::delete('/forum/posts/{post}', [ForumController::class, 'destroyPost'])->whereNumber('post');
+});
+
+// Домашние задания. Обучение читает задания своей группы и сдаёт
+// работы; преподавание (grading/groups/courses.manage) — создаёт,
+// публикует и проверяет.
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/assignments', [AssignmentController::class, 'index']);
+    Route::post('/assignments', [AssignmentController::class, 'store']);
+    Route::get('/assignments/{assignment}', [AssignmentController::class, 'show'])->whereNumber('assignment');
+    Route::patch('/assignments/{assignment}', [AssignmentController::class, 'update'])->whereNumber('assignment');
+    Route::delete('/assignments/{assignment}', [AssignmentController::class, 'destroy'])->whereNumber('assignment');
+    Route::post('/assignments/{assignment}/submissions', [AssignmentController::class, 'submit'])
+        ->whereNumber('assignment');
+    Route::post('/assignments/{assignment}/submissions/{submission}', [AssignmentController::class, 'review'])
+        ->whereNumber('assignment')
+        ->whereNumber('submission');
+});
+
+// Отчёты и аналитика. Право reports.view; инструктор дополнительно
+// ограничен своей группой внутри контроллера.
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/reports', [ReportController::class, 'index']);
+    Route::get('/reports/export', [ReportController::class, 'export']);
 });
 
 // Грейдбук преподавателя. Право grading.manage проверяется в
