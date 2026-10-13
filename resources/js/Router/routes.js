@@ -321,6 +321,22 @@ const routes = [
         name: 'learning.plan',
     },
     {
+        // Достижения: XP, уровень, streak, галерея, лидерборд группы.
+        path: '/gamification',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'gamification.pageTitle' }], titleKey: 'gamification' },
+        component: () => import('../Pages/Gamification.vue'),
+        name: 'gamification',
+    },
+    {
+        // Бланк сертификата: организация, подписант, логотип.
+        // Отдельная страница, а не вкладка списка: прав тот, кто
+        // отвечает за выпуск, а видит сертификаты обучаемый.
+        path: '/certificates/settings',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'certSettings.pageTitle' }], permission: ['certificates.manage'], titleKey: 'certSettings' },
+        component: () => import('../Pages/Certificate/Settings.vue'),
+        name: 'certificates.settings',
+    },
+    {
         // Сертификаты обучаемого: какие курсы закрыты и что ещё мешает.
         path: '/my/certificates',
         meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.myLearning', to: '/my/learning' }, { key: 'certificates.pageTitle' }], titleKey: 'certificates' },

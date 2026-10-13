@@ -40,7 +40,7 @@ const { t } = useI18n({ useScope: "global" });
         variant="text"
         size="small"
         :title="`${$t('cmdk.placeholder')} — ${$t('cmdk.hint')}`"
-        aria-label="$t('cmdk.hint')"
+        :aria-label="$t('cmdk.hint')"
         data-test="open-cmdk"
         @click="paletteOpen = true"
       />
@@ -177,12 +177,33 @@ const { t } = useI18n({ useScope: "global" });
       сообщения переживают навигацию.
     -->
     <ToastStack />
+
+    <!--
+      Палитра команд открывается кнопкой в шапке.
+
+      Ctrl/Cmd+K остаётся за глобальным поиском: это сочетание было
+      у него и раньше, и человек привык искать по нему. Палитра —
+      про разделы и действия, поиск — про данные; смешивать их в одном
+      сочетании значило бы ломать привычку привычнее, чем добавлять
+      удобство.
+    -->
+    <CommandPalette
+      v-if="loggedIn"
+      v-model="paletteOpen"
+      :commands="paletteCommands"
+      :placeholder="$t('cmdk.placeholder')"
+      :empty-text="$t('cmdk.empty')"
+      data-test="cmd-palette"
+      @run="onCommandRun"
+    />
 </template>
 
 <script>
 import { mapGetters, mapState } from 'vuex';
 import LeftSideMenu from './Pages/Navigation/LeftSideMenu.vue';
-import { navigationSections } from './navigation';
+import { navigationSections } from './navigation'
+import { routePermissionIndex } from './utils/routePermissions'
+import { visibleSections as buildVisibleSections } from './utils/navigationVisibility'
 import AccountMenu from './Pages/Navigation/AccountMenu.vue';
 import Breadcrumbs from './components/ui/Breadcrumbs.vue';
 import GlobalSearch from './components/ui/GlobalSearch.vue';
@@ -192,7 +213,8 @@ import AppBrand from './components/ui/AppBrand.vue';
 import ToastStack from './components/ui/ToastStack.vue';
 import NotificationBell from './components/ui/NotificationBell.vue';
 import density from './utils/density';
-import theme from './utils/theme';
+import theme from './utils/theme'
+import vuetify from './Vuetify';
 
 
 /**
@@ -220,30 +242,56 @@ export default {
       // Палитра команд открывается по Ctrl/Cmd+K и по клику на строку
       // подсказки поиска.
       paletteOpen: false,
+      // Индекс прав по ссылкам: тот же источник, что у меню.
+      requiredBy: routePermissionIndex(),
     };
   },
 
   computed: {
+    // Права нужны палитре команд: она строит команды из видимого меню.
+    ...mapGetters('Auth', ['can']),
+
     /**
-     * Команды палитры строятся из меню.
+     * Признак «управляющий» — по правам, как в меню и на дашборде.
+     * Роль приходит из двух источников и называется по-разному, а
+     * права у всех одна.
+     */
+    isManagerUser() {
+      return this.can('users.view', 'users.permissions', 'groups.view', 'groups.manage', 'courses.manage')
+    },
+
+    /**
+     * Команды палитры строятся из видимого меню.
      *
      * Отдельный список команд разошёлся бы с меню при первой же
-     * правке: пункт переехал или стал скрытым по правам, а палитра
-     * продолжала предлагать его. Меню — единственный источник.
+     * правке: пункт скрыт по правам в меню, а палитра продолжала бы
+     * предлагать его. Поэтому берём ровно то, что видит человек, —
+     * тем же хелпером, что и боковое меню.
      */
+    visibleNavigation() {
+      return buildVisibleSections(navigationSections, {
+        can: this.can,
+        isManager: this.isManagerUser,
+        t: (key) => this.$t(key),
+        index: this.requiredBy,
+      })
+    },
+
     paletteCommands() {
       const commands = [];
       let index = 0;
 
-      this.navigationSections.forEach((section) => {
+      this.visibleNavigation.forEach((section) => {
         section.items.forEach((item) => {
           commands.push({
             id: `nav-${index++}`,
-            title: item.title || item.titleKey,
+            title: item.title,
             icon: item.icon,
             group: section.title,
             route: { path: item.link },
-            keywords: [item.link, item.key].filter(Boolean).join(' '),
+            // Ключ и путь нужны для поиска: человек помнит и название,
+            // и адрес раздела, а не только одно из двух.
+            keywords: [item.link, item.key, item.title].filter(Boolean).join(' '),
           });
         });
       });
@@ -255,15 +303,15 @@ export default {
           icon: 'mdi-theme-light-dark',
           group: this.$t('cmdk.group.actions'),
           action: () => this.toggleTheme(),
-          keywords: 'тема темаdark light тема оформления',
+          keywords: this.$t('cmdk.keywords.theme'),
         },
         {
           id: 'action-density',
-          title: this.$t('cmdk.group.actions') + ': ' + this.$t('ui.density.toggle'),
+          title: this.$t('cmdk.density'),
           icon: 'mdi-format-line-spacing',
           group: this.$t('cmdk.group.actions'),
           action: () => this.toggleDensity(),
-          keywords: 'плотность интервал',
+          keywords: this.$t('cmdk.keywords.density'),
         }
       );
 
@@ -326,8 +374,20 @@ export default {
      * палитра переключала бы на «противоположное», а не на следующий
      * режим, и человек получал бы разное поведение по разным кнопкам.
      */
+    /**
+     * Переключение темы из палитры команд.
+     *
+     * Тот же цикл light → dark → auto, что у переключателя в шапке:
+     * своя реализация переключала бы «на противоположное», и одна
+     * кнопка вела бы себя иначе, чем другая.
+     *
+     * Экземпляр Vuetify берётся импортом, а не через this.$vuetify:
+     * в Options API Vue 3 такого поля нет, и передача undefined
+     * молча оставляла бы токены темы в прежнем состоянии — кнопка
+     * выглядела бы работающей, а тема не менялась.
+     */
     toggleTheme() {
-      theme.cycle(this.$vuetify?.theme);
+      theme.cycle(vuetify);
     },
 
     changeRu() {

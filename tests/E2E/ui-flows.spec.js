@@ -48,7 +48,17 @@ async function loginViaForm(page) {
   await page.fill('input[name="password"]', ADMIN.password)
   await page.getByRole('button', { name: 'ВХОД' }).click()
 
-  await page.waitForTimeout(1500)
+  /*
+   * Ждём появления токена, а не фиксированную паузу.
+   *
+   * Пауза в 1.5 секунды работала на пустой машине и падала на
+   * загруженной: тест успевал упасть раньше, чем ответ логина
+   * разобрался. Ожидание по условию ждёт ровно столько, сколько нужно,
+   * и не делает тест медленнее в спокойном случае.
+   */
+  await page.waitForFunction(() => !!window.localStorage.getItem('token'), null, { timeout: 15000 })
+    .catch(() => null)
+
   const token = await page.evaluate(() => window.localStorage.getItem('token'))
   expect(token, 'после логина токен должен сохраниться в localStorage').toBeTruthy()
   return token
@@ -369,10 +379,19 @@ test.describe('Выпадающий список групп в редактир�
     await page.goto(`${HASH}/user/edit/${userId}`, { waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(1800)
 
-    // .v-input — базовый класс Vuetify 3 и для v-select, и для
-    // v-autocomplete: привязка к .v-select ломалась бы при смене
-    // компонента.
-    const groupSelect = page.locator('.v-input', { has: page.locator('label', { hasText: 'Группа' }) }).first()
+    /*
+     * Контейнер поля ищется по .u-field, а не по .v-input.
+     *
+     * Метку рисует FormField — обёртка нашего дизайн-слоя, — и она
+     * лежит НАД контролом, а не внутри .v-input. Поиск «label внутри
+     * .v-input» находил пустоту и падал на правильной разметке.
+     * Дополнительно принимаем .v-input: у полей без FormField метка
+     * остаётся собственной разметкой Vuetify.
+     */
+    const groupSelect = page
+      .locator('.u-field, .v-input')
+      .filter({ has: page.locator('label', { hasText: 'Группа' }) })
+      .first()
     await expect(groupSelect, 'поле «Группа» присутствует на форме').toBeVisible()
 
     // Ищем группу по имени прямо в поле выбора.

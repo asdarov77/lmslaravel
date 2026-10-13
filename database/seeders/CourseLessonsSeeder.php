@@ -98,12 +98,16 @@ class CourseLessonsSeeder extends Seeder
                 $rows[] = [
                     'course_id' => $course->id,
                     'parent_id' => null,
-                    'title' => 'Материал курса',
+                    // Название одинакового вида у всех разделов: первый
+                    // был назван просто «Материал курса», и дерево
+                    // показывало его иначе — из четырёх доступных
+                    // разделов в интерфейсе, хотя в базе их было пять.
+                    'title' => 'Материал курса, раздел 1',
                     // 3 — раздел с файлом; такие узлы открываются в манифесте.
                     'type' => 3,
                     'description' => '',
                     'categories' => $category->code,
-                    'identifier' => 'MATERIAL-' . $course->id . '-1',
+                    'identifier' => 'DEMO-MATERIAL-' . $course->id . '-1',
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
@@ -116,7 +120,7 @@ class CourseLessonsSeeder extends Seeder
                         'type' => 3,
                         'description' => '',
                         'categories' => $category->code,
-                        'identifier' => 'MATERIAL-' . $course->id . '-' . $section,
+                        'identifier' => 'DEMO-MATERIAL-' . $course->id . '-' . $section,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ];
@@ -143,7 +147,7 @@ class CourseLessonsSeeder extends Seeder
                     // Код категории: по нему CourseFilter находит уроки
                     // нужной специальности.
                     'categories' => $category->code,
-                    'identifier' => 'L-' . $course->id . '-' . $number,
+                    'identifier' => 'DEMO-L-' . $course->id . '-' . $number,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
@@ -159,30 +163,58 @@ class CourseLessonsSeeder extends Seeder
         // insertOrIgnore: сидер должен быть повторяемым, иначе второй
         // запуск падает на уникальном индексе identifier.
         /*
+         * Повторяемость обеспечиваем сами.
+         *
          * Идентификатор урока не уникален в схеме, поэтому
          * insertOrIgnore не спасает: каждый прогон добавлял ещё одну
-         * пару материальных уроков, и в манифесте появлялись дубли.
-         * Повторяемость обеспечиваем сами — удаляем свои же уроки перед
-         * вставкой. Чужие уроки (identifier не MATERIAL-*) не трогаем.
+         * пару уроков на курс, и в манифесте появлялись дубли (на
+         * реальной базе их набралось больше трёхсот).
+         *
+         * Удаляются ТОЛЬКО строки с префиксом DEMO- — то есть созданные
+         * этим сидером. Уроки, загруженные импортом из XML, имеют
+         * другие идентификаторы и не должны потеряться.
          */
         DB::table('links')
             ->whereIn('aukstructure_id', function ($query) {
-                $query->select('id')->from('aukstructures')->where('identifier', 'like', 'MATERIAL-%');
+                $query->select('id')->from('aukstructures')->where('identifier', 'like', 'DEMO-%');
             })
             ->delete();
 
-        DB::table('aukstructures')->where('identifier', 'like', 'MATERIAL-%')->delete();
+        DB::table('aukstructures')->where('identifier', 'like', 'DEMO-%')->delete();
 
         DB::table('aukstructures')->insert($rows);
-        DB::table('category_course')->insertOrIgnore($pivot);
+        /*
+         * Связи пишем через firstOrCreate, а не insertOrIgnore.
+         *
+         * На category_course нет уникального индекса, поэтому
+         * insertOrIgnore ничего не подавлял: каждый запуск добавлял
+         * ещё одну строку на курс, и список категорий курса
+         * разрастался копиями. firstOrCreate делает то же без
+         * изменения схемы.
+         */
+        foreach ($pivot as $link) {
+            // exists, а не firstOrCreate: у Query\Builder такого метода
+            // нет, он есть только у Eloquent-моделей.
+            $exists = DB::table('category_course')
+                ->where('category_id', $link['category_id'])
+                ->where('course_id', $link['course_id'])
+                ->exists();
+
+            if (! $exists) {
+                DB::table('category_course')->insert($link);
+            }
+        }
 
         /*
          * Ссылки на материалы ставим после вставки уроков: нужен их id.
          * Каждому разделу — свой файл, иначе переключение между
          * материалами не меняло бы ничего и проверялось бы вхолостую.
          */
+        // Именно DEMO-MATERIAL-, а не DEMO-: под общим префиксом лежат
+        // и обычные уроки (DEMO-L-*), и ссылки на файлы достались бы
+        // первым пяти из них — то есть разделу без материала.
         $materials = DB::table('aukstructures')
-            ->where('identifier', 'like', 'MATERIAL-%')
+            ->where('identifier', 'like', 'DEMO-MATERIAL-%')
             ->orderBy('identifier')
             ->get();
 

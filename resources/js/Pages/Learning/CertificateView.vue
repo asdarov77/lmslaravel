@@ -29,7 +29,21 @@
 
       <article class="cert-sheet" data-test="cert-sheet">
         <header class="cert-sheet__head">
-          <p class="cert-sheet__org">{{ $t('certificates.organization') }}</p>
+          <img
+            v-if="certificate.logo_url"
+            :src="certificate.logo_url"
+            class="cert-sheet__logo"
+            alt=""
+            data-test="cert-logo"
+          />
+          <!--
+            Название организации приходит из настроек бланка, а не из
+            локализации: печать на бланке конкретного заведения, и в
+            переводах его названия быть не может.
+          -->
+          <p class="cert-sheet__org">
+            {{ certificate.organization || $t('certificates.organization') }}
+          </p>
           <h1 class="cert-sheet__title">{{ $t('certificates.title') }}</h1>
         </header>
 
@@ -62,11 +76,23 @@
           </div>
         </dl>
 
+        <p v-if="certificate.footer_note" class="cert-sheet__note">
+          {{ certificate.footer_note }}
+        </p>
+
         <footer class="cert-sheet__foot">
           <div class="cert-sheet__code">
             <span class="cert-sheet__code-label">{{ $t('certificates.code') }}</span>
             <span class="cert-sheet__code-value" data-test="cert-code">{{ certificate.code }}</span>
           </div>
+          <div v-if="certificate.signatory_name" class="cert-sheet__sign">
+            <span class="cert-sheet__sign-line"></span>
+            <span class="cert-sheet__sign-name">{{ certificate.signatory_name }}</span>
+            <span v-if="certificate.signatory_title" class="cert-sheet__sign-title">
+              {{ certificate.signatory_title }}
+            </span>
+          </div>
+
           <p class="cert-sheet__verify">{{ $t('certificates.verifyHint') }}</p>
         </footer>
       </article>

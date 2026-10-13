@@ -288,7 +288,16 @@ test.describe('страница материала курса', () => {
     await page.waitForSelector('.cm-toolbar')
     await page.waitForTimeout(4000)
 
-    await page.locator('.auk-node__title--module').nth(4).click()
+    /*
+     * Берём ПОСЛЕДНИЙ раздел, а не пятый по счёту.
+     *
+     * Корневой узел курса в дереве намеренно не рисуется
+     * (v-if="index !== 0" в CourseManifest), поэтому в списке на одну
+     * строку меньше, чем разделов в базе. Привязка к индексу ломалась
+     * вслед за любым изменением числа демо-разделов.
+     */
+    const modules = page.locator('.auk-node__title--module')
+    await modules.last().click()
     await page.waitForTimeout(2500)
 
     await page.getByRole('button', { name: 'В избранное', exact: true }).click()

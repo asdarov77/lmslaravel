@@ -44,6 +44,11 @@
 import { mapGetters } from 'vuex'
 import { navigationSections } from '../../navigation'
 import { routePermissionIndex, requiredPermissions } from '../../utils/routePermissions'
+import {
+  fitsRole as fitsRoleBy,
+  visibleItems as filterVisibleItems,
+  visibleSections as buildVisibleSections,
+} from '../../utils/navigationVisibility'
 
 /**
  * Боковое меню.
@@ -72,14 +77,22 @@ export default {
 
     /** Пункты секции после отсева по правам. */
     filterItems() {
-      return (items) =>
-        items
-          .filter((item) => this.allows(item.link))
-          .filter((item) => this.fitsRole(item))
-          .map((item) => ({
-            ...item,
-            title: this.$t(item.titleKey),
-          }))
+      return (items) => filterVisibleItems(items, this.visibilityContext)
+    },
+
+    /**
+     * Контекст видимости для общих хелперов.
+     *
+     * Собирается один раз: палитра команд пользуется тем же
+     * правилом, иначе она предлагала бы пункты, которых в меню нет.
+     */
+    visibilityContext() {
+      return {
+        can: this.can,
+        isManager: this.isManager,
+        t: (key) => this.$t(key),
+        index: this.requiredBy,
+      }
     },
 
     /*
@@ -118,17 +131,7 @@ export default {
      * остаётся на своём месте — иначе она врёт о принадлежности.
      */
     visibleSections() {
-      const sections = navigationSections
-        .map((section) => ({
-          key: section.key,
-          title: this.$t(`app.nav.${section.key}`),
-          items: this.filterItems(section.items),
-        }))
-        .filter((section) => section.items.length > 0)
-
-      const showHeaders = sections.length > 1
-
-      return sections.map((section) => ({ ...section, showHeader: showHeaders }))
+      return buildVisibleSections(navigationSections, this.visibilityContext)
     },
 
   },
@@ -171,11 +174,7 @@ export default {
     },
 
     fitsRole(item) {
-      const only = item?.onlyFor
-
-      if (!only) return true
-
-      return only === 'manager' ? this.isManager : !this.isManager
+      return fitsRoleBy(item, this.isManager)
     },
 
     /**

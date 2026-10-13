@@ -193,6 +193,17 @@ return [
         ],
 
         // ------------------------------------------------------------------
+        // Сертификаты
+        // ------------------------------------------------------------------
+        // Бланк сертификата — официальный документ: его настраивает тот,
+        // кто отвечает за выпуск, а не любой методист курса. Поэтому
+        // право отдельное, а не content.manage.
+        'certificates.manage' => [
+            'name' => 'Настройка бланка сертификата',
+            'group' => 'content',
+        ],
+
+        // ------------------------------------------------------------------
         // Форум
         // ------------------------------------------------------------------
         // Писать в форум может любой, у кого открыт курс, а вот
@@ -257,6 +268,7 @@ return [
             'questions.view', 'questions.manage', 'exams.take', 'exams.manage',
             'grading.manage', 'progress.view',
             'files.upload', 'content.view', 'content.manage', 'announcements.manage',
+            'certificates.manage',
             'forum.moderate',
             'dictionaries.view', 'reports.view', 'users.view',
             'tutor.use', 'tutor.manage',

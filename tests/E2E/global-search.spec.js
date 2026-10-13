@@ -53,7 +53,7 @@ async function auth(page, creds) {
 }
 
 test.describe('Глобальный поиск', () => {
-  test('находит курс и открывает его; чужой курс обучаемому не показывается', async ({ page }) => {
+  test('находит курс и открывает его; чужой курс обучаемому не показывается', async ({ page, request }) => {
     const errors = []
     page.on('pageerror', e => errors.push(e.message.split('\n')[0]))
 
@@ -183,12 +183,27 @@ test.describe('Глобальный поиск', () => {
 
       expect(errors, 'сценарий не должен давать ошибок').toEqual([])
     } finally {
-      // Порядок не важен: удаление группы каскадно снимает её записи.
-      // Но null пропускаем: конструкция выше может не дойти до конца.
-      if (otherUserId) await page.request.delete(BASE + `/api/user/${otherUserId}`, { headers })
-      if (otherGroupId) await page.request.delete(BASE + `/api/groups/${otherGroupId}`, { headers })
-      await page.request.delete(BASE + `/api/user/${userId}`, { headers })
-      await page.request.delete(BASE + `/api/groups/${groupId}`, { headers })
+      /*
+       * Уборка идёт через отдельный request-контекст, а не через
+       * page.request.
+       *
+       * page.request связан с состоянием страницы: если тест упал или
+       * оставил страницу в процессе навигации, запросы уборки
+       * вставали в очередь и падали по таймауту в 30 секунд. Из-за
+       * этого мусор оставался в боевой базе, а следующий прогон видел
+       * «чужой курс» там, где его быть не должно.
+       *
+       * Удаление не бросает исключение: уборка не должна отменять
+       * результат проверок, которые уже прошли.
+       */
+      const drop = async (url) => {
+        await request.delete(url, { headers, timeout: 15000 }).catch(() => null)
+      }
+
+      if (otherUserId) await drop(BASE + `/api/user/${otherUserId}`)
+      if (otherGroupId) await drop(BASE + `/api/groups/${otherGroupId}`)
+      await drop(BASE + `/api/user/${userId}`)
+      await drop(BASE + `/api/groups/${groupId}`)
     }
   })
 })

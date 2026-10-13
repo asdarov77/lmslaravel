@@ -414,7 +414,33 @@ class AuthController extends Controller
         // переписать ФИО и телефон сотрудника чужой группы.
         $this->authorize('update', $user);
 
-        $user->fio = request('fio');
+        /*
+         * Поля проходят валидацию, а не пишутся как request('...').
+         *
+         * Без этого длинное значение уходило прямо в БД: маска телефона
+         * отдавала «+7 (999) 000-00-00» (17 символов) в колонку
+         * varchar(16), и Postgres отвечал «String data, right
+         * truncated» — то есть форма падала с 500 на ровном месте.
+         * Теперь это 422 с понятным сообщением о поле.
+         */
+        $fields = $request->validate([
+            'fio' => ['required', 'string', 'max:150'],
+            'phonenumber' => ['nullable', 'string', 'max:16'],
+            'city' => ['nullable', 'string', 'max:25'],
+            'country' => ['nullable', 'string', 'max:30'],
+            'organization' => ['nullable', 'string', 'max:100'],
+            'position' => ['nullable', 'string', 'max:100'],
+            'rank' => ['nullable', 'string', 'max:30'],
+            'spfere' => ['nullable', 'string', 'max:100'],
+            'specialization' => ['nullable', 'string', 'max:100'],
+            'group_id' => ['nullable', 'integer', 'exists:groups,id'],
+        ], [], [
+            'fio' => 'ФИО',
+            'phonenumber' => 'телефон',
+            'group_id' => 'группа',
+        ]);
+
+        $user->fio = $fields['fio'];
         // users.role здесь НЕ пишется. Поле было свободным текстом
         // (v-combobox в UserItemEdit позволял ввести что угодно), и его
         // значение — один из двух источников роли наряду с role_user.
@@ -424,15 +450,15 @@ class AuthController extends Controller
         // Единственный писатель роли — PUT /api/user/chroll/{id}
         // (users.permissions), а из этой формы роль выводится только
         // для чтения.
-        $user->phonenumber = request('phonenumber');
-        $user->city = request('city');
-        $user->country = request('country');
-        $user->organization = request('organization');
-        $user->position = request('position');
-        $user->rank = request('rank');
-        $user->spfere = request('spfere');
-        $user->specialization = request('specialization');
-        $user->group_id = request('group_id');
+        $user->phonenumber = $fields['phonenumber'] ?? null;
+        $user->city = $fields['city'] ?? null;
+        $user->country = $fields['country'] ?? null;
+        $user->organization = $fields['organization'] ?? null;
+        $user->position = $fields['position'] ?? null;
+        $user->rank = $fields['rank'] ?? null;
+        $user->spfere = $fields['spfere'] ?? null;
+        $user->specialization = $fields['specialization'] ?? null;
+        $user->group_id = $fields['group_id'] ?? null;
         $user->save();
 
         // Раньше здесь синхронизировались права, если в теле был

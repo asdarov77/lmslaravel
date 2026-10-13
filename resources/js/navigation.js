@@ -43,6 +43,7 @@ export const navigationSections = [
       // Сертификаты видны только обучаемому: у методиста нет ни плана,
       // ни закрытых уроков, и список был бы пустым.
       { key: 'certificates', titleKey: 'app.menu.certificates', link: '/my/certificates', icon: 'mdi-certificate-outline', onlyFor: 'trainee' },
+      { key: 'gamification', titleKey: 'app.menu.gamification', link: '/gamification', icon: 'mdi-chart-line', onlyFor: 'trainee' },
     ],
   },
   {
@@ -73,6 +74,8 @@ export const navigationSections = [
       // Отчёты: видимость определяется правом reports.view из
       // meta.permission маршрута.
       { key: 'reports', titleKey: 'app.menu.reports', link: '/reports', icon: 'mdi-chart-box-outline' },
+      // Бланк сертификата: видимость по праву certificates.manage.
+      { key: 'certSettings', titleKey: 'app.menu.certSettings', link: '/certificates/settings', icon: 'mdi-file-certificate-outline' },
     ],
   },
   {

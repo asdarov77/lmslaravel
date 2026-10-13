@@ -52,8 +52,9 @@ defineProps({
   busy: { type: Boolean, default: false },
   /** Первичная загрузка сущности: полей ещё нет. */
   loading: { type: Boolean, default: false },
-  submitText: { type: String, default: 'Сохранить' },
-  cancelText: { type: String, default: 'Отмена' },
+  // Пусто = перевод берётся в FormActions; раньше дефолт был русским.
+  submitText: { type: String, default: '' },
+  cancelText: { type: String, default: '' },
   showCancel: { type: Boolean, default: true },
 })
 

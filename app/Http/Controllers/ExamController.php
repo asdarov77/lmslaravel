@@ -276,6 +276,16 @@ class ExamController extends Controller
          * попытки не отправляются, иначе лента забивалась бы шумом.
          */
         if ($passed) {
+            // XP — за экзамен, а не за попытку: пересдача после
+            // неудачи не должна платить дважды.
+            \App\Support\Gamification::award(
+                $actor,
+                'exam_passed',
+                "exam:{$exam->id}",
+                (int) $exam->course_id,
+                $attempt->submitted_at
+            );
+
             try {
                 \App\Support\Notifications::toPermission(
                     'exams.manage',

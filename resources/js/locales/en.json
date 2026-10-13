@@ -41,7 +41,9 @@
       "announcements": "Announcements",
       "schedule": "Schedule",
       "reports": "Reports",
-      "assignments": "Assignments"
+      "assignments": "Assignments",
+      "certSettings": "Certificate template",
+      "gamification": "Achievements"
     },
     "buttons": {
       "cancel": "cancel",
@@ -145,7 +147,9 @@
       "schedule": "Schedule",
       "password": "Password recovery",
       "reports": "Reports",
-      "assignments": "Assignments"
+      "assignments": "Assignments",
+      "certSettings": "Certificate template",
+      "gamification": "Achievements"
     },
     "nav": {
       "learning": "Learning",
@@ -1409,7 +1413,12 @@
     },
     "placeholder": "Type a command or section…",
     "empty": "Nothing found",
-    "hint": "Ctrl + K"
+    "hint": "Ctrl + K",
+    "density": "Interface density",
+    "keywords": {
+      "theme": "theme light dark",
+      "density": "density spacing compact"
+    }
   },
   "assignments": {
     "title": "Assignments",
@@ -1453,5 +1462,51 @@
     "fieldDue": "Due date",
     "fieldMaxScore": "Max score",
     "fieldPublish": "Publish immediately"
+  },
+  "certSettings": {
+    "pageTitle": "Certificate template",
+    "subtitle": "Organization, signatory and logo printed on the certificate",
+    "formTitle": "Template details",
+    "previewTitle": "Preview",
+    "previewFio": "Ivan Ivanovich Ivanov",
+    "previewCourse": "for the course “Aviation Safety”",
+    "previewHint": "This is how the template looks in print",
+    "logoPick": "Choose logo",
+    "logoClear": "Remove logo",
+    "fields": {
+      "organization": "Organization",
+      "signatoryName": "Signatory",
+      "signatoryTitle": "Signatory title",
+      "footerNote": "Note at the bottom",
+      "logo": "Logo"
+    },
+    "hints": {
+      "organization": "Printed at the top of the page. Left empty — a default text is used.",
+      "footerNote": "For example, “Issued without a seal mark”. Up to 500 characters."
+    },
+    "actions": {
+      "save": "Save template"
+    },
+    "errors": {
+      "load": "Could not load the template settings",
+      "save": "Could not save the template"
+    }
+  },
+  "gamification": {
+    "pageTitle": "Achievements",
+    "pageHint": "Experience, consistency and place in the group",
+    "xp": "XP",
+    "level": "Level",
+    "streakDays": "day streak",
+    "group": "Group",
+    "toNextLevel": "{need} XP to the next level",
+    "calendarHint": "A filled day means you were active that day",
+    "leaderboardTitle": "Place in the group",
+    "emptyBoard": "The leaderboard is empty",
+    "emptyBoardHint": "Points appear once you or your group start closing lessons",
+    "badgesTitle": "Achievements",
+    "badgesHint": "Achievements are granted automatically from your own data",
+    "badgeProgress": "{current} of {total}",
+    "loadFailed": "Could not load achievements"
   }
 }

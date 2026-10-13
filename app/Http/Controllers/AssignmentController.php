@@ -37,8 +37,17 @@ use Illuminate\Support\Str;
  */
 class AssignmentController extends Controller
 {
-    /** Куда кладутся работы. */
-    private const DISK = 'public';
+    /**
+     * Диск для работ обучаемых.
+     *
+     * Не 'public': работы — персональные данные, и на public disk путь
+     * вида /storage/assignments/1/12/имя открывался бы всем, кто его
+     * угадает. И не переопределённый 'private': он поднят под каталог
+     * курсов и отдаётся через nginx — работа осела бы в дереве
+     * материалов. Файл отдаётся только через проверяемый
+     * download-эндпоинт.
+     */
+    private const DISK = 'submissions';
 
     /**
      * Список заданий.
@@ -146,6 +155,15 @@ class AssignmentController extends Controller
         abort_unless((int) $assignment->group_id === (int) $actor->group_id, 403);
 
         /*
+         * Дедлайн проверяет сервер, а не форма.
+         *
+         * Форма после срока просто исчезает — это удобство, а не правило.
+         * Запрос, отправленный мимо интерфейса, принимался и попадал в
+         * журнал как вовремя сданная работа.
+         */
+        abort_if($assignment->isOverdue(), 403, 'Срок сдачи прошёл');
+
+        /*
          * Дедлайн проверяется здесь, а не только формой.
          *
          * Скрытие кнопки — это удобство, а не правило: запрос, отправленный
@@ -201,6 +219,16 @@ class AssignmentController extends Controller
         $submission->reviewer_id = null;
         $submission->reviewed_at = null;
         $submission->save();
+
+        // XP за первое задание, а не за каждую пересдачу: пересдача
+        // улучшает оценку, а не добавляет работу.
+        \App\Support\Gamification::award(
+            $actor,
+            'assignment_submitted',
+            "assignment:{$assignment->id}",
+            (int) $assignment->course_id,
+            $submission->submitted_at
+        );
 
         return response()->json([
             'data' => $this->presentSubmission($submission, $actor),
@@ -446,7 +474,7 @@ class AssignmentController extends Controller
             'user' => ($isOwn || $this->mayManage($viewer)) ? $submission->user?->fio : null,
             'file_name' => $submission->file_name,
             'file_url' => $submission->file_path && ($isOwn || $this->mayManage($viewer))
-                ? $this->fileUrl($submission->file_path)
+                ? $this->fileUrl($submission, $viewer)
                 : null,
             'comment' => $isOwn || $this->mayManage($viewer) ? $submission->comment : null,
             'score' => $isOwn || $this->mayManage($viewer) ? $submission->score : null,
@@ -457,8 +485,86 @@ class AssignmentController extends Controller
         ];
     }
 
-    private function fileUrl(string $path): string
+    /**
+     * Безопасное имя файла для заголовка ответа.
+     *
+     * Убираются только разделители пути и управляющие символы — то,
+     * что может вырваться из HTTP-заголовка. Кириллица и пробелы
+     * остаются: имя файла и должно быть похожим на то, что человек
+     * загрузил.
+     */
+    private function safeFileName(string $name): string
     {
-        return Storage::disk(self::DISK)->url($path);
+        // basename отрезает путь: '../../secret.txt' станет 'secret.txt'.
+        $clean = basename(str_replace('\\', '/', $name));
+
+        // CR/LF и прочие управляющие символы ломают заголовок ответа.
+        $clean = preg_replace('/[\x00-\x1F\x7F]/u', '', $clean) ?? '';
+        $clean = trim($clean);
+
+        return $clean === '' || $clean === '.' || $clean === '..' ? 'work' : $clean;
+    }
+
+    /**
+     * Ссылка на работу.
+     *
+     * Это не публичный URL файла, а адрес нашего download-эндпоинта:
+     * отдать Storage::url() значило бы раскрыть путь к персональной
+     * работе в ответе API.
+     */
+    private function fileUrl(AssignmentSubmission $submission, User $viewer): ?string
+    {
+        if ($submission->file_path === null) {
+            return null;
+        }
+
+        return route('assignments.download', [
+            'assignment' => $submission->assignment_id,
+            'submission' => $submission->id,
+        ]);
+    }
+
+    /**
+     * Отдача файла работы.
+     *
+     * Права проверяются на каждом скачивании: файл может быть сдан
+     * раньше, чем доступ открыт, и постоянная ссылка в истории браузера
+     * не должна переживать смену прав.
+     */
+    public function download(Request $request, Assignment $assignment, AssignmentSubmission $submission)
+    {
+        $actor = $request->user();
+        abort_if($actor === null, 401);
+
+        abort_unless((int) $submission->assignment_id === (int) $assignment->id, 404);
+
+        // Видеть работу может автор или преподаватель.
+        abort_unless(
+            (int) $submission->user_id === (int) $actor->id || $this->mayManage($actor),
+            403
+        );
+
+        abort_if($submission->file_path === null, 404);
+
+        if (! Storage::disk(self::DISK)->exists($submission->file_path)) {
+            // Файл потерян (перенос, очистка). Отдаём 404 с объяснением,
+            // а не пустой файл: иначе в журнале будет «сдано» без работы.
+            abort(404, 'Файл работы не найден в хранилище');
+        }
+
+        /*
+         * Имя для заголовка ответа.
+         *
+         * Отдаём через download, а не streamDownload, потому что второй
+         * подставляет имя как есть: «../../etc/passwd» или перевод строки
+         * в заголовке разорвали бы ответ. Поэтому имя очищается, но
+         * кириллица сохраняется — иначе «Курсовая работа.docx»
+         * скачивался бы как «___________________.docx», и человек не
+         * находил файл в своих документах.
+         */
+        return Storage::disk(self::DISK)->download(
+            $submission->file_path,
+            $this->safeFileName((string) $submission->file_name)
+        );
     }
 }

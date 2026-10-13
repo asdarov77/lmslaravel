@@ -93,7 +93,13 @@ class DatabaseSeeder extends Seeder
 
             foreach ($groupIds as $groupIndex => $groupId) {
                 foreach (array_slice($courseIds, $groupIndex, 3) as $courseId) {
-                    $row = new \App\Models\Group2learning([
+                    /*
+                     * firstOrNew, а не new: повторный запуск сидеров не
+                     * должен плодить копии записей. Три одинаковые
+                     * записи на один курс выглядят в расписании как три
+                     * отдельных периода обучения.
+                     */
+                    $row = \App\Models\Group2learning::firstOrNew([
                         'group_id' => $groupId,
                         'course_id' => $courseId,
                     ]);

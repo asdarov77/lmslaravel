@@ -25,17 +25,23 @@ class AircraftSeeder extends Seeder
          * находилось, и страница материала показывала ошибку. Значения
          * взяты из реальных каталогов, чтобы демо-курс открывался.
          */
-        DB::table('aircrafts')->insert([
-            [
-
-                'path' => 'БПЛА',
-                'title' => 'БПЛА',
-            ],
-            [
-
-                'path' => 'КЛЕН',
-                'title' => 'КЛЕН',
-            ],
-        ]);
+        /*
+         * updateOrCreate по path, а не insert.
+         *
+         * И insert, и upsert требуют уникального индекса на path,
+         * которого в схеме нет: upsert падал бы с «нет уникального
+         * ограничения… соответствующего ON CONFLICT». Повторный
+         * запуск сидеров не должен плодить копии самолётов — иначе
+         * курсы разъезжаются по двум «БПЛА».
+         */
+        foreach ([
+            ['path' => 'БПЛА', 'title' => 'БПЛА'],
+            ['path' => 'КЛЕН', 'title' => 'КЛЕН'],
+        ] as $aircraft) {
+            \Illuminate\Support\Facades\DB::table('aircrafts')->updateOrInsert(
+                ['path' => $aircraft['path']],
+                ['title' => $aircraft['title'], 'updated_at' => now()]
+            );
+        }
     }
 }

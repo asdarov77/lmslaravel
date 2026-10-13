@@ -25,6 +25,7 @@
  */
 import { computed, ref } from 'vue'
 import { useTheme } from 'vuetify'
+import { useI18n } from 'vue-i18n'
 import theme from '../../utils/theme'
 
 const vuetifyTheme = useTheme()
@@ -35,14 +36,24 @@ const vuetifyTheme = useTheme()
 const mode = ref(theme.read())
 const isDark = computed(() => vuetifyTheme.global.name.value === 'dark')
 
+const { t: $t } = useI18n()
+
+/**
+ * Подпись переключателя.
+ *
+ * Раньше здесь был `window.$t?.(...)`: в сборке Vite такого поля нет,
+ * и вместо перевода человек видел «Тема (theme.auto)» — с ключом в
+ * интерфейсе. Кроме того, suffix тоже оставался ключом. Оба значения
+ * теперь берутся из локализации.
+ */
 const label = computed(() => {
-  const suffix = {
+  const suffixKey = {
     light: 'theme.light',
     dark: 'theme.dark',
     auto: 'theme.auto',
-  }[mode.value]
+  }[mode.value] ?? 'theme.auto'
 
-  return `${window.$t?.('theme.label') || 'Тема'} (${suffix})`
+  return `${$t('theme.label')} (${$t(suffixKey)})`
 })
 
 const icon = computed(() => {

@@ -34,7 +34,7 @@ class CourseSeeder extends Seeder
 
         $index = 0;
 
-        DB::table('courses')->insert([
+        $rows = [
                     [
                         'title' => "Подготовка и выполнение полета. Боевое применение",
                         'short_description' => 'курсы для летчика',
@@ -157,6 +157,30 @@ class CourseSeeder extends Seeder
                     ],
                     
                     
-                ]);
+                ];
+
+        /*
+         * updateOrCreate по path, а не пакетный insert.
+         *
+         * courses.path — естественный ключ курса: по нему строится путь
+         * к материалам. Повторный запуск сидеров обновляет курс, а не
+         * добавляет второй с тем же path, из-за чего в каталоге
+         * появлялись дубли одного и того же курса.
+         */
+        foreach ($rows as $row) {
+            DB::table('courses')->updateOrInsert(
+                ['path' => $row['path']],
+                [
+                    'title' => $row['title'],
+                    'short_description' => $row['short_description'],
+                    'long_description' => $row['long_description'],
+                    // aircraft_id тоже обновляем: категория курса могла
+                    // смениться, и без этого курс остался бы на старом
+                    // самолёте, а каталог группировал бы его неверно.
+                    'aircraft_id' => $row['aircraft_id'] ?? null,
+                    'updated_at' => now(),
+                ]
+            );
+        }
             }
         }

@@ -78,7 +78,7 @@
           color="primary"
           class="mt-3"
           :loading="saving"
-          :disabled="!comment.trim()"
+          :disabled="!comment.trim() && !file"
           data-test="assignment-send"
           @click="submit"
         >

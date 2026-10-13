@@ -30,6 +30,7 @@ use App\Http\Controllers\AircraftController;
 use App\Http\Controllers\CoursesListController;
 use App\Http\Controllers\ManagerDashboardController;
 use App\Http\Controllers\CertificateController;
+use App\Http\Controllers\GamificationController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\ForgotPasswordController;
@@ -223,6 +224,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // Сертификаты об окончании курса. Печатная HTML-страница, а не
     // PDF-файл: генератора PDF в проекте нет, а печать браузером даёт
     // тот же документ с тем же проверочным кодом.
+    // Геймификация: свои показатели и лидерборд группы.
+    Route::get('/gamification/me', [GamificationController::class, 'me']);
+    // Настройки бланка: отдельное право certificates.manage.
+    Route::get('/certificates/settings', [CertificateController::class, 'settings']);
+    Route::put('/certificates/settings', [CertificateController::class, 'updateSettings']);
     Route::get('/my/certificates', [CertificateController::class, 'index']);
     Route::get('/my/certificates/{course}', [CertificateController::class, 'show'])
         ->whereNumber('course');
@@ -617,6 +623,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/assignments/{assignment}/submissions/{submission}', [AssignmentController::class, 'review'])
         ->whereNumber('assignment')
         ->whereNumber('submission');
+    // Скачивание работы идёт через проверяемый эндпоинт: на public
+    // диске путь к файлу был бы доступен всем, кто его угадает.
+    Route::get('/assignments/{assignment}/submissions/{submission}/download', [AssignmentController::class, 'download'])
+        ->whereNumber('assignment')
+        ->whereNumber('submission')
+        ->name('assignments.download');
 });
 
 // Отчёты и аналитика. Право reports.view; инструктор дополнительно

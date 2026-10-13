@@ -147,6 +147,19 @@ import EmptyState from '../../components/ui/EmptyState.vue'
 import PageHeader from '../../components/ui/PageHeader.vue'
 
 /**
+ * Строки из ответа любой формы: голый массив, конверт { data }, либо
+ * пагинатор { data: [...] }. Раньше каждая страница разбирала это по-своему,
+ * и половина списков была пустой без видимой причины.
+ */
+function rowsOf(payload) {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.data)) return payload.data
+  if (Array.isArray(payload?.items)) return payload.items
+
+  return []
+}
+
+/**
  * Домашние задания.
  *
  * Список один и тот же для обеих ролей, различается он тем, что
@@ -167,15 +180,30 @@ export default {
     }
   },
   computed: {
+    /**
+     * Может ли пользователь создавать и проверять задания.
+     *
+     * Раньше здесь стояло `Auth/groups.includes('manage')` — геттера с
+     * таким именем не существует, условие всегда было ложным, и кнопка
+     * «Создать задание» не появлялась ни у кого. Теперь используются
+     * штатные геттеры: право ИЛИ роль, как в меню и на дашборде.
+     */
     canManage() {
-      const perms = this.$store?.getters?.['Auth/permissionSlugs'] || []
-      const groups = this.$store?.getters?.['Auth/groups'] || []
+      const can = this.$store?.getters?.['Auth/can']
+      const isSuperAdmin = this.$store?.getters?.['Auth/isSuperAdmin']
 
-      return perms.some((slug) => ['grading.manage', 'groups.manage', 'courses.manage'].includes(slug)) && groups.includes('manage')
-    },
+      if (isSuperAdmin) return true
 
-    userGroupId() {
-      return this.$store?.state?.Auth?.user?.group_id ?? null
+      // can() уже умеет «любое из прав», но осторожность не лишняя:
+      // если его нет (например, в тесте без полного модуля), остаётся
+      // проверка по правам из state.
+      if (typeof can === 'function') {
+        return can('grading.manage', 'groups.manage', 'courses.manage')
+      }
+
+      const perms = this.$store?.state?.Auth?.permissionSlugs || []
+
+      return perms.some((slug) => ['grading.manage', 'groups.manage', 'courses.manage'].includes(slug))
     },
   },
   async mounted() {
@@ -199,7 +227,14 @@ export default {
       }
     },
 
-    /** Справочники для формы: курсы и группы. */
+    /**
+     * Справочники для формы: курсы и группы.
+     *
+     * Разбор ответа терпимый к обоим видам конверта: unwrapResponse уже
+     * снимает оболочку, поэтому ответ может быть как массивом, так и
+     * пагинатором с data/meta. Раньше бралось `payload.data` от
+     * unwrapped-объекта, и список курсов был пуст всегда.
+     */
     async loadOptions() {
       const [coursesRes, groupsRes] = await Promise.allSettled([
         $api.get('/api/courses', { params: { per_page: 100 } }),
@@ -207,13 +242,14 @@ export default {
       ])
 
       if (coursesRes.status === 'fulfilled') {
-        const payload = unwrapResponse(coursesRes.value) || {}
-        this.courses = (payload.data || []).map((c) => ({ id: c.id, name: c.title }))
+        this.courses = rowsOf(unwrapResponse(coursesRes.value)).map((c) => ({ id: c.id, name: c.title }))
       }
 
       if (groupsRes.status === 'fulfilled') {
-        const payload = unwrapResponse(groupsRes.value) || {}
-        this.groups = (payload.data || []).map((g) => ({ id: g.id, name: g.groupname || g.name }))
+        this.groups = rowsOf(unwrapResponse(groupsRes.value)).map((g) => ({
+          id: g.id,
+          name: g.groupname || g.name,
+        }))
       }
     },
 

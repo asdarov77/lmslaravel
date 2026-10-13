@@ -60,6 +60,23 @@ return [
 // В итоге Storage::exists('private/<самолёт>/<АУК>/imsmanifest.xml') и
 // отдача index.html всегда смотрели в несуществующий storage/app/private/
 // и возвращали 404: ни импорт курсов в БД, ни просмотр материалов не работали.
+        /*
+         * Работы по домашним заданиям.
+         *
+         * Отдельный диск, а не переиспользованный 'private': тот
+         * перенаправлен под каталог курсов (root = courses_path), и
+         * файл работы осел бы в дереве материалов, отдаваемом через
+         * nginx. Здесь root — свой каталог, а visibility private:
+         * работы персональные и отдаются только через проверяемый
+         * эндпоинт контроллера.
+         */
+        'submissions' => [
+            'driver' => 'local',
+            'root' => storage_path('app/submissions'),
+            'visibility' => 'private',
+            'throw' => false,
+        ],
+
         'private' => [
             'driver' => 'local',
             // root = родитель app.courses_path, потому что все пути в коде
