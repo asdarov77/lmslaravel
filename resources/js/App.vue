@@ -1,5 +1,6 @@
 <script setup>
 import { useI18n } from "vue-i18n";
+import PageTransition from "./components/ui/PageTransition.vue";
 const { t } = useI18n({ useScope: "global" });
 </script>
 
@@ -13,16 +14,18 @@ const { t } = useI18n({ useScope: "global" });
   -->
   <v-app :class="{ 'app--course': isCourseView }"
     >
-    <v-app-bar color="primary" prominence="prominent">
+    <v-app-bar class="app__bar" prominence="prominent">
       <v-app-bar-nav-icon
         v-if="checkLeftSideMenu()"
         variant="text"
+        :aria-label="$t('app.menu.main')"
+        :title="$t('app.menu.main')"
         @click.stop="drawer = !drawer"
       ></v-app-bar-nav-icon>
       <!-- tag="span" // in app-bar-title ?-->
       <v-app-bar-title>
         <router-link to="/" class="app__brand" :aria-label="$t('app.title')">
-          <app-brand :full="true" />
+          <app-brand :full="true" :on-primary="true" />
         </router-link>
       </v-app-bar-title>
       <!--
@@ -95,7 +98,15 @@ const { t } = useI18n({ useScope: "global" });
     >
       <left-side-menu v-if="loggedIn "></left-side-menu>
     </v-navigation-drawer>
-    <v-main>
+    <!--
+      Skip-ссылка. Без неё переход к содержимому страницы с клавиатуры
+      требовал пройти табом через все пункты меню — на разделе
+      «Управление» это два десятка остановок до первого заголовка.
+      Показывается только при фокусе, поэтому в интерфейсе её не видно.
+    -->
+    <a class="app__skip-link" href="#app-main">{{ $t('app.skipToContent') }}</a>
+
+    <v-main id="app-main" tabindex="-1">
       <!--
         Скелетон загрузки.
         
@@ -117,7 +128,9 @@ const { t } = useI18n({ useScope: "global" });
             ничего не рисует.
         -->
         <breadcrumbs />
-        <router-view></router-view>
+        <PageTransition name="page" mode="out-in" :enter-duration="200" :leave-duration="150">
+          <router-view></router-view>
+        </PageTransition>
       </v-container>
     </v-main>
     <!--
@@ -176,6 +189,7 @@ const { t } = useI18n({ useScope: "global" });
       действия («Сохранено») пользователь не успевал увидеть. Здесь
       сообщения переживают навигацию.
     -->
+    <mobile-bottom-nav :logged-in="loggedIn" :is-trainee="isTrainee" />
     <ToastStack />
 
     <!--
@@ -212,6 +226,7 @@ import ThemeToggle from './components/ui/ThemeToggle.vue';
 import AppBrand from './components/ui/AppBrand.vue';
 import ToastStack from './components/ui/ToastStack.vue';
 import NotificationBell from './components/ui/NotificationBell.vue';
+import MobileBottomNav from './components/ui/MobileBottomNav.vue';
 import density from './utils/density';
 import theme from './utils/theme'
 import vuetify from './Vuetify';
@@ -235,15 +250,71 @@ function readDrawer() {
 }
 
 export default {
-  components: { AppBrand, Breadcrumbs, GlobalSearch, ThemeToggle, ToastStack, NotificationBell, CommandPalette },
+  name: 'App',
+
+  /*
+   * ВНИМАНИЕ: объявления Options API здесь ровно ОДИН раз каждый.
+   *
+   * В этом файле стояло по два блока `data` и по два `computed`.
+   * В объектном литерале JS повторный ключ просто перетирает
+   * предыдущий, и «молча»: без ошибки сборки. Выигрывал ВТОРОЙ
+   * блок, поэтому терялись paletteOpen, requiredBy,
+   * isManagerUser, visibleNavigation и paletteCommands — а кнопка
+   * палитры команд в шапке (@click="paletteOpen = true") не
+   * открывала ничего. Теперь дублей нет; если понадобится новое
+   * состояние — дописывается сюда.
+   */
+  components: {
+    AppBrand,
+    LeftSideMenu,
+    AccountMenu,
+    Breadcrumbs,
+    GlobalSearch,
+    CommandPalette,
+    ThemeToggle,
+    ToastStack,
+    NotificationBell,
+    MobileBottomNav,
+  },
 
   data() {
     return {
-      // Палитра команд открывается по Ctrl/Cmd+K и по клику на строку
-      // подсказки поиска.
+      // Палитра команд открывается по клику на кнопку в шапке.
       paletteOpen: false,
       // Индекс прав по ссылкам: тот же источник, что у меню.
       requiredBy: routePermissionIndex(),
+
+      /*
+       * Состояние меню берётся из LocalStorage: см. watcher drawer.
+       * При отсутствии значения (первый визит) меню открыто, как раньше.
+       */
+      drawer: readDrawer(),
+      tab: true,
+      courseItemShow: false,
+      courseItemManiShow: false,
+      /*
+       * Флаг загрузки приложения.
+       *
+       * Объявлялся и не использовался: пока грузились данные, страница
+       * оставалась пустой, и это выглядело как «приложение зависло».
+       * Теперь по нему рисуется скелетон (см. шаблон).
+       */
+      isLoading: true,
+
+      /*
+       * Ширина окна — в состоянии, а не вычисляется прямо из matchMedia.
+       *
+       * Раньше `isNarrow` был computed без единой реактивной зависимости:
+       * он читал window.matchMedia и зависел только от неё. Vue
+       * вычислял его ОДИН раз и больше не пересчитывал, потому что
+       * изменение размера окна не отслеживал никто. Следствие: открыли
+       * страницу на широком экране, сузили окно или открыли на телефоне —
+       * меню оставалось постоянным и резервировало 300px из 500px
+       * экрана, то есть на телефоне уезжало почти всё место. Теперь
+       * размер приходит из состояния, который обновляется по событию
+       * resize (см. onResize), и вычисление честно пересчитывается.
+       */
+      viewportWidth: typeof window === 'undefined' ? 1280 : window.innerWidth,
     };
   },
 
@@ -317,6 +388,57 @@ export default {
 
       return commands;
     },
+    /*
+     * Открыт ли учебный экран курса.
+     *
+     * На странице курса шапка и футер не нужны: это полноэкранный
+     * просмотр материала. Раньше они скрывались через v-show по флагу,
+     * и при переходе мигали. Теперь это вариант раскладки.
+     */
+    isCourseView() {
+      return (
+        this.$route?.name === 'courses.item' ||
+        this.$route?.name === 'courses.itemmani'
+      );
+    },
+
+    /*
+     * Узкий экран — это телефон/планшет. На нём меню должно
+     * перекрывать контент по требованию, а не вытеснять его.
+     */
+    isNarrow() {
+      return this.viewportWidth <= 900;
+    },
+
+    /**
+     * Ширина панели меню — ЧИСЛОМ, и это не stylistic выбор.
+     *
+     * Vuetify считает ширину как `Number(props.width)`
+     * (VNavigationDrawer.js). Строка "300px" даёт `Number("300px")` =
+     * NaN, и NaN уходит в layout: v-main получал
+     * `--v-layout-left: NaN` и НЕ резервировал место под меню. Панель
+     * при этом оставалась слева, а содержимое начиналось с нуля — левое
+     * меню лежало поверх заголовков, хлебных крошек и кнопок, и по ним
+     * нельзя было нажать. Симптом выглядел как «страница сломана» и
+     * «тест не находит кнопку», хотя разметка была правильной.
+     *
+     * Поэтому токен читается и сразу переводится в число. Значение
+     * по умолчанию продублировано на случай, если токен не задан.
+     */
+    drawerWidth() {
+      const name = this.isNarrow
+        ? "--layout-drawer-width-mobile"
+        : "--layout-drawer-width";
+
+      const raw = getComputedStyle(document.documentElement).getPropertyValue(name);
+      const px = Number.parseFloat(raw);
+
+      return Number.isFinite(px) && px > 0 ? px : 300;
+    },
+
+    ...mapGetters("Auth", ["loggedIn", "isTrainee"]),
+    ...mapState("Ui", ["menudrawler", "language", "density"]),
+    ...mapState("Auth", ["user"]),
   },
 
   mounted() {
@@ -424,106 +546,20 @@ export default {
 
   },
 
-  name: "App",
-  data: () => ({
-    /*
-     * Состояние меню берётся из LocalStorage: см. watcher drawer.
-     * При отсутствии значения (первый визит) меню открыто, как раньше.
-     */
-    drawer: readDrawer(),
-    tab: true,
-    courseItemShow: false,
-    courseItemManiShow: false,
-    /*
-     * Флаг загрузки приложения.
-     *
-     * Объявлялся и не использовался: пока грузились данные, страница
-     * оставалась пустой, и это выглядело как «приложение зависло».
-     * Теперь по нему рисуется скелетон (см. шаблон).
-     */
-    isLoading: true,
-
-    /*
-     * Ширина окна — в состоянии, а не вычисляется прямо из matchMedia.
-     *
-     * Раньше `isNarrow` был computed без единой реактивной зависимости:
-     * он читал window.matchMedia и зависел только от неё. Vue
-     * вычислял его ОДИН раз и больше не пересчитывал, потому что
-     * изменение размера окна не отслеживал никто. Следствие: открыли
-     * страницу на широком экране, сузили окно или открыли на телефоне —
-     * меню оставалось постоянным и резервировало 300px из 500px
-     * экрана, то есть на телефоне уезжало почти всё место. Теперь
-     * размер приходит из состояния, который обновляется по событию
-     * resize (см. onResize), и вычисление честно пересчитывается.
-     */
-    viewportWidth: typeof window === 'undefined' ? 1280 : window.innerWidth,
-  }),
-  components: { LeftSideMenu, AccountMenu },
-
-  //----------сохранение в session storage----------------
-
-  computed: {
-    /*
-     * Открыт ли учебный экран курса.
-     *
-     * На странице курса шапка и футер не нужны: это полноэкранный
-     * просмотр материала. Раньше они скрывались через v-show по флагу,
-     * и при переходе мигали. Теперь это вариант раскладки.
-     */
-    isCourseView() {
-      return (
-        this.$route?.name === 'courses.item' ||
-        this.$route?.name === 'courses.itemmani'
-      );
-    },
-
-    /*
-     * Узкий экран — это телефон/планшет. На нём меню должно
-     * перекрывать контент по требованию, а не вытеснять его.
-     */
-    isNarrow() {
-      return this.viewportWidth <= 900;
-    },
-
-    /**
-     * Ширина панели меню — ЧИСЛОМ, и это не stylistic выбор.
-     *
-     * Vuetify считает ширину как `Number(props.width)`
-     * (VNavigationDrawer.js). Строка "300px" даёт `Number("300px")` =
-     * NaN, и NaN уходит в layout: v-main получал
-     * `--v-layout-left: NaN` и НЕ резервировал место под меню. Панель
-     * при этом оставалась слева, а содержимое начиналось с нуля — левое
-     * меню лежало поверх заголовков, хлебных крошек и кнопок, и по ним
-     * нельзя было нажать. Симптом выглядел как «страница сломана» и
-     * «тест не находит кнопку», хотя разметка была правильной.
-     *
-     * Поэтому токен читается и сразу переводится в число. Значение
-     * по умолчанию продублировано на случай, если токен не задан.
-     */
-    drawerWidth() {
-      const name = this.isNarrow
-        ? "--layout-drawer-width-mobile"
-        : "--layout-drawer-width";
-
-      const raw = getComputedStyle(document.documentElement).getPropertyValue(name);
-      const px = Number.parseFloat(raw);
-
-      return Number.isFinite(px) && px > 0 ? px : 300;
-    },
-
-    ...mapGetters("Auth", ["loggedIn", "isTrainee"]),
-    ...mapState("Ui", ["menudrawler", "language", "density"]),
-    ...mapState("Auth", ["user"]),
-
-  },
 watch: {
   '$route' (){
-    if(this.$route.name === 'courses.item') this.drawer=false;
+    /*
+     * Раньше здесь стояло `if (name === 'courses.item') this.drawer = false`
+     * — одностороннее закрытие панели: зайти на страницу курса было
+     * можно один раз, обратно меню уже не открывалось (openBranding и
+     * прочие кнопки drawer не трогали). Управление панелью теперь только
+     * у пользователя: кнопка в шапке и состояние в localStorage.
+     */
     if(this.$route.name !== "courses.item") this.courseItemShow=true;
     if(this.$route.name !== 'courses.itemmani') this.courseItemManiShow=true;
   },
 
-}  
+}
 };
 
 </script>
