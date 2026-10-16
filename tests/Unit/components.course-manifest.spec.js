@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
 
 /**
  * Страница материала курса (CourseManifest).
@@ -360,5 +361,44 @@ describe('CourseManifest: без ошибок в консоли', () => {
 
     const fatal = consoleErrors.filter((line) => !/Failed to load resource/.test(line))
     expect(fatal, `ошибки в консоли: ${fatal.join('; ')}`).toEqual([])
+  })
+})
+
+/*
+ * Фаза 3.4: страница материала перестала быть источником истины по
+ * цвету.
+ *
+ * Линтер столбов относит CourseManifest к файлам-наследии и потому
+ * лишь предупреждает о hex-цветах, а не запрещает их. Проверка жёстче:
+ * страница должна держаться на токенах, иначе в тёмной теме панель
+ * инструментов и подсветка миниатюры остаются светлыми пятнами.
+ */
+describe('CourseManifest: цвет только из токенов', () => {
+  const read = () => readFileSync('resources/js/Pages/CourseManifest.vue', 'utf-8')
+
+  it('не содержит hex-цветов в стилях и скрипте', () => {
+    const source = read()
+    // HTML-сущности вроде &#9650; — это стрелки, а не цвета.
+    const hex =
+      source.match(/#[0-9a-fA-F]{3,6}\b/g)?.filter((m) => !source.includes(`&#${m.slice(1)};`)) ?? []
+
+    expect(hex, `найдены hex-цвета: ${hex.join(', ')}`).toHaveLength(0)
+  })
+
+  it('панель инструментов окрашена токенами', () => {
+    const source = read()
+    const toolbar = source.slice(source.indexOf('.cm-toolbar {'), source.indexOf('.cm-toolbar__group'))
+
+    expect(toolbar).toContain('var(--c-border)')
+    expect(toolbar).toContain('var(--c-surface-2)')
+  })
+
+  it('мёртвые методы подсветки миниатюры удалены', () => {
+    // showthumb/hidethumb нигде не вызывались и только динамически
+    // красили узлы в серый — в тёмной теме это было серое пятно.
+    const source = read()
+
+    expect(source).not.toContain('showthumb')
+    expect(source).not.toContain('hidethumb')
   })
 })

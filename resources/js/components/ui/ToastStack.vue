@@ -31,6 +31,18 @@
         <span class="toast-stack__text">{{ item.text }}</span>
 
         <!--
+          Счётчик повторов. Сообщение, поднятое несколько раз подряд
+          (несколько запросов упали с одной ошибкой), показывается ОДИН
+          раз с числом — иначе на экране появлялась стопка из
+          одинаковых тостов (проверено: до шести на одной странице).
+        -->
+        <span
+          v-if="item.count > 1"
+          class="toast-stack__count"
+          :aria-label="$t('common.toastRepeat', { n: item.count })"
+        >×{{ item.count }}</span>
+
+        <!--
           Кнопка действия — «Отменить» после удаления и подобное.
           Она появляется только когда действие передано, поэтому пустого
           серого прямоугольника в тосте нет.
@@ -121,6 +133,16 @@ export default {
   font-size: 0.9rem;
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+/* Счётчик повторов: ×3 рядом с текстом, чтобы не плодить тосты. */
+.toast-stack__count {
+  flex: 0 0 auto;
+  align-self: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  opacity: 0.75;
+  padding-inline: 2px;
 }
 
 .toast-stack__action {

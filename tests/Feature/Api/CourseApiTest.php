@@ -325,12 +325,12 @@ class CourseApiTest extends TestCase
         $this->assertCount(2, $json['data']);
     }
 
-    /** Находка: AukstructureController::show — пустая заглушка, всегда 200. */
-    public function test_aukstructure_show_is_a_stub_returning_200()
+    /** AukstructureController::show — возвращает 404 для несуществующего. */
+    public function test_aukstructure_show_returns_404_for_missing()
     {
         $this->admin();
 
-        $this->getJson('/api/aukstructure/999999')->assertStatus(200);
+        $this->getJson('/api/aukstructure/999999')->assertStatus(404);
     }
 
     // ------------------------------------------------------------------ CITY

@@ -148,6 +148,24 @@ class ExamController extends Controller
     }
 
     /**
+     * Получение одного экзамена.
+     *
+     * GET /api/exams/{exam}
+     */
+    public function show($id)
+    {
+        $exam = Exam::with(['course', 'module', 'category', 'group'])->findOrFail($id);
+
+        if (! $this->manages($request->user()) && ! $this->assignedTo($exam, $request->user())) {
+            return $this->fail('Экзамен недоступен', 403);
+        }
+
+        return response()->json([
+            'data' => $this->present($exam, $request->user()),
+        ]);
+    }
+
+    /**
      * Вопросы экзамена БЕЗ правильных ответов.
      *
      * GET /api/exams/{exam}/questions
@@ -282,7 +300,7 @@ class ExamController extends Controller
                 $actor,
                 'exam_passed',
                 "exam:{$exam->id}",
-                (int) $exam->course_id,
+                $exam->course_id,
                 $attempt->submitted_at
             );
 
@@ -307,6 +325,35 @@ class ExamController extends Controller
             }
         }
 
+        // Разбор по вопросам: собираем детальную информацию для каждого ответа
+        $questionDetails = [];
+        foreach ($validated['answers'] as $given) {
+            $questionId = (int) $given['question_id'];
+            $answerId = (int) $given['answer_id'];
+
+            if (! $correctIds->contains($questionId)) {
+                continue;
+            }
+
+            $question = DB::table('questions')->where('id', $questionId)->first();
+            $answer = DB::table('answers')->where('id', $answerId)->first();
+            $correctAnswer = DB::table('answers')
+                ->where('question_id', $questionId)
+                ->where('is_correct', true)
+                ->first();
+
+            if ($question) {
+                $questionDetails[] = [
+                    'question_id' => $questionId,
+                    'question_text' => $question->question_text,
+                    'given_answer_id' => $answerId,
+                    'given_answer_text' => $answer?->answer ?? null,
+                    'is_correct' => $answer?->is_correct ?? false,
+                    'correct_answer_text' => $correctAnswer?->answer ?? null,
+                ];
+            }
+        }
+
         return response()->json([
             'data' => [
                 'attempt_id' => $attempt->id,
@@ -317,6 +364,7 @@ class ExamController extends Controller
                 'passing_score' => (float) $exam->passing_score,
                 'question_limit' => $exam->question_limit,
                 'attempts_left' => max(0, $exam->max_attempts - $exam->attempts()->where('user_id', $actor->id)->count()),
+                'question_details' => $questionDetails,
             ],
         ], 201);
     }

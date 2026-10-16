@@ -15,8 +15,7 @@
     value-prop="value"
     group-label="group"
     group-values="values"
-    object
-    @update:model-value="$emit('update:modelValue', $event)"
+    @update:model-value="onUpdate"
     @blur="$emit('blur', $event)"
   />
 </template>
@@ -35,7 +34,7 @@ import '@vueform/multiselect/themes/default.css'
  * options — [{ value, label }] или [{ label, values: [...] }] для
  * группировки. Значение наружу: id или массив id.
  */
-defineProps({
+const props = defineProps({
   modelValue: { type: [Array, String, Number, null], default: null },
   options: { type: Array, default: () => [] },
   multiple: { type: Boolean, default: true },
@@ -46,7 +45,29 @@ defineProps({
   noResultsText: { type: String, default: 'Ничего не найдено' },
 })
 
-defineEmits(['update:modelValue', 'blur'])
+const emit = defineEmits(['update:modelValue', 'blur'])
+
+/**
+ * Приводим ответ библиотеки к контракту компонента: массив ЗНАЧЕНИЙ.
+ *
+ * Зачем: @vueform/multiselect в этой версии отдаёт объект опции
+ * ({ value, label }) и одиночный объект вместо массива при multiple.
+ * Наружу уходил объект, значение не доходило до формы — категория
+ * «выбиралась», но поле оставалось пустым, и шаг не пропускал
+ * валидацию. Форма работает со значениями (id), а не с объектами:
+ * объекты нужны только для отображения.
+ */
+const onUpdate = (value) => {
+  const raw = Array.isArray(value) ? value : value === null || value === undefined ? [] : [value]
+
+  const list = raw.map((item) => {
+    if (item && typeof item === 'object') return item.value ?? item.id ?? item.label ?? item
+
+    return item
+  })
+
+  emit('update:modelValue', props.multiple ? list : list[0] ?? null)
+}
 </script>
 
 <style scoped>

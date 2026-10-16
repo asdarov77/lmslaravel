@@ -60,6 +60,37 @@
       </p>
       <p v-else class="u-page__subtitle">{{ $t("exams.attemptsExhausted") }}</p>
 
+      <!-- Разбор по вопросам -->
+      <div v-if="result.question_details?.length" class="runner__review">
+        <h3 class="runner__review-title">{{ $t("exams.reviewTitle") }}</h3>
+        <div
+          v-for="(detail, idx) in result.question_details"
+          :key="detail.question_id"
+          class="runner__review-item"
+          :class="detail.is_correct ? 'runner__review-item--correct' : 'runner__review-item--wrong'"
+        >
+          <div class="runner__review-header">
+            <span class="runner__review-number">{{ idx + 1 }}.</span>
+            <span class="runner__review-question">{{ detail.question_text }}</span>
+            <v-icon
+              :icon="detail.is_correct ? 'mdi-check-circle' : 'mdi-close-circle'"
+              size="18"
+              :aria-label="detail.is_correct ? $t('exams.correctAnswer') : $t('exams.wrongAnswer')"
+            />
+          </div>
+          <div class="runner__review-body">
+            <p class="runner__review-line">
+              <span class="runner__review-label">{{ $t("exams.yourAnswer") }}:</span>
+              <span>{{ detail.given_answer_text || $t("exams.noAnswer") }}</span>
+            </p>
+            <p v-if="!detail.is_correct" class="runner__review-line">
+              <span class="runner__review-label">{{ $t("exams.correctAnswer") }}:</span>
+              <span class="runner__review-correct">{{ detail.correct_answer_text }}</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div class="runner__result-actions">
         <v-btn color="primary" variant="flat" :to="{ name: 'exams.mine' }">
           {{ $t("exams.backToList") }}
@@ -68,6 +99,18 @@
     </section>
 
     <section v-else class="runner">
+      <!-- Таймер-кольцо -->
+      <div v-if="timeLimit > 0" class="runner__timer">
+        <ProgressRing
+          :progress="timeProgress"
+          :color="timeColor"
+          :size="48"
+          :stroke-width="4"
+        >
+          <span class="runner__timer-text">{{ formattedTimeLeft }}</span>
+        </ProgressRing>
+      </div>
+
       <div class="runner__progress">
         <span class="u-page__subtitle">
           {{ $t("exams.progress", { current: currentIndex + 1, total: questions.length }) }}
@@ -75,6 +118,25 @@
         <span class="u-page__subtitle">
           {{ $t("exams.answeredOf", { answered: answeredCount, total: questions.length }) }}
         </span>
+      </div>
+
+      <!-- Навигатор вопросов -->
+      <div v-if="questions.length > 1" class="runner__navigator">
+        <button
+          v-for="(q, idx) in questions"
+          :key="q.id"
+          class="runner__nav-dot"
+          :class="{
+            'runner__nav-dot--current': idx === currentIndex,
+            'runner__nav-dot--answered': isAnswered(q.id),
+            'runner__nav-dot--marked': markedQuestions.includes(q.id)
+          }"
+          :aria-label="$t('exams.goToQuestion', { number: idx + 1 })"
+          :aria-current="idx === currentIndex ? 'true' : undefined"
+          @click="currentIndex = idx"
+        >
+          {{ idx + 1 }}
+        </button>
       </div>
 
       <div class="u-card runner__question">
@@ -107,6 +169,19 @@
 
           <v-btn
             v-if="currentIndex < questions.length - 1"
+            variant="text"
+            @click="toggleMark(currentQuestion?.id)"
+          >
+            <v-icon
+              :icon="isMarked(currentQuestion?.id) ? 'mdi-bookmark' : 'mdi-bookmark-outline'"
+              size="18"
+              aria-hidden="true"
+            ></v-icon>
+            {{ isMarked(currentQuestion?.id) ? $t("exams.unmark") : $t("exams.mark") }}
+          </v-btn>
+
+          <v-btn
+            v-if="currentIndex < questions.length - 1"
             color="primary"
             variant="flat"
             @click="currentIndex += 1"
@@ -121,7 +196,7 @@
             variant="flat"
             :loading="submitting"
             :disabled="!allAnswered"
-            @click="submit"
+            @click="confirmSubmit"
           >
             <v-icon start icon="mdi-check" size="18" aria-hidden="true"></v-icon>
             {{ $t("exams.finish") }}
@@ -130,6 +205,27 @@
 
         <p v-if="!allAnswered" class="runner__hint">{{ $t("exams.answerAll") }}</p>
       </div>
+
+      <!-- Диалог подтверждения завершения -->
+      <v-dialog v-model="showConfirmDialog" max-width="400">
+        <v-card>
+          <v-card-title>{{ $t("exams.confirmTitle") }}</v-card-title>
+          <v-card-text>
+            <p>{{ $t("exams.confirmText", { answered: answeredCount, total: questions.length }) }}</p>
+            <p v-if="!allAnswered" class="runner__confirm-warning">
+              {{ $t("exams.confirmWarning") }}
+            </p>
+          </v-card-text>
+          <v-card-actions>
+            <v-btn variant="text" @click="showConfirmDialog = false">
+              {{ $t("common.cancel") }}
+            </v-btn>
+            <v-btn color="success" variant="flat" @click="submit">
+              {{ $t("exams.finish") }}
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </section>
 
   </div>
@@ -138,31 +234,14 @@
 <script>
 import PageHeader from "../../components/ui/PageHeader.vue";
 import EmptyState from "../../components/ui/EmptyState.vue";
-import examApi from "../../api/exam.api";
+import ProgressRing from "../../components/ui/ProgressBarRing.vue";
+import * as examApi from "../../api/exam.api";
 import { toast } from "../../composables/useToast";
 
-/**
- * Прохождение экзамена.
- *
- * Отдельный компонент, а не доработка Pages/Gift/ExamineItem.vue, потому
- * что там результат считался В БРАУЗЕРЕ:
- *
- *   const correctAnswerId = question.answers.find(a => a.is_correct).id
- *
- * а /api/questions отдавал все ответы вместе с is_correct. Итог: «сдать»
- * экзамен можно было не отвечая — достаточно прочитать правильные ответы
- * из JSON-ответа. Плюс submitTest() был написан, но ни разу не вызван, а
- * маршрута /api/student-answers не существовало, поэтому результаты
- * нигде не сохранялись.
- *
- * Здесь вопросы берутся из /exams/{id}/questions, где is_correct нет, а
- * проверка и вердикт считаются сервером. Клиент показывает то, что
- * вернули, и изменить это не может.
- */
 export default {
   name: "ExamRunner",
 
-  components: { PageHeader, EmptyState },
+  components: { PageHeader, EmptyState, ProgressRing },
 
   props: {
     idEdit: { type: Number, required: true },
@@ -178,6 +257,11 @@ export default {
       submitting: false,
       loadError: "",
       result: null,
+      timeLimit: 0,
+      timeLeft: 0,
+      timerInterval: null,
+      markedQuestions: [],
+      showConfirmDialog: false,
     };
   },
 
@@ -198,10 +282,31 @@ export default {
       const parts = [this.exam.module_title, this.exam.category_title].filter(Boolean);
       return parts.length ? parts.join(" · ") : this.$t("exams.take.subtitle");
     },
+
+    timeProgress() {
+      if (this.timeLimit <= 0) return 0;
+      return Math.max(0, Math.min(1, this.timeLeft / this.timeLimit));
+    },
+
+    timeColor() {
+      if (this.timeLeft < 300) return 'var(--c-danger)';
+      if (this.timeLeft < 600) return 'var(--c-warning)';
+      return 'var(--c-primary)';
+    },
+
+    formattedTimeLeft() {
+      const mins = Math.floor(this.timeLeft / 60);
+      const secs = this.timeLeft % 60;
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    },
   },
 
   created() {
     this.load();
+  },
+
+  beforeUnmount() {
+    this.stopTimer();
   },
 
   methods: {
@@ -216,13 +321,39 @@ export default {
 
         if (!bundle.questions.length) {
           this.loadError = this.$t("exams.noQuestions");
+        } else {
+          if (this.exam.time_limit > 0) {
+            this.timeLimit = this.exam.time_limit * 60;
+            this.timeLeft = this.timeLimit;
+            this.startTimer();
+          }
         }
       } catch (e) {
-        // 403 — экзамен не назначен или окно закрыто; причина уже
-        // сформулирована сервером, показываем её, а не «что-то пошло не так».
         this.loadError = e?.response?.data?.error?.message || this.$t("exams.loadError");
       } finally {
         this.loading = false;
+      }
+    },
+
+    startTimer() {
+      this.stopTimer();
+      this.timerInterval = setInterval(() => {
+        this.timeLeft--;
+        if (this.timeLeft <= 300 && this.timeLeft > 0 && this.timeLeft % 60 === 0) {
+          this.notify(this.$t("exams.timeWarning", { minutes: Math.ceil(this.timeLeft / 60) }), "warning");
+        }
+        if (this.timeLeft <= 0) {
+          this.stopTimer();
+          this.notify(this.$t("exams.timeUp"), "error");
+          this.submit();
+        }
+      }, 1000);
+    },
+
+    stopTimer() {
+      if (this.timerInterval) {
+        clearInterval(this.timerInterval);
+        this.timerInterval = null;
       }
     },
 
@@ -231,14 +362,35 @@ export default {
     },
 
     select(answerId) {
-      // Прямое присваивание, а НЕ this.$set: $set — API Vue 2, в Vue 3
-      // его нет, и вызов падал «this.$set is not a function», из-за чего
-      // ответы не отмечались вовсе («Отвечено 0 из 5» при кликах) и
-      // кнопка «Закончить» оставалась заблокированной.
       this.selected[this.currentQuestion.id] = answerId;
     },
 
+    isAnswered(questionId) {
+      return this.selected[questionId] !== undefined;
+    },
+
+    isMarked(questionId) {
+      return this.markedQuestions.includes(questionId);
+    },
+
+    toggleMark(questionId) {
+      if (!questionId) return;
+      const idx = this.markedQuestions.indexOf(questionId);
+      if (idx >= 0) {
+        this.markedQuestions.splice(idx, 1);
+      } else {
+        this.markedQuestions.push(questionId);
+      }
+    },
+
+    confirmSubmit() {
+      this.showConfirmDialog = true;
+    },
+
     async submit() {
+      if (this.submitting) return;
+      this.showConfirmDialog = false;
+      this.stopTimer();
       this.submitting = true;
 
       const answers = Object.entries(this.selected).map(([questionId, answerId]) => ({
@@ -249,8 +401,6 @@ export default {
       try {
         const raw = examApi.attemptResult(await examApi.submitExam(this.idEdit, answers));
 
-        // Проценты считаются для показа, но вердикт «сдал/не сдал»
-        // приходит с сервера: пересчитывать его на клиенте нельзя.
         this.result = {
           ...raw,
           scorePercent: Math.round((raw.score ?? 0) * 100),
@@ -376,5 +526,160 @@ export default {
 
 .runner__result-actions {
   margin-top: var(--sp-4);
+}
+
+.runner__timer {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--sp-3);
+}
+
+.runner__timer-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.runner__navigator {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+  padding: var(--sp-3);
+  background: var(--c-surface-2);
+  border-radius: var(--radius-md);
+}
+
+.runner__nav-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+
+.runner__nav-dot:hover {
+  border-color: var(--c-primary);
+}
+
+.runner__nav-dot--current {
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+  border-color: var(--c-primary);
+}
+
+.runner__nav-dot--answered {
+  background: var(--c-primary-soft);
+  border-color: var(--c-primary);
+}
+
+.runner__nav-dot--marked {
+  position: relative;
+}
+
+.runner__nav-dot--marked::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-warning);
+}
+
+.runner__confirm-warning {
+  margin-top: var(--sp-2);
+  color: var(--c-danger);
+  font-weight: 500;
+}
+
+.runner__review {
+  margin-top: var(--sp-5);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--c-border);
+}
+
+.runner__review-title {
+  margin: 0 0 var(--sp-3);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.runner__review-item {
+  padding: var(--sp-3);
+  margin-bottom: var(--sp-2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--c-border);
+}
+
+.runner__review-item--correct {
+  border-color: var(--c-success);
+  background: color-mix(in srgb, var(--c-success) 5%, transparent);
+}
+
+.runner__review-item--wrong {
+  border-color: var(--c-danger);
+  background: color-mix(in srgb, var(--c-danger) 5%, transparent);
+}
+
+.runner__review-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+
+.runner__review-number {
+  font-weight: 600;
+  color: var(--c-text-muted);
+}
+
+.runner__review-question {
+  flex: 1;
+  font-weight: 500;
+}
+
+.runner__review-body {
+  padding-left: var(--sp-5);
+}
+
+.runner__review-line {
+  margin: 0 0 var(--sp-1);
+  font-size: 0.875rem;
+}
+
+.runner__review-label {
+  color: var(--c-text-muted);
+  margin-right: var(--sp-1);
+}
+
+.runner__review-correct {
+  color: var(--c-success);
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .runner__navigator {
+    gap: var(--sp-1);
+    padding: var(--sp-2);
+  }
+
+  .runner__nav-dot {
+    width: 32px;
+    height: 32px;
+    font-size: 0.75rem;
+  }
+
+  .runner__review-body {
+    padding-left: 0;
+  }
 }
 </style>

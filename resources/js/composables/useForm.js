@@ -359,6 +359,21 @@ export function useForm({
       },
       onBlur: () => validateField(name),
       error: Boolean(errors[name]),
+      /*
+        Доступное имя поля.
+        
+        Vuetify жёстко вешает на нативный input
+        aria-labelledby="{свой-id}-label", а сам элемент с таким id
+        рисует ТОЛЬКО если компоненту передан проп label. В наших
+        формах подпись рисует FormField, и Vuetify её не знает — ссылка
+        вела в пустоту, и скринридер объявлял поле просто «текстовым».
+        
+        Здесь атрибут переопределяется на id подписи FormField, который
+        детерминирован: field-<имя поля>-label. Именно поэтому порядок
+        важен — bind() кладёт его последним, а inputAttrs в Vuetify
+        мержится после его значений по умолчанию.
+      */
+      'aria-labelledby': `field-${name}-label`,
     }
   }
 

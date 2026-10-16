@@ -51,7 +51,10 @@ const routes = [
     {
         path: '/login',
         meta: { titleKey: 'login' },
-        component: () => import('../Pages/Login.vue'),
+        // Вход и регистрация — один экран с переключением на месте
+        // (Фаза 3.1). /reg ведёт туда же с ?mode=register, поэтому
+        // старые закладки и ссылки продолжают работать.
+        component: () => import('../Pages/AuthPage.vue'),
         name: 'login',
     },
     {
@@ -63,11 +66,16 @@ const routes = [
          * добавлено в маршрут.
          */
         path: '/reg',
+        // Старая закладка «/reg» должна открывать РЕГИСТРАЦИЮ, а не
+        // форму входа. Раньше это была отдельная страница; теперь
+        // режим задаётся параметром, поэтому /reg перенаправляется на
+        // /login?mode=register — ссылка остаётся рабочей и явной.
+        redirect: () => ({ name: 'login', query: { mode: 'register' } }),
         meta: {
             breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.reguser' }],
             titleKey: 'regist',
         },
-        component: () => import('../Pages/Register.vue'),
+        component: () => import('../Pages/AuthPage.vue'),
         name: 'regist'
     },
     {
@@ -203,14 +211,17 @@ const routes = [
         meta: { permission: ['courses.view', 'courses.manage'] },        props: route => ({ idEdit: Number(route.params.idEdit) }),
     },
     // новый (ресурсный) контроллер
+    // Конструктор курса: один мастер на создание и правку (Фаза 2.3.2).
+    // Раньше это были три отдельные формы — создание, правка и импорт
+    // структуры, — и контекст терялся между ними.
     {
         path: '/course',
-        component: () => import('../Pages/Course/RegisterCourse.vue'),
+        component: () => import('../Pages/Course/CourseWizard.vue'),
         name: 'course.store',
         meta: { permission: ['courses.manage'], titleKey: 'courses' },    },
     {
         path: '/course/:idEdit',
-        component: () => import('../Pages/Course/UpdateCourse.vue'),
+        component: () => import('../Pages/Course/CourseWizard.vue'),
         name: 'course.update',
         meta: { permission: ['courses.manage'], titleKey: 'courses' },        props: route => ({ idEdit: Number(route.params.idEdit) }),
     },
@@ -259,7 +270,7 @@ const routes = [
         name: 'tutor.index',
         meta: {
             permission: ['tutor.use'],
-            titleKey: 'tutor.title',
+            titleKey: 'tutorTitle',
             breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.tutor' }],
         },
     },
@@ -271,7 +282,7 @@ const routes = [
         name: 'tutor.runner',
         meta: {
             permission: ['tutor.use'],
-            titleKey: 'tutor.runner',
+            titleKey: 'tutorRunnerTitle',
             breadcrumbs: [
                 { key: 'app.title', to: '/' },
                 { key: 'app.menu.tutor', to: '/tutor' },
@@ -321,9 +332,24 @@ const routes = [
         name: 'learning.plan',
     },
     {
+        // Публичный профиль преподавателя.
+        path: '/instructors/:id',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'instructor.profile' }], titleKey: 'instructorProfile' },
+        component: () => import('../Pages/Instructor/Profile.vue'),
+        name: 'instructor.profile',
+    },
+
+    {
+        // White-label: бренд-панель (только white_label.manage).
+        path: '/white-label',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'whiteLabel.pageTitle' }], permission: ['white_label.manage'], titleKey: 'whiteLabel' },
+        component: () => import('../Pages/WhiteLabel/Settings.vue'),
+        name: 'whiteLabel',
+    },
+    {
         // Достижения: XP, уровень, streak, галерея, лидерборд группы.
         path: '/gamification',
-        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'gamification.pageTitle' }], titleKey: 'gamification' },
+        meta: { permission: [], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'gamification.pageTitle' }], titleKey: 'gamification' },
         component: () => import('../Pages/Gamification.vue'),
         name: 'gamification',
     },
@@ -335,6 +361,13 @@ const routes = [
         meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'certSettings.pageTitle' }], permission: ['certificates.manage'], titleKey: 'certSettings' },
         component: () => import('../Pages/Certificate/Settings.vue'),
         name: 'certificates.settings',
+    },
+    {
+        // Публичная проверка сертификата по коду.
+        path: '/certificates/verify/:code?',
+        meta: { titleKey: 'certificates', isPublic: true },
+        component: () => import('../Pages/Certificate/Verify.vue'),
+        name: 'certificates.verify',
     },
     {
         // Сертификаты обучаемого: какие курсы закрыты и что ещё мешает.
@@ -359,9 +392,38 @@ const routes = [
         name: 'exams.mine',
     },
     {
+        // История попыток экзаменов: просмотр своих прошедших экзаменов.
+        path: '/my/exams/attempts',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.exams' }, { key: 'exams.attemptsHistory' }], permission: ['exams.take', 'exams.manage'], titleKey: 'exams.attemptsHistory' },
+        component: () => import('../Pages/Exam/ExamAttemptsHistory.vue'),
+        name: 'exams.attemptsHistory',
+    },
+    {
+        // Управление экзаменами: список, создание, редактирование.
+        path: '/exams',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'exams.title' }], permission: ['exams.manage'], titleKey: 'examsTitle' },
+        component: () => import('../Pages/Exam/ExamManage.vue'),
+        name: 'exams.manage',
+    },
+    {
+        // Конструктор экзамена через wizard (4 шага).
+        path: '/exams/create',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'exams.createTitle' }], permission: ['exams.manage'], titleKey: 'examsCreateTitle' },
+        component: () => import('../Pages/Exam/ExamWizard.vue'),
+        name: 'exams.create',
+    },
+    {
+        // Редактирование экзамена через wizard.
+        path: '/exams/:idEdit/edit',
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'exams.editTitle' }], permission: ['exams.manage'], titleKey: 'examsEditTitle' },
+        component: () => import('../Pages/Exam/ExamWizard.vue'),
+        name: 'exams.edit',
+        props: true,
+    },
+    {
         // Прохождение экзамена.
         path: '/exams/:idEdit',
-        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.exams', to: '/my/exams' }, { key: 'exams.runner.title' }], permission: ['exams.take', 'exams.manage'], titleKey: 'exams' },
+        meta: { breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.exams', to: '/my/exams' }, { key: 'exams.runner.title' }], permission: ['exams.take', 'exams.manage'], titleKey: 'examsTitle' },
         component: () => import('../Pages/Exam/ExamRunner.vue'),
         name: 'exams.take',
         props: route => ({ idEdit: Number(route.params.idEdit) }),
@@ -409,7 +471,7 @@ const routes = [
         meta: { permission: ['questions.view', 'questions.manage'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.questionbank' }], titleKey: 'questionbank' },    },
     {
         path: '/questions-main/:idEdit',
-        component: () => import('../Pages/Gift/QuestionEdit.vue'),
+        component: () => import('../Pages/Gift/QuestionForm.vue'),
         props: route => ({ idEdit: Number(route.params.idEdit) }),
         name: 'question.edit',
         meta: { permission: ['questions.manage'] },    },
@@ -426,7 +488,7 @@ const routes = [
     },
     {
         path: '/questions-main/new/:category_id/:aukstructure_id',
-        component: () => import('../Pages/Gift/QuestionNew.vue'),
+        component: () => import('../Pages/Gift/QuestionForm.vue'),
         //props: route => ({ category_id: Number(route.params.category_id), aukstructure_id: Number(route.params.aukstructure_id) }),
         // props: (route) => ({
         //     category_id: toIntOrNull(route.query.current_category),
@@ -559,7 +621,26 @@ const routes = [
         name: '500',
         component: () => import('../Pages/Errors/_500.vue')
     },
-]
+
+    /*
+     * ЛОВУШКА (catch-all) — ОБЯЗАТЕЛЬНО ПОСЛЕДНИМ.
+     *
+     * Без неё любой несуществующий адрес (`#/?` опечатка, старая
+     * закладка, ссылка из письма) не совпадал ни с одним маршрутом,
+     * router-view оставался ПУСТЫМ, и человек видел белый экран без
+     * единого слова: ни «страница не найдена», ни кнопки вернуться.
+     *
+     * Порядок важен: catch-all матчит всё, поэтому после него
+     * объявлять новые маршруты нельзя — они просто перестанут
+     * открываться.
+     */
+    {
+        path: '/:pathMatch(.*)*',
+        name: 'not-found',
+        component: () => import('../Pages/Errors/_404.vue'),
+        meta: { titleKey: 'notFound' },
+    },
+];
 
 export default routes;
 

@@ -174,6 +174,71 @@ class QuestionsController extends Controller
     }
 
     /**
+     * Статистика вопросов по модулям для категории (для Exam Wizard).
+     *
+     * GET /api/questions/module-stats?category_id=X
+     */
+    public function moduleStats(Request $request)
+    {
+        $validated = $request->validate([
+            'category_id' => ['required', 'integer', 'exists:categories,id'],
+        ]);
+
+        $categoryId = $validated['category_id'];
+
+        $modules = \App\Models\Aukstructure::where('category_id', $categoryId)
+            ->withCount(['questions' => function ($q) {
+                $q->whereHas('answers', fn ($q2) => $q2->where('is_correct', true));
+            }])
+            ->orderBy('title')
+            ->get(['id', 'title'])
+            ->map(function ($module) {
+                return [
+                    'id' => $module->id,
+                    'title' => $module->title,
+                    'questions' => $module->questions_count,
+                ];
+            });
+
+        return response()->json([
+            'data' => [
+                'categories' => [[
+                    'id' => $categoryId,
+                    'title' => \App\Models\Category::find($categoryId)?->title ?? '',
+                    'questions' => $modules->sum('questions'),
+                ]],
+                'modules' => $modules,
+            ],
+        ]);
+    }
+
+    /**
+     * Курсы по категории (для Exam Wizard).
+     *
+     * GET /api/courses?category_id=X
+     */
+    public function coursesByCategory(Request $request)
+    {
+        $validated = $request->validate([
+            'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+        ]);
+
+        $query = \App\Models\Course::with('categories');
+
+        if (!empty($validated['category_id'])) {
+            $query->whereHas('categories', function ($q) use ($validated) {
+                $q->where('categories.id', $validated['category_id']);
+            });
+        }
+
+        $courses = $query->orderBy('title')->get(['id', 'title']);
+
+        return response()->json([
+            'data' => $courses->map(fn ($c) => ['id' => $c->id, 'title' => $c->title]),
+        ]);
+    }
+
+    /**
      * Store a newly created resource in storage.
      *
      * @param  \Illuminate\Http\Request  $request

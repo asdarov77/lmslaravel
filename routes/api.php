@@ -31,6 +31,9 @@ use App\Http\Controllers\CoursesListController;
 use App\Http\Controllers\ManagerDashboardController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\GamificationController;
+use App\Http\Controllers\WhiteLabelController;
+use App\Http\Controllers\MaterialNoteController;
+use App\Http\Controllers\InstructorProfileController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\ForgotPasswordController;
@@ -45,6 +48,7 @@ use App\Http\Controllers\CategoryListController;
 use App\Http\Controllers\ClearDBController;
 use App\Http\Controllers\FileLoadAndExtractController;
 use App\Http\Controllers\UsersCoursesController;
+use App\Http\Controllers\TwoFactorController;
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
@@ -161,7 +165,8 @@ Route::post('/register', [AuthController::class, 'register'])->middleware('throt
 // видимости, а не по глобальному праву каталога.
 Route::post('/user/list', [AuthController::class, 'getUserList'])->middleware('auth:sanctum'); // вывод всех пользователей
 Route::get('/user/list/{id}', [AuthController::class, 'getUser'])->middleware(['auth:sanctum','permission:users.view,users.update'])->whereNumber('id'); // вывод конкретного пользователя
-Route::get('user/{id}/edit', [AuthController::class, 'editData'])->middleware(['auth:sanctum','permission:users.view,users.update'])->whereNumber('id');
+// Метод editData у AuthController не существует — маршрут отдавал 500.
+// Правка карточки пользователя делается через GET /api/user/list/{id} и PATCH /api/user/{id}.
 // Свой пароль может менять любой авторизованный; чужой — только users.update (проверка в контроллере)
 Route::put('user/chpass/{id}', [AuthController::class, 'chpass'])->middleware('auth:sanctum')->whereNumber('id');
 Route::delete('user/{id}', [AuthController::class, 'destroy'])->middleware(['auth:sanctum', 'permission:users.delete'])->whereNumber('id');
@@ -224,6 +229,17 @@ Route::middleware('auth:sanctum')->group(function () {
     // Сертификаты об окончании курса. Печатная HTML-страница, а не
     // PDF-файл: генератора PDF в проекте нет, а печать браузером даёт
     // тот же документ с тем же проверочным кодом.
+    // Публичный профиль преподавателя.
+    Route::get('/instructors/{id}', [InstructorProfileController::class, 'show']);
+    // Материалы: заметки студента.
+    Route::prefix('materials')->group(function () {
+        Route::get('/{id}/note', [MaterialNoteController::class, 'show']);
+        Route::put('/{id}/note', [MaterialNoteController::class, 'update']);
+        Route::delete('/{id}/note', [MaterialNoteController::class, 'destroy']);
+    });
+    // White-label: бренд, цвета, логотипы.
+    Route::get('/white-label', [WhiteLabelController::class, 'index']);
+    Route::put('/white-label', [WhiteLabelController::class, 'update']);
     // Геймификация: свои показатели и лидерборд группы.
     Route::get('/gamification/me', [GamificationController::class, 'me']);
     // Настройки бланка: отдельное право certificates.manage.
@@ -232,8 +248,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/my/certificates', [CertificateController::class, 'index']);
     Route::get('/my/certificates/{course}', [CertificateController::class, 'show'])
         ->whereNumber('course');
+    Route::get('/my/certificates/{course}/download', [CertificateController::class, 'download'])
+        ->whereNumber('course');
     Route::delete('/my/progress/{lesson}', [LessonProgressController::class, 'destroy'])
         ->whereNumber('lesson');
+
 
     // Сводка для администратора и инструктора. Отдельная от
     // /my/dashboard: там «моё обучение», а здесь «что происходит в
@@ -241,13 +260,38 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/summary', ManagerDashboardController::class);
 });
 
+// 2FA: настройка (только авторизованным) и верификация при входе.
+//
+// Блок стоит ПОСЛЕ общей группы auth:sanctum намеренно: verify — шаг
+// входа гостя, который токена ещё не имеет. Внутри auth-группы он
+// был недостижим, и вход с включённым 2FA не проходил.
+
+// Настройка 2FA — авторизованным.
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/user/two-factor', [TwoFactorController::class, 'show']);
+    Route::post('/user/two-factor/enable', [TwoFactorController::class, 'enable']);
+    Route::post('/user/two-factor/disable', [TwoFactorController::class, 'disable']);
+    Route::post('/user/two-factor/regenerate-codes', [TwoFactorController::class, 'regenerateCodes']);
+});
+
+// Верификация кода при входе — публичная.
+Route::post('/two-factor/verify', [TwoFactorController::class, 'verify']);
+
 // Календарь учебного процесса: лента периодов обучения из
 // group2learnings. Область видимости задаёт сам контроллер (своя группа
 // для обучаемого, все группы для методиста), поэтому доменное право здесь
 // не требуется — фильтровать список изнутри дешевле и безопаснее, чем
 // запрещать доступ целиком.
 Route::middleware('auth:sanctum')->group(function () {
+    // Календарь: лента периодов обучения и ручные события.
+    // store/destroy у контроллера были написаны, но маршрутов не имели:
+    // фронт звал POST /api/calendar/events и DELETE /api/calendar/events/{id},
+    // получал 404 и уводил всё приложение на страницу «Страница не найдена».
     Route::get('/calendar', [CalendarController::class, 'index']);
+    Route::post('/calendar/events', [CalendarController::class, 'store'])
+        ->middleware('permission:exams.manage,grading.manage');
+    Route::delete('/calendar/events/{event}', [CalendarController::class, 'destroy'])
+        ->middleware('permission:exams.manage,grading.manage');
 });
 
 Route::get('lessons/', [LessonsController::class, 'lessons'])->middleware('auth:sanctum'); // занятия  в иерархической структуре
@@ -392,7 +436,9 @@ Route::get('/getfirstauk/{id}', [CourseController::class, 'get_first_auk'])
 //-------------------- классы -----------------
 Route::get('/classes/', [AircraftController::class, 'indexclasses'])->middleware('auth:sanctum');
 Route::get('/classesfs/', [AircraftController::class, 'showclassesfs'])->middleware('auth:sanctum');
-Route::get('/classess/{air}', [CourseController::class, 'showauks'])->middleware('auth:sanctum');
+// Опечатка в адресе (/classess) плюс отсутствующий метод showauks у
+// CourseController: маршрут был и давал 500. Список классов доступен
+// на GET /api/classes, содержимое папки — на GET /api/classesfs.
 // Создание классов (самолётов) — по праву content.manage или courses.manage
 Route::post('/classes/', [AircraftController::class, 'storeclasses'])->middleware(['auth:sanctum','permission:content.manage,courses.manage']);
 
@@ -477,7 +523,8 @@ Route::post('/search-files/', [SearchController::class, 'search'])
 // группы, люди и банк вопросов. Область видимости — по CourseVisibility,
 // то есть так же, как у каталога курсов.
 Route::get('/search', [GlobalSearchController::class, 'index'])->middleware('auth:sanctum');
-Route::post('/get-content/', [SearchController::class, 'get_file_content'])->middleware('auth:sanctum'); // возможно удалим
+// Метод get_file_content у SearchController не существует — маршрут давал 500.
+// Поиск по материалам курса: POST /api/search-files (см. SearchController@search).
 //-------------------------------------------------------------
 
 //---------------------блок работы с избранным---------------
@@ -510,10 +557,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/exams/{exam}/attempts', [ExamController::class, 'submit'])->whereNumber('exam');
 });
 Route::middleware(['auth:sanctum', 'permission:exams.manage'])->group(function () {
-    Route::apiResource('exams', ExamController::class)->only(['index', 'store', 'update', 'destroy'])->whereNumber('exam');
+    Route::apiResource('exams', ExamController::class)->only(['index', 'show', 'store', 'update', 'destroy'])->whereNumber('exam');
 });
 
-// Банк вопросов больше НЕ открыт всем авторизованным.
+// Статистика модулей для Exam Wizard.
+    Route::middleware('auth:sanctum')->get('/questions/module-stats', [QuestionsController::class, 'moduleStats']);
+
+    // Курсы по категории для Exam Wizard.
+    Route::middleware('auth:sanctum')->get('/questions/courses-by-category', [QuestionsController::class, 'coursesByCategory']);
+
+    // Банк вопросов больше НЕ открыт всем авторизованным.
 //
 // Здесь отдавались ответы вместе с is_correct, поэтому любой вошедший —
 // включая обучаемого — мог вычитать правильные ответы на любой вопрос и
@@ -540,11 +593,14 @@ Route::middleware(['auth:sanctum', 'permission:questions.manage'])->group(functi
 
 //---------------------блок настроек и вспомогательных таблиц ---------------
 
-Route::apiResource('grade-boundary', GradeBoundaryController::class)->only(['index', 'show'])->middleware('auth:sanctum')->whereNumber('grade-boundary');
-Route::post('/grade-boundary', [GradeBoundaryController::class, 'store'])->middleware(['auth:sanctum', 'permission:settings.manage']);
-Route::put('/grade-boundary/{grade-boundary}', [GradeBoundaryController::class, 'update'])->middleware(['auth:sanctum', 'permission:settings.manage']);
-Route::patch('/grade-boundary/{grade-boundary}', [GradeBoundaryController::class, 'update'])->middleware(['auth:sanctum', 'permission:settings.manage']);
-Route::delete('/grade-boundary/{grade-boundary}', [GradeBoundaryController::class, 'destroy'])->middleware(['auth:sanctum', 'permission:settings.manage']);
+// ВНИМАНИЕ: update/destroy у контроллера НЕ РЕАЛИЗОВАНЫ, но маршруты на них
+// были объявлены — любой такой запрос давал 500 вместо 404. Маршруты убраны.
+// store меняет значение ПО ПОРЯДКОВОЙ ПОЗИЦИИ (index), а не по id: это
+// осознанно (порядок шкалы — это порядок записей), см. GradeBoundaryController.
+Route::get('/grade-boundary', [GradeBoundaryController::class, 'index'])
+    ->middleware(['auth:sanctum', 'permission:settings.manage']);
+Route::post('/grade-boundary', [GradeBoundaryController::class, 'store'])
+    ->middleware(['auth:sanctum', 'permission:settings.manage']);
 // Переключатель способа раздачи приватного контента (php | nginx).
 //
 // Регистрируется ДО apiResource('settings'), иначе PUT /settings/content-delivery
@@ -659,8 +715,12 @@ Route::get('/notifications', [\App\Http\Controllers\NotificationController::clas
     ->middleware('auth:sanctum');
 Route::post('/notifications/{notification}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])
     ->middleware('auth:sanctum');
-// Аватар пользователя.
+// Аватар пользователя. DELETE добавлен вместе с методом: кнопка
+// «Убрать фото» на странице профиля меняла только Vuex, поэтому после
+// перезагрузки аватар возвращался и кнопка выглядела нерабочей.
 Route::post('/user/avatar', [\App\Http\Controllers\AuthController::class, 'updateAvatar'])
+    ->middleware('auth:sanctum');
+Route::delete('/user/avatar', [\App\Http\Controllers\AuthController::class, 'destroyAvatar'])
     ->middleware('auth:sanctum');
 
 Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])
@@ -678,11 +738,20 @@ Route::get('/settings/content-delivery', [SettingsController::class, 'contentDel
 Route::put('/settings/content-delivery', [SettingsController::class, 'updateContentDelivery'])
     ->middleware(['auth:sanctum', 'permission:settings.manage']);
 
-Route::apiResource('settings', SettingsController::class)->only(['index', 'show'])->middleware(['auth:sanctum', 'permission:settings.manage'])->whereNumber('setting');
-Route::post('/settings', [SettingsController::class, 'store'])->middleware(['auth:sanctum', 'permission:settings.manage']);
-Route::put('/settings/{setting}', [SettingsController::class, 'update'])->middleware(['auth:sanctum', 'permission:settings.manage'])->whereNumber('setting');
-Route::patch('/settings/{setting}', [SettingsController::class, 'update'])->middleware(['auth:sanctum', 'permission:settings.manage'])->whereNumber('setting');
-Route::delete('/settings/{setting}', [SettingsController::class, 'destroy'])->middleware(['auth:sanctum', 'permission:settings.manage'])->whereNumber('setting');
+// Настройки key-value.
+// show/update реализованы (см. SettingsController). store и destroy
+// удалены: у таблицы настроек нет смысла в создании и удалении записей,
+// а методов в контроллере не было — запрос падал с 500.
+// Параметр — ИМЯ настройки (name), а не её id: значения ищутся по имени,
+// и whereNumber('setting') делал маршрут недостижимым (все имена — строки).
+Route::get('/settings', [SettingsController::class, 'index'])
+    ->middleware(['auth:sanctum', 'permission:settings.manage']);
+Route::get('/settings/{setting}', [SettingsController::class, 'show'])
+    ->middleware(['auth:sanctum', 'permission:settings.manage'])->where('setting', '[A-Za-z0-9_\-]+');
+Route::put('/settings/{setting}', [SettingsController::class, 'update'])
+    ->middleware(['auth:sanctum', 'permission:settings.manage'])->where('setting', '[A-Za-z0-9_\-]+');
+Route::patch('/settings/{setting}', [SettingsController::class, 'update'])
+    ->middleware(['auth:sanctum', 'permission:settings.manage'])->where('setting', '[A-Za-z0-9_\-]+');
 //Route::post('grade-boundary', 'GradeBoundaryController@store');
 
 

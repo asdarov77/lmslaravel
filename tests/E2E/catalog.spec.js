@@ -14,7 +14,7 @@
  */
 import { test, expect } from "@playwright/test";
 
-const BASE = process.env.APP_URL || "http://127.0.0.1:8000";
+const BASE = process.env.APP_URL || 'http://127.0.0.1:8080';
 const ADMIN = { fio: "Администратор", password: "123" };
 const PASSWORD = "secret123";
 
@@ -39,7 +39,14 @@ async function session(browser, creds) {
 
     await ctx.addInitScript(
         ([t, u]) => {
-            localStorage.clear();
+            // Очистка хранилища — ОДИН раз на контекст. В addInitScript очистка
+            // выполнялась на КАЖДОЙ загрузке документа, а часть страниц меняет
+            // адрес при инициализации: вторая загрузка стирала то, что приложение
+            // только что сохранило (прогресс, закреплённые курсы).
+            if (!sessionStorage.getItem('__e2e_cleared')) {
+              localStorage.clear();
+              sessionStorage.setItem('__e2e_cleared', '1');
+            }
             localStorage.setItem("token", t);
             localStorage.setItem("user", u);
         },

@@ -2,11 +2,31 @@
   <div class="u-page">
     <PageHeader :title="$t('calendar.title')" :subtitle="$t('calendar.subtitle')">
       <template #actions>
+        <!--
+          Кнопка создания события — ОСНОВНОЙ способ добавить событие.
+
+          Раньше единственным способом был клик по свободному месту в
+          сетке месяца, а свободного места там практически нет: полосы
+          периодов обучения занимают всю высоту ячейки, и клик попадал
+          в них и открывал карточку существующего периода. То есть
+          форма «Новое событие» была достижима только в редких
+          месяцах без записей — фактически недостижимо.
+        -->
+        <v-btn
+          color="primary"
+          variant="flat"
+          data-test="calendar-event-add"
+          @click="openEventFormForToday"
+        >
+          <v-icon start icon="mdi-plus" size="18" aria-hidden="true"></v-icon>
+          {{ $t("calendar.addEvent") }}
+        </v-btn>
         <v-btn
           color="primary"
           variant="tonal"
           :loading="loading"
           :disabled="loading"
+          data-test="calendar-refresh"
           @click="load()"
         >
           <v-icon start icon="mdi-refresh" size="18" aria-hidden="true"></v-icon>
@@ -228,7 +248,84 @@
             <v-icon start icon="mdi-open-in-new" size="18" aria-hidden="true"></v-icon>
             {{ $t("plan.openMaterials") }}
           </v-btn>
+          <v-btn
+            v-if="selected.kind === 'custom' && selected.can_delete"
+            variant="text"
+            color="error"
+            data-test="calendar-event-delete"
+            @click="askDeleteEvent"
+          >
+            <v-icon start icon="mdi-trash-can-outline" size="18" aria-hidden="true"></v-icon>
+            {{ $t("calendar.eventDelete") }}
+          </v-btn>
           <v-btn variant="text" @click="detail = false">{{ $t("calendar.close") }}</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Quick-add событие: модалка с формой. -->
+    <v-dialog v-model="eventForm.open" max-width="480">
+      <v-card>
+        <v-card-title>{{ $t("calendar.addEventTitle") }}</v-card-title>
+        <v-card-text>
+          <v-text-field
+            v-model="eventForm.title"
+            :label="$t('calendar.eventTitle')"
+            :placeholder="$t('calendar.eventTitlePlaceholder')"
+            variant="outlined"
+            density="compact"
+            hide-details
+            class="mb-3"
+            data-test="calendar-event-title"
+          />
+          <v-text-field
+            v-model="eventForm.start"
+            :label="$t('calendar.eventStart')"
+            type="date"
+            variant="outlined"
+            density="compact"
+            hide-details
+            class="mb-3"
+          />
+          <v-text-field
+            v-model="eventForm.end"
+            :label="$t('calendar.eventEnd')"
+            type="date"
+            variant="outlined"
+            density="compact"
+            hide-details
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="eventForm.open = false">
+            {{ $t("calendar.eventCancel") }}
+          </v-btn>
+          <v-btn
+            color="primary"
+            variant="flat"
+            :loading="eventForm.saving"
+            :disabled="eventForm.saving || !eventForm.title"
+            @click="saveEvent"
+          >
+            {{ $t("calendar.eventCreate") }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Подтверждение удаления события. -->
+    <v-dialog v-model="deleteConfirm" max-width="400">
+      <v-card>
+        <v-card-title>{{ $t("calendar.eventDeleteConfirm") }}</v-card-title>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="deleteConfirm = false">
+            {{ $t("calendar.eventCancel") }}
+          </v-btn>
+          <v-btn color="error" variant="flat" @click="deleteEvent">
+            {{ $t("calendar.eventDelete") }}
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -261,6 +358,8 @@ import { toast } from "../composables/useToast";
  * периоды обучения групп (group2learnings.study_from/study_to).
  * События read-only намеренно — их источник не календарь, а запись
  * группы на курс, и редактирование здесь создавало бы вторую правду.
+ * Пользовательские события (calendar_events) можно добавлять и удалять
+ * через модалку быстрого добавления.
  */
 let uidCounter = 0;
 
@@ -282,6 +381,15 @@ export default {
       loading: false,
       detail: false,
       selected: null,
+      eventForm: {
+        open: false,
+        title: '',
+        start: null,
+        end: null,
+        saving: false,
+      },
+      deleteConfirm: false,
+      pendingDeleteId: null,
     };
   },
 
@@ -320,12 +428,26 @@ export default {
         // перетаскивание вводило бы в заблуждение.
         editable: false,
         selectable: false,
+        // Quick-add открывает модалку через кнопку действий, а не выделение даты:
+        // сохранение событий пока не подтверждено на backend, поэтому
+        // черновик живёт только в сессии календаря.
         dayMaxEvents: 3,
         weekends: true,
+        // Тема FullCalendar берётся из токенов проекта. Раньше использовались
+        // дефолтные цвета библиотеки: синий календарь не совпадал с
+        // акцентом интерфейса и читался как отдельный продукт.
+        eventColor: 'var(--c-primary)',
+        eventBackgroundColor: 'var(--c-primary)',
+        eventBorderColor: 'var(--c-primary-soft)',
+        eventTextColor: 'var(--c-primary-contrast, var(--c-text-inverse))',
+        nowIndicator: true,
+        slotDuration: '00:30:00',
+        slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
         locale: ruLocale,
         firstDay: 1,
         height: "auto",
         eventClick: this.openDetail,
+        dateClick: this.openEventForm,
         eventTimeFormat: { hour: "2-digit", minute: "2-digit", hour12: false },
         displayEventTime: false,
         // Однострочная подпись: курс и модуль через точку. Та же строка
@@ -552,6 +674,129 @@ export default {
     openDetail(info) {
       this.selected = info.event.extendedProps;
       this.detail = true;
+
+      if (this.selected?.kind === 'custom' && this.selected?.event_id) {
+        this.pendingDeleteId = this.selected.event_id;
+      }
+    },
+
+    /*
+     * Открытие формы создания по клику на дату.
+     *
+     * FullCalendar зовёт dateClick с ОБЪЕКТОМ { dateStr, date, ... },
+     * а не со строкой. Раньше объект клали прямо в v-model поля
+     * type="date": input ожидает строку YYYY-MM-DD, получал объект —
+     * и дата в форме оставалась пустой, хотя человек только что
+     * кликнул именно по ней. Теперь берём dateStr и подставляем
+     * в поле дату клика.
+     */
+
+    /** Открытие формы создания по клику на дату. */
+    openEventForm(info) {
+      const picked = this.pickDate(info) || this.todayIso();
+
+      this.eventForm.start = picked;
+      this.eventForm.end = picked;
+      this.eventForm.title = '';
+      this.eventForm.open = true;
+    },
+
+    /** Кнопка «Добавить событие»: дата по умолчанию — сегодня. */
+    openEventFormForToday() {
+      this.openEventForm({ dateStr: this.todayIso() });
+    },
+
+    /** Сегодняшняя дата в формате YYYY-MM-DD (локальная, не UTC). */
+    todayIso() {
+      const d = new Date();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+
+      return `${d.getFullYear()}-${m}-${day}`;
+    },
+
+    /** Достаёт YYYY-MM-DD из аргумента dateClick. */
+    pickDate(info) {
+      if (!info) return null;
+      if (typeof info === 'string') return info;
+      if (typeof info.dateStr === 'string') return info.dateStr.slice(0, 10);
+      if (info.date instanceof Date) {
+        const y = info.date.getFullYear();
+        const m = String(info.date.getMonth() + 1).padStart(2, '0');
+        const d = String(info.date.getDate()).padStart(2, '0');
+
+        return `${y}-${m}-${d}`;
+      }
+
+      return null;
+    },
+
+    closeEventForm() {
+      this.eventForm.open = false;
+      this.eventForm.title = '';
+      this.eventForm.start = null;
+      this.eventForm.end = null;
+    },
+
+    async saveEvent() {
+      if (this.eventForm.saving) return;
+
+      // Без даты сервер вернёт 422, а человек увидит только
+      // «Не удалось создать событие» без причины.
+      if (!this.eventForm.title) {
+        this.notify(this.$t("calendar.eventTitleRequired"), "error");
+
+        return;
+      }
+
+      if (!this.eventForm.start) {
+        this.notify(this.$t("calendar.eventDateRequired"), "error");
+
+        return;
+      }
+
+      this.eventForm.saving = true;
+
+      try {
+        await calendarApi.createEvent({
+          title: this.eventForm.title,
+          start: this.eventForm.start,
+          end: this.eventForm.end || this.eventForm.start,
+        });
+
+        this.notify(this.$t("calendar.eventCreated"));
+        this.closeEventForm();
+        await this.load();
+      } catch (e) {
+        this.notify(
+          e?.response?.data?.error?.message || this.$t("calendar.eventCreateError"),
+          "error"
+        );
+      } finally {
+        this.eventForm.saving = false;
+      }
+    },
+
+    askDeleteEvent() {
+      this.deleteConfirm = true;
+    },
+
+    async deleteEvent() {
+      if (!this.pendingDeleteId) return;
+
+      try {
+        await calendarApi.deleteEvent(this.pendingDeleteId);
+        this.notify(this.$t("calendar.eventDeleted"));
+        this.deleteConfirm = false;
+        this.pendingDeleteId = null;
+        this.detail = false;
+        await this.load();
+      } catch (e) {
+        this.notify(
+          e?.response?.data?.error?.message || this.$t("calendar.eventDeleteError"),
+          "error"
+        );
+      }
     },
 
     /**
@@ -714,7 +959,7 @@ export default {
 .calendar__board .fc .fc-button-primary:not(:disabled):active {
   background: var(--c-primary);
   border-color: var(--c-primary);
-  color: #fff;
+  color: var(--c-on-primary);
 }
 
 .calendar__board .fc .fc-col-header-cell-cushion,
@@ -744,7 +989,7 @@ export default {
   border: none;
   border-radius: var(--radius-sm);
   background: var(--c-primary);
-  color: #fff;
+  color: var(--c-on-primary);
   padding: 2px var(--sp-2);
   cursor: pointer;
 }
@@ -753,7 +998,7 @@ export default {
 .calendar__board .fc .fc-daygrid-event:focus-visible {
   background: var(--c-primary);
   filter: brightness(0.9);
-  color: #fff;
+  color: var(--c-on-primary);
 }
 
 /*
@@ -770,7 +1015,7 @@ export default {
 .calendar__board .fc .fc-daygrid-event .fc-event-main,
 .calendar__board .fc .fc-daygrid-event .fc-event-title,
 .calendar__board .fc .fc-daygrid-event .fc-event-time {
-  color: #fff;
+  color: var(--c-on-primary);
 }
 
 /*
@@ -781,21 +1026,33 @@ export default {
  * периода. Soft-вариант — тот же приём, что у бейджей
  * .u-badge--warning, и в тёмной теме работает автоматически.
  */
+/*
+   !important здесь не про вкус, а про inline-стиль.
+
+   FullCalendar проставляет цвет события инлайном
+   (style="border-color: …; background-color: …"), а инлайн-побеждает
+   любую таблицу стилей, включая более специфичную. Из-за этого метка
+   «Срок сдачи» рисовалась тёмно-жёлтым по СИНЕЙ полосе периода:
+   контраст 1.26:1 при норме 4.5 — текст был физически не читаем.
+   Здесь inline-стиль библиотеки единственное, что перебивает
+   !important по специфичности.
+*/
 .calendar__board .fc .fc-daygrid-event.cal-event--deadline {
-  background: var(--c-warning-soft);
-  border: 1px dashed var(--c-warning);
+  background: var(--c-warning-soft) !important;
+  border: 1px dashed var(--c-warning) !important;
   font-weight: 600;
 }
 
 .calendar__board .fc .fc-daygrid-event.cal-event--deadline:hover {
-  background: var(--c-warning-soft);
+  background: var(--c-warning-soft) !important;
+  border-color: var(--c-warning) !important;
   filter: brightness(0.97);
 }
 
 .calendar__board .fc .fc-daygrid-event.cal-event--deadline .fc-event,
 .calendar__board .fc .fc-daygrid-event.cal-event--deadline .fc-event-main,
 .calendar__board .fc .fc-daygrid-event.cal-event--deadline .fc-event-title {
-  color: var(--c-warning);
+  color: var(--c-warning) !important;
 }
 
 /* Список (list view) — на светлой подложке, текст обычный */

@@ -6,20 +6,35 @@
       icon="mdi-bookshelf"
     />
 
-    <!-- Фильтры -->
-    <div class="catalog__filters">
-      <v-text-field
-        v-model="query"
-        :label="$t('catalog.search')"
-        prepend-inner-icon="mdi-magnify"
-        variant="outlined"
-        density="comfortable"
-        hide-details
-        clearable
-        data-test="catalog-search"
-        @update:model-value="scheduleReload"
-      />
+    <!-- Герой-секция каталога: акцент на курсы, вдохновение и поиск. -->
+    <div class="catalog__hero u-card--glass u-hover-lift">
+      <div class="catalog__hero-content">
+        <!--
+          Заголовок страницы — h1 в PageHeader выше. Здесь h2: два h1 на
+          одной странице сбивают навигацию по заголовкам — и у человека,
+          и у скринридера, который строит по ним оглавление
+          (WCAG 2.2 SC 1.3.1).
+        -->
+        <h2 class="catalog__hero-title u-text-gradient">{{ $t('catalog.heroTitle') }}</h2>
+        <p class="catalog__hero-sub">{{ $t('catalog.heroSub') }}</p>
+        <v-text-field
+          v-model="query"
+          :label="$t('catalog.search')"
+          prepend-inner-icon="mdi-magnify"
+          variant="outlined"
+          hide-details
+          clearable
+          class="catalog__hero-search"
+          data-test="catalog-search"
+          @update:model-value="scheduleReload"
+        />
+      </div>
+    </div>
 
+    <!-- Фильтры. Поиска здесь нет: он уже есть в герое-секции, и два
+         одинаковых поля на одной странице означали два ответа на один
+         вопрос «где искать». -->
+    <div class="catalog__filters u-card--glass">
       <v-select
         v-model="categoryId"
         :items="categoryItems"
@@ -38,6 +53,25 @@
         <v-chip value="all">{{ $t("catalog.all") }}</v-chip>
         <v-chip value="mine">{{ $t("catalog.onlyMine") }}</v-chip>
       </v-chip-group>
+
+      <div class="catalog__controls">
+        <v-select
+          v-model="sortBy"
+          :items="sortOptions"
+          item-value="value"
+          item-title="label"
+          :label="$t('catalog.sort')"
+          variant="outlined"
+          density="comfortable"
+          hide-details
+          class="catalog__sort"
+        />
+
+        <v-btn-toggle v-model="viewMode" mandatory class="catalog__view-toggle">
+          <v-btn value="grid" icon="mdi-view-grid" :title="$t('catalog.viewGrid')" />
+          <v-btn value="list" icon="mdi-view-list" :title="$t('catalog.viewList')" />
+        </v-btn-toggle>
+      </div>
     </div>
 
     <p class="u-page__subtitle" data-test="catalog-count">
@@ -45,22 +79,29 @@
     </p>
 
     <!-- Каталог -->
-    <div v-if="items.length" class="catalog__grid">
+    <div v-if="items.length" :class="viewMode === 'grid' ? 'catalog__grid' : 'catalog__list'">
       <article
-        v-for="course in items"
+        v-for="(course, index) in items"
         :key="course.id"
-        class="u-card catalog__card"
+        class="u-card--glass catalog__card u-hover-lift"
+        :class="{ 'catalog__card--list': viewMode === 'list' }"
         :data-test="course.enrolled ? 'catalog-card-enrolled' : 'catalog-card'"
+        data-stagger
+        :data-stagger-index="index"
       >
+        <!--
+          Обложка. Поля картинки у курса нет, поэтому рисуем
+          детерминированный градиент по id: одинаковый курс — одинаковая
+          обложка, и не нужно миграцию БД ради оформления.
+        -->
+        <div class="catalog__cover" :style="coverStyle(course.id)" aria-hidden="true">
+          <span class="catalog__cover-initial">{{ initial(course.title) }}</span>
+        </div>
+
         <header class="catalog__card-head">
           <h2 class="u-card__title">
-            <!--
-                Ссылка ведёт на материал, а он открыт только записанному
-                (CourseAccess). Для незаписанного название остаётся
-                текстом: клик по ссылке приводил бы к 403.
-            -->
             <router-link v-if="course.enrolled" :to="course.to">{{ course.title }}</router-link>
-            <template v-else>{{ course.title }}</template>
+            <span v-else>{{ course.title }}</span>
           </h2>
           <span class="u-badge" :class="course.enrolled ? 'u-badge--success' : 'u-badge--muted'">
             {{ course.enrolled ? $t("catalog.enrolled") : $t("catalog.notEnrolled") }}
@@ -185,6 +226,8 @@ export default {
     loading: true,
     busyId: null,
     timer: null,
+    viewMode: 'grid',
+    sortBy: 'name',
   }),
 
   computed: {
@@ -193,6 +236,13 @@ export default {
 
     categoryItems() {
       return asArray(this.categories)
+    },
+
+    sortOptions() {
+      return [
+        { value: 'name', label: this.$t('catalog.sortByName') },
+        { value: 'topics', label: this.$t('catalog.sortByTopics') },
+      ]
     },
 
     /**
@@ -220,9 +270,11 @@ export default {
     hasGroup() {
       return Boolean(this.user?.group_id)
     },
+
   },
 
   created() {
+    this.applyQueryFromUrl()
     if (!this.canView) {
       this.loading = false
       return
@@ -235,7 +287,67 @@ export default {
     if (this.timer) clearTimeout(this.timer)
   },
 
+  watch: {
+    query() { this.syncQueryToUrl() },
+    categoryId() { this.syncQueryToUrl() },
+    mine() { this.syncQueryToUrl() },
+    sortBy() { this.syncQueryToUrl() },
+    viewMode() { this.syncQueryToUrl() },
+  },
+
   methods: {
+    /** Прочитать фильтры из URL при входе на страницу. */
+    applyQueryFromUrl() {
+      const q = this.$route?.query || {}
+      this.query = typeof q.q === 'string' ? q.q : ''
+      this.categoryId = q.category ? Number(q.category) || null : null
+      this.mine = q.mine === '1' ? 'mine' : 'all'
+      this.sortBy = q.sort === 'topics' ? 'topics' : 'name'
+      this.viewMode = q.view === 'list' ? 'list' : 'grid'
+    },
+
+    /** Записать фильтры в URL при изменении. */
+    syncQueryToUrl() {
+      // Роутера может не быть вовсе (превью компонента вне приложения)
+      // или быть заглушкой без replace. Синхронизация с URL — удобство,
+      // а не условие работы страницы, поэтому при отсутствии replace
+      // просто выходим, а не роняем компонент.
+      if (typeof this.$router?.replace !== 'function') return
+
+      const query = {}
+      if (this.query.trim()) query.q = this.query.trim()
+      if (this.categoryId) query.category = this.categoryId
+      if (this.mine === 'mine') query.mine = '1'
+      if (this.sortBy === 'topics') query.sort = 'topics'
+      if (this.viewMode === 'list') query.view = 'list'
+
+      this.$router.replace({ query }).catch(() => {})
+    },
+
+    /**
+     * Цвет обложки по id курса.
+     *
+     * Детерминированный градиент: один и тот же курс всегда одной и той же
+     * обложки. Менять цвет по настроению нельзя — это подпись, по которой
+     * курс узнают в списке.
+     */
+    coverStyle(id) {
+      const hue = ((Number(id) || 0) * 47) % 360
+      return {
+        background: `linear-gradient(135deg, hsl(${hue} 55% 42%), hsl(${(hue + 40) % 360} 60% 30%))`,
+      }
+    },
+
+    /**
+     * Первая буква названия — для обложки без картинки.
+     * Кириллица берётся как есть: латинская альтернатива тут не нужна,
+     * названия курсов на русском.
+     */
+    initial(title) {
+      const text = String(title || '').trim()
+      return text ? text[0].toUpperCase() : '?'
+    },
+
     async reload() {
       if (!this.canView) {
         this.loading = false
@@ -337,10 +449,177 @@ export default {
   gap: var(--sp-4);
 }
 
+.catalog__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
 .catalog__card {
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
+}
+
+/* Ховер-лифт задан классом u-hover-lift (в app.css) — кастомный hover
+   убран, чтобы не конфликтовать со стеклянной карточкой. */
+
+.catalog__card--list {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) auto;
+  grid-template-areas:
+    'cover head actions'
+    'cover desc actions'
+    'cover facts actions';
+  align-items: center;
+  column-gap: var(--sp-4);
+}
+
+.catalog__card--list .catalog__cover { grid-area: cover }
+.catalog__card--list .catalog__card-head { grid-area: head }
+.catalog__card--list .catalog__desc { grid-area: desc }
+.catalog__card--list .catalog__facts { grid-area: facts }
+.catalog__card--list .catalog__actions { grid-area: actions }
+
+.catalog__card--list /* Обложка курса: детерминированный градиент, первая буква названия. */
+.catalog__cover {
+  position: relative;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  overflow: hidden;
+}
+
+.catalog__cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, 0.28));
+}
+
+.catalog__cover-initial {
+  position: relative;
+  z-index: 1;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.catalog__card--list .catalog__cover {
+  height: 80px;
+  width: 160px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+}
+
+.catalog__card--list .catalog__cover-initial {
+  font-size: 1.8rem;
+}
+
+@media (max-width: 900px) {
+  .catalog__card--list {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'cover'
+      'head'
+      'desc'
+      'facts'
+      'actions';
+  }
+
+  .catalog__card--list .catalog__cover {
+    width: 100%;
+    height: 110px;
+  }
+}
+
+.catalog__card-head {
+  flex: 1;
+}
+
+.catalog__card--list .catalog__desc {
+  flex: 2;
+}
+
+.catalog__card--list .catalog__facts {
+  flex: 1;
+}
+
+.catalog__card--list .catalog__actions {
+  margin-top: 0;
+}
+
+.catalog__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-left: auto;
+}
+
+.catalog__sort {
+  min-width: 160px;
+}
+
+.catalog__view-toggle {
+  flex-shrink: 0;
+}
+
+/* Обложка курса: детерминированный градиент, первая буква названия. */
+.catalog__cover {
+  position: relative;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  overflow: hidden;
+}
+
+.catalog__cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, 0.28));
+}
+
+.catalog__cover-initial {
+  position: relative;
+  z-index: 1;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.catalog__card--list .catalog__cover {
+  height: 80px;
+  width: 160px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+}
+
+.catalog__card--list .catalog__cover-initial {
+  font-size: 1.8rem;
+}
+
+@media (max-width: 900px) {
+  .catalog__card--list {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'cover'
+      'head'
+      'desc'
+      'facts'
+      'actions';
+  }
+
+  .catalog__card--list .catalog__cover {
+    width: 100%;
+    height: 110px;
+  }
 }
 
 .catalog__card-head {
@@ -385,5 +664,102 @@ export default {
   align-items: center;
   gap: var(--sp-2);
   margin-top: auto;
+}
+
+/* Герой-секция каталога. */
+.catalog__hero {
+  padding: var(--sp-10) var(--sp-8);
+  border-radius: var(--radius-xl);
+  margin-bottom: var(--sp-6);
+  overflow: hidden;
+}
+
+.catalog__hero-content {
+  max-width: 680px;
+}
+
+.catalog__hero-title {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-4xl);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+  letter-spacing: -0.02em;
+}
+
+.catalog__hero-sub {
+  margin: 0 0 var(--sp-5);
+  font-size: var(--fs-lg);
+  color: var(--c-text-secondary);
+  line-height: var(--lh-normal);
+  max-width: 60ch;
+}
+
+.catalog__hero-search {
+  min-width: 360px;
+}
+
+@media (max-width: 640px) {
+  .catalog__hero {
+    padding: var(--sp-6) var(--sp-4);
+  }
+
+  .catalog__hero-title {
+    font-size: var(--fs-2xl);
+  }
+
+  .catalog__hero-sub {
+    font-size: var(--fs-base);
+  }
+
+  .catalog__hero-search {
+    min-width: auto;
+    width: 100%;
+  }
+}
+
+/* Карточка курса: более выразительная обложка с градиентным свечением. */
+.catalog__cover {
+  position: relative;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--c-primary), var(--c-accent));
+}
+
+.catalog__cover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(255 255 255 / 0.25) 0%, transparent 60%);
+}
+
+.catalog__cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 35%, rgba(0, 0, 0, 0.35));
+}
+
+.catalog__cover-initial {
+  position: relative;
+  z-index: 1;
+  font-size: 3rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  letter-spacing: -0.03em;
+}
+
+.catalog__card--list .catalog__cover {
+  height: 90px;
+  width: 170px;
+  border-radius: var(--radius-md);
+}
+
+.catalog__card--list .catalog__cover-initial {
+  font-size: 2rem;
 }
 </style>

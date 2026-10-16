@@ -10,7 +10,7 @@
  */
 import { test, expect } from '@playwright/test'
 
-const BASE = process.env.APP_URL || 'http://127.0.0.1:8000'
+const BASE = process.env.APP_URL || 'http://127.0.0.1:8080'
 const ADMIN = { fio: 'Администратор', password: '123' }
 
 async function auth(page) {

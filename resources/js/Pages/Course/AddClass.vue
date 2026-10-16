@@ -1,9 +1,16 @@
 <template>
-  <v-col xs12 sm8 md4>
-    <v-card class="elevation-12 mx-auto">
-      <v-toolbar color="primary">
-        <v-toolbar-title>{{ $t("classes.title") }}</v-toolbar-title>
-      </v-toolbar>
+  <!--
+    Обёртка u-page + PageHeader добавлены потому, что страница шла
+    «голым фрагментом» без единого заголовка: на /classes не было ни
+    одного h1-h3, то есть у страницы не было имени — ни для человека,
+    ни для скринридера, ни для якоря «к содержанию» (WCAG 2.2 SC 1.3.1,
+    2.4.1). Заодно появился корректный единственный h1.
+  -->
+  <div class="u-page">
+    <PageHeader :title="$t('classes.title')" />
+
+    <v-col xs12 sm8 md4>
+    <v-card class="u-card u-card--elevated">
       <v-card-text>
         <v-alert
           v-if="errorMessage"
@@ -64,25 +71,27 @@
         ></ButtonGroup>
       </v-card-actions>
     </v-card>
-  </v-col>
+    </v-col>
 
-  <ConfirmDialog
-    v-model="confirmClear"
-    :title="$t('classes.clearTitle')"
-    :confirm-text="$t('classes.clearConfirm')"
-    :cancel-text="$t('common.cancel')"
-    :busy="clearing"
-    @cancel="confirmClear = false"
-    @confirm="clearDatabase"
-  >
-    {{ $t("classes.clearText") }}
-  </ConfirmDialog>
+    <ConfirmDialog
+      v-model="confirmClear"
+      :title="$t('classes.clearTitle')"
+      :confirm-text="$t('classes.clearConfirm')"
+      :cancel-text="$t('common.cancel')"
+      :busy="clearing"
+      @cancel="confirmClear = false"
+      @confirm="clearDatabase"
+    >
+      {{ $t("classes.clearText") }}
+    </ConfirmDialog>
+  </div>
 </template>
 
 <script>
 import { mapState, mapGetters } from "vuex";
 import ButtonGroup from "../../components/ButtonGroup.vue";
 import ConfirmDialog from "../../components/ui/ConfirmDialog.vue";
+import PageHeader from "../../components/ui/PageHeader.vue";
 import $api from "../../api/httpClient";
 import { unwrapArray, unwrapResponse } from "../../api/envelope";
 
@@ -153,6 +162,7 @@ export default {
   components: {
     ButtonGroup,
     ConfirmDialog,
+    PageHeader,
   },
   data() {
     return {

@@ -62,15 +62,22 @@ export function visibleItems(items, ctx) {
   const { can, isManager, t, requiredBy } = ctx
   const index = ctx.index
 
+  const mapItem = (item) => ({
+    ...item,
+    title: t(item.titleKey),
+  })
+
   return (items || [])
     .filter((item) => allowsLink(item.link, index, can, requiredBy))
     .filter((item) => fitsRole(item, isManager))
-    .map((item) => ({
-      ...item,
-      // titleKey без перевода показывался в интерфейсе как «app.menu.X»:
-      // ключ полезен разработчику и бесполезен человеку.
-      title: t(item.titleKey),
-    }))
+    .map((item) => {
+      const mapped = mapItem(item)
+      // Рекурсивно фильтруем вложенные подэлементы.
+      if (Array.isArray(item.children) && item.children.length) {
+        mapped.children = visibleItems(item.children, ctx)
+      }
+      return mapped
+    })
 }
 
 /**

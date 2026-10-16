@@ -18,9 +18,7 @@
     <!-- Состояние движка: переключатель включает тренажёр, но не
          запускает модель. Если её нет, включённый тренажёр — это
          «ничего не работает», и сказать об этом нужно здесь. -->
-    <v-card class="mt-6" data-test="tutor-engine-card">
-      <v-card-title class="text-subtitle-1">{{ $t('settings.tutor.engine') }}</v-card-title>
-      <v-card-text>
+    <SectionCard class="mt-6" :title="$t('settings.tutor.engine')" data-test="tutor-engine-card">
         <v-alert v-if="loading" type="info" density="compact">{{ $t('common.loading') }}</v-alert>
 
         <template v-else-if="health">
@@ -57,12 +55,9 @@
         </template>
 
         <v-alert v-else type="warning" density="compact">{{ $t('settings.tutor.noProbe') }}</v-alert>
-      </v-card-text>
-    </v-card>
+    </SectionCard>
 
-    <v-card v-if="canManage" class="mt-4">
-      <v-card-title class="text-subtitle-1">{{ $t('settings.tutor.materials') }}</v-card-title>
-      <v-card-text>
+    <SectionCard v-if="canManage" class="mt-4" :title="$t('settings.tutor.materials')">
         <v-alert v-if="!enabled" type="info" density="compact" class="mb-3">
           {{ $t('settings.tutor.enableFirst') }}
         </v-alert>
@@ -90,8 +85,7 @@
         </v-list>
 
         <p v-else class="text-body-2 text-medium-emphasis">{{ $t('settings.tutor.noMaterials') }}</p>
-      </v-card-text>
-    </v-card>
+    </SectionCard>
   </div>
 </template>
 
@@ -111,10 +105,11 @@
 import $api from '../../api/httpClient'
 import { unwrapResponse } from '../../api/envelope'
 import DataTable from '../../components/ui/DataTable.vue'
+import SectionCard from '../../components/ui/SectionCard.vue'
 
 export default {
   name: 'TutorSettings',
-  components: { DataTable },
+  components: { DataTable, SectionCard },
   data() {
     return {
       enabled: false,

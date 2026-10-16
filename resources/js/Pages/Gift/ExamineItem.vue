@@ -5,10 +5,17 @@
   <!-- {{ answerStatus }} -->
 
 
-  <v-card>
-    <v-toolbar color="primary">
-      <v-toolbar-title>{{ $t('gift.testing') }}</v-toolbar-title>
-    </v-toolbar>
+  <div class="u-page">
+  <!--
+    Заголовок страницы добавлен: страница прохождения экзамена
+    начиналась сразу с вопроса, и единственным заголовком был h2
+    вопроса. Заголовка уровня 1 не было вовсе — то есть у страницы не
+    было имени ни для человека, ни для навигации по заголовкам
+    (WCAG 2.2 SC 1.3.1, 2.4.6).
+  -->
+  <PageHeader :title="$t('exams.take.title')" />
+
+  <v-card class="u-card u-card--elevated">
     <v-row no-gutters>
       <v-col cols="8">
 
@@ -16,7 +23,7 @@
         <!-- <v-container fluid> <div class="questions"> -->
 
         <!-- Блок вопросов -->
-        <v-sheet elevation="1" color="#f5f5f5" v-if='!isFinishExamClicked' no-gutters class="cards">
+        <v-sheet elevation="1" color="var(--c-surface-2)" v-if='!isFinishExamClicked' no-gutters class="cards">
           <!-- <div class="question ml-5 mt-1"> -->
 
           <h2 class="mx-1">{{ question.question_text }}</h2>
@@ -62,7 +69,7 @@
         <!--                      блок карточек с вопросами                     -->
 
         <!-- <div class="cards">   -->
-        <v-sheet rounded elevation="1" color="#f5f5f5">
+        <v-sheet rounded elevation="1" color="var(--c-surface-2)">
           <!-- <v-sheet> -->
           <!-- <v-row v-if='!isFinishExamClicked'> -->
           <v-row>
@@ -97,6 +104,7 @@
       </v-col>
     </v-row>
   </v-card>
+  </div>
 </template>
 
   
@@ -105,8 +113,10 @@ import $api from "../../api/httpClient";
 import { unwrapResponse, unwrapArray, numericQuery } from "../../api/envelope";
 const apiUrl = import.meta.env.VITE_APP_URL;
 import MyProgress from '../VProgressCircular.vue'
+import PageHeader from '../../components/ui/PageHeader.vue'
 export default {
   components: {
+    PageHeader,
     MyProgress
   },
   props: {

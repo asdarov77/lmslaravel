@@ -19,6 +19,9 @@
         <v-btn color="primary" prepend-icon="mdi-printer" data-test="cert-print" @click="print">
           {{ $t('certificates.print') }}
         </v-btn>
+        <v-btn color="success" prepend-icon="mdi-file-pdf-box" data-test="cert-download" @click="download">
+          {{ $t('certificates.download') }}
+        </v-btn>
         <v-btn variant="text" prepend-icon="mdi-content-copy" data-test="cert-copy" @click="copyCode">
           {{ $t('certificates.copyCode') }}
         </v-btn>
@@ -167,6 +170,30 @@ export default {
       } catch (error) {
         // Буфер обмена может быть недоступен без https или разрешения:
         // код всё равно напечатан на листе, копирование не обязательно.
+      }
+    },
+
+    async download() {
+      if (!this.certificate) return
+
+      try {
+        const response = await $api.get(`/api/my/certificates/${this.idEdit}/download`, {
+          responseType: 'blob',
+        })
+
+        const url = window.URL.createObjectURL(new Blob([response.data]))
+        const link = document.createElement('a')
+        link.href = url
+        link.setAttribute('download', `certificate-${this.certificate.course}-${this.certificate.code}.pdf`)
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        window.URL.revokeObjectURL(url)
+      } catch (error) {
+        this.notify(
+          error?.response?.data?.message || this.$t('certificates.downloadError'),
+          'error'
+        )
       }
     },
   },

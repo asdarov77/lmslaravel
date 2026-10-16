@@ -130,6 +130,48 @@ class CertificateController extends Controller
     }
 
     /**
+     * Скачать сертификат как PDF.
+     *
+     * GET /api/my/certificates/{course}/download
+     */
+    public function download(Request $request, Course $course)
+    {
+        $user = $request->user();
+        abort_if($user === null, 401);
+
+        $rows = collect($this->planRows($user))->firstWhere('course.id', $course->id);
+
+        if ($rows === null) {
+            abort(404);
+        }
+
+        CourseAccess::authorizeOpen($user, $course);
+
+        $status = $this->statusFor($user, $rows);
+
+        abort_unless($status['available'], 403, 'Курс ещё не завершён');
+
+        $certificateData = array_merge($this->settingsPayload(), [
+            'fio' => $user->fio ?? $user->name,
+            'course' => $rows['course']->title,
+            'module_title' => $rows['module_title'],
+            'study_from' => $rows['study_from'],
+            'study_to' => $rows['study_to'],
+            'issued_at' => Carbon::now()->toDateString(),
+            'lessons_done' => $status['lessons_done'],
+            'lessons_total' => $status['lessons_total'],
+            'exams_passed' => $status['exams_passed'],
+            'exams_total' => $status['exams_total'],
+            'code' => $this->code($user->id, $course->id),
+        ]);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('certificates.pdf', $certificateData);
+        $pdf->setPaper('A4', 'portrait');
+
+        return $pdf->download("certificate-{$course->id}-{$user->id}.pdf");
+    }
+
+    /**
      * Настройки бланка сертификата.
      *
      * GET /api/certificates/settings
@@ -295,11 +337,29 @@ class CertificateController extends Controller
             abort(404);
         }
 
+        $moduleTitle = null;
+        $issuedAt = null;
+
+        $learning = Group2learning::where('course_id', $courseId)
+            ->whereHas('course', fn ($q) => $q)
+            ->first();
+
+        if ($learning) {
+            $moduleTitle = $learning->parent_id
+                ? \App\Models\Aukstructure::find($learning->parent_id)?->title
+                : null;
+            $issuedAt = $learning->study_to
+                ? Carbon::parse($learning->study_to)->format('d.m.Y')
+                : null;
+        }
+
         return response()->json([
             'data' => [
                 'valid' => true,
                 'fio' => $user->fio ?? $user->name,
                 'course' => $course->title,
+                'module_title' => $moduleTitle,
+                'issued_at' => $issuedAt,
             ],
         ]);
     }

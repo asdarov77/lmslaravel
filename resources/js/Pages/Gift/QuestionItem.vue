@@ -89,7 +89,7 @@ export default {
 
 <style>
 .card {
-  background-color: #F0F8FF;
+  background-color: var(--c-info-soft);
   padding: 20px;
   margin: 20px;
   border-radius: 10px;
@@ -97,7 +97,7 @@ export default {
 }
 
 button {
-  background-color: #4CAF50;
+  background-color: var(--c-success);
   color: white;
   border: none;
   padding: 10px;

@@ -2,10 +2,13 @@
   <div class="u-page">
     <PageHeader :title="$t('manager.title')" :subtitle="$t('manager.subtitle')">
       <template #head>
-        <p class="dash__greeting">
-          {{ $t("manager.greeting") }},
-          <strong>{{ userName }}</strong>
-        </p>
+        <!-- Герой-блок приветствия для администратора/инструктора. -->
+        <div class="dash__hero">
+          <p class="dash__hero-greeting">{{ $t("manager.greeting") }},
+            <strong class="u-text-gradient">{{ userName }}</strong>
+          </p>
+          <p class="dash__hero-sub">{{ dashboardSubtitle }}</p>
+        </div>
       </template>
       <template #actions>
         <v-btn
@@ -22,39 +25,50 @@
       </template>
     </PageHeader>
 
-    <!-- Сводные показатели -->
-    <div v-if="stats.length" class="dash__stats">
-      <div v-for="stat in stats" :key="stat.key" class="u-card dash__stat">
-        <span class="dash__stat-icon" :class="`dash__stat-icon--${stat.tone}`">
-          <v-icon :icon="stat.icon" size="20" aria-hidden="true"></v-icon>
-        </span>
-        <div>
-          <span class="dash__stat-value">{{ stat.value }}</span>
-          <span class="dash__stat-label">{{ $t(stat.label_key) }}</span>
-        </div>
-      </div>
-    </div>
+    <!--
+      Пока считаются показатели, показываем СКЕЛЕТОНЫ той же формы.
+      Раньше loading в данные попадал, но в шаблоне не использовался:
+      страница секунду была пустой, а потом разом появлялась — выглядело
+      как «ничего не грузится». Скелетон повторяет раскладку, поэтому
+      страница не прыгает при появлении данных.
+    -->
+    <AppSkeleton v-if="loading" variant="cards" :count="4" class="mb-4" />
 
-    <div class="dash__grid">
+    <template v-else>
+      <!-- Сводные показатели -->
+      <div v-if="stats.length" class="dash__stats" data-test="dash-stats">
+        <StatCard
+          v-for="stat in stats"
+          :key="stat.key"
+          :label="$t(stat.label_key)"
+          :value="stat.value"
+          :suffix="stat.suffix"
+          :icon="stat.icon"
+          :trend="stat.trend"
+          :tone="stat.tone"
+        />
+      </div>
+
+      <MetricCharts
+        v-if="trends.attempts_by_month.length || trends.groups.length"
+        class="mb-4"
+        :months="trends.attempts_by_month"
+        :groups="trends.groups"
+      />
+
+      <div class="dash__grid">
+
       <!--
           Требует внимания. Суммы сами по себе бесполезны: «групп: 10»
           ничего не подсказывает. Список говорит, что делать, и ведёт
           прямо к записи.
       -->
-              <!-- Графики: динамика попыток и успеваемость по группам. -->
-        <MetricCharts
-          v-if="trends.attempts_by_month.length || trends.groups.length"
-          class="mt-4"
-          :months="trends.attempts_by_month"
-          :groups="trends.groups"
-        />
-
-<section class="u-card dash__panel">
+<section class="u-card dash__panel u-card--glass u-hover-lift">
         <h2 class="u-card__title">{{ $t('manager.attentionTitle') }}</h2>
         <p class="u-page__subtitle">{{ $t('manager.attentionHint') }}</p>
 
         <ul v-if="attention.length" class="dash__list">
-          <li v-for="(row, index) in attention" :key="`${row.key}-${index}`" class="dash__list-row">
+          <li v-for="(row, index) in attention" :key="`${row.key}-${index}`" class="dash__list-row" data-stagger :data-stagger-index="index">
             <div>
               <span class="dash__list-title">{{ row.text || $t(row.hint_key) }}</span>
               <span class="dash__list-sub">{{ $t(row.hint_key) }}</span>
@@ -78,12 +92,12 @@
       </section>
 
       <!-- Последние попытки экзаменов -->
-      <section class="u-card dash__panel">
+      <section class="u-card dash__panel u-card--glass u-hover-lift">
         <h2 class="u-card__title">{{ $t('manager.recent') }}</h2>
         <p class="u-page__subtitle">{{ $t('manager.recentHint') }}</p>
 
         <ul v-if="recent.length" class="dash__list">
-          <li v-for="row in recent" :key="row.id" class="dash__list-row">
+          <li v-for="(row, index) in recent" :key="row.id" class="dash__list-row" data-stagger :data-stagger-index="index">
             <div>
               <span class="dash__list-title">{{ row.exam || $t('manager.examUnknown') }}</span>
               <span class="dash__list-sub">{{ row.user }}</span>
@@ -96,7 +110,8 @@
 
         <p v-else class="dash__muted">{{ $t('manager.recentEmpty') }}</p>
       </section>
-    </div>
+      </div>
+    </template>
 
   </div>
 </template>
@@ -104,6 +119,8 @@
 <script>
 import PageHeader from '../../components/ui/PageHeader.vue'
 import MetricCharts from '../../components/ui/MetricCharts.vue'
+import StatCard from '../../components/ui/StatCard.vue'
+import AppSkeleton from '../../components/ui/AppSkeleton.vue'
 import { mapGetters, mapState } from 'vuex'
 import { toast } from '../../composables/useToast'
 import { fetchDashboardSummary } from '../../api/dashboard.api'
@@ -120,7 +137,7 @@ import { unwrapResponse } from '../../api/envelope'
 export default {
   name: 'ManagerDashboard',
 
-  components: { PageHeader, MetricCharts },
+  components: { PageHeader, MetricCharts, StatCard, AppSkeleton },
 
   data: () => ({
     role: null,
@@ -162,6 +179,13 @@ export default {
 
       return actions
     },
+
+    /** Подзаголовок героя-блока: контекст роли. */
+    dashboardSubtitle() {
+      return this.role
+        ? this.$t('manager.heroSubRole', { role: this.role })
+        : this.$t('manager.heroSubDefault');
+    },
   },
 
   async created() {
@@ -196,6 +220,28 @@ export default {
 </script>
 
 <style scoped>
+.dash__hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin: var(--sp-2) 0 var(--sp-4);
+}
+
+.dash__hero-greeting {
+  margin: 0;
+  font-size: 1.125rem;
+  color: var(--c-text-secondary);
+  line-height: var(--lh-normal);
+}
+
+.dash__hero-sub {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--c-text-muted);
+  max-width: 60ch;
+  line-height: var(--lh-normal);
+}
+
 .dash__empty {
   display: flex;
   flex-direction: column;

@@ -193,6 +193,16 @@ return [
         ],
 
         // ------------------------------------------------------------------
+        // White-label
+        // ------------------------------------------------------------------
+        // Бренд системы — логотипы, цвета, градиенты. Меняет визуал
+        # всей платформы, поэтому право отдельное от content.manage.
+        'white_label.manage' => [
+            'name' => 'Управление брендом (white-label)',
+            'group' => 'settings',
+        ],
+
+        // ------------------------------------------------------------------
         // Сертификаты
         // ------------------------------------------------------------------
         // Бланк сертификата — официальный документ: его настраивает тот,
@@ -269,6 +279,7 @@ return [
             'grading.manage', 'progress.view',
             'files.upload', 'content.view', 'content.manage', 'announcements.manage',
             'certificates.manage',
+            'white_label.manage',
             'forum.moderate',
             'dictionaries.view', 'reports.view', 'users.view',
             'tutor.use', 'tutor.manage',

@@ -26,7 +26,7 @@ const catalogSlugs = (() => {
 })()
 
 /** Маршруты, которые по замыслу доступны всем (публичные и служебные). */
-const PUBLIC_ROUTES = new Set(['/', '/login', '/reg', '/about', '/my', '/logout', '/datepicker', '/403', '/404', '/500'])
+const PUBLIC_ROUTES = new Set(['/', '/login', '/reg', '/about', '/my', '/logout', '/datepicker', '/403', '/404', '/500', '/certificates/verify/:code?', '/:pathMatch(.*)*'])
 
 /**
  * Маршруты, доступные только авторизованному, но без доменного права.
@@ -76,7 +76,14 @@ const AUTH_ONLY_ROUTES = new Set([
   // meta.permission здесь был бы либо слишком узким (закрыл бы сдачу),
   // либо слишком широким (открыл бы создание всем).
   '/assignments', '/assignments/:idEdit',
+  // Достижения: доступен любому вошедшему обучающемуся, права
+  // (trainee) проверяются через onlyFor в меню и на бэкенде
+  // через GamificationController (возвращает только свои данные).
+  '/gamification',
+  // Публичный профиль преподавателя: доступен любому вошедшему.
+  '/instructors/:id',
 ])
+
 
 const flat = (routes || []).flat(Infinity).filter(Boolean)
 

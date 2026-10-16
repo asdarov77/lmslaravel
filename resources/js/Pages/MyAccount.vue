@@ -52,6 +52,8 @@
                 color="error"
                 class="mt-1 ml-2"
                 data-test="avatar-remove"
+                :loading="removingAvatar"
+                :disabled="removingAvatar"
                 @click="removeAvatar"
               >
                 {{ $t("profile.avatarRemove") }}
@@ -102,20 +104,151 @@
         <h2 class="u-card__title">{{ $t("profile.permissions") }}</h2>
         <p class="u-page__subtitle">{{ $t("profile.permissionsHint") }}</p>
 
-        <div v-if="permissionGroups.length" class="profile__perms">
-          <div v-for="group in permissionGroups" :key="group.key" class="profile__perm-group">
-            <span class="profile__perm-title">{{ $t(group.titleKey) }}</span>
-            <ul class="profile__perm-list">
-              <li v-for="slug in group.slugs" :key="slug">
-                <span class="u-badge">{{ permissionLabel(slug) }}</span>
-              </li>
-            </ul>
+<div v-if="permissionGroups.length" class="profile__perms">
+            <div v-for="group in permissionGroups" :key="group.key" class="profile__perm-group">
+              <span class="profile__perm-title">{{ $t(group.titleKey) }}</span>
+              <ul class="profile__perm-list">
+                <li v-for="slug in group.slugs" :key="slug">
+                  <span class="u-badge">{{ permissionLabel(slug) }}</span>
+                </li>
+              </ul>
+            </div>
           </div>
-        </div>
-        <p v-else class="u-muted">{{ $t("profile.noPermissions") }}</p>
-      </section>
+          <p v-else class="u-muted">{{ $t("profile.noPermissions") }}</p>
+    </section>
+
+        <!-- 2FA: двухфакторная аутентификация. -->
+        <section class="u-card" data-test="profile-2fa">
+          <h2 class="u-card__title">{{ $t("profile.twoFactor.title") }}</h2>
+          <p class="u-page__subtitle">{{ $t("profile.twoFactor.hint") }}</p>
+
+          <v-alert
+            v-if="twoFactorEnabled"
+            type="success"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+          >
+            {{ $t("profile.twoFactor.enabled") }}
+          </v-alert>
+          <v-alert
+            v-else
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+          >
+            {{ $t("profile.twoFactor.disabled") }}
+          </v-alert>
+
+          <div v-if="!twoFactorSetupLoaded" class="d-flex justify-center py-4">
+            <v-progress-circular indeterminate :aria-label="$t('common.loading')"></v-progress-circular>
+          </div>
+
+          <div v-else-if="!twoFactorEnabled" class="two-factor__setup">
+            <h3 class="two-factor__title">{{ $t("profile.twoFactor.setupTitle") }}</h3>
+            <p class="two-factor__text">{{ $t("profile.twoFactor.setupText") }}</p>
+
+            <div v-if="qrCodeUrl" class="two-factor__qr mb-4">
+              <img :src="qrCodeUrl" :alt="$t('profile.twoFactor.qrAlt')" />
+            </div>
+
+            <div v-if="secret" class="two-factor__secret mb-4">
+              <!--
+                Подпись связана с полем через for/id. Раньше <label> шёл
+                рядом с <input> без id, поэтому поле оставалось БЕЗ
+                доступного имени: скринридер читал «поле ввода» вместо
+                «Секретный ключ». WCAG 2.2 SC 1.3.1 и 4.1.2.
+              -->
+              <label class="u-field__label" for="two-factor-secret">
+                {{ $t("profile.twoFactor.secretLabel") }}
+              </label>
+              <div class="d-flex align-center gap-2">
+                <input
+                  id="two-factor-secret"
+                  type="text"
+                  readonly
+                  :value="secret"
+                  class="u-field__input"
+                  style="font-family: monospace; letter-spacing: 0.1em;"
+                />
+                <v-btn
+                  size="x-small"
+                  variant="text"
+                  prepend-icon="mdi-content-copy"
+                  @click="copySecret"
+                >
+                  {{ $t("profile.twoFactor.copy") }}
+                </v-btn>
+              </div>
+            </div>
+
+            <v-text-field
+              v-model="totpCode"
+              :label="$t('profile.twoFactor.codeLabel')"
+              :placeholder="$t('profile.twoFactor.codePlaceholder')"
+              maxlength="6"
+              density="compact"
+              variant="outlined"
+              class="mb-3"
+              @keyup.enter="enable2FA"
+            />
+
+            <v-btn
+              color="primary"
+              variant="flat"
+              :loading="enabling2FA"
+              @click="enable2FA"
+            >
+              {{ $t("profile.twoFactor.enable") }}
+            </v-btn>
+          </div>
+
+          <div v-else class="two-factor__manage">
+            <div class="d-flex flex-wrap gap-2 mb-3">
+              <v-btn
+                color="warning"
+                variant="tonal"
+                prepend-icon="mdi-key-variant"
+                @click="regenerateRecoveryCodes"
+              >
+                {{ $t("profile.twoFactor.regenerateCodes") }}
+              </v-btn>
+              <v-btn
+                color="error"
+                variant="tonal"
+                prepend-icon="mdi-shield-off-outline"
+                @click="disable2FA"
+              >
+                {{ $t("profile.twoFactor.disable") }}
+              </v-btn>
+            </div>
+
+            <v-alert
+              v-if="recoveryCodes.length"
+              type="info"
+              variant="tonal"
+              density="compact"
+              class="mb-3"
+            >
+              <div class="d-flex align-center justify-space-between mb-2">
+                <span class="u-typography__subtitle-2">{{ $t("profile.twoFactor.recoveryCodesLabel") }}</span>
+                <v-btn size="x-small" variant="text" @click="copyRecoveryCodes">
+                  {{ $t("profile.twoFactor.copyAll") }}
+                </v-btn>
+              </div>
+              <div class="two-factor__recovery-codes">
+                <span
+                  v-for="code in recoveryCodes"
+                  :key="code"
+                  class="two-factor__recovery-code"
+                >{{ code }}</span>
+              </div>
+            </v-alert>
+          </div>
+        </section>
+      </div>
     </div>
-  </div>
 </template>
 
 <script>
@@ -139,6 +272,10 @@ import PageHeader from "../components/ui/PageHeader.vue";
 export default {
   components: { PageHeader },
 
+  mounted() {
+    this.loadTwoFactorSetup();
+  },
+
   data: () => ({
     // Разделы для группировки прав. Ключи совпадают с разделами
     // config/permissions.php на бэкенде — это их названия, а не
@@ -156,7 +293,16 @@ export default {
     // Текст ошибки загрузки аватара: сервер вернёт 422 с перечнем
     // правил, а человеку нужна одна понятная фраза.
     avatarError: null,
+    removingAvatar: false,
     uploadingAvatar: false,
+    // 2FA
+    twoFactorEnabled: false,
+    twoFactorSetupLoaded: false,
+    secret: null,
+    qrCodeUrl: null,
+    totpCode: '',
+    enabling2FA: false,
+    recoveryCodes: [],
   }),
 
   computed: {
@@ -295,9 +441,28 @@ export default {
       }
     },
 
-    /** Убирает аватар: возвращаем инициалы. */
-    removeAvatar() {
-      this.$store.commit("Auth/SET_USER_AVATAR", null);
+    /**
+     * Убрать аватар.
+     *
+     * Раньше здесь был только `SET_USER_AVATAR(null)` — то есть
+     * менялось состояние вкладки, а не данные: после перезагрузки
+     * аватар возвращался, и человек заключал, что кнопка не работает.
+     * Теперь запрос уходит на сервер, и запись стирается по-настоящему.
+     */
+    async removeAvatar() {
+      if (this.removingAvatar) return;
+
+      this.removingAvatar = true;
+      this.avatarError = null;
+
+      try {
+        await $api.delete("/api/user/avatar");
+        this.$store.commit("Auth/SET_USER_AVATAR", null);
+      } catch (e) {
+        this.avatarError = this.$t("profile.avatarRemoveFailed");
+      } finally {
+        this.removingAvatar = false;
+      }
     },
 
     /**
@@ -313,6 +478,102 @@ export default {
       const translated = this.$t(key);
 
       return translated === key ? slug : translated;
+    },
+
+    // ===== 2FA Methods =====
+
+    /** Загружает настройки 2FA для текущего пользователя. */
+    async loadTwoFactorSetup() {
+      this.twoFactorSetupLoaded = false;
+      try {
+        const response = await $api.get('/api/user/two-factor');
+        const data = response?.data?.data ?? {};
+        this.twoFactorEnabled = Boolean(data.enabled);
+        this.secret = data.secret;
+        this.qrCodeUrl = data.qr_code_url;
+        this.recoveryCodes = data.recovery_codes ?? [];
+      } catch (error) {
+        console.warn('[MyAccount] loadTwoFactorSetup:', error?.message);
+      } finally {
+        this.twoFactorSetupLoaded = true;
+      }
+    },
+
+    /** Включает 2FA после проверки TOTP кода. */
+    async enable2FA() {
+      if (!this.totpCode || this.totpCode.length !== 6) {
+        this.notify(this.$t('profile.twoFactor.codeInvalid'), 'warning');
+        return;
+      }
+
+      this.enabling2FA = true;
+      try {
+        const response = await $api.post('/api/user/two-factor/enable', {
+          code: this.totpCode,
+        });
+        this.twoFactorEnabled = true;
+        this.totpCode = '';
+        this.recoveryCodes = response?.data?.data?.recovery_codes ?? [];
+        this.notify(this.$t('profile.twoFactor.enabledSuccess'));
+        this.notify(this.$t('profile.twoFactor.saveCodesHint'), 'info');
+      } catch (error) {
+        this.notify(
+          error?.response?.data?.error?.message || this.$t('profile.twoFactor.enableFailed'),
+          'error'
+        );
+      } finally {
+        this.enabling2FA = false;
+      }
+    },
+
+    /** Отключает 2FA после проверки кода. */
+    async disable2FA() {
+      const code = window.prompt(this.$t('profile.twoFactor.disablePrompt'));
+      if (!code || code.length !== 6) return;
+
+      try {
+        await $api.post('/api/user/two-factor/disable', { code: code.trim() });
+        this.twoFactorEnabled = false;
+        this.secret = null;
+        this.qrCodeUrl = null;
+        this.recoveryCodes = [];
+        this.notify(this.$t('profile.twoFactor.disabledSuccess'));
+      } catch (error) {
+        this.notify(
+          error?.response?.data?.error?.message || this.$t('profile.twoFactor.disableFailed'),
+          'error'
+        );
+      }
+    },
+
+    /** Регенерирует коды восстановления. */
+    async regenerateRecoveryCodes() {
+      const confirmed = window.confirm(this.$t('profile.twoFactor.regenerateConfirm'));
+      if (!confirmed) return;
+
+      try {
+        const response = await $api.post('/api/user/two-factor/regenerate-codes');
+        this.recoveryCodes = response?.data?.data?.recovery_codes ?? [];
+        this.notify(this.$t('profile.twoFactor.codesRegenerated'));
+        this.notify(this.$t('profile.twoFactor.saveCodesHint'), 'info');
+      } catch (error) {
+        this.notify(
+          error?.response?.data?.error?.message || this.$t('profile.twoFactor.regenerateFailed'),
+          'error'
+        );
+      }
+    },
+
+    /** Копирует секрет в буфер обмена. */
+    copySecret() {
+      navigator.clipboard.writeText(this.secret || '');
+      this.notify(this.$t('profile.twoFactor.secretCopied'));
+    },
+
+    /** Копирует все коды восстановления в буфер обмена. */
+    copyRecoveryCodes() {
+      navigator.clipboard.writeText(this.recoveryCodes.join('\n'));
+      this.notify(this.$t('profile.twoFactor.codesCopied'));
     },
   },
 };

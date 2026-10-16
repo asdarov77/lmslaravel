@@ -1,8 +1,14 @@
 <template>
-  <v-card class="elevation-12 mx-auto" style="max-width: 900px; overflow: visible">
-    <v-toolbar color="primary">
-      <v-toolbar-title>{{ $t("groupLearning.title") }}</v-toolbar-title>
-    </v-toolbar>
+  <div class="u-page">
+  <!--
+    Заголовок страницы добавлен: раньше его не было вовсе, страница
+    начиналась сразу с полей — то есть у неё не было имени ни для
+    человека, ни для навигации по заголовкам (WCAG 2.2 SC 1.3.1,
+    2.4.6).
+  -->
+    <PageHeader :title="$t('groupLearning.title')" />
+
+    <v-card class="u-card u-card--elevated" style="max-width: 900px;">
 
     <v-card-text>
       <v-form @submit.prevent="submitForm">
@@ -57,7 +63,7 @@
           variant="tonal"
           density="compact"
           class="mb-3"
-          text="Выберите класс и категорию — после этого появится список курсов"
+          :text="$t('groupLearning.selectHint')"
         ></v-alert>
 
         <treeselect
@@ -71,6 +77,9 @@
           :clearable="false"
           :disabled="loading || saving"
         />
+        <p v-if="form.aircraft_id && form.category_id" class="text-caption text-medium-emphasis mt-2">
+          {{ $t("groupLearning.materialsOnlyHint") }}
+        </p>
 
         <v-alert
           v-if="form.course_ids.length"
@@ -78,7 +87,7 @@
           variant="tonal"
           density="compact"
           class="mt-3"
-          :text="`Выбрано модулей: ${form.course_ids.length}`"
+          :text="$t('groupLearning.selectedCount', { count: form.course_ids.length })"
         ></v-alert>
 
         <v-divider class="my-3"></v-divider>
@@ -170,7 +179,8 @@
       ></ButtonGroup>
     </v-card-actions>
 
-  </v-card>
+    </v-card>
+  </div>
 </template>
 
 <script>
@@ -179,12 +189,14 @@ import $api from "../../api/httpClient";
 import { asArray, unwrapArray, unwrapResponse, numericQuery } from "../../api/envelope";
 import { canonicalRoleSlug } from "../../utils/roles";
 import ButtonGroup from "../../components/ButtonGroup.vue";
+import { toast } from "../../composables/useToast";
+import PageHeader from "../../components/ui/PageHeader.vue";
 import Treeselect from "vue3-treeselect";
 import "vue3-treeselect/dist/vue3-treeselect.css";
 
 export default {
   name: "GroupLearning",
-  components: { ButtonGroup, Treeselect },
+  components: { ButtonGroup, Treeselect, PageHeader },
 
   props: {
     /** Группа из маршрута. Не обязательна: группу можно выбрать в форме. */
@@ -349,7 +361,20 @@ export default {
         if (!item) return;
         // label обязателен для treeselect, title из БД не подходит.
         nodeCourse[item.id] = courseId;
-        byId.set(item.id, { id: item.id, label: item.title, children: [] });
+        byId.set(item.id, {
+          id: item.id,
+          label: item.title,
+          /*
+           * Единица записи — модуль (type 3). Тема и раздел остаются в
+           * дереве для контекста, но отметить их нельзя: иначе в запись
+           * попадал parent_id раздела, ограничение не работало (доступ
+           * считался по course_id), а форма обещала ровно обратное.
+           * isDisabled оставляет узел видимым и неотмечаемым, а не
+           * выбрасывает его из дерева.
+           */
+          isDisabled: Number(item.type) !== 3,
+          children: [],
+        });
       });
 
       const roots = [];
@@ -488,7 +513,7 @@ export default {
 .vue-treeselect__single-value {
   padding-left: 12px;
   line-height: 56px;
-  color: #848484;
+  color: var(--c-text-muted);
 }
 
 .vue-treeselect__control-arrow-container {
@@ -497,8 +522,8 @@ export default {
 
 .vue-treeselect__multi-value-item {
   cursor: pointer;
-  color: #7a7a7a;
-  background-color: #f2efef;
+  color: var(--c-text-secondary);
+  background-color: var(--c-surface-2);
   border-bottom: 3px solid;
 }
 

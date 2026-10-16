@@ -1,6 +1,7 @@
 <template>
   <v-col cols="12" sm="8" md="4">
     <FormCard
+      :heading-level="1"
       :title="`${t('user.changePassword')} ${usernameEdit}`"
       :busy="form.submitting.value"
       @submit="submitForm"

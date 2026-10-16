@@ -32,7 +32,7 @@ const i18n = createI18n({
 })
 
 import UserItemEdit from '../../resources/js/Pages/User/UserItemEdit.vue'
-import Register from '../../resources/js/Pages/Register.vue'
+import AuthPage from '../../resources/js/Pages/AuthPage.vue'
 import GroupList from '../../resources/js/Pages/GroupList.vue'
 import ru from '../../resources/js/locales/ru.json'
 import en from '../../resources/js/locales/en.json'
@@ -88,7 +88,7 @@ const passthroughStub = name => ({
   template: '<div class="' + name.toLowerCase() + '-stub"></div>',
 })
 
-const mountPage = component => {
+const mountPage = (component, setup = {}) => {
   // Страницы на <script setup> берут стор и роутер через useStore()/useRouter(),
   // которые читают их из provide, а не из $store/$router. Поэтому плагины
   // обязаны стоять: одних mocks недостаточно — страница падала бы на
@@ -265,15 +265,23 @@ describe('GroupList: отрисовка без ошибок', () => {
 
 // ------------------------------------------------ РЕГРЕСС: форма создания
 
-describe('Register: создание пользователя', () => {
-  // Контракт страницы изменился вместе с переводом на useForm (Фаза 2):
-  // полей в data больше нет, значения живут в схеме формы, а ошибка
-  // «пароли не совпадают» показывается ПОД полем повторного ввода,
-  // а не в общем списке строк.
+describe('AuthPage: регистрация', () => {
+  /*
+   * Контракт менялся дважды.
+   *
+   * Фаза 2 — перевод на useForm: полей в data больше нет, значения живут
+   * в схеме, а «пароли не совпадают» показывается ПОД полем повторного
+   * ввода, а не в общем списке строк.
+   *
+   * Фаза 3.1 — отдельная страница Register.vue упразднена: регистрация
+   * стала вторым режимом AuthPage, который открывается по ?mode=register.
+   */
+  const mountRegister = () => mountPage(AuthPage, { mode: 'register' })
+
   const fill = (wrapper, { fio, password, confirmation }) => {
-    wrapper.vm.form.values.fio = fio
-    wrapper.vm.form.values.password = password
-    wrapper.vm.form.values.password_confirmation = confirmation
+    wrapper.vm.register.values.fio = fio
+    wrapper.vm.register.values.password = password
+    wrapper.vm.register.values.password_confirmation = confirmation
   }
 
   it('успешный ответ показывает диалог и кладёт пользователя в state', async () => {
@@ -284,11 +292,11 @@ describe('Register: создание пользователя', () => {
       return Promise.resolve(envelope([]))
     })
 
-    const wrapper = mountPage(Register)
+    const wrapper = mountRegister()
     await tick()
 
     fill(wrapper, { fio: 'Новый Сотрудник', password: 'secret123', confirmation: 'secret123' })
-    await wrapper.vm.submitForm()
+    await wrapper.vm.submitRegister()
     await tick()
 
     const [url, payload] = http.post.mock.calls[0]
@@ -298,40 +306,40 @@ describe('Register: создание пользователя', () => {
   })
 
   it('не отправляет форму, если пароли не совпадают', async () => {
-    const wrapper = mountPage(Register)
+    const wrapper = mountRegister()
     await tick()
 
     fill(wrapper, { fio: 'Новый', password: 'secret123', confirmation: 'other456' })
-    await wrapper.vm.submitForm()
+    await wrapper.vm.submitRegister()
     await tick()
 
     expect(http.post).not.toHaveBeenCalled()
     // Ошибка принадлежит полю, а не общему списку строк в шаблоне.
-    expect(wrapper.vm.form.errors.password_confirmation).toBe('Пароли не совпадают')
+    expect(wrapper.vm.register.errors.password_confirmation).toBe('Пароли не совпадают')
     // Первый пароль валиден по остальным правилам — иначе подсветились бы
     // оба поля и ошибка «пароли не совпадают» потерялась бы среди прочих.
-    expect(wrapper.vm.form.errors.password).toBe('')
+    expect(wrapper.vm.register.errors.password).toBe('')
   })
 
   it('не отправляет форму без fio', async () => {
-    const wrapper = mountPage(Register)
+    const wrapper = mountRegister()
     await tick()
 
     fill(wrapper, { fio: '', password: 'secret123', confirmation: 'secret123' })
-    await wrapper.vm.submitForm()
+    await wrapper.vm.submitRegister()
     await tick()
 
     expect(http.post).not.toHaveBeenCalled()
-    expect(wrapper.vm.form.errors.fio).toBe('Укажите ФИО')
+    expect(wrapper.vm.register.errors.fio).toBe('Укажите ФИО')
   })
 
   it('ошибка не роняет страницу', async () => {
     http.post.mockRejectedValue({ response: { status: 500, data: { message: 'boom' } } })
-    const wrapper = mountPage(Register)
+    const wrapper = mountRegister()
     await tick()
 
     fill(wrapper, { fio: 'Ошибка', password: 'secret123', confirmation: 'secret123' })
-    await wrapper.vm.submitForm()
+    await wrapper.vm.submitRegister()
     await tick()
 
     expect(shownToasts().some((t) => t.type === 'error')).toBe(true)

@@ -1,6 +1,7 @@
 <template>
   <div class="u-page">
     <FormCard
+      :heading-level="1"
       :title="t('groups.create.title')"
       :subtitle="t('groups.create.subtitle')"
       :busy="form.submitting.value"
@@ -40,6 +41,7 @@
         name="groupdescription"
       >
         <AutosizeTextarea
+            :label-id="`field-groupdescription-label`"
           v-model="form.values.groupdescription"
           :maxlength="255"
           :rows="3"

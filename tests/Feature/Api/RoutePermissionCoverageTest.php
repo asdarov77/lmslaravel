@@ -4,6 +4,7 @@ namespace Tests\Feature\Api;
 
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Feature\AuthenticatesApi;
@@ -34,7 +35,12 @@ class RoutePermissionCoverageTest extends TestCase
             ['POST', '/api/gift', ['name' => 'Подарок']],
             ['POST', '/api/groups', ['groupname' => 'Группа']],
             ['POST', '/api/course', ['title' => 'Курс']],
-            ['POST', '/api/settings', ['name' => 'setting']],
+            // POST /api/settings УБРАН из списка намеренно: у таблицы
+            // настроек (key-value) нет операции создания, метода store()
+            // в контроллере никогда не было, и маршрут только отдавал 500.
+            // Теперь его нет — и маршрута, который можно проверить на
+            // права, тоже нет. Проверка прав на настройки идёт по
+            // PUT /api/settings/{name} (см. SettingsApiTest).
         ];
     }
 
@@ -75,6 +81,22 @@ class RoutePermissionCoverageTest extends TestCase
                     . 'но пользователь авторизован.'
             );
         }
+    }
+
+    /**
+     * Настройки: прав достаточно только у администратора.
+     *
+     * Отдельный тест, потому что здесь проверяется не POST (его нет),
+     * а реальная операция правки — PUT /api/settings/{имя}.
+     */
+    public function test_settings_write_requires_settings_manage(): void
+    {
+        $this->admin();
+        Setting::factory()->create(['name' => 'probe_setting', 'value' => 'old']);
+
+        $this->putJson('/api/settings/probe_setting', [
+            ['name' => 'probe_setting', 'value' => 'new'],
+        ])->assertStatus(200)->assertJsonPath('success', true);
     }
 
     public function test_guest_is_rejected_with_401_on_write_routes(): void

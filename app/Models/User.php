@@ -90,6 +90,22 @@ class User extends Authenticatable
     }
 
     /**
+     * URL аватара пользователя.
+     *
+     * Хранится в JSON-поле avatar (путь к файлу на диске public).
+     */
+    public function getAvatarUrlAttribute(): ?string
+    {
+        if (empty($this->avatar)) {
+            return null;
+        }
+
+        $avatar = is_string($this->avatar) ? json_decode($this->avatar, true) : $this->avatar;
+
+        return $avatar['path'] ?? $avatar['url'] ?? null;
+    }
+
+    /**
      * Приводит произвольное написание роли к каноническому slug'у.
      * Возвращает null, если значение не опознано.
      */

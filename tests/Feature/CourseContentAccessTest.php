@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Aukstructure;
 use App\Models\Aircraft;
+use App\Models\Category;
 use App\Models\Course;
 use App\Models\Group;
 use App\Models\Group2learning;
@@ -140,5 +141,65 @@ class CourseContentAccessTest extends TestCase
                 ->getJson($endpoint)
                 ->assertOk("администратор открывает: {$endpoint}");
         }
+    }
+
+    /**
+     * Спецразделение: пилот не видит материалы бортинженера.
+     *
+     * Один курс привязан к двум специальностям, группа записана на курс
+     * в рамках одной из них. Материал другой специальности того же курса
+     * должен быть закрыт (403), пока группа не записана и на него.
+     */
+    public function test_trainee_sees_only_own_specialty_material(): void
+    {
+        $group = Group::factory()->create();
+        $aircraft = Aircraft::factory()->create();
+        $course = Course::factory()->create(['aircraft_id' => $aircraft->id]);
+
+        $pilot = Category::factory()->create(['title' => 'Командир экипажа']);
+        $radio = Category::factory()->create(['title' => 'Бортовой радист']);
+        $course->categories()->sync([$pilot->id, $radio->id]);
+
+        // Группа записана на курс в рамках категории командира экипажа.
+        Group2learning::factory()->create([
+            'group_id' => $group->id,
+            'course_id' => $course->id,
+            'category_id' => $pilot->id,
+        ]);
+
+        $user = $this->trainee($group);
+
+        // Материал категории командира — открыт.
+        $pilotAuk = Aukstructure::factory()->create([
+            'course_id' => $course->id,
+            'type' => 3,
+        ]);
+        $pilotAuk->categories()->sync([$pilot->id]);
+
+        // Материал категории радиста — закрыт лётчику.
+        $radioAuk = Aukstructure::factory()->create([
+            'course_id' => $course->id,
+            'type' => 3,
+        ]);
+        $radioAuk->categories()->sync([$radio->id]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson("/api/getlink/{$pilotAuk->id}")
+            ->assertOk('материал своей специальности открыт');
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson("/api/getlink/{$radioAuk->id}")
+            ->assertForbidden('материал другой специальности закрыт');
+
+        // После записи группы на категорию радиста — материал открывается.
+        Group2learning::factory()->create([
+            'group_id' => $group->id,
+            'course_id' => $course->id,
+            'category_id' => $radio->id,
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson("/api/getlink/{$radioAuk->id}")
+            ->assertOk('материал открыт после записи на свою специальность');
     }
 }

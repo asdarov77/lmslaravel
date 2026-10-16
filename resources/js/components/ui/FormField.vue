@@ -4,12 +4,37 @@
     :class="{ 'u-field--invalid': !!error, 'u-field--disabled': disabled }"
     :data-field="name || undefined"
   >
-    <label v-if="label" class="u-field__label" :class="{ 'u-field__label--required': required }" :for="fieldId">
-      {{ label }}
-    </label>
+    <!--
+      Подпись — элемент с ЗАРАНЕЕ ИЗВЕСТНЫМ id, а не «просто label».
+
+      Зачем: Vuetify жёстко прописывает нативному полю
+      aria-labelledby="{его-id}-label" (VTextField.js), и если
+      компонент не получил проп label, элемента с таким id в документе
+      нет. Ссылка ведёт в пустоту, и у поля НЕТ доступного имени —
+      скринридер читает «текстовое поле» вместо «Наименование».
+
+      Раньше подпись здесь была обычным <label :for> без id, и
+      `v-slot="{ id }"` требовалось писать руками: на ~40 полях
+      проектных форм его не писали, и подпись висела в воздухе.
+
+      Теперь id детерминирован (поле `name` → `field-<name>-label`) и
+      отдаётся в слот как labelId: useForm.bind() подставляет его в
+      aria-labelledby автоматически (см. composables/useForm.js).
+
+      Элемент — <span>, а не <label>: оборачивать контрол в <label>
+      нельзя, внутри рендерится собственная подпись Vuetify, а label
+      внутри label — невалидный HTML, и браузер разбирает его не так,
+      как ожидалось.
+    -->
+    <span
+      v-if="label"
+      :id="labelId"
+      class="u-field__label"
+      :class="{ 'u-field__label--required': required }"
+    >{{ label }}</span>
 
     <div class="u-field__control">
-      <slot :id="fieldId" :invalid="!!error" />
+      <slot :id="fieldId" :invalid="!!error" :label-id="labelId" />
     </div>
 
     <div class="u-field__meta">
@@ -23,7 +48,7 @@
 </template>
 
 <script setup>
-import { useId } from 'vue'
+import { computed, useId } from 'vue'
 
 /**
  * Обёртка поля формы: подпись, подсказка, ошибка и счётчик символов
@@ -62,6 +87,15 @@ const props = defineProps({
 })
 
 const fieldId = props.id || `field-${useId()}`
+
+/**
+ * id подписи.
+ *
+ * Детерминированный, когда у поля есть имя: useForm.bind() собирает
+ * ссылку `field-<name>-label` сам, не зная сгенерированных Vue id.
+ * Без имени (поле вне формы) берётся уникальный.
+ */
+const labelId = computed(() => (props.name ? `field-${props.name}-label` : `${fieldId}-label`))
 </script>
 
 <style scoped>

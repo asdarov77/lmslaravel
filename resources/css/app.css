@@ -258,6 +258,250 @@ body {
   border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
 
+/* --- Стеклянные карточки (glassmorphism) ------------------------------- */
+
+/* Полупрозрачная карточка с размытием заднего фона и тонкой обводкой.
+   Смотсится лёгко и современно, не перегружает страницу. */
+.u-card--glass {
+  background: var(--c-glass-bg);
+  border: 1px solid var(--c-glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--c-glass-shadow);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  transition:
+    border-color var(--dur-base) var(--ease),
+    box-shadow var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease);
+}
+
+.u-card--glass:hover {
+  border-color: rgb(255 255 255 / 0.55);
+  box-shadow: var(--shadow-3);
+}
+
+/* Карточка с глубокой тенью и подъёмом при наведении — для главных
+   блоков дашборда, где нужно выделить акцент. */
+.u-card--elevated {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-2);
+  transition:
+    box-shadow var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease-spring);
+}
+
+.u-card--elevated:hover {
+  box-shadow: var(--shadow-4);
+  transform: translateY(-4px);
+}
+
+/* Карточка-лента (активный/выбранный элемент) — тонкая цветная обводка
+   и мягкий фон вместо тяжёлой заливки. */
+.u-card--ring {
+  position: relative;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-1);
+}
+
+.u-card--ring::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-xl);
+  padding: 1px;
+  background: linear-gradient(135deg, var(--c-primary), var(--c-accent));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: destination-out;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease);
+}
+
+.u-card--ring:hover::before,
+.u-card--ring.is-active::before {
+  opacity: 1;
+}
+
+/* --- Микро-взаимодействия --------------------------------------------- */
+
+/* Подъём элемента при наведении — для карточек каталога, курсов, списков. */
+.u-hover-lift {
+  transition:
+    transform var(--dur-base) var(--ease-spring),
+    box-shadow var(--dur-base) var(--ease),
+    border-color var(--dur-base) var(--ease);
+}
+
+.u-hover-lift:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-3);
+}
+
+.u-hover-lift:active {
+  transform: translateY(-2px);
+}
+
+/* Градиентный текст — для больших заголовков, цифр KPI, акцентов. */
+.u-text-gradient {
+  background: linear-gradient(135deg, var(--c-gradient-hero-1), var(--c-gradient-hero-2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Кнопка-стекло: полупрозрачная, с ореолом при наведении. */
+.u-btn-glass {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  height: 40px;
+  padding: 0 var(--sp-5);
+  background: var(--c-glass-bg);
+  border: 1px solid var(--c-glass-border);
+  border-radius: var(--radius-pill);
+  color: var(--c-text);
+  font: inherit;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+
+.u-btn-glass:hover {
+  background: var(--c-surface);
+  border-color: var(--c-border-strong);
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-1px);
+}
+
+.u-btn-glass:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+/* --- Анимации списков (stagger) --------------------------------------- */
+
+/* Детейл-вход элементов списка по очереди — используется через
+   директиву v-stagger или вручную с data-stagger-index. */
+[data-stagger] {
+  opacity: 0;
+  transform: translateY(12px);
+  animation:
+    stagger-enter var(--dur-slow) var(--ease-out) forwards;
+}
+
+[data-stagger-index] {
+  animation-delay: calc(var(--stagger-delay) * var(--stagger-index));
+}
+
+@keyframes stagger-enter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Пульсирующая точка (живой индикатор) — для статусов, онлайна, новых
+   уведомлений без раздражающего мигания. */
+.u-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-success);
+  box-shadow: var(--c-glow-accent);
+  animation: u-pulse 2s ease-in-out infinite;
+}
+
+@keyframes u-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.7;
+  }
+}
+
+/* --- Усиленные переходы страниц --------------------------------------- */
+
+/* Scale + fade (более выраженный эффект, чем базовый slide). */
+.page-scale-enter-active,
+.page-scale-leave-active {
+  transition:
+    opacity var(--page-transition-dur) var(--page-transition-ease),
+    transform var(--page-transition-dur) var(--ease-spring);
+}
+
+.page-scale-enter-from {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.page-scale-leave-to {
+  opacity: 0;
+  transform: scale(1.03);
+}
+
+/* Reduced motion — отключаем все анимации выше. */
+@media (prefers-reduced-motion: reduce) {
+  [data-stagger],
+  [data-stagger-index] {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+  .u-pulse {
+    animation: none !important;
+    opacity: 1;
+  }
+  .page-scale-enter-active,
+  .page-scale-leave-active {
+    transition: none !important;
+  }
+  .page-scale-enter-from,
+  .page-scale-leave-to {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* --------------------------------- переходы ------------------------------- */
+.page-enter-active,
+.page-leave-active {
+  transition: opacity var(--dur-base, 200ms) var(--ease-out, ease), transform var(--dur-base, 200ms) var(--ease-out, ease);
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* Уважаем prefers-reduced-motion. */
+@media (prefers-reduced-motion: reduce) {
+  .page-enter-active,
+  .page-leave-active {
+    transition: none;
+  }
+}
+
 /* --------------------------------- таблица ------------------------------- */
 /* Одна разметка для всех списков: шапка, строки, зебра, hover, выделение.
    Раньше у каждой страницы своя: v-table/v-data-table/сырой table,
@@ -605,9 +849,18 @@ body {
    ============================================================ */
 
 .app__brand {
-  /* Не #fff: в тёмной теме primary светлый (#7aa7e8), и белый текст на
-     нём давал контраст 2.46 при норме 4.5. */
-  color: var(--c-on-primary);
+  /*
+    Цвет берётся из --c-text, а НЕ из --c-on-primary.
+
+    Шапка перестала быть залитой primary: теперь это «стеклянная» панель,
+    которая в светлой теме белая, а в тёмной тёмная. Старое
+    `color: var(--c-on-primary)` считало, что под текстом насыщенный
+    синий, и давало белый по белому в светлой теме (контраст 1.0) и
+    тёмный по тёмному в тёмной (1.04) — логотип с названием был
+    фактически не виден ни в одной теме. --c-text переключается вместе
+    с темой, поэтому читается на обеих.
+  */
+  color: var(--c-text);
   text-decoration: none;
   cursor: pointer;
   overflow: hidden;
@@ -618,6 +871,45 @@ body {
 .app__brand:hover,
 .app__brand:focus-visible {
   text-decoration: underline;
+}
+
+/* Стеклянная шапка: полупрозрачный фон, размытие, тонкая обводка.
+   Primary больше не закрашивает панель целиком — это выглядело тяжело
+   и «ведомственно». Теперь шапка légère и не конкурирует с контентом. */
+/*
+ * Skip-ссылка «к содержимому».
+ *
+ * В покое спрятана, но не display:none и не visibility:hidden — иначе
+ * она выпала бы из порядка обхода и не получила фокус с клавиатуры.
+ */
+.app__skip-link {
+  position: absolute;
+  top: var(--sp-2);
+  left: var(--sp-2);
+  z-index: 2000;
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-md);
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.app__skip-link:focus-visible {
+  transform: translateY(0);
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+.app__bar {
+  background: var(--c-glass-bg);
+  border-bottom: 1px solid var(--c-glass-border);
+  box-shadow: none;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
 
 /* Ширина рабочей области ограничена токеном: на широком мониторе
@@ -714,6 +1006,24 @@ body {
   outline: 2px solid var(--c-accent);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
+}
+
+/*
+  Vuetify снимает outline у своих полей классом `.v-field__input:focus`
+  — он специфичнее голого `:focus-visible`, и кольцо фокуса не
+  появлялось НИ НА ОДНОМ поле формы: ни «Класс», ни «Группа», ни
+  категория. С клавиатуры по форме было не пройти.
+  Возвращаем кольцо с достаточной специфичностью; рамку поля
+  рисует сам Vuetify, поэтому дублирования контура нет.
+  WCAG 2.2 SC 2.4.7 (Focus Visible), 2.4.11 (Focus Not Obscured).
+*/
+/* Специфичность 0-3-0 против 0-2-0 у Vuetify: порядок подключения
+   таблиц стилей не должен решать, виден фокус или нет. */
+.v-field .v-field__input:focus-visible,
+.v-field .v-select__selection-text:focus-visible,
+textarea.v-field__input:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 1px;
 }
 
 /* ==================================================================

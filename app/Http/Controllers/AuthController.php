@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\NewAccessToken;
 use Laravel\Sanctum\PersonalAccessToken;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -301,11 +302,54 @@ class AuthController extends Controller
     /**
      * Список пользователей для API v1 (resources).
      */
-    public function index()
+    /**
+     * Список пользователей для API v1.
+     *
+     * Фильтры `role`, `group_id` и `q` добавлены для экранов
+     * назначения (мастер экзамена и подобные): раньше список приходилось
+     * фильтровать на клиенте, а единственный «удобный» адрес
+     * `/api/users?role=trainee` на бэкенде не существует — и фронт,
+     * вызвав его, получал 404 и уводил всё приложение на страницу
+     * «Страница не найдена».
+     *
+     * Роль сравнивается и по каноническому slug ('trainee'), и по
+     * названию ('Обучаемый'): в users.role исторически пишут и то,
+     * и другое (см. User::ROLE_ALIASES).
+     */
+    public function index(Request $request)
     {
-        return User::with('permissions')
-            ->orderBy('id')
-            ->get();
+        $filters = $request->validate([
+            'role' => ['nullable', 'string', 'max:32'],
+            'group_id' => ['nullable', 'integer'],
+            'q' => ['nullable', 'string', 'max:150'],
+        ]);
+
+        $query = User::with('permissions')->orderBy('id');
+
+        if (! empty($filters['role'])) {
+            $role = trim($filters['role']);
+            $variants = array_merge([$role], User::ROLE_ALIASES[$role] ?? []);
+
+            $query->where(function ($q) use ($variants) {
+                $q->whereIn('role', $variants);
+                $q->orWhereHas('roles', function ($rq) use ($variants) {
+                    $rq->whereIn('slug', $variants);
+                });
+            });
+        }
+
+        if (! empty($filters['group_id'])) {
+            $query->where('group_id', $filters['group_id']);
+        }
+
+        if (! empty($filters['q'])) {
+            $needle = mb_strtolower(trim($filters['q']));
+            $query->where(function ($q) use ($needle) {
+                $q->whereRaw('LOWER(fio) LIKE ?', ["%{$needle}%"]);
+            });
+        }
+
+        return $query->get();
     }
 
     /**
@@ -680,6 +724,34 @@ public function group2learning(Request $request)
         return response()->json([
             'success' => true,
             'data' => ['avatar' => $path],
+        ]);
+    }
+
+    /**
+     * Убрать аватар.
+     *
+     * DELETE /api/user/avatar
+     *
+     * Метода не было, а кнопка «Убрать фото» на странице профиля
+     * меняла только состояние Vuex: после перезагрузки аватар
+     * возвращался, и человек думал, что кнопка не работает.
+     * Старый файл тоже удаляется — иначе он остаётся мусором в
+     * storage/public навсегда.
+     */
+    public function destroyAvatar(Request $request)
+    {
+        $user = $request->user();
+        $current = $user->avatar;
+
+        if ($current && ! str_contains((string) $current, '..')) {
+            Storage::disk('public')->delete($current);
+        }
+
+        $user->forceFill(['avatar' => null])->save();
+
+        return response()->json([
+            'success' => true,
+            'data' => ['avatar' => null],
         ]);
     }
 }

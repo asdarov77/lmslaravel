@@ -1,6 +1,7 @@
 <template>
   <div class="u-page">
     <FormCard
+      :heading-level="1"
       :title="`${t('user.editTitle')} ${user.fio || ''}`"
       :busy="form.submitting.value"
       @submit="submitForm"
@@ -219,7 +220,14 @@ const form = useForm({
 const { confirmLeave } = useLeaveGuard(() => form.dirty.value, { message: t('common.leaveConfirm') })
 
 onMounted(async () => {
-  store.dispatch('User/fetchUser', props.idEdit)
+  /*
+   * Загрузка пользователя — ОДИН раз, ниже, с await и .catch().
+   * Раньше здесь стоял второй, необработанный dispatch того же action:
+   * запрос уходил дважды, а отказ (например 403, когда инструктор открыл
+   * карточку администратора) всплывал как необработанное исключение —
+   * «Request failed with status code 403» в консоли поверх корректной
+   * страницы «В доступе отказано».
+   */
 
   // Группы в выпадающем «Группа» не появлялись при прямом заходе на
   // страницу: fetchGroups звал только ряд страниц, а здесь его не было.
