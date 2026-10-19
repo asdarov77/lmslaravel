@@ -94,6 +94,15 @@ routes/api.php ─► middleware: auth:sanctum + permission:a,b (здесь «л
 
 ## 4. Приватный контент: подпись и выдача
 
+> **Актуализация (2026-10-19):** безопасность этого узла закрыта (подпись, realpath,
+> internal-location, CourseAccess на getlink/showmanifest — сделано). Производительность —
+> нет: открытие курса стоит 6 Vuex-dispatch + фильтр-запрос + цепочку из 3 RTT до первого
+> кадра; `CourseController::index` грузит всё дерево `aukstructures.links` без select/кэша;
+> поиск по материалам синхронно обходит ФС; режим раздачи по умолчанию `php`. Диагностика
+> и план переделки (player-endpoint, tsvector-индекс, LRU-кэш, nginx X-Accel) — в
+> **`docs/course-player-performance.md`**. Там же сверка с первоначальной версией
+> (`merged_all.txt`): модель «link только у модулей type=3» сохранена верно.
+
 Это самый тонкий узел проекта. Здесь байты файла — единственное место, где они
 целиком проходят через PHP.
 

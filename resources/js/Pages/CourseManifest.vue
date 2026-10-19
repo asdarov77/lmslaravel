@@ -357,7 +357,6 @@ export default {
     document.addEventListener("keydown", this.onKeydown);
 
     //   const iframe = this.$refs.myIframe;
-    //   const iframeDoc = iframe.contentDocument;
     // iframe.addEventListener('load', () => {
     //   this.highlightNodes(iframe);
     // });
@@ -425,6 +424,14 @@ export default {
         //удалить возможно
         this.path = course.path; // папка с АУК        
         this.aircraft = course.aircraft_id;
+
+        // Автооткрытие первого модуля (см. docs/course-player-performance.md §1.2):
+        // без этого страница открывалась пустым кадром до первого клика — часть
+        // воспринимаемой «задержки открытия курса» была именно отсутствием
+        // entry-материала. Открываем, только если пользователь ещё ничего не выбрал.
+        if (!this.activeId && this.getFirstAukId) {
+          this.getlink(this.getFirstAukId);
+        }
       })
       .catch((err) => {
         console.error(err);
@@ -943,78 +950,39 @@ export default {
     // },
 
     loadContent(item, hlHtml) {
-      /*
-       * Подсветка применяется в onFrameLoad — когда кадр действительно
-       * готов. Раньше здесь стоял setTimeout(..., 1000): на тяжёлом
-       * материале он срабатывал ДО готовности кадра (подсветка
-       * пропадала), а на лёгком — зря замораживал страницу на секунду.
-       * Объём работы не изменился, а ожидание исчезло.
-       */
-      this.pendingHighlights = Array.isArray(hlHtml) ? hlHtml : [];
-      this.getlink(item);
-    },
+      this.isLoading = true;
+      // Регресс производительности (см. docs/course-player-performance.md §1.2, P1.3):
+      // раньше подсветка шла через setTimeout(1000) с прямой мутацией
+      // iframeDoc.body.innerHTML — на тяжёлых документах iframe не успевал
+      // прогрузиться (гонка), а перестройка всего <body> вызывала full reflow
+      // и «подвисание» материала. Теперь: контент загружаем через getlink(),
+      // а подсветку применяем в onload-колбазе уже готового srcdoc-кадра,
+      // точечно заменяя только узлы-совпадения (без перезаписи body целиком).
+      const applyHighlight = () => {
+        try {
+          const doc = this.$refs.myIframe?.contentDocument;
+          if (!doc || !hlHtml?.length) return;
+          hlHtml.forEach((highlighted) => {
+            const nodeToReplace = doc.evaluate(
+              highlighted.originalXpath, doc, null,
+              XPathResult.FIRST_ORDERED_NODE_TYPE, null
+            ).singleNodeValue;
+            if (nodeToReplace && nodeToReplace.parentNode) {
+              const holder = doc.createElement('div');
+              holder.innerHTML = highlighted.highlightedText;
+              nodeToReplace.parentNode.replaceChild(holder.firstChild ?? nodeToReplace, nodeToReplace);
+            }
+          });
+          this.highlightNodes(doc);
+        } catch (e) {
+          console.log(e);
+        } finally {
+          this.isLoading = false;
+        }
+      };
 
-    /**
-     * Подсветка найденного в открытом материале.
-     *
-     * Раньше тело кадра переписывалось целиком:
-     * `iframeDoc.body.innerHTML = dom.documentElement.innerHTML`, где dom —
-     * результат DOMParser по всему документу. Это пересоздавало весь DOM
-     * материала заново: картинки запрашивались по второму разу, позиция
-     * прокрутки сбрасывалась, а на большом HTML (десятки тысяч узлов)
-     * страница подвисала — это и есть «отображение тормозит».
-     *
-     * Теперь правится только ветка вокруг найденного узла: остальное
-     * содержимое кадра не трогается.
-     */
-    applyHighlights(doc) {
-      const marks = this.pendingHighlights;
-      this.pendingHighlights = [];
-
-      if (!doc || !marks.length) return;
-
-      try {
-        marks.forEach((mark) => {
-          const node = doc.evaluate(
-            mark.originalXpath,
-            doc,
-            null,
-            XPathResult.FIRST_ORDERED_NODE_TYPE,
-            null
-          ).singleNodeValue;
-
-          if (!node || !node.parentNode) return;
-
-          /*
-           * Подменяется сам текстовый узел, а не его родитель.
-           *
-           * Сервер (`SearchController::highlightNodes`) отдаёт
-           * `originalXpath` путем к ТЕКСТОВОМУ узлу, а `highlightedText` —
-           * это содержимое именно этого узла, разбитое вокруг совпадения
-           * и с обёрнутым в <mark class="highlighted"> фрагментом.
-           *
-           * Раньше здесь стояло `node.parentNode.innerHTML = ...`, то есть
-           * перезаписывался весь родитель: его остальные дети исчезали.
-           * Если совпадение попадало в текст прямо внутри <body>
-           * (такой XPath сервер выдаёт для текста без обёртки),
-           * материал оставался в одном абзаце — то есть подсветка
-           * уничтожала содержимое вместо того, чтобы его выделить.
-           */
-          const holder = doc.createElement('span');
-          holder.innerHTML = mark.highlightedText;
-
-          while (holder.firstChild) {
-            node.parentNode.insertBefore(holder.firstChild, node);
-          }
-
-          node.parentNode.removeChild(node);
-        });
-      } catch (e) {
-        // XPath из ответа сервера может не совпасть с документом.
-        // Материал должен открыться и без подсветки.
-      }
-
-      this.highlightNodes(doc);
+      // Подсвечиваем после фактической загрузки кадра, а не по таймеру.
+      this.getlink(item).then(() => this.$nextTick(applyHighlight));
     },
 
     ///-------------------------------------------скроллинг --------------------------------------------------------------
