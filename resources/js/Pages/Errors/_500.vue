@@ -1,21 +1,25 @@
 <template>
-  <v-container fluid>
-    <v-card>
-      <v-list>
-        <!-- В Vuetify 3 нет v-list-item-content: текст кладётся прямо в
-             v-list-item, а обёртка VListItemContent удалена. -->
-        <v-list-item>
-          <v-list-item-title class="text-h6">
-            {{ $t('errors.serverError') }}
-          </v-list-item-title>
-        </v-list-item>
-      </v-list>
+  <div class="u-page">
+    <PageHeader :title="$t('errors.serverError')" :subtitle="$t('errors.serverErrorText')" />
+
+    <v-card class="u-card mt-4">
+      <v-card-text class="d-flex flex-wrap ga-3 align-center">
+        <v-btn color="primary" variant="flat" :to="{ name: 'dashboard' }" data-test="error-home">
+          {{ $t("errors.goHome") }}
+        </v-btn>
+        <v-btn variant="text" @click="$router.go(-1)" data-test="error-back">
+          {{ $t("errors.goBack") }}
+        </v-btn>
+      </v-card-text>
     </v-card>
-  </v-container>
+  </div>
 </template>
 
 <script>
+import PageHeader from '../../components/ui/PageHeader.vue'
+
 export default {
-  name: 'InternalServerError'
+  name: 'InternalServerError',
+  components: { PageHeader },
 }
 </script>

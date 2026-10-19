@@ -45,9 +45,22 @@ describe('user.api: URL и методы', () => {
     expect(patch).toHaveBeenCalledWith('/api/user/37', { fio: 'X' })
   })
 
-  it('createUser идёт в /api/register', () => {
-    userApi.createUser({ fio: 'Новый' })
+  /*
+   * Два разных вызова, и раньше это был один.
+   *
+   * Регресс: и публичная регистрация, и создание пользователя из админки
+   * шли в `POST /api/register`. Эндпоинт открыт и прав администратора не
+   * проверяет, поэтому «создать пользователя» из админки было невозможно:
+   * кнопка вела в форму для посторонних, без выбора роли и группы.
+   */
+  it('registerUser идёт в публичный /api/register', () => {
+    userApi.registerUser({ fio: 'Новый' })
     expect(post).toHaveBeenCalledWith('/api/register', { fio: 'Новый' })
+  })
+
+  it('createUser идёт в /api/v1/users — админский эндпоинт', () => {
+    userApi.createUser({ fio: 'Новый' })
+    expect(post).toHaveBeenCalledWith('/api/v1/users', { fio: 'Новый' })
   })
 
   it('deleteUser использует DELETE', () => {

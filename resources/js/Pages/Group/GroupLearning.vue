@@ -1,8 +1,14 @@
 <template>
-  <v-card class="elevation-12 mx-auto" style="max-width: 900px; overflow: visible">
-    <v-toolbar color="primary">
-      <v-toolbar-title>{{ $t("groupLearning.title") }}</v-toolbar-title>
-    </v-toolbar>
+  <div class="u-page">
+  <!--
+    Заголовок страницы добавлен: раньше его не было вовсе, страница
+    начиналась сразу с полей — то есть у неё не было имени ни для
+    человека, ни для навигации по заголовкам (WCAG 2.2 SC 1.3.1,
+    2.4.6).
+  -->
+    <PageHeader :title="$t('groupLearning.title')" />
+
+    <v-card class="u-card u-card--elevated" style="max-width: 900px;">
 
     <v-card-text>
       <v-form @submit.prevent="submitForm">
@@ -12,7 +18,7 @@
              жёстко зашитый /group/learning/1 — то есть записать можно было
              только группу №1, и непонятно было, какую именно. -->
         <v-select
-          label="Группа"
+          :label="$t('groupLearning.group')"
           type="text"
           :items="allGroups"
           v-model="form.group_id"
@@ -24,7 +30,7 @@
         ></v-select>
 
         <v-select
-          label="Класс"
+          :label="$t('groupLearning.class')"
           type="text"
           :items="aircrafts"
           v-model="form.aircraft_id"
@@ -36,7 +42,7 @@
         ></v-select>
 
         <v-select
-          label="Категории"
+          :label="$t('groupLearning.categories')"
           type="text"
           :items="catFilter"
           v-model="form.category_id"
@@ -57,13 +63,13 @@
           variant="tonal"
           density="compact"
           class="mb-3"
-          text="Выберите класс и категорию — после этого появится список курсов"
+          :text="$t('groupLearning.selectHint')"
         ></v-alert>
 
         <treeselect
           v-if="form.aircraft_id && form.category_id"
           :key="treeselectKey"
-          placeholder="Курсы и модули"
+          :placeholder="$t('groupLearning.coursesPlaceholder')"
           :default-expand-level="1"
           v-model="form.course_ids"
           :options="options"
@@ -71,6 +77,9 @@
           :clearable="false"
           :disabled="loading || saving"
         />
+        <p v-if="form.aircraft_id && form.category_id" class="text-caption text-medium-emphasis mt-2">
+          {{ $t("groupLearning.materialsOnlyHint") }}
+        </p>
 
         <v-alert
           v-if="form.course_ids.length"
@@ -78,13 +87,13 @@
           variant="tonal"
           density="compact"
           class="mt-3"
-          :text="`Выбрано модулей: ${form.course_ids.length}`"
+          :text="$t('groupLearning.selectedCount', { count: form.course_ids.length })"
         ></v-alert>
 
         <v-divider class="my-3"></v-divider>
 
         <v-select
-          label="Инструктор"
+          :label="$t('groupLearning.instructor')"
           type="text"
           :items="instructors"
           v-model="form.teacher"
@@ -98,7 +107,7 @@
              У строки нет поля id, поэтому модель всегда становилась
              undefined, и вид занятия молча не сохранялся. -->
         <v-select
-          label="Вид занятия"
+          :label="$t('groupLearning.lessonType')"
           type="text"
           :items="lessonTypes"
           v-model="form.typeOfLesson"
@@ -112,7 +121,7 @@
             <v-text-field
               type="date"
               v-model="form.study_from"
-              label="начало"
+              :label="$t('group.labelNachalo')"
               variant="outlined"
               :disabled="loading"
               :error-messages="fieldErrors.study_from"
@@ -122,7 +131,7 @@
             <v-text-field
               type="date"
               v-model="form.study_to"
-              label="конец"
+              :label="$t('group.labelKonec')"
               variant="outlined"
               :disabled="loading"
               :error-messages="fieldErrors.study_to"
@@ -148,9 +157,9 @@
           </v-col>
         </v-row>
 
-        <!-- Регресс: интерполяция была внутри HTML-комментария
-             (<!-- {{ error }} -->), поэтому пользователь видел красные
-             пустые блоки без единого слова. -->
+<!-- Регресс: интерполяция была внутри HTML-комментария
+     (строка вида <комментарий {{ error }} комментарий>), поэтому
+     пользователь видел красные пустые блоки без единого слова. -->
         <v-alert
           v-for="(error, index) in errors"
           :key="index"
@@ -170,7 +179,8 @@
       ></ButtonGroup>
     </v-card-actions>
 
-  </v-card>
+    </v-card>
+  </div>
 </template>
 
 <script>
@@ -179,12 +189,14 @@ import $api from "../../api/httpClient";
 import { asArray, unwrapArray, unwrapResponse, numericQuery } from "../../api/envelope";
 import { canonicalRoleSlug } from "../../utils/roles";
 import ButtonGroup from "../../components/ButtonGroup.vue";
+import { toast } from "../../composables/useToast";
+import PageHeader from "../../components/ui/PageHeader.vue";
 import Treeselect from "vue3-treeselect";
 import "vue3-treeselect/dist/vue3-treeselect.css";
 
 export default {
   name: "GroupLearning",
-  components: { ButtonGroup, Treeselect },
+  components: { ButtonGroup, Treeselect, PageHeader },
 
   props: {
     /** Группа из маршрута. Не обязательна: группу можно выбрать в форме. */
@@ -349,7 +361,20 @@ export default {
         if (!item) return;
         // label обязателен для treeselect, title из БД не подходит.
         nodeCourse[item.id] = courseId;
-        byId.set(item.id, { id: item.id, label: item.title, children: [] });
+        byId.set(item.id, {
+          id: item.id,
+          label: item.title,
+          /*
+           * Единица записи — модуль (type 3). Тема и раздел остаются в
+           * дереве для контекста, но отметить их нельзя: иначе в запись
+           * попадал parent_id раздела, ограничение не работало (доступ
+           * считался по course_id), а форма обещала ровно обратное.
+           * isDisabled оставляет узел видимым и неотмечаемым, а не
+           * выбрасывает его из дерева.
+           */
+          isDisabled: Number(item.type) !== 3,
+          children: [],
+        });
       });
 
       const roots = [];
@@ -471,12 +496,20 @@ export default {
 
 <style src="vue3-treeselect/dist/vue3-treeselect.css"></style>
 
-<style>
-.v-card-text {
+<!--
+  Блок был unscoped и правил классы Vuetify и vue3-treeselect во всём
+  приложении: `.v-card-text { font-size: 1rem }` менял кегль текста ВСЕХ
+  карточек на всех страницах, а правила деревовидного селекта попадали
+  в любой другой экран, где он встретится. Здесь нужен :deep — сами
+  классы лежат внутри дочерних компонентов, — но блок остаётся привязан
+  к этой странице.
+-->
+<style scoped>
+:deep(.v-card-text) {
   font-size: 1rem;
 }
 
-.vue-treeselect__control {
+:deep(.vue-treeselect__control) {
   height: 56px;
   border-bottom: 1px solid;
   background: var(--c-surface-3);
@@ -484,25 +517,25 @@ export default {
   border-radius: 5px;
 }
 
-.vue-treeselect__placeholder,
-.vue-treeselect__single-value {
+:deep(.vue-treeselect__placeholder),
+:deep(.vue-treeselect__single-value) {
   padding-left: 12px;
   line-height: 56px;
-  color: #848484;
+  color: var(--c-text-muted);
 }
 
-.vue-treeselect__control-arrow-container {
+:deep(.vue-treeselect__control-arrow-container) {
   width: 38px;
 }
 
-.vue-treeselect__multi-value-item {
+:deep(.vue-treeselect__multi-value-item) {
   cursor: pointer;
-  color: #7a7a7a;
-  background-color: #f2efef;
+  color: var(--c-text-secondary);
+  background-color: var(--c-surface-2);
   border-bottom: 3px solid;
 }
 
-.vue-treeselect--has-value .vue-treeselect__multi-value {
+:deep(.vue-treeselect--has-value .vue-treeselect__multi-value) {
   margin-bottom: 15px;
 }
 </style>

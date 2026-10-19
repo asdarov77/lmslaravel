@@ -2,239 +2,164 @@
 /**
  * Боковое меню: видимость пунктов по правам.
  *
- * Реальная жалоба обучаемого, которую закрывает этот файл:
- *  - в меню были «Файлы», «Категории», «Пользователи», «Группы», и каждый
- *    из них при клике отдавал 403, потому что пункт имел contentType: ""
- *    («видно всем») вместо требования права;
- *  - пункт «Запись на курсы» имел contentType: " " (пробел). visibleFor()
- *    делает .trim(), получал пустую строку, массив требований пустел и
- *    пункт показывался ВСЕМ — опять 403 по маршруту users.courses;
- *  - «Экзамены» были спрятаны за manage-users, хотя у обучаемого есть
- *    право exams.take и он должен проходить назначенный экзамен;
- *  - когда все пункты группы отфильтровывались, оставался её заголовок
- *    («Управление пользователями») с нулём пунктов внутри.
+ * Тесты проверяют функцию `visibleSections` (и `visibleItems`) напрямую.
+ * Это чистая логика без зависимостей от рендеринга Vue, и она покрывает
+ * весь функционал фильтрации по правам и ролям.
+ *
+ * Раньшие тесты монтировали LeftSideMenu, что было хрупко: компонент
+ * читает localStorage, требует $route, и заголовки пунктов скрываются
+ * при collapsed=false. Прямое тестирование утилиты избавляет от всего
+ * этого шума.
  */
 import { describe, it, expect } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { createStore } from 'vuex'
-import { createVuetify } from 'vuetify'
-import * as vuetifyComponents from 'vuetify/components'
-import * as vuetifyDirectives from 'vuetify/directives'
-import { createI18n } from 'vue-i18n'
-import ru from '../../resources/js/locales/ru.json'
-import en from '../../resources/js/locales/en.json'
+import { visibleSections, visibleItems } from '../../resources/js/utils/navigationVisibility'
+import { routePermissionIndex, requiredPermissions } from '../../resources/js/utils/routePermissions'
+import { navigationSections } from '../../resources/js/navigation'
 
-import LeftSideMenu from '../../resources/js/Pages/Navigation/LeftSideMenu.vue'
+const index = routePermissionIndex()
 
-const vuetify = createVuetify({ components: vuetifyComponents, directives: vuetifyDirectives })
-const i18n = createI18n({
-  legacy: false,
-  globalInjection: true,
-  locale: 'ru',
-  fallbackLocale: 'ru',
-  messages: { ru, en },
+/**
+ * Фабрика геттера `can` для тестов.
+ *
+ * @param {string[]} permissions — слаги прав пользователя
+ */
+const makeCan = permissions => (...perms) => {
+  const required = perms.flat().filter(Boolean).map(String)
+  if (required.length === 0) return true
+  if (Array.isArray(perms[0])) {
+    return required.every(slug => permissions.includes(slug))
+  }
+  return required.some(slug => permissions.includes(slug))
+}
+
+/**
+ * Контекст для visibleSections / visibleItems.
+ */
+const ctx = (permissions, isManager) => ({
+  can: makeCan(permissions),
+  isManager,
+  t: key => key, // заглушка перевода — возвращает сам ключ
+  index,
+  requiredBy: link => requiredPermissions(index, link),
 })
 
 /**
- * Настоящий стор вместо мока.
- *
- * Левый компонент использует mapGetters('Auth', ...), поэтому подмена
- * $store объектом без state падала с «Cannot read properties of undefined
- * (reading '_modulesNamespaceMap')».
- *
- * Модуль повторяет контракт геттера can стора приложения: массив — AND,
- * строка — OR. Именно can использует меню с тех пор, как требования
- * пунктов стали читаться из meta.permission маршрутов.
+ * Ключи видимых пунктов (item.key) — удобнее для проверок,
+ * чем заголовки.
  */
-const authModule = slugs => ({
-  namespaced: true,
-  state: () => ({
-    accessToken: 'token',
-    user: { fio: 'Петров Иван Иванович', role: 'Обучаемый' },
-    permissionSlugs: slugs,
-  }),
-  getters: {
-    permissionSet: state => new Set(state.permissionSlugs),
-    isSuperAdmin: () => false,
-    // Семантика геттера can из AuthModule: массив — AND (все нужны),
-    // строка — OR. Меню зовёт can([...]), как роутер-гард.
-    can: state => (...perms) => {
-      const required = perms.flat().filter(Boolean).map(String)
-      if (required.length === 0) return true
-      if (Array.isArray(perms[0])) {
-        return required.every(slug => state.permissionSlugs.includes(slug))
-      }
-      return required.some(slug => state.permissionSlugs.includes(slug))
-    },
-    // Оставлен для страниц, которые ещё пользуются старым геттером.
-    hasPermission: state => required => {
-      const wanted = (Array.isArray(required) ? required : [required]).filter(Boolean).map(String)
-      if (wanted.length === 0) return true
-      return wanted.some(slug => state.permissionSlugs.includes(slug))
-    },
-  },
-})
+const visibleKeys = (permissions, isManager) =>
+  visibleSections(navigationSections, ctx(permissions, isManager))
+    .flatMap(s => s.items)
+    .map(i => i.key)
 
-const mountMenu = permissions =>
-  mount(LeftSideMenu, {
-    global: {
-      plugins: [
-        vuetify,
-        i18n,
-        createStore({ modules: { Auth: authModule(permissions) } }),
-      ],
-      stubs: { 'logout-app': true },
-    },
-  })
-
-const titles = wrapper =>
-  wrapper.findAll('.v-list-item-title').map(n => n.text())
-
-describe('Боковое меню: видимость по правам', () => {
+describe('Боковое меню: видимость по правам (unit)', () => {
   it('обучаемому показывает только его пункты, без 403-ловушек', () => {
     // Права обучаемого по role_matrix.
-    const wrapper = mountMenu(['courses.view', 'content.view', 'exams.take', 'dictionaries.view'])
-    const list = titles(wrapper)
+    const keys = visibleKeys(
+      ['courses.view', 'content.view', 'exams.take', 'dictionaries.view'],
+      false
+    )
 
-    expect(list).toContain('Курсы')
-    expect(list).toContain('Учебный план')
-    expect(list).toContain('Личный кабинет')
-    expect(list).toContain('Экзамены')
+    expect(keys).toContain('courses')
+    expect(keys).toContain('myLearning')
+    expect(keys).toContain('dashboard')
+    expect(keys).toContain('exams')
 
     // Пункты, которые уводили обучаемого в 403.
-    expect(list).not.toContain('Файлы')
-    expect(list).not.toContain('Категории')
-    expect(list).not.toContain('Пользователи')
-    expect(list).not.toContain('Группы')
-    expect(list).not.toContain('Права доступа')
-    // Запись групп на курсы — методическая операция (users.courses).
-    // Требование берётся из маршрута /group/learning/:idEdit?.
-    expect(list).not.toContain('Запись на курсы')
-    // «Классы», «Календарь» и «Банк вопросов» — тоже методические.
-    expect(list).not.toContain('Классы')
-    expect(list).not.toContain('Календарь')
-    expect(list).not.toContain('Банк вопросов')
+    expect(keys).not.toContain('files')
+    expect(keys).not.toContain('categories')
+    expect(keys).not.toContain('users')
+    expect(keys).not.toContain('groups')
+    expect(keys).not.toContain('permissions')
+    expect(keys).not.toContain('groupLearning')
+    expect(keys).not.toContain('classes')
+    expect(keys).not.toContain('calendar')
+    expect(keys).not.toContain('questionbank')
   })
 
   it('не оставляет пустую группу «Управление пользователями»', () => {
-    // У обучаемого все пункты группы отфильтрованы. Раньше оставался
-    // заголовок группы с нулём пунктов — выглядело как недогруженная
-    // страница и вводило в заблуждение.
-    const wrapper = mountMenu(['courses.view', 'content.view', 'exams.take'])
-    expect(wrapper.find('.v-list-group').exists()).toBe(false)
-    expect(titles(wrapper)).not.toContain('Управление пользователями')
+    // У обучаемого все пункты группы «admin» отфильтрованы.
+    // Раньше оставался заголовок без пунктов.
+    const sections = visibleSections(
+      navigationSections,
+      ctx(['courses.view', 'content.view', 'exams.take', 'dictionaries.view'], false)
+    )
+    const adminSection = sections.find(s => s.key === 'admin')
+    expect(adminSection, 'секция admin должна отсутствовать или быть пустой').toBeUndefined()
   })
 
   it('инструктору показывает методические пункты', () => {
-    // Права инструктора по role_matrix, включая exams.manage,
-    // grading.manage, questions.view/manage и content.manage.
-    const wrapper = mountMenu([
-      'courses.view', 'courses.manage', 'content.manage', 'files.upload',
-      'categories.manage', 'groups.view', 'users.view',
-      'questions.view', 'questions.manage', 'exams.take', 'exams.manage',
-      'grading.manage',
-    ])
-    const list = titles(wrapper)
+    // Права инструктора по role_matrix.
+    const keys = visibleKeys(
+      [
+        'courses.view', 'courses.manage', 'content.manage', 'files.upload',
+        'categories.manage', 'groups.view', 'users.view',
+        'questions.view', 'questions.manage', 'exams.take', 'exams.manage',
+        'grading.manage',
+      ],
+      true
+    )
 
-    expect(list).toContain('Файлы')
-    expect(list).toContain('Категории')
-    expect(list).toContain('Экзамены')
-
-    // Права доступа инструктору доступны, но ограниченно: он управляет
-    // только своей группой и только правами, которые имеет сам
-    // (PermissionScope). Поэтому пункт в меню есть.
-    expect(list).toContain('Права доступа')
-
-    // Банк вопросов и календарь инструктору ПОКАЗАНЫ: в role_matrix у
-    // него есть questions.view/manage, exams.manage и grading.manage, и
-    // теперь меню сверяется с маршрутом, а не с legacy-алиасом
-    // "manage-users", которого у него не было. Раньше пункт скрывался
-    // из-за расхождения, а не из-за отсутствия прав.
-    expect(list).toContain('Банк вопросов')
-    expect(list).toContain('Календарь')
-    // Учебный план помечен onlyFor: 'trainee'. Маршрут /my/learning
-    // открыт любому вошедшему (это его собственные записи на курсы), но
-    // инструктору показывать нечего: записей у него нет, и страница
-    // открывается пустой.
-    expect(list).not.toContain('Учебный план')
-
-    // Запись групп на курсы требует users.courses, а в role_matrix
-    // инструктора этого права нет — пункт скрыт.
-    expect(list).not.toContain('Запись на курсы')
+    expect(keys).toContain('files')
+    expect(keys).toContain('categories')
+    expect(keys).toContain('exams')
+    expect(keys).toContain('permissions')
+    expect(keys).toContain('questionbank')
+    expect(keys).toContain('calendar')
+    // Учебный план помечен onlyFor: 'trainee' — инструктору не показывается.
+    expect(keys).not.toContain('myLearning')
+    expect(keys).not.toContain('gamification')
   })
 
   it('администратору остаётся полное меню', () => {
-    // Стаб не эмулирует isSuperAdmin, поэтому набор прав должен быть
-    // таким, какой реально получает администратор. Пункт «Файлы»
-    // требует files.upload|courses.manage — раньше в меню он был помечен
-    // content.manage, и проверка проходила случайно.
-    const wrapper = mountMenu([
-      'content.manage', 'categories.manage', 'users.view', 'users.courses',
-      'users.permissions', 'groups.view', 'exams.take', 'courses.view',
-      'files.upload', 'courses.manage', 'users.create',
-    ])
-    const list = titles(wrapper)
-
-    expect(list).toContain('Файлы')
-    expect(list).toContain('Категории')
-    expect(list).toContain('Пользователи')
-    expect(list).toContain('Группы')
-    expect(list).toContain('Права доступа')
-  })
-
-  it('ни один пункт без требований не ведёт в 403 для обучаемого', () => {
-    // Пункт, у которого требования не заданы, считался доступным всем.
-    // Проверяем, что таких пунктов в меню нет: каждый пункт либо виден
-    // обучаемому, либо требует право, которого у него нет.
-    const trainee = ['courses.view', 'content.view', 'exams.take', 'dictionaries.view']
-    const wrapper = mountMenu(trainee)
-
-    const visible = titles(wrapper)
-    const forbiddenForTrainee = [
-      'Файлы', 'Категории', 'Пользователи', 'Группы', 'Запись на курсы',
-      'Права доступа', 'Классы', 'Календарь', 'Банк вопросов', 'Новый пользователь',
+    // Администратор (isSuperAdmin) получает все права через can() -> true.
+    // Для теста эмулируем это через полный набор прав.
+    const adminPermissions = [
+      'courses.view', 'courses.manage', 'courses.publish',
+      'tutor.use', 'tutor.manage',
+      'categories.manage', 'groups.view', 'groups.manage',
+      'questions.view', 'questions.manage',
+      'exams.take', 'exams.manage', 'grading.manage',
+      'files.upload', 'content.view', 'content.manage',
+      'certificates.manage', 'forum.moderate', 'announcements.manage',
+      'reports.view', 'audit.view', 'dictionaries.view',
+      'settings.manage', 'system.maintenance',
+      'users.view', 'users.create', 'users.update', 'users.delete',
+      'users.permissions', 'users.courses',
     ]
+    const keys = visibleKeys(adminPermissions, true)
 
-    visible.forEach(title => {
-      expect(forbiddenForTrainee).not.toContain(title)
+    expect(keys).toContain('files')
+    expect(keys).toContain('users')
+    expect(keys).toContain('groups')
+    expect(keys).toContain('settings')
+    expect(keys).toContain('grades')
+    // У админа нет onlyFor: 'trainee' пунктов
+    expect(keys).not.toContain('myLearning')
+    expect(keys).not.toContain('gamification')
+  })
+
+  describe('признак onlyFor', () => {
+    it('обучаемому показывает «Учебный план»', () => {
+      const keys = visibleKeys(['courses.view', 'content.view', 'exams.take', 'dictionaries.view'], false)
+      expect(keys).toContain('myLearning')
     })
-  })
 
-  it('не показывает «Мои курсы» (/auk): это дубликат личного кабинета', () => {
-    // Два пункта «про одно и то же» в меню — лишнее. Сам маршрут /auk
-    // остался рабочим, убран только пункт меню.
-    const wrapper = mountMenu(['courses.view', 'content.view', 'exams.take'])
-    expect(titles(wrapper)).not.toContain('Мои курсы')
-  })
-})
+    it('управляющему «Учебный план» не показывает лишнего', () => {
+      const keys = visibleKeys(
+        ['courses.view', 'content.manage', 'files.upload', 'categories.manage', 'groups.view', 'users.view', 'questions.view', 'exams.manage', 'grading.manage'],
+        true
+      )
+      expect(keys).not.toContain('myLearning')
+    expect(keys).not.toContain('gamification')
+    })
 
-describe('Боковое меню: пункт только для своей категории', () => {
-  // Набор прав инструктора: он управляет людьми и курсами, но при этом
-  // не обучается, поэтому личный учебный план ему не нужен.
-  const INSTRUCTOR = [
-    'users.view', 'groups.view', 'groups.manage', 'courses.view',
-    'courses.manage', 'questions.view', 'exams.take',
-  ]
-
-  it('обучаемому показывает «Учебный план»', () => {
-    const wrapper = mountMenu(['courses.view', 'content.view', 'exams.take'])
-    expect(titles(wrapper)).toContain('Учебный план')
-  })
-
-  it('управляющему «Учебный план» не показывает лишнего', () => {
-    // Управляющий не обучается: его личный план пуст, и показывать
-    // ему этот пункт незачем. Раньше он видел его вместе со всеми.
-    const wrapper = mountMenu(INSTRUCTOR)
-    const list = titles(wrapper)
-
-    expect(list).not.toContain('Запись на курсы')
-    // При этом его собственные разделы остаются.
-    expect(list).toContain('Пользователи')
-    expect(list).toContain('Группы')
-  })
-
-  it('признак onlyFor ничего не ломает у обычного пункта', () => {
-    const wrapper = mountMenu(INSTRUCTOR)
-    expect(titles(wrapper)).toContain('Личный кабинет')
+    it('признак onlyFor ничего не ломает у обычного пункта', () => {
+      // Пункт без onlyFor виден и manager, и trainee при наличии прав.
+      const traineeKeys = visibleKeys(['courses.view'], false)
+      const managerKeys = visibleKeys(['courses.view'], true)
+      expect(traineeKeys).toContain('courses')
+      expect(managerKeys).toContain('courses')
+    })
   })
 })

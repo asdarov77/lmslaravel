@@ -1,0 +1,209 @@
+<template>
+  <div class="styleguide-section">
+    <h2 class="styleguide-section__title">{{ $t('styleguide.colors.title') }}</h2>
+    <p class="styleguide-section__desc">{{ $t('styleguide.colors.desc') }}</p>
+
+    <div class="styleguide__palette">
+      <div
+        v-for="group in colorGroups"
+        :key="group.name"
+        class="styleguide__palette-group"
+      >
+        <h3 class="styleguide__group-title">{{ $t(group.name) }}</h3>
+        <div class="styleguide__swatches">
+          <div
+            v-for="color in group.colors"
+            :key="color.name"
+            class="styleguide__swatch"
+          >
+            <div
+              class="styleguide__swatch-color"
+              :style="{ backgroundColor: color.value }"
+              :data-test="`swatch-${color.name}`"
+            />
+            <div class="styleguide__swatch-info">
+              <code class="styleguide__swatch-name">{{ color.name }}</code>
+              <code class="styleguide__swatch-value">{{ color.value }}</code>
+              <code class="styleguide__swatch-var" v-if="color.var">{{ color.var }}</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="styleguide-section__note">
+      {{ $t('styleguide.colors.note') }}
+    </div>
+  </div>
+</template>
+
+<script>
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+export default {
+  name: 'StyleguideColors',
+
+  setup() {
+    const { t } = useI18n()
+
+    const colorGroups = computed(() => [
+      {
+        name: 'styleguide.colors.groups.brand',
+        colors: [
+          { name: t('styleguide.colors.primary'), value: 'var(--c-primary)', var: '--c-primary' },
+          { name: t('styleguide.colors.primaryHover'), value: 'var(--c-primary-hover)', var: '--c-primary-hover' },
+          { name: t('styleguide.colors.primaryActive'), value: 'var(--c-primary-active)', var: '--c-primary-active' },
+          { name: t('styleguide.colors.primarySoft'), value: 'var(--c-primary-soft)', var: '--c-primary-soft' },
+          { name: t('styleguide.colors.onPrimary'), value: 'var(--c-on-primary)', var: '--c-on-primary' },
+        ],
+      },
+      {
+        name: t('styleguide.colors.groups.accent'),
+        colors: [
+          { name: t('styleguide.colors.accent'), value: 'var(--c-accent)', var: '--c-accent' },
+          { name: t('styleguide.colors.accentHover'), value: 'var(--c-accent-hover)', var: '--c-accent-hover' },
+          { name: t('styleguide.colors.accentSoft'), value: 'var(--c-accent-soft)', var: '--c-accent-soft' },
+          { name: t('styleguide.colors.onAccent'), value: 'var(--c-on-accent)', var: '--c-on-accent' },
+        ],
+      },
+      {
+        name: t('styleguide.colors.groups.neutral'),
+        colors: [
+          { name: t('styleguide.colors.bg'), value: 'var(--c-bg)', var: '--c-bg' },
+          { name: t('styleguide.colors.surface'), value: 'var(--c-surface)', var: '--c-surface' },
+          { name: t('styleguide.colors.surface2'), value: 'var(--c-surface-2)', var: '--c-surface-2' },
+          { name: t('styleguide.colors.surface3'), value: 'var(--c-surface-3)', var: '--c-surface-3' },
+          { name: t('styleguide.colors.border'), value: 'var(--c-border)', var: '--c-border' },
+          { name: t('styleguide.colors.borderStrong'), value: 'var(--c-border-strong)', var: '--c-border-strong' },
+          { name: t('styleguide.colors.text'), value: 'var(--c-text)', var: '--c-text' },
+          { name: t('styleguide.colors.textSecondary'), value: 'var(--c-text-secondary)', var: '--c-text-secondary' },
+          { name: t('styleguide.colors.textMuted'), value: 'var(--c-text-muted)', var: '--c-text-muted' },
+          { name: t('styleguide.colors.textInverse'), value: 'var(--c-text-inverse)', var: '--c-text-inverse' },
+        ],
+      },
+      {
+        name: t('styleguide.colors.groups.status'),
+        colors: [
+          { name: t('styleguide.colors.success'), value: 'var(--c-success)', var: '--c-success' },
+          { name: t('styleguide.colors.successSoft'), value: 'var(--c-success-soft)', var: '--c-success-soft' },
+          { name: t('styleguide.colors.warning'), value: 'var(--c-warning)', var: '--c-warning' },
+          { name: t('styleguide.colors.warningSoft'), value: 'var(--c-warning-soft)', var: '--c-warning-soft' },
+          { name: t('styleguide.colors.danger'), value: 'var(--c-danger)', var: '--c-danger' },
+          { name: t('styleguide.colors.dangerSoft'), value: 'var(--c-danger-soft)', var: '--c-danger-soft' },
+          { name: t('styleguide.colors.info'), value: 'var(--c-info)', var: '--c-info' },
+          { name: t('styleguide.colors.infoSoft'), value: 'var(--c-info-soft)', var: '--c-info-soft' },
+        ],
+      },
+      {
+        name: t('styleguide.colors.groups.gradient'),
+        colors: [
+          { name: t('styleguide.colors.brandGrad1'), value: 'var(--c-brand-gradient-1)', var: '--c-brand-gradient-1' },
+          { name: t('styleguide.colors.brandGrad2'), value: 'var(--c-brand-gradient-2)', var: '--c-brand-gradient-2' },
+          { name: t('styleguide.colors.highlight'), value: 'var(--c-highlight)', var: '--c-highlight' },
+          { name: t('styleguide.colors.highlightHover'), value: 'var(--c-highlight-hover)', var: '--c-highlight-hover' },
+        ],
+      },
+      {
+        name: t('styleguide.colors.groups.dark'),
+        colors: [
+          { name: t('styleguide.colors.darkBg'), value: 'var(--c-bg)', var: '--c-bg (dark)', dark: true },
+          { name: t('styleguide.colors.darkSurface'), value: 'var(--c-surface)', var: '--c-surface (dark)', dark: true },
+          { name: t('styleguide.colors.darkPrimary'), value: 'var(--c-primary)', var: '--c-primary (dark)', dark: true },
+          { name: t('styleguide.colors.darkAccent'), value: 'var(--c-accent)', var: '--c-accent (dark)', dark: true },
+        ],
+      },
+    ])
+
+    return { colorGroups }
+  },
+}
+</script>
+
+<style scoped>
+.styleguide-section__title {
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  margin-bottom: var(--sp-2);
+}
+
+.styleguide-section__desc {
+  color: var(--c-text-secondary);
+  margin-bottom: var(--sp-6);
+}
+
+.styleguide-section__note {
+  margin-top: var(--sp-6);
+  padding: var(--sp-4);
+  background: var(--c-surface-2);
+  border-radius: var(--c-radius-md);
+  font-size: var(--fs-sm);
+  color: var(--c-text-secondary);
+}
+
+.styleguide__palette-group {
+  margin-bottom: var(--sp-8);
+}
+
+.styleguide__group-title {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  margin-bottom: var(--sp-3);
+  color: var(--c-text);
+}
+
+.styleguide__swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--sp-4);
+}
+
+.styleguide__swatch {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-3);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius-md);
+  transition: box-shadow var(--hover-dur) var(--hover-ease);
+}
+
+.styleguide__swatch:hover {
+  box-shadow: var(--shadow-2);
+}
+
+.styleguide__swatch-color {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--c-radius-md);
+  border: 1px solid var(--c-border);
+  flex-shrink: 0;
+}
+
+.styleguide__swatch-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.styleguide__swatch-name {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--c-text);
+}
+
+.styleguide__swatch-value {
+  font-size: var(--fs-xs);
+  color: var(--c-text-secondary);
+  font-family: var(--font-mono);
+}
+
+.styleguide__swatch-var {
+  font-size: var(--fs-xs);
+  color: var(--c-primary);
+  font-family: var(--font-mono);
+}
+</style>

@@ -142,7 +142,14 @@ test.describe('Регресс: страницы не падают и отобр�
       { timeout: 15000 }
     );
 
-    await page.locator('.v-card-actions button:visible', { hasText: /save|сохран/i }).last().click();
+    /*
+     * Кнопка сохранения ищется по тексту, а не по классу контейнера.
+     *
+     * Раньше кнопки лежали в .v-card-actions — это разметка Vuetify.
+     * Теперь их рисует наш FormCard в .u-card__foot, и жёсткий класс
+     * перестал находить кнопку на правильной странице.
+     */
+    await page.getByRole('button', { name: /сохранить|save/i }).last().click();
 
     const patch = await patchPromise;
     expect(patch.status(), 'PATCH не должен возвращать 5xx').toBeLessThan(500);

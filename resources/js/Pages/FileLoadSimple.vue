@@ -1,66 +1,41 @@
 <template>
   <PageHeader :title="$t('files.uploadTitle')" />
 
-  <v-file-input
-    label="выбери файл"
-    @change="onFileSelected"
-    show-size
-    counter
-    multiple
-    type="file"
-    v-model="image"
-    enctype="multipart/form-data"
-  >
-  </v-file-input>
-  <v-btn v-on:click="sendFiles" class="button is-light" type="submit"
-    >Отправить
-  </v-btn>
+  <DropzoneUpload
+    :queue="queue"
+    :title="$t('files.dropzoneTitle')"
+    :hint="$t('files.dropzoneHint')"
+    :accept="acceptedTypes"
+    :multiple="true"
+    @completed="onFileCompleted"
+  />
 </template>
 
+<script setup>
+import { ref, onMounted } from 'vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import DropzoneUpload from '@/components/ui/DropzoneUpload.vue'
+import { createUploadQueue } from '@/services/chunkUpload'
+import { useToast } from '@/composables/useToast'
 
-<script>
+const { toast } = useToast()
 
-import $api from '../api/httpClient'; 
-import PageHeader from '../components/ui/PageHeader.vue'
-export default {
-  components: {PageHeader },
-  data() {
-    return {
-      image: [],
-      selectedFile: null, // текущий выбранный файл
-      filesOrder: [], // очередь загрузки      
-    };
-  },
-  methods: {
-    onFileSelected(e) {      
-      let files = Array.from(e.target.files);
-      this.filesOrder = files.slice(); // текущая очередь    
+/** Разрешенные MIME-типы для загрузки. */
+const acceptedTypes = 'application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif,.zip,.rar,.7z'
 
-      // this.image = files;
-      // for (let item of files) {        
-      //   this.sendFiles(item);
-      // }
-      
-    },
-    sendFiles() {      
-      let formData = new FormData();     
+/** Очередь загрузки: движок chunkUpload управляет прогрессом и докачкой. */
+const queue = createUploadQueue({})
 
-      for( var i = 0; i < this.image.length; i++ ){
-          let file = this.image[i];
-          formData.append('image[' + i + ']', file);
-        }
-      
-      $api.post("/api/files/add", formData,  // разобраться почему авторизация не работает
-          {
-            headers: {
-                'Content-Type': 'multipart/form-data',                
-      //          'Authorization':`Bearer ${localStorage.getItem('token')}`  // вынесен в httpClient.js
-            }
-          }).then((response) => { this.image = [];          
-      });        
-    },
-  },
-};
+/**
+ * Обработка завершения загрузки файла.
+ * Движок chunkUpload уже сохранил файл на сервере и вернул метаданные
+ * в task.result. Здесь просто показываем уведомление.
+ */
+function onFileCompleted(task) {
+  if (task.result?.url) {
+    toast.success(`Файл "${task.name}" загружен`)
+  } else {
+    toast.success(`Файл "${task.name}" загружен`)
+  }
+}
 </script>
-
-

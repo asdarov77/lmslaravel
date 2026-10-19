@@ -71,6 +71,8 @@ class AnnouncementController extends Controller
 
         $announcement = Announcement::create($data + ['author_id' => $actor->id]);
 
+        $this->notifyAudience($announcement, $actor);
+
         return response()->json(['data' => $this->present($announcement)], 201);
     }
 
@@ -127,6 +129,37 @@ class AnnouncementController extends Controller
                     ->map(fn ($r) => ['id' => $r->id, 'name' => $r->rolename]),
             ],
         ]);
+    }
+
+    /**
+     * Уведомляет аудиторию объявления.
+     *
+     * Рассылка идёт только тем, кто реально увидит объявление: иначе
+     * уведомление пришло бы человеку из чужой группы, а открыв ссылку,
+     * он получил бы 404. Список берётся ровно тем же правилом, что и
+     * лента, — Announcement::visibilityFor.
+     */
+    private function notifyAudience(Announcement $announcement, User $actor): void
+    {
+        try {
+            $users = User::query()
+                ->get()
+                ->filter(fn (User $user) => $announcement->visibilityFor($user));
+
+            \App\Support\Notifications::toGroupUsers(
+                $users,
+                $actor,
+                'announcement',
+                'Новое объявление: ' . $announcement->title,
+                mb_substr((string) $announcement->body, 0, 200),
+                '/announcements',
+                ['dedup_key' => 'announcement:' . $announcement->id]
+            );
+        } catch (\Throwable $e) {
+            // Объявление уже создано: сбой рассылки не должен отменять
+            // публикацию — иначе автор видел бы ошибку при успешном POST.
+            report($e);
+        }
     }
 
     /**

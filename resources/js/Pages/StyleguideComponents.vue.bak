@@ -1,0 +1,128 @@
+<template>
+  <div class="styleguide-section">
+    <h2 class="styleguide-section__title">{{ $t('styleguide.components.title') }}</h2>
+    <p class="styleguide-section__desc">{{ $t('styleguide.components.desc') }}</p>
+
+    <h3 class="styleguide__group-title">{{ $t('styleguide.components.buttons') }}</h3>
+    <div class="styleguide__component-demo">
+      <v-btn color="primary" variant="flat">{{ $t('styleguide.components.flat') }}</v-btn>
+      <v-btn color="primary" variant="outlined">{{ $t('styleguide.components.outlined') }}</v-btn>
+      <v-btn color="primary" variant="text">{{ $t('styleguide.components.text') }}</v-btn>
+      <v-btn color="primary" variant="tonal">{{ $t('styleguide.components.tonal') }}</v-btn>
+      <v-btn color="secondary" variant="flat">{{ $t('styleguide.components.secondary') }}</v-btn>
+      <v-btn color="error" variant="flat">{{ $t('styleguide.components.error') }}</v-btn>
+      <v-btn color="success" variant="flat">{{ $t('styleguide.components.success') }}</v-btn>
+      <v-btn variant="flat" :disabled="true">{{ $t('styleguide.components.disabled') }}</v-btn>
+    </div>
+
+    <h3 class="styleguide__group-title" style="margin-top: var(--sp-8);">{{ $t('styleguide.components.sizes') }}</h3>
+    <div class="styleguide__component-demo">
+      <v-btn size="x-small">{{ $t('styleguide.components.xsmall') }}</v-btn>
+      <v-btn size="small">{{ $t('styleguide.components.small') }}</v-btn>
+      <v-btn size="default">{{ $t('styleguide.components.default') }}</v-btn>
+      <v-btn size="large">{{ $t('styleguide.components.large') }}</v-btn>
+    </div>
+
+    <h3 class="styleguide__group-title" style="margin-top: var(--sp-8);">{{ $t('styleguide.components.inputs') }}</h3>
+    <div class="styleguide__component-demo" style="max-width: 400px;">
+      <v-text-field
+        label="{{ $t('styleguide.components.textField') }}"
+        variant="outlined"
+        placeholder="{{ $t('styleguide.components.placeholder') }}">
+      </v-text-field>
+
+      <v-text-field
+        label="{{ $t('styleguide.components.textarea') }}"
+        variant="outlined"
+        type="textarea"
+        rows="3"
+        placeholder="{{ $t('styleguide.components.placeholder') }}">
+      </v-text-field>
+
+      <v-select
+        :items="['Option 1', 'Option 2', 'Option 3']"
+        label="{{ $t('styleguide.components.select') }}"
+        variant="outlined">
+      </v-select>
+
+      <v-text-field
+        type="password"
+        label="{{ $t('styleguide.components.password') }}"
+        variant="outlined">
+        <template v-slot:append-inner>
+          <v-btn variant="text" icon="mdi-eye" @click="showPassword = !showPassword"></v-btn>
+        </template>
+      </v-text-field>
+    </div>
+
+    <h3 class="styleguide__group-title" style="margin-top: var(--sp-8);">{{ $t('styleguide.components.chips') }}</h3>
+    <div class="styleguide__component-demo">
+      <v-chip color="primary" variant="flat">{{ $t('styleguide.components.flat') }}</v-chip>
+      <v-chip color="primary" variant="outlined">{{ $t('styleguide.components.outlined') }}</v-chip>
+      <v-chip color="primary" variant="tonal">{{ $t('styleguide.components.tonal') }}</v-chip>
+      <v-chip color="primary" filter>{{ $t('styleguide.components.filter') }}</v-chip>
+      <v-chip color="primary" input>{{ $t('styleguide.components.input') }}</v-chip>
+      <v-chip color="primary" clickable>{{ $t('styleguide.components.clickable') }}</v-chip>
+    </div>
+
+    <h3 class="styleguide__group-title" style="margin-top: var(--sp-8);">{{ $t('styleguide.components.badges') }}</h3>
+    <div class="styleguide__component-demo">
+      <v-badge color="primary" content="5">{{ $t('styleguide.components.withBadge') }}</v-badge>
+      <v-badge color="error" content="99+">{{ $t('styleguide.components.many') }}</v-badge>
+      <v-badge color="success" dot>{{ $t('styleguide.components.dot') }}</v-badge>
+    </div>
+
+    <h3 class="styleguide__group-title" style="margin-top: var(--sp-8);">{{ $t('styleguide.components.avatars') }}</h3>
+    <div class="styleguide__component-demo">
+      <v-avatar size="32"><v-icon>mdi-account</v-icon></v-avatar>
+      <v-avatar size="48"><v-icon>mdi-account</v-icon></v-avatar>
+      <v-avatar size="64"><v-icon>mdi-account</v-icon></v-avatar>
+      <v-avatar size="48" color="primary"><span class="text-white">AB</span></v-avatar>
+      <v-avatar size="48" color="secondary"><span class="text-white">CD</span></v-avatar>
+    </div>
+
+    <h3 class="styleguide__group-title" style="margin-top: var(--sp-8);">{{ $t('styleguide.components.cards') }}</h3>
+    <div class="styleguide__component-demo" style="max-width: 360px;">
+      <v-card>
+        <v-img src="https://picsum.photos/seed/styleguide/400/200" height="150"></v-img>
+        <v-card-title>{{ $t('styleguide.components.cardTitle') }}</v-card-title>
+        <v-card-text>{{ $t('styleguide.components.cardText') }}</v-card-text>
+        <v-card-actions>
+          <v-btn variant="text">{{ $t('styleguide.components.action') }}</v-btn>
+          <v-spacer></v-spacer>
+          <v-btn color="primary" variant="flat">{{ $t('styleguide.components.primary') }}</v-btn>
+        </v-card-actions>
+      </v-card>
+    </div>
+
+    <h3 class="styleguide__group-title" style="margin-top: var(--sp-8);">{{ $t('styleguide.components.dialogs') }}</h3>
+    <div class="styleguide__component-demo">
+      <v-btn @click="dialog = true">{{ $t('styleguide.components.openDialog') }}</v-btn>
+      <v-dialog v-model="dialog" max-width="400">
+        <v-card>
+          <v-card-title>{{ $t('styleguide.components.dialogTitle') }}</v-card-title>
+          <v-card-text>{{ $t('styleguide.components.dialogText') }}</v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn variant="text" @click="dialog = false">{{ $t('common.cancel') }}</v-btn>
+            <v-btn color="primary" @click="dialog = false">{{ $t('common.save') }}</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref } from 'vue'
+
+export default {
+  name: 'StyleguideComponents',
+
+  setup() {
+    const dialog = ref(false)
+    const showPassword = ref(false)
+    return { dialog, showPassword }
+  },
+}
+</script>

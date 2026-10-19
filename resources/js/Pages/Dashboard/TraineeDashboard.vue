@@ -2,11 +2,37 @@
   <div class="u-page">
     <PageHeader :title="$t('dashboard.title')" :subtitle="$t('dashboard.subtitle')">
       <template #head>
-        <p class="dash__greeting">
-          {{ $t("dashboard.greeting") }},
-          <strong>{{ userName }}</strong>
-        </p>
-      </template>
+        <!-- Герой-блок приветствия с градиентным акцентом — первое, что
+             видит обучаемый после входа. Задаёт тон всему кабинету. -->
+        <div class="dash__hero">
+          <p class="dash__hero-greeting">{{ $t("dashboard.greeting") }},
+            <strong class="u-text-gradient">{{ userName }}</strong>
+          </p>
+          <p class="dash__hero-sub">{{ dashboardSubtitle }}</p>
+        </div>
+      
+    <!--
+      Обзор интерфейса при первом входе.
+
+      Показывается один раз: факт прохождения хранится в localStorage
+      внутри OnboardingTour. Кнопка «показать снова» нужна, потому что
+      человек, пропустивший тур случайно, иначе не найдёт его больше
+      никогда.
+    -->
+    <OnboardingTour :steps="tourSteps" tour-key="trainee-dashboard" />
+
+    <v-btn
+      v-if="canRestartTour"
+      size="small"
+      variant="text"
+      class="mt-2"
+      prepend-icon="mdi-help-circle-outline"
+      data-test="tour-restart"
+      @click="restartTour"
+    >
+      {{ $t("onboarding.restart") }}
+    </v-btn>
+</template>
       <template #actions>
         <v-btn
           color="primary"
@@ -19,17 +45,22 @@
       </template>
     </PageHeader>
 
-    <!-- Ключевые показатели: как в Moodle «Dashboard» / Canvas «Dash» -->
-    <div class="dash__stats">
-      <div v-for="stat in stats" :key="stat.key" class="u-card dash__stat">
-        <span class="dash__stat-icon" :class="`dash__stat-icon--${stat.tone}`">
-          <v-icon :icon="stat.icon" size="20" aria-hidden="true"></v-icon>
-        </span>
-        <div>
-          <span class="dash__stat-value">{{ stat.value }}</span>
-          <span class="dash__stat-label">{{ stat.label }}</span>
-        </div>
-      </div>
+    <!--
+      Ключевые показатели на общем StatCard. Раньше KPI рисовались
+      вручную в каждом дашборде, и оформление расходилось с
+      дизайн-системой: цифра не выделялась, тренда не было вовсе.
+    -->
+    <AppSkeleton v-if="loading" variant="cards" :count="4" class="mb-4" />
+
+    <div v-else class="dash__stats" data-test="dash-stats">
+      <StatCard
+        v-for="stat in stats"
+        :key="stat.key"
+        :label="stat.label"
+        :value="stat.value"
+        :icon="stat.icon"
+        :tone="stat.tone"
+      />
     </div>
 
     <div class="dash__grid">
@@ -40,7 +71,7 @@
         и кнопка, ведущая в него. Список всего плана ниже по странице —
         он отвечает на другой вопрос («что вообще назначено»).
       -->
-      <section v-if="continueItem" class="u-card dash__panel dash__continue" data-test="dash-continue">
+      <section v-if="continueItem" class="u-card dash__panel dash__continue u-card--elevated u-hover-lift" data-test="dash-continue">
         <h2 class="u-card__title">{{ $t("dashboard.continueTitle") }}</h2>
         <p class="u-page__subtitle">{{ continueHint }}</p>
 
@@ -91,44 +122,85 @@
       </section>
 
       <!-- Прогресс обучения -->
-      <section class="u-card dash__panel">
+      <section class="u-card dash__panel u-card--glass u-hover-lift">
         <h2 class="u-card__title">{{ $t("dashboard.progress") }}</h2>
         <p class="u-page__subtitle">{{ $t("dashboard.progressHint") }}</p>
 
         <div class="dash__progress">
-          <v-progress-circular
-            :model-value="progressPercent"
+          <ProgressBarRing
+            :value="progressPercent"
             :size="104"
-            :width="10"
-            color="primary"
-            bg-color="surface"
-          >
-            <span class="dash__progress-value">{{ progressPercent }}%</span>
-          </v-progress-circular>
+            tone="accent"
+            :caption="$t('dashboard.statProgress')"
+            data-test="dash-progress-ring"
+          />
         </div>
       </section>
 
+      <!--
+        Календарь активности (streak). Данные — из /api/gamification/me,
+        тот же источник, что и страница «Геймификация»: отдельного
+        запроса не делаем, а Heatmap уже лежал в проекте неиспользованным.
+        Панель необязательная: если запрос не прошёл (нет права, движок
+        недоступен), дашборд работает дальше — просто без календаря.
+      -->
+      <section
+        v-if="heatmapData.length"
+        class="u-card dash__panel u-card--glass u-hover-lift"
+        data-test="dash-streak"
+      >
+        <h2 class="u-card__title">{{ $t("dashboard.streakTitle") }}</h2>
+        <p class="u-page__subtitle">{{ $t("dashboard.streakHint") }}</p>
+
+        <p class="dash__streak-value">
+          <span class="dash__streak-num">{{ streak }}</span>
+          <span class="dash__streak-unit">{{ $t("dashboard.streakUnit") }}</span>
+        </p>
+
+        <Heatmap
+          :data="heatmapData"
+          :levels="4"
+          :title="$t('dashboard.streakTitle')"
+          :legend-from="$t('dashboard.streakLegendFrom')"
+          :legend-to="$t('dashboard.streakLegendTo')"
+          data-test="dash-streak-heatmap"
+        />
+      </section>
+
       <!-- Подходит к завершению -->
-      <section class="u-card dash__panel">
+      <section class="u-card dash__panel u-card--glass u-hover-lift">
         <h2 class="u-card__title">{{ $t("dashboard.upcoming") }}</h2>
         <p class="u-page__subtitle">{{ $t("dashboard.upcomingHint") }}</p>
 
-        <ul v-if="upcoming.length" class="dash__list">
-          <li v-for="row in upcoming" :key="row.course_id" class="dash__list-row">
-            <span class="dash__list-title">{{ row.title }}</span>
-            <span
-              class="u-badge"
-              :class="deadlineBadge(row.days_left)"
+        <!--
+          Лента дедлайнов. Раньше строки были списком текста: у курса
+          не было даже ссылки, и «сдать к пятнице» превращалось в
+          перечитывание дат. Теперь строка ведёт в курс, показывает и
+          абсолютную дату, и источник срока — иначе неясно, это
+          отдельный дедлайн или конец периода занятий.
+        -->
+        <ul v-if="upcoming.length" class="dash__list" data-test="dash-deadlines">
+          <li v-for="(row, index) in upcoming" :key="row.course_id" class="dash__list-row" data-stagger :data-stagger-index="index">
+            <router-link
+              class="dash__deadline"
+              :to="{ name: 'courses.itemmani', query: { idEdit: row.course_id } }"
             >
-              {{ deadlineLabel(row) }}
-            </span>
+              <span class="dash__list-title">{{ row.title }}</span>
+              <span class="dash__list-sub">
+                <time :datetime="row.due_at">{{ formatDue(row.due_at) }}</time>
+                <span class="dash__deadline-source">{{ deadlineSource(row) }}</span>
+              </span>
+              <span class="u-badge" :class="deadlineBadge(row.days_left)">
+                {{ deadlineLabel(row) }}
+              </span>
+            </router-link>
           </li>
         </ul>
         <p v-else class="dash__muted">{{ $t("dashboard.upcomingEmpty") }}</p>
       </section>
 
       <!-- Экзамены -->
-      <section class="u-card dash__panel">
+      <section class="u-card dash__panel u-card--glass u-hover-lift" data-test="my-exams">
         <h2 class="u-card__title">{{ $t("dashboard.exams") }}</h2>
         <p class="u-page__subtitle">{{ $t("dashboard.examsHint") }}</p>
 
@@ -161,12 +233,12 @@
       </section>
 
       <!-- Мои курсы: краткий список назначений -->
-      <section class="u-card dash__panel">
+      <section class="u-card dash__panel u-card--glass u-hover-lift" data-test="my-plan">
         <h2 class="u-card__title">{{ $t("dashboard.myCourses") }}</h2>
         <p class="u-page__subtitle">{{ $t("dashboard.myCoursesHint") }}</p>
 
         <ul v-if="plan.length" class="dash__list">
-          <li v-for="item in plan.slice(0, 6)" :key="item.id" class="dash__list-row">
+          <li v-for="(item, index) in plan.slice(0, 6)" :key="item.id" class="dash__list-row" data-stagger :data-stagger-index="index">
             <div>
               <span class="dash__list-title">{{ item.course_title }}</span>
               <span class="dash__list-sub">{{ item.module_title || item.aircraft }}</span>
@@ -195,7 +267,13 @@
 
 <script>
 import { mapState } from "vuex";
+import OnboardingTour from "../../components/ui/OnboardingTour.vue";
 import PageHeader from "../../components/ui/PageHeader.vue";
+import StatCard from "../../components/ui/StatCard.vue";
+import ProgressBarRing from "../../components/ui/ProgressBarRing.vue";
+import AppSkeleton from "../../components/ui/AppSkeleton.vue";
+import Heatmap from "../../components/ui/charts/Heatmap.vue";
+import $api from "../../api/httpClient";
 import learningApi from "../../api/learning.api";
 import { toast } from "../../composables/useToast";
 
@@ -210,12 +288,21 @@ import { toast } from "../../composables/useToast";
 export default {
   name: "TraineeDashboard",
 
-  components: { PageHeader },
+  components: { PageHeader, OnboardingTour, StatCard, ProgressBarRing, AppSkeleton, Heatmap },
 
   data() {
     return {
       summary: {},
       plan: [],
+      // Календарь активности и streak — из /api/gamification/me.
+      // Держим отдельно от summary: это необязательный блок, его
+      // отсутствие не должно ломать остальной дашборд.
+      gamification: {},
+      // Пока идут два параллельных запроса, показываем скелетоны той же
+      // формы. Раньше состояния загрузки не было вовсе: карточки появлялись
+      // разом и без предупреждения, а на медленной сети страница выглядела
+      // пустой минуту.
+      loading: true,
     };
   },
 
@@ -264,6 +351,22 @@ export default {
       return this.summary?.progress?.lessons_total ?? 0;
     },
 
+    /** Шаги тура приходят из локализации, а не из кода. */
+    tourSteps() {
+      return this.$t("onboarding.steps");
+    },
+
+    /** Кнопка «показать снова» — только после первого показа. */
+    canRestartTour() {
+      try {
+        return window.localStorage.getItem("app:tour:trainee-dashboard") === "1";
+      } catch (error) {
+        // Приватный режим: localStorage недоступен, кнопка просто не
+        // показывается — это лучше, чем кнопка, которая не работает.
+        return false;
+      }
+    },
+
     progressPercent() {
       return this.summary?.progress?.percent ?? 0;
     },
@@ -282,6 +385,35 @@ export default {
       return this.continueItem?.started
         ? this.$t("dashboard.continueStartedHint")
         : this.$t("dashboard.continueNewHint");
+    },
+
+    /** Подзаголовок героя-блока: текущий статус обучаемого. */
+    dashboardSubtitle() {
+      const lessons = this.lessonsTotal;
+      const done = this.lessonsDone;
+      if (!lessons) return this.$t("dashboard.heroSubStart");
+      return this.$t("dashboard.heroSubProgress", { done, total: lessons });
+    },
+
+    /**
+     * Дни активности в формате Heatmap.
+     *
+     * Бэкенд отдаёт { date, points }, компонент ждёт { date, value } —
+     * переименование при отдаче, без пересчёта самих чисел.
+     */
+    heatmapData() {
+      const calendar = this.gamification?.calendar;
+
+      if (!Array.isArray(calendar)) return [];
+
+      return calendar
+        .filter((day) => day && day.date)
+        .map((day) => ({ date: day.date, value: Number(day.points) || 0 }));
+    },
+
+    /** Текущий streak в днях — подпись крупным числом над сеткой. */
+    streak() {
+      return Number(this.gamification?.streak) || 0;
     },
 
     /**
@@ -327,6 +459,18 @@ export default {
   },
 
   methods: {
+    restartTour() {
+      try {
+        window.localStorage.removeItem("app:tour:trainee-dashboard");
+      } catch (error) {
+        // см. canRestartTour
+      }
+
+      // Ключ сброшен — ту�� заново откроется при следующей монтаже,
+      // а здесь просто перезагружаем шаги.
+      window.location.reload();
+    },
+
     async load() {
       try {
         // Сводка и список назначений идут параллельно: дашборд не должен
@@ -337,13 +481,35 @@ export default {
         ]);
 
         this.summary = learningApi.dashboard(dashRes);
-        this.plan = learningApi.planItems(planRes);
+        /*
+         * Блок ниже называется «Мои курсы», а /api/my/learning отдаёт
+         * строки плана: группа может быть записана на конкретные модули
+         * курса (у каждой строки свой parent_id), и один курс приходил
+         * двумя строками с одинаковым названием. На странице учебного
+         * плана это верно — там видно, на какие именно модули запись,
+         * — а здесь список выглядел как сбой данных.
+         */
+        this.plan = learningApi.planItems(planRes).filter(
+          (item, index, all) => all.findIndex(c => c.course_id === item.course_id) === index
+        );
       } catch (e) {
         // Пустые данные — валидное состояние (нет группы, нет курсов).
         // Сообщаем об ошибке только если пришёл отказ сервера.
         if (e?.response?.status && e.response.status >= 400) {
           this.notify(this.$t("dashboard.loadError"), "error");
         }
+      } finally {
+        this.loading = false;
+      }
+
+      // Календарь активности грузим ОТДЕЛЬНО и не блокируем им дашборд:
+      // это дополнительный блок, и его отсутствие (нет права, отказ
+      // сервера) не должно превращать рабочий экран в ошибку.
+      try {
+        const response = await $api.get("/api/gamification/me");
+        this.gamification = response?.data?.data ?? {};
+      } catch {
+        this.gamification = {};
       }
     },
 
@@ -355,6 +521,30 @@ export default {
       if (row.days_left === 0) return this.$t("dashboard.deadlineToday");
       if (row.days_left === 1) return this.$t("dashboard.deadlineTomorrow");
       return this.$t("dashboard.deadlineInDays", { days: row.days_left });
+    },
+
+    /** Дата дедлайна в локальном формате, без «Invalid Date». */
+    formatDue(value) {
+      if (!value) return "";
+
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+
+      return new Intl.DateTimeFormat(this.$i18n?.locale || "ru-RU", {
+        day: "2-digit",
+        month: "short",
+      }).format(date);
+    },
+
+    /**
+     * Откуда взят срок: отдельный дедлайн или конец периода занятий.
+     * Разница существенна: период может длиться месяц, а сдать нужно
+     * к конкретной дате.
+     */
+    deadlineSource(row) {
+      return row.source === "deadline"
+        ? this.$t("dashboard.deadlineSourceDeadline")
+        : this.$t("dashboard.deadlineSourceStudyTo");
     },
 
     deadlineBadge(daysLeft) {
@@ -376,10 +566,26 @@ export default {
 </script>
 
 <style scoped>
-.dash__greeting {
-  margin: var(--sp-2) 0 0;
-  font-size: 0.9375rem;
+.dash__hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin: var(--sp-2) 0 var(--sp-4);
+}
+
+.dash__hero-greeting {
+  margin: 0;
+  font-size: 1.125rem;
   color: var(--c-text-secondary);
+  line-height: var(--lh-normal);
+}
+
+.dash__hero-sub {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--c-text-muted);
+  max-width: 60ch;
+  line-height: var(--lh-normal);
 }
 
 .dash__stats {
@@ -446,6 +652,27 @@ export default {
   font-weight: 600;
 }
 
+.dash__streak-value {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: var(--sp-3) 0 var(--sp-2);
+}
+
+.dash__streak-num {
+  font-size: var(--fs-3xl);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-text);
+}
+
+.dash__streak-unit {
+  font-size: var(--fs-sm);
+  color: var(--c-text-muted);
+}
+
 .dash__facts {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -501,6 +728,41 @@ export default {
   gap: var(--sp-3);
   padding: var(--sp-2) 0;
   border-bottom: 1px solid var(--c-border);
+}
+
+/* Строка дедлайна целиком кликабельна: курс открывается из любого
+   места строки, а не только из названия. */
+.dash__deadline {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex: 1 1 auto;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.dash__deadline:hover .dash__list-title {
+  color: var(--c-primary);
+  text-decoration: underline;
+}
+
+.dash__deadline:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.dash__deadline .dash__list-sub {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  white-space: nowrap;
+}
+
+.dash__deadline-source {
+  font-size: var(--fs-2xs);
+  color: var(--c-text-muted);
 }
 
 .dash__list-row:last-child {

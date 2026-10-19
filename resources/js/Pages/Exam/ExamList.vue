@@ -102,7 +102,7 @@
 <script>
 import PageHeader from "../../components/ui/PageHeader.vue";
 import EmptyState from "../../components/ui/EmptyState.vue";
-import examApi from "../../api/exam.api";
+import * as examApi from "../../api/exam.api";
 import { toast } from "../../composables/useToast";
 
 /**

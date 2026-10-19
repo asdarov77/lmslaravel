@@ -457,8 +457,15 @@ test.describe('Боковое меню', () => {
      * выполняем ОДИН переход — чтобы убедиться, что страница открывается
      * без ошибок в консоли.
      */
+    /*
+     * Ссылки берём у .u-nav__item — это корень v-list-item, то есть
+     * НАСТОЯЩИЙ <a href>. Селектор [data-test="nav-item"] попадает в
+     * .v-list-item-title: Vuetify уводит лишние атрибуты туда, и у
+     * такого элемента href нет вовсе, поэтому проверка видела 25
+     * «пустых ссылок» на исправном меню.
+     */
     const links = await page
-      .locator('[data-test="nav-item"]')
+      .locator('.u-nav__item')
       .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('href')))
 
     expect(links.length, 'в меню есть пункты').toBeGreaterThan(0)

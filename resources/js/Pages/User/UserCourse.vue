@@ -95,7 +95,7 @@ export default {
 @import "../../../css/app.css";
 
 .btn-lesson {
-  background-color: #B0E0E6;
+  background-color: var(--c-accent-soft);
 }
 
 .container-course {
@@ -105,7 +105,7 @@ export default {
 
 .btn-action {
   margin: 0 auto;
-  background-color: #90EE90;
+  background-color: var(--c-success-soft);
 }
 
 .learning {
@@ -120,7 +120,7 @@ export default {
 }
 
 .tests-card {
-  background-color: #c3e6cb;
+  background-color: var(--c-success-soft);
 }
 
 .btn-action {

@@ -33,7 +33,7 @@
       </template>
 
       <div v-else class="d-flex justify-center py-6">
-        <v-progress-circular indeterminate aria-label="Загрузка"></v-progress-circular>
+        <v-progress-circular indeterminate :aria-label="$t('category.labelZagruzka')"></v-progress-circular>
       </div>
 
       <v-alert

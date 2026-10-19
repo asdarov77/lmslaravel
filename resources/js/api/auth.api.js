@@ -13,4 +13,6 @@ const logout = () => httpClient.get('/api/logout')
 // состояние с БД после изменения прав администратором.
 const fetchMe = () => httpClient.get('/api/v1/me')
 
-export { login, logout, fetchMe }
+const verifyTwoFactor = (data) => httpClient.post('/api/two-factor/verify', data)
+
+export { login, logout, fetchMe, verifyTwoFactor }

@@ -17,7 +17,7 @@
  */
 import { test, expect } from '@playwright/test'
 
-const BASE = process.env.APP_URL || 'http://127.0.0.1:8000'
+const BASE = process.env.APP_URL || 'http://127.0.0.1:8080'
 const HASH = BASE + '/#'
 
 const ADMIN = { fio: 'Администратор', password: '123' }
@@ -37,9 +37,21 @@ async function auth(page, creds) {
 
   await page.addInitScript(
     ([t, u]) => {
-      localStorage.clear()
+      // Очистка хранилища — ОДИН раз на контекст. В addInitScript очистка
+      // выполнялась на КАЖДОЙ загрузке документа, а часть страниц меняет
+      // адрес при инициализации: вторая загрузка стирала то, что приложение
+      // только что сохранило (прогресс, закреплённые курсы).
+      if (!sessionStorage.getItem('__e2e_cleared')) {
+        localStorage.clear();
+        sessionStorage.setItem('__e2e_cleared', '1');
+      }
       localStorage.setItem('token', t)
       localStorage.setItem('user', u)
+      // Тур первого входа: помечаем как пройденный. Его оверлей
+      // перехватывает клики по всей странице, и без этой отметки любой
+      // тест, кликающий по дашборду, падал бы из-за подсказки, а не
+      // из-за своей проверки.
+      localStorage.setItem('app:tour:trainee-dashboard', '1')
     },
     [token, JSON.stringify(user)]
   )
@@ -48,7 +60,7 @@ async function auth(page, creds) {
 }
 
 test.describe('Глобальный поиск', () => {
-  test('находит курс и открывает его; чужой курс обучаемому не показывается', async ({ page }) => {
+  test('находит курс и открывает его; чужой курс обучаемому не показывается', async ({ page, request }) => {
     const errors = []
     page.on('pageerror', e => errors.push(e.message.split('\n')[0]))
 
@@ -178,12 +190,27 @@ test.describe('Глобальный поиск', () => {
 
       expect(errors, 'сценарий не должен давать ошибок').toEqual([])
     } finally {
-      // Порядок не важен: удаление группы каскадно снимает её записи.
-      // Но null пропускаем: конструкция выше может не дойти до конца.
-      if (otherUserId) await page.request.delete(BASE + `/api/user/${otherUserId}`, { headers })
-      if (otherGroupId) await page.request.delete(BASE + `/api/groups/${otherGroupId}`, { headers })
-      await page.request.delete(BASE + `/api/user/${userId}`, { headers })
-      await page.request.delete(BASE + `/api/groups/${groupId}`, { headers })
+      /*
+       * Уборка идёт через отдельный request-контекст, а не через
+       * page.request.
+       *
+       * page.request связан с состоянием страницы: если тест упал или
+       * оставил страницу в процессе навигации, запросы уборки
+       * вставали в очередь и падали по таймауту в 30 секунд. Из-за
+       * этого мусор оставался в боевой базе, а следующий прогон видел
+       * «чужой курс» там, где его быть не должно.
+       *
+       * Удаление не бросает исключение: уборка не должна отменять
+       * результат проверок, которые уже прошли.
+       */
+      const drop = async (url) => {
+        await request.delete(url, { headers, timeout: 15000 }).catch(() => null)
+      }
+
+      if (otherUserId) await drop(BASE + `/api/user/${otherUserId}`)
+      if (otherGroupId) await drop(BASE + `/api/groups/${otherGroupId}`)
+      await drop(BASE + `/api/user/${userId}`)
+      await drop(BASE + `/api/groups/${groupId}`)
     }
   })
 })

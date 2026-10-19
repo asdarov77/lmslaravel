@@ -31,4 +31,10 @@ export default {
    * undefined — счётчик молча показывал бы 0.
    */
   total: response => metaField(response, 'total') ?? null,
+
+  /** Создание события календаря. */
+  createEvent: data => httpClient.post('/api/calendar/events', data).then(response => response?.data?.data),
+
+  /** Удаление события календаря. */
+  deleteEvent: id => httpClient.delete(`/api/calendar/events/${id}`).then(() => true),
 }

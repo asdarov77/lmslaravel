@@ -44,7 +44,17 @@
   --c-border-strong: #c3c9d1;
   --c-text: #1c2024;
   --c-text-secondary: #5a626c;
-  --c-text-muted: #8b929b;
+  /*
+    Приглушённый текст — тоже текст.
+
+    Раньше здесь стояло #8b929b: на белом это 3.14:1 при норме 4.5:1 для
+    текста до 18px. Под токен попадали подписи таблиц, счётчики, подсказки
+    и весь класс .u-muted — то есть почти каждая вторая надпись на
+    странице читалась хуже, чем должна. Тон тот же (hue 214°), lightness
+    опущен до 38% — контраст на белом 6.35:1.
+    WCAG 2.2 SC 1.4.3 (AA): 4.5:1 для текста до 18.66px.
+  */
+  --c-text-muted: #5a6068;
   --c-text-inverse: #ffffff;
 
   /* Статусы. Семантические роли вместо «зелёного/красного» из палитры:
@@ -74,6 +84,23 @@
      не спорить с primary. */
   --c-highlight: #eceff3;
   --c-highlight-hover: #e2e7ee;
+
+  /* Стеклянные поверхности: полупрозрачный фон + размытие заднего фона.
+     Используются для карточек, шапки, модальных окон — создают глубину
+     без тяжелых теней. */
+  --c-glass-bg: rgb(255 255 255 / 0.62);
+  --c-glass-border: rgb(255 255 255 / 0.42);
+  --c-glass-shadow: 0 8px 32px rgba(16, 24, 40, 0.06);
+
+  /* Свечения: мягкий ореол вокруг первичного и акцентного цвета.
+     Добавляют «светящийся» эффект на тёмных и светлых фонах. */
+  --c-glow-primary: 0 0 32px rgba(26, 95, 180, 0.20);
+  --c-glow-accent: 0 0 32px rgba(13, 148, 136, 0.20);
+
+  /* Градиенты hero-панелей. Составляются из существующих токенов,
+     чтобы палитра оставалась единой — новые цвета не вводятся. */
+  --c-gradient-hero-1: var(--c-primary);
+  --c-gradient-hero-2: var(--c-accent);
 
   /* Фон скелетона загрузки. Раньше класс .app__skeleton-bar ссылался
      на несуществующий токен — фон был прозрачным, и вместо пульсации
@@ -219,6 +246,23 @@
   --dur-fast: 120ms;
   --dur-base: 200ms;
   --dur-slow: 320ms;
+
+  /* Motion / Анимации */
+  /* Stagger delay для списков */
+  --stagger-delay: 40ms;
+  --stagger-duration: 300ms;
+  --stagger-ease: var(--ease-out);
+
+  /* Page transitions */
+  --page-transition-dur: 200ms;
+  --page-transition-ease: var(--ease-out);
+  --page-slide-distance: 20px;
+
+  /* Hover/focus transitions */
+  --hover-dur: 150ms;
+  --hover-ease: var(--ease-out);
+  --focus-dur: 100ms;
+  --focus-ease: var(--ease-out);
 }
 
 /**
@@ -269,6 +313,19 @@
 
   --c-brand-gradient-1: #7aa7e8;
   --c-brand-gradient-2: #2dd4bf;
+
+  /* Стеклянные поверхности — тёмная тема. */
+  --c-glass-bg: rgb(30 34 42 / 0.55);
+  --c-glass-border: rgb(255 255 255 / 0.12);
+  --c-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+
+  /* Свечения — тёмная тема, цвет鮨ее. */
+  --c-glow-primary: 0 0 36px rgba(122, 167, 232, 0.30);
+  --c-glow-accent: 0 0 36px rgba(45, 212, 191, 0.30);
+
+  /* Градиенты hero — тёмная тема. */
+  --c-gradient-hero-1: var(--c-primary);
+  --c-gradient-hero-2: var(--c-accent);
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-2: 0 4px 6px rgba(0, 0, 0, 0.35), 0 12px 16px rgba(0, 0, 0, 0.4);

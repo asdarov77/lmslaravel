@@ -1,5 +1,6 @@
 <script setup>
 import { useI18n } from "vue-i18n";
+import PageTransition from "./components/ui/PageTransition.vue";
 const { t } = useI18n({ useScope: "global" });
 </script>
 
@@ -13,16 +14,18 @@ const { t } = useI18n({ useScope: "global" });
   -->
   <v-app :class="{ 'app--course': isCourseView }"
     >
-    <v-app-bar color="primary" prominence="prominent">
+    <v-app-bar class="app__bar" prominence="prominent">
       <v-app-bar-nav-icon
         v-if="checkLeftSideMenu()"
         variant="text"
+        :aria-label="$t('app.menu.main')"
+        :title="$t('app.menu.main')"
         @click.stop="drawer = !drawer"
       ></v-app-bar-nav-icon>
       <!-- tag="span" // in app-bar-title ?-->
       <v-app-bar-title>
         <router-link to="/" class="app__brand" :aria-label="$t('app.title')">
-          <app-brand :full="true" />
+          <app-brand :full="true" :on-primary="true" />
         </router-link>
       </v-app-bar-title>
       <!--
@@ -30,6 +33,20 @@ const { t } = useI18n({ useScope: "global" });
           авторизации, и кнопка без смысла только вводила бы в заблуждение.
       -->
       <global-search v-if="loggedIn" class="app__search" />
+
+      <!-- Палитра команд. Кнопка нужна и помимо Ctrl+K: человек не
+           знающий сочетания должен найти её обычным кликом. -->
+      <v-btn
+        v-if="loggedIn"
+        class="app__cmdk"
+        icon="mdi-command"
+        variant="text"
+        size="small"
+        :title="`${$t('cmdk.placeholder')} — ${$t('cmdk.hint')}`"
+        :aria-label="$t('cmdk.hint')"
+        data-test="open-cmdk"
+        @click="paletteOpen = true"
+      />
 
       <notification-bell class="app__bell" />
 
@@ -81,7 +98,15 @@ const { t } = useI18n({ useScope: "global" });
     >
       <left-side-menu v-if="loggedIn "></left-side-menu>
     </v-navigation-drawer>
-    <v-main>
+    <!--
+      Skip-ссылка. Без неё переход к содержимому страницы с клавиатуры
+      требовал пройти табом через все пункты меню — на разделе
+      «Управление» это два десятка остановок до первого заголовка.
+      Показывается только при фокусе, поэтому в интерфейсе её не видно.
+    -->
+    <a class="app__skip-link" href="#app-main">{{ $t('app.skipToContent') }}</a>
+
+    <v-main id="app-main" tabindex="-1">
       <!--
         Скелетон загрузки.
         
@@ -103,7 +128,9 @@ const { t } = useI18n({ useScope: "global" });
             ничего не рисует.
         -->
         <breadcrumbs />
-        <router-view></router-view>
+        <PageTransition name="page" mode="out-in" :enter-duration="200" :leave-duration="150">
+          <router-view></router-view>
+        </PageTransition>
       </v-container>
     </v-main>
     <!--
@@ -162,20 +189,47 @@ const { t } = useI18n({ useScope: "global" });
       действия («Сохранено») пользователь не успевал увидеть. Здесь
       сообщения переживают навигацию.
     -->
+    <mobile-bottom-nav :logged-in="loggedIn" :is-trainee="isTrainee" />
     <ToastStack />
+
+    <!--
+      Палитра команд открывается кнопкой в шапке.
+
+      Ctrl/Cmd+K остаётся за глобальным поиском: это сочетание было
+      у него и раньше, и человек привык искать по нему. Палитра —
+      про разделы и действия, поиск — про данные; смешивать их в одном
+      сочетании значило бы ломать привычку привычнее, чем добавлять
+      удобство.
+    -->
+    <CommandPalette
+      v-if="loggedIn"
+      v-model="paletteOpen"
+      :commands="paletteCommands"
+      :placeholder="$t('cmdk.placeholder')"
+      :empty-text="$t('cmdk.empty')"
+      data-test="cmd-palette"
+      @run="onCommandRun"
+    />
 </template>
 
 <script>
 import { mapGetters, mapState } from 'vuex';
 import LeftSideMenu from './Pages/Navigation/LeftSideMenu.vue';
+import { navigationSections } from './navigation'
+import { routePermissionIndex } from './utils/routePermissions'
+import { visibleSections as buildVisibleSections } from './utils/navigationVisibility'
 import AccountMenu from './Pages/Navigation/AccountMenu.vue';
 import Breadcrumbs from './components/ui/Breadcrumbs.vue';
 import GlobalSearch from './components/ui/GlobalSearch.vue';
+import CommandPalette from './components/ui/CommandPalette.vue';
 import ThemeToggle from './components/ui/ThemeToggle.vue';
 import AppBrand from './components/ui/AppBrand.vue';
 import ToastStack from './components/ui/ToastStack.vue';
 import NotificationBell from './components/ui/NotificationBell.vue';
+import MobileBottomNav from './components/ui/MobileBottomNav.vue';
 import density from './utils/density';
+import theme from './utils/theme'
+import vuetify from './Vuetify';
 
 
 /**
@@ -196,115 +250,144 @@ function readDrawer() {
 }
 
 export default {
-  components: { AppBrand, Breadcrumbs, GlobalSearch, ThemeToggle, ToastStack, NotificationBell },
-  mounted() {
-    const hist = this.$router.options.history;
+  name: 'App',
 
-    // Плотность применяется к <html> при старте: без этого после
-    // перезагрузки состояние в Vuex и разметка расходились бы.
-    density.apply(this.density);
+  /*
+   * ВНИМАНИЕ: объявления Options API здесь ровно ОДИН раз каждый.
+   *
+   * В этом файле стояло по два блока `data` и по два `computed`.
+   * В объектном литерале JS повторный ключ просто перетирает
+   * предыдущий, и «молча»: без ошибки сборки. Выигрывал ВТОРОЙ
+   * блок, поэтому терялись paletteOpen, requiredBy,
+   * isManagerUser, visibleNavigation и paletteCommands — а кнопка
+   * палитры команд в шапке (@click="paletteOpen = true") не
+   * открывала ничего. Теперь дублей нет; если понадобится новое
+   * состояние — дописывается сюда.
+   */
+  components: {
+    AppBrand,
+    LeftSideMenu,
+    AccountMenu,
+    Breadcrumbs,
+    GlobalSearch,
+    CommandPalette,
+    ThemeToggle,
+    ToastStack,
+    NotificationBell,
+    MobileBottomNav,
+  },
 
-    // Ширина окна в состоянии обновляется здесь (см. viewportWidth в
-    // data). Событие снимается в beforeUnmount, иначе при уходе со
-    // страницы слушатель остаётся висеть на window.
-    this._onResize = () => {
-      this.viewportWidth = window.innerWidth;
+  data() {
+    return {
+      // Палитра команд открывается по клику на кнопку в шапке.
+      paletteOpen: false,
+      // Индекс прав по ссылкам: тот же источник, что у меню.
+      requiredBy: routePermissionIndex(),
+
+      /*
+       * Состояние меню берётся из LocalStorage: см. watcher drawer.
+       * При отсутствии значения (первый визит) меню открыто, как раньше.
+       */
+      drawer: readDrawer(),
+      tab: true,
+      courseItemShow: false,
+      courseItemManiShow: false,
+      /*
+       * Флаг загрузки приложения.
+       *
+       * Объявлялся и не использовался: пока грузились данные, страница
+       * оставалась пустой, и это выглядело как «приложение зависло».
+       * Теперь по нему рисуется скелетон (см. шаблон).
+       */
+      isLoading: true,
+
+      /*
+       * Ширина окна — в состоянии, а не вычисляется прямо из matchMedia.
+       *
+       * Раньше `isNarrow` был computed без единой реактивной зависимости:
+       * он читал window.matchMedia и зависел только от неё. Vue
+       * вычислял его ОДИН раз и больше не пересчитывал, потому что
+       * изменение размера окна не отслеживал никто. Следствие: открыли
+       * страницу на широком экране, сузили окно или открыли на телефоне —
+       * меню оставалось постоянным и резервировало 300px из 500px
+       * экрана, то есть на телефоне уезжало почти всё место. Теперь
+       * размер приходит из состояния, который обновляется по событию
+       * resize (см. onResize), и вычисление честно пересчитывается.
+       */
+      viewportWidth: typeof window === 'undefined' ? 1280 : window.innerWidth,
     };
-    window.addEventListener("resize", this._onResize);
-
-    /*
-     * Снимаем скелетон после первой отрисовки.
-     *
-     * Раньше isLoading объявлялся и не использовался: страница оставалась
-     * пустой, пока грузились данные. Теперь скелетон показывается, пока
-     * приложение не отрисуется, и снимается после первой отрисовки.
-     */
-    this.$nextTick(() => {
-      this.isLoading = false;
-    });
   },
-
-  beforeUnmount() {
-    if (this._onResize) {
-      window.removeEventListener("resize", this._onResize);
-      this._onResize = null;
-    }
-  },
-
-  methods: {
-    changeRu() {
-      this.$store.commit("Ui/SET_LANGUAGE", "ru");
-      this.$i18n.locale = "ru";
-    },
-    changeEn() {
-      this.$store.commit("Ui/SET_LANGUAGE", "en");
-      this.$i18n.locale = "en";
-    },
-
-    /*
-     * Переключение плотности.
-     *
-     * Раньше метод отсутствовал: кнопка в шапке вызывала
-     * несуществующий toggleDensity, а состояние density не было
-     * проброшено из Vuex. Внешне это выглядело как «кнопка не
-     * работает». Теперь выбор сохраняется, применяется к <html>
-     * (data-density) и отражается в Pinia/Vuex для иконки.
-     */
-    toggleDensity() {
-      const next = density.toggle();
-      this.$store.commit("Ui/SET_DENSITY", next);
-    },
-
-    checkLeftSideMenu(){
-      // Раньше здесь было сравнение user.role !== 'Обучаемый' по строке.
-      // Оно ломалось дважды: у обучаемого роль хранится как 'trainee'
-      // в части записей (сравнение давало true и показывало меню),
-      // а у пользователя с ролью из role_user колонка role пуста —
-      // то есть проверка читала несуществующее поле.
-      return this.loggedIn && !this.isTrainee;
-    },
-
-  },
-
-  name: "App",
-  data: () => ({
-    /*
-     * Состояние меню берётся из LocalStorage: см. watcher drawer.
-     * При отсутствии значения (первый визит) меню открыто, как раньше.
-     */
-    drawer: readDrawer(),
-    tab: true,
-    courseItemShow: false,
-    courseItemManiShow: false,
-    /*
-     * Флаг загрузки приложения.
-     *
-     * Объявлялся и не использовался: пока грузились данные, страница
-     * оставалась пустой, и это выглядело как «приложение зависло».
-     * Теперь по нему рисуется скелетон (см. шаблон).
-     */
-    isLoading: true,
-
-    /*
-     * Ширина окна — в состоянии, а не вычисляется прямо из matchMedia.
-     *
-     * Раньше `isNarrow` был computed без единой реактивной зависимости:
-     * он читал window.matchMedia и зависел только от неё. Vue
-     * вычислял его ОДИН раз и больше не пересчитывал, потому что
-     * изменение размера окна не отслеживал никто. Следствие: открыли
-     * страницу на широком экране, сузили окно или открыли на телефоне —
-     * меню оставалось постоянным и резервировало 300px из 500px
-     * экрана, то есть на телефоне уезжало почти всё место. Теперь
-     * размер приходит из состояния, который обновляется по событию
-     * resize (см. onResize), и вычисление честно пересчитывается.
-     */
-    viewportWidth: typeof window === 'undefined' ? 1280 : window.innerWidth,
-  }),
-  components: { LeftSideMenu, AccountMenu },
-
-  //----------сохранение в session storage----------------
 
   computed: {
+    // Права нужны палитре команд: она строит команды из видимого меню.
+    ...mapGetters('Auth', ['can']),
+
+    /**
+     * Признак «управляющий» — по правам, как в меню и на дашборде.
+     * Роль приходит из двух источников и называется по-разному, а
+     * права у всех одна.
+     */
+    isManagerUser() {
+      return this.can('users.view', 'users.permissions', 'groups.view', 'groups.manage', 'courses.manage')
+    },
+
+    /**
+     * Команды палитры строятся из видимого меню.
+     *
+     * Отдельный список команд разошёлся бы с меню при первой же
+     * правке: пункт скрыт по правам в меню, а палитра продолжала бы
+     * предлагать его. Поэтому берём ровно то, что видит человек, —
+     * тем же хелпером, что и боковое меню.
+     */
+    visibleNavigation() {
+      return buildVisibleSections(navigationSections, {
+        can: this.can,
+        isManager: this.isManagerUser,
+        t: (key) => this.$t(key),
+        index: this.requiredBy,
+      })
+    },
+
+    paletteCommands() {
+      const commands = [];
+      let index = 0;
+
+      this.visibleNavigation.forEach((section) => {
+        section.items.forEach((item) => {
+          commands.push({
+            id: `nav-${index++}`,
+            title: item.title,
+            icon: item.icon,
+            group: section.title,
+            route: { path: item.link },
+            // Ключ и путь нужны для поиска: человек помнит и название,
+            // и адрес раздела, а не только одно из двух.
+            keywords: [item.link, item.key, item.title].filter(Boolean).join(' '),
+          });
+        });
+      });
+
+      commands.push(
+        {
+          id: 'action-theme',
+          title: this.$t('app.theme.toggle'),
+          icon: 'mdi-theme-light-dark',
+          group: this.$t('cmdk.group.actions'),
+          action: () => this.toggleTheme(),
+          keywords: this.$t('cmdk.keywords.theme'),
+        },
+        {
+          id: 'action-density',
+          title: this.$t('cmdk.density'),
+          icon: 'mdi-format-line-spacing',
+          group: this.$t('cmdk.group.actions'),
+          action: () => this.toggleDensity(),
+          keywords: this.$t('cmdk.keywords.density'),
+        }
+      );
+
+      return commands;
+    },
     /*
      * Открыт ли учебный экран курса.
      *
@@ -356,16 +439,127 @@ export default {
     ...mapGetters("Auth", ["loggedIn", "isTrainee"]),
     ...mapState("Ui", ["menudrawler", "language", "density"]),
     ...mapState("Auth", ["user"]),
+  },
+
+  mounted() {
+    const hist = this.$router.options.history;
+
+    // Плотность применяется к <html> при старте: без этого после
+    // перезагрузки состояние в Vuex и разметка расходились бы.
+    density.apply(this.density);
+
+    // Ширина окна в состоянии обновляется здесь (см. viewportWidth в
+    // data). Событие снимается в beforeUnmount, иначе при уходе со
+    // страницы слушатель остаётся висеть на window.
+    this._onResize = () => {
+      this.viewportWidth = window.innerWidth;
+    };
+    window.addEventListener("resize", this._onResize);
+
+    /*
+     * Снимаем скелетон после первой отрисовки.
+     *
+     * Раньше isLoading объявлялся и не использовался: страница оставалась
+     * пустой, пока грузились данные. Теперь скелетон показывается, пока
+     * приложение не отрисуется, и снимается после первой отрисовки.
+     */
+    this.$nextTick(() => {
+      this.isLoading = false;
+    });
+  },
+
+  beforeUnmount() {
+    if (this._onResize) {
+      window.removeEventListener("resize", this._onResize);
+      this._onResize = null;
+    }
+  },
+
+  methods: {
+    /**
+     * Выполнение команды палитры.
+     *
+     * Переходы делает сам компонент палитры (у команды задан route),
+     * а сюда попадают только команды-действия.
+     */
+    onCommandRun(command) {
+      if (typeof command?.action === 'function') {
+        command.action();
+      }
+    },
+
+    /**
+     * Переключение темы из палитры.
+     *
+     * Через utils/theme — тем же циклом light → dark → auto, что и у
+     * переключателя в шапке. Своя реализация дала бы расхождение:
+     * палитра переключала бы на «противоположное», а не на следующий
+     * режим, и человек получал бы разное поведение по разным кнопкам.
+     */
+    /**
+     * Переключение темы из палитры команд.
+     *
+     * Тот же цикл light → dark → auto, что у переключателя в шапке:
+     * своя реализация переключала бы «на противоположное», и одна
+     * кнопка вела бы себя иначе, чем другая.
+     *
+     * Экземпляр Vuetify берётся импортом, а не через this.$vuetify:
+     * в Options API Vue 3 такого поля нет, и передача undefined
+     * молча оставляла бы токены темы в прежнем состоянии — кнопка
+     * выглядела бы работающей, а тема не менялась.
+     */
+    toggleTheme() {
+      theme.cycle(vuetify);
+    },
+
+    changeRu() {
+      this.$store.commit("Ui/SET_LANGUAGE", "ru");
+      this.$i18n.locale = "ru";
+    },
+    changeEn() {
+      this.$store.commit("Ui/SET_LANGUAGE", "en");
+      this.$i18n.locale = "en";
+    },
+
+    /*
+     * Переключение плотности.
+     *
+     * Раньше метод отсутствовал: кнопка в шапке вызывала
+     * несуществующий toggleDensity, а состояние density не было
+     * проброшено из Vuex. Внешне это выглядело как «кнопка не
+     * работает». Теперь выбор сохраняется, применяется к <html>
+     * (data-density) и отражается в Pinia/Vuex для иконки.
+     */
+    toggleDensity() {
+      const next = density.toggle();
+      this.$store.commit("Ui/SET_DENSITY", next);
+    },
+
+    checkLeftSideMenu(){
+      // Раньше здесь было сравнение user.role !== 'Обучаемый' по строке.
+      // Оно ломалось дважды: у обучаемого роль хранится как 'trainee'
+      // в части записей (сравнение давало true и показывало меню),
+      // а у пользователя с ролью из role_user колонка role пуста —
+      // то есть проверка читала несуществующее поле.
+      return this.loggedIn && !this.isTrainee;
+    },
 
   },
+
 watch: {
   '$route' (){
-    if(this.$route.name === 'courses.item') this.drawer=false;
+    /*
+     * Раньше здесь стояло `if (name === 'courses.item') this.drawer = false`
+     * — одностороннее закрытие панели: зайти на страницу курса было
+     * можно один раз, обратно меню уже не открывалось (openBranding и
+     * прочие кнопки drawer не трогали). Управление панелью теперь только
+     * у пользователя: кнопка в шапке и состояние в localStorage.
+     */
     if(this.$route.name !== "courses.item") this.courseItemShow=true;
     if(this.$route.name !== 'courses.itemmani') this.courseItemManiShow=true;
   },
 
-}  
+}
 };
 
 </script>

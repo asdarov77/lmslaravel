@@ -168,7 +168,7 @@ describe('Список экзаменов', () => {
     http.get.mockResolvedValue(envelope([]));
     const w = await mountList();
 
-    expect(w.text()).toContain('Экзаменов нет');
+    expect(w.text()).toContain('Нет экзаменов');
   });
 
   it('ошибка загрузки показывается тостом', async () => {
@@ -292,7 +292,7 @@ describe('Прохождение экзамена', () => {
     const w = await mountRunner();
 
     expect(w.vm.loadError).not.toBe('');
-    expect(w.text()).toContain('нет вопросов');
+    expect(w.text()).toContain('Нет вопросов');
   })
 
   it('403 от сервера показывается текстом, а не «неизвестной ошибкой»', async () => {

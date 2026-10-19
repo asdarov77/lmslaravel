@@ -129,6 +129,7 @@ import { mapState, mapGetters } from "vuex";
 import PageHeader from "../../components/ui/PageHeader.vue";
 import DataTable from "../../components/ui/DataTable.vue";
 import ConfirmDialog from "../../components/ui/ConfirmDialog.vue";
+import { toast } from "../../composables/useToast";
 
 export default {
   name: "CategoryList",

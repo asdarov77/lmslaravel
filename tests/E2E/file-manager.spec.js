@@ -170,6 +170,82 @@ async function closeDrawer(page) {
   await drawer.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {})
 }
 
+/**
+ * Открыть папку независимо от текущего вида списка.
+ *
+ * Файловый менеджер открывается в СЕТКЕ, и там строка папки помечена
+ * data-test="fm-grid-folder-{id}"; в таблице — "fm-folder-{id}".
+ * Тест обращался только к табличному селектору, поэтому на первом же
+ * открытии папки не находил элемент и падал по таймауту — при том,
+ * что папка была на экране.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {number} id
+ */
+/**
+ * Дождаться появления строки с указанным именем.
+ *
+ * Список показывается либо сеткой, либо таблицей — в зависимости от
+ * выбранного вида, и оба варианта свои. Раньше проверка искала только
+ * .u-table tbody tr, то есть работала лишь в табличном виде, хотя по
+ * умолчанию открывается сетка.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} name
+ */
+async function expectListed(page, name) {
+  // Активен ровно ОДИН вид: сетка или таблица. Проверять оба сразу
+  // нельзя — в сетке таблицы просто нет, и ожидание второго никогда не
+  // выполнится.
+  const grid = page.locator('.fm-grid__item', { hasText: name });
+  const table = page.locator('.u-table tbody tr', { hasText: name });
+
+  await expect
+    .poll(
+      async () =>
+        (await grid.isVisible().catch(() => false)) ||
+        (await table.isVisible().catch(() => false)),
+      { timeout: 15000 },
+    )
+    .toBe(true);
+}
+
+async function clickFolder(page, id) {
+  const selectors = [
+    `[data-test="fm-grid-open-folder-${id}"]`,
+    `[data-test="fm-folder-${id}"]`,
+  ]
+
+  for (const selector of selectors) {
+    const el = page.locator(selector)
+
+    if (await el.count()) {
+      await el.first().click()
+
+      return
+    }
+  }
+
+  throw new Error(`не найдена папка ${id} ни в сетке, ни в таблице`)
+}
+
+/**
+ * Переключает менеджер в табличный вид.
+ *
+ * По умолчанию открывается сетка, а действия строки (переименовать /
+ * переместить / удалить) нарисованы ТОЛЬКО в таблице — в DataTable это
+ * слот cell-actions. У карточки сетки есть выбор и открытие, но не
+ * действия, поэтому кликать по fm-rename-* и fm-delete-* из сетки
+ * бессмысленно: элемента просто нет.
+ */
+async function switchToListView(page) {
+  // Селектор по data-test, а не по подписи «Список»: такая кнопка на
+  // странице не одна (тот же текст есть в палитре команд), и клик по
+  // «первой» попадал не в переключатель вида.
+  await page.locator('[data-test="fm-view-list"]').click()
+  await expect(page.locator('.u-table')).toBeVisible({ timeout: 15000 })
+}
+
 const openManager = async (page) => {
   await page.goto(BASE + '/#/filemanager', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('[data-test="fm-upload"]')).toBeVisible({ timeout: 20000 })
@@ -334,14 +410,14 @@ test.describe('Файловый менеджер: папки', () => {
     await page.locator('[data-test="fm-name-submit"]').click()
 
     // Регресс 3: папка видна в списке, а не только «создана».
-    await expect(page.locator('.u-table tbody tr', { hasText: name })).toBeVisible({ timeout: 15000 })
+    await expectListed(page, name)
 
     const data = await readFolder(page, token)
     const folder = data.folders.find((f) => f.name === name)
     expect(folder, 'папка есть в ответе API').toBeTruthy()
 
     // Заходим внутрь и убеждаемся, что каталог действительно открывается.
-    await page.locator(`[data-test="fm-folder-${folder.id}"]`).click()
+    await clickFolder(page, folder.id)
     await expect(page.locator('[data-test="fm-breadcrumbs"]')).toContainText(name, { timeout: 15000 })
     // Пустой каталог рисуется EmptyState, а таблицей .u-table — только
     // когда есть строки. Проверять «.u-table» тут бессмысленно: её нет.
@@ -349,7 +425,7 @@ test.describe('Файловый менеджер: папки', () => {
 
     // Возврат в корень кнопкой-хлебной крошкой.
     await page.locator('[data-test="fm-breadcrumbs"] button').first().click()
-    await expect(page.locator('.u-table tbody tr', { hasText: name })).toBeVisible({ timeout: 15000 })
+    await expectListed(page, name)
 
     await dropFolder(page, token, folder.id)
 
@@ -388,7 +464,8 @@ test.describe('Файловый менеджер: папки', () => {
     // Перечитываем страницу: мы в корне, а первая крошка — это корень,
     // он disabled, и кликнуть по нему нельзя (и незачем).
     await openManager(page)
-    await page.locator(`[data-test="fm-folder-${folderId}"]`).click()
+    await switchToListView(page)
+    await clickFolder(page, folderId)
     await expect(page.locator('[data-test="fm-breadcrumbs"]')).toContainText(folderName, { timeout: 15000 })
 
     // Первое нажатие «удалить» обязано спросить, а не снести содержимое.
@@ -398,7 +475,7 @@ test.describe('Файловый менеджер: папки', () => {
     await page.locator('.confirm-dialog').getByRole('button', { name: /^Удалить$/ }).click()
 
     // Подтверждение о непустой папке: файл обязан остаться на месте.
-    await expect(page.locator('.u-table tbody tr', { hasText: file.name })).toBeVisible({ timeout: 15000 })
+    await expectListed(page, file.name)
 
     await dropFolder(page, token, folderId)
   })
@@ -490,6 +567,7 @@ test.describe('Файловый менеджер: перенос и переим
      * настоящий пользователь. Проверять надо ИМЕННО этот путь.
      */
     const newName = `${PREFIX}новое.txt`
+    await switchToListView(page)
     await page.locator(`[data-test="fm-rename-file-${stored.id}"]`).click()
     await page.locator('[data-test="fm-name-input"] input').fill(newName)
     await page.locator('[data-test="fm-name-submit"]').click()
@@ -516,6 +594,7 @@ test.describe('Файловый менеджер: перенос и переим
      * а не «молча вычищено»: молчаливая очистка создала бы файл с
      * именем, которого пользователь не просил.
      */
+    await switchToListView(page)
     await page.locator(`[data-test="fm-rename-file-${stored.id}"]`).click()
     await page.locator('[data-test="fm-name-input"] input').fill('../побег.txt')
     await page.locator('[data-test="fm-name-submit"]').click()
@@ -547,11 +626,12 @@ test.describe('Файловый менеджер: перенос и переим
     const folderId = await makeFolder(page, token, folderName)
 
     await openManager(page)
-    await page.locator(`[data-test="fm-folder-${folderId}"]`).click()
+    await switchToListView(page)
+    await clickFolder(page, folderId)
     await expect(page.locator('[data-test="fm-breadcrumbs"]')).toContainText(folderName, { timeout: 15000 })
 
     await page.locator('[data-test="fm-breadcrumbs"] button').first().click()
-    await expect(page.locator('.u-table tbody tr', { hasText: folderName })).toBeVisible({ timeout: 15000 })
+    await expectListed(page, folderName)
 
     await dropFolder(page, token, folderId)
   })

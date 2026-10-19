@@ -60,11 +60,74 @@ function normalizeText(text) {
   return value;
 }
 
+/*
+ * Окно схлопывания одинаковых сообщений, мс.
+ *
+ * ЗАЧЕМ. Одна страница часто делает несколько запросов подряд, и все
+ * они могут завершиться одинаковой ошибкой: открытая вкладка с
+ * битым идентификатором давала три-шесть ТОСТОВ «Запрошенные данные
+ * не найдены» друг над другом. Отметка `error.__toastShown` в
+ * httpClient спасала от повторов только в пределах ОДНОГО объекта
+ * ошибки, а запросы-то разные.
+ *
+ * Теперь сообщение с тем же текстом и типом, поднятое в течение
+ * DEDUPE_WINDOW_MS, не добавляется вторым: вместо него обновляется
+ * счётчик у уже показанного. Действие («Вернуть») при этом
+ * сохраняется, чтобы повторное сообщение не теряло возможность
+ * отменить действие.
+ */
+const DEDUPE_WINDOW_MS = 4000;
+
+function findRecentDuplicate(type, text) {
+  const now = Date.now();
+
+  /*
+   * Ищем не только последний, а ЛЮБОЙ недавний: запросы идут вперемешку
+   * («нет данных» → «сохранено» → снова «нет данных»), и сравнение
+   * только с последним элементом тогда не схлопывало бы ничего.
+   */
+  for (let i = items.length - 1; i >= 0; i -= 1) {
+    const item = items[i];
+
+    if (item.type === type && item.text === text && now - (item.shownAt || 0) <= DEDUPE_WINDOW_MS) {
+      return item;
+    }
+  }
+
+  return null;
+}
+
 function push(type, text, options = {}) {
   const config = DEFAULTS[type] || DEFAULTS.info;
+
+  const duplicate = findRecentDuplicate(type, normalizeText(text));
+
+  if (duplicate) {
+    duplicate.count = (duplicate.count || 1) + 1;
+    duplicate.shownAt = Date.now();
+
+    // Продлеваем жизнь сообщения: пользователь его видит.
+    const pending = timers.get(duplicate.id);
+
+    if (pending) {
+      clearTimeout(pending);
+    }
+
+    if (duplicate.timeout > 0) {
+      timers.set(
+        duplicate.id,
+        setTimeout(() => dismiss(duplicate.id), duplicate.timeout),
+      );
+    }
+
+    return duplicate.id;
+  }
+
   const id = nextId++;
 
   const item = reactive({
+    shownAt: Date.now(),
+    count: 1,
     id,
     type,
     text: normalizeText(text),

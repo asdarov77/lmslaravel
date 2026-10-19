@@ -39,6 +39,7 @@ export default defineConfig({
     },
 
     server: {
+        host: '127.0.0.1',
         watch: {
             // не следить за PHP-зависимостями (экономит лимит inotify-наблюдателей)
             ignored: ['**/vendor/**', '**/storage/**', '**/node_modules/**'],

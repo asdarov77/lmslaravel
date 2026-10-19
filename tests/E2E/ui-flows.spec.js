@@ -48,7 +48,17 @@ async function loginViaForm(page) {
   await page.fill('input[name="password"]', ADMIN.password)
   await page.getByRole('button', { name: 'ВХОД' }).click()
 
-  await page.waitForTimeout(1500)
+  /*
+   * Ждём появления токена, а не фиксированную паузу.
+   *
+   * Пауза в 1.5 секунды работала на пустой машине и падала на
+   * загруженной: тест успевал упасть раньше, чем ответ логина
+   * разобрался. Ожидание по условию ждёт ровно столько, сколько нужно,
+   * и не делает тест медленнее в спокойном случае.
+   */
+  await page.waitForFunction(() => !!window.localStorage.getItem('token'), null, { timeout: 15000 })
+    .catch(() => null)
+
   const token = await page.evaluate(() => window.localStorage.getItem('token'))
   expect(token, 'после логина токен должен сохраниться в localStorage').toBeTruthy()
   return token
@@ -97,7 +107,16 @@ test.describe('Логин и сессия', () => {
 
   test('гость на корневом адресе попадает на вход', async ({ page }) => {
     await page.context().clearCookies()
-    await page.addInitScript(() => window.localStorage.clear())
+    // Очистка хранилища — ОДИН раз на контекст. В addInitScript очистка
+    // выполнялась на КАЖДОЙ загрузке документа, а часть страниц меняет
+    // адрес при инициализации: вторая загрузка стирала то, что приложение
+    // только что сохранило (прогресс, закреплённые курсы).
+    await page.addInitScript(() => {
+      if (!sessionStorage.getItem('__e2e_cleared')) {
+        localStorage.clear();
+        sessionStorage.setItem('__e2e_cleared', '1');
+      }
+    })
 
     await page.goto(BASE + '/#/', { waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(2000)
@@ -117,7 +136,16 @@ test.describe('Логин и сессия', () => {
 
   test('защищённая страница без токена не отдаёт данные', async ({ page }) => {
     await page.context().clearCookies()
-    await page.addInitScript(() => window.localStorage.clear())
+    // Очистка хранилища — ОДИН раз на контекст. В addInitScript очистка
+    // выполнялась на КАЖДОЙ загрузке документа, а часть страниц меняет
+    // адрес при инициализации: вторая загрузка стирала то, что приложение
+    // только что сохранило (прогресс, закреплённые курсы).
+    await page.addInitScript(() => {
+      if (!sessionStorage.getItem('__e2e_cleared')) {
+        localStorage.clear();
+        sessionStorage.setItem('__e2e_cleared', '1');
+      }
+    })
 
     const res = await page.request.get(BASE + '/api/categories')
     expect(res.status(), '/api/categories без токена → 401').toBe(401)
@@ -369,10 +397,17 @@ test.describe('Выпадающий список групп в редактир�
     await page.goto(`${HASH}/user/edit/${userId}`, { waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(1800)
 
-    // .v-input — базовый класс Vuetify 3 и для v-select, и для
-    // v-autocomplete: привязка к .v-select ломалась бы при смене
-    // компонента.
-    const groupSelect = page.locator('.v-input', { has: page.locator('label', { hasText: 'Группа' }) }).first()
+    /*
+     * Поле ищем по доступному имени, а не по вложенному <label>.
+     *
+     * FormField — наша обёртка — рисует подпись элементом <span> с
+     * заранее известным id и связывает её с контролом через
+     * aria-labelledby (см. FormField.vue). Нативного <label> внутри
+     * .u-field/.v-input нет вообще, поэтому поиск «label внутри
+     * .v-input» находил пустоту. Поиск по имени заодно проверяет то,
+     * что видит скринридер: поле обязано называться «Группа».
+     */
+    const groupSelect = page.getByRole('combobox', { name: 'Группа' })
     await expect(groupSelect, 'поле «Группа» присутствует на форме').toBeVisible()
 
     // Ищем группу по имени прямо в поле выбора.
@@ -393,7 +428,7 @@ test.describe('Выпадающий список групп в редактир�
 
     await menu.locator('.v-list-item', { hasText: names[0] }).first().click()
     await page.waitForTimeout(600)
-    await expect(groupSelect, 'в поле выбрана найденная группа').toContainText(names[0])
+    await expect(groupSelect, 'в поле выбрана найденная группа').toHaveValue(names[0])
     await page.getByRole('button', { name: /сохранить/i }).first().click()
     await page.waitForTimeout(1500)
 

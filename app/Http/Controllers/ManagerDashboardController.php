@@ -12,6 +12,7 @@ use App\Models\Permission;
 use App\Models\Question;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -180,6 +181,7 @@ class ManagerDashboardController extends Controller
                 'stats' => $stats,
                 'attention' => $this->attention($actor, $isAdmin, $groupScope),
                 'recent' => $this->recent($actor, $groupScope),
+                'trends' => $this->trends($actor, $groupScope),
             ],
             'error' => null,
             'meta' => null,
@@ -250,6 +252,88 @@ class ManagerDashboardController extends Controller
         $query->whereIn('user_id', function ($sub) use ($scope) {
             $sub->select('id')->from('users')->whereIn('group_id', $scope);
         });
+    }
+
+    /**
+     * Ряды для графиков: динамика попыток и успеваемость по группам.
+     *
+     * Месяцы собираются в PHP, а не оконной функцией SQL: проект не
+     * использует generate_series, а отправлять наружу все попытки ради
+     * подсчёта по месяцам — это десятки тысяч строк без выигрыша.
+     *
+     * Данные уже ограничены областью видимости (groupScope), иначе
+     * инструктор увидел бы цифры по чужим группам.
+     *
+     * @return array{attempts_by_month: array<int, array<string, mixed>>, groups: array<int, array<string, mixed>>}
+     */
+    private function trends(User $actor, ?array $groupScope): array
+    {
+        $months = 6;
+        $buckets = [];
+
+        // Ровно шесть последних месяцев, включая текущий: пропуск
+        // месяца без попыток сжал бы график и создал бы впечатление
+        // «данных нет» там, где их просто не было.
+        for ($i = $months - 1; $i >= 0; $i--) {
+            $start = Carbon::today()->subMonths($i)->startOfMonth();
+
+            $buckets[$start->format('Y-m')] = [
+                'month' => $start->format('Y-m'),
+                'label' => $start->translatedFormat('M Y'),
+                'attempts' => 0,
+                'passed' => 0,
+            ];
+        }
+
+        $attempts = ExamAttempt::query();
+        $this->applyGroupScopeOnAttempts($attempts, $actor, $groupScope);
+
+        $attempts->where('created_at', '>=', Carbon::today()->subMonths($months - 1)->startOfMonth())
+            ->get(['created_at', 'passed'])
+            ->each(function (ExamAttempt $attempt) use (&$buckets) {
+                $key = Carbon::parse($attempt->created_at)->format('Y-m');
+
+                if (! isset($buckets[$key])) {
+                    return;
+                }
+
+                $buckets[$key]['attempts']++;
+
+                if ($attempt->passed) {
+                    $buckets[$key]['passed']++;
+                }
+            });
+
+        $groups = Group::query()
+            ->when($groupScope !== null, fn ($q) => $q->whereIn('id', $groupScope))
+            ->orderBy('groupname')
+            ->get(['id', 'groupname'])
+            ->map(function (Group $group) {
+                $studentIds = DB::table('users')->where('group_id', $group->id)->pluck('id');
+
+                $total = $studentIds->isEmpty()
+                    ? 0
+                    : ExamAttempt::whereIn('user_id', $studentIds)->count();
+                $passed = $studentIds->isEmpty()
+                    ? 0
+                    : ExamAttempt::whereIn('user_id', $studentIds)->where('passed', true)->count();
+
+                return [
+                    'id' => $group->id,
+                    'name' => $group->groupname,
+                    // Процент, а не доля: «успеваемость 0.75» читается
+                    // неоднозначно, «75%» — однозначно.
+                    'percent' => $total > 0 ? (int) round($passed / $total * 100) : null,
+                    'attempts' => $total,
+                ];
+            })
+            ->values()
+            ->all();
+
+        return [
+            'attempts_by_month' => array_values($buckets),
+            'groups' => $groups,
+        ];
     }
 
     /**

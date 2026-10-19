@@ -1,5 +1,13 @@
 <template>
-  <div>
+  <div class="u-page">
+    <!--
+      Заголовок страницы добавлен: здесь его не было вовсе, и
+      страница начиналась сразу с полей — у неё не было имени ни
+      для человека, ни для навигации по заголовкам, ни для якоря
+      «к содержанию» (WCAG 2.2 SC 1.3.1, 2.4.6).
+    -->
+    <PageHeader :title="$t('permissions.title')" />
+
     <v-alert
       v-if="loadError"
       type="error"
@@ -167,6 +175,7 @@
 <script>
 import { mapState, mapGetters } from "vuex";
 import { toast } from "../../composables/useToast";
+import PageHeader from "../../components/ui/PageHeader.vue";
 
 /**
  * Отдельная страница управления правами.
@@ -182,6 +191,7 @@ import { toast } from "../../composables/useToast";
  */
 export default {
   name: "PermissionsManager",
+  components: { PageHeader },
 
   data() {
     return {

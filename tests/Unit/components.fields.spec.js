@@ -50,11 +50,34 @@ describe('MaskedField', () => {
     wrapper.unmount()
   })
 
-  it('эмитит отформатированное значение при вводе', async () => {
+  /**
+   * В модель уходит «сырое» значение, в поле видно отформатированное.
+   *
+   * Раньше наружу эмитился отформатированный вид, и маска телефона
+   * отправляла «+7 (999) 000-00-00» (17 символов) в колонку
+   * varchar(16) — Postgres отвечал «String data, right truncated», и
+   * форма падала с 500. Маска существует для ввода, а не для хранения.
+   */
+  it('в модель отдаёт значение без разделителей, в поле — с ними', async () => {
     const wrapper = mount(MaskedField, { ...mountOptions, props: { modelValue: '', preset: 'date' } })
     await wrapper.find('input').setValue('31122024')
     const emitted = wrapper.emitted('update:modelValue')
-    expect(emitted.at(-1)).toEqual(['31.12.2024'])
+    expect(emitted.at(-1)).toEqual(['31122024'])
+    expect(wrapper.find('input').element.value).toBe('31.12.2024')
+    wrapper.unmount()
+  })
+
+  it('телефон уходит цифрами, а знак «+» сохраняется', async () => {
+    const wrapper = mount(MaskedField, { ...mountOptions, props: { modelValue: '', preset: 'phone' } })
+    await wrapper.find('input').setValue('+79990000000')
+    const emitted = wrapper.emitted('update:modelValue')
+    expect(emitted.at(-1)).toEqual(['+79990000000'])
+    wrapper.unmount()
+  })
+
+  it('значение, пришедшее снаружи, отображается по маске', async () => {
+    const wrapper = mount(MaskedField, { ...mountOptions, props: { modelValue: '79990000000', preset: 'phone' } })
+    expect(wrapper.find('input').element.value).toContain('999')
     wrapper.unmount()
   })
 })
