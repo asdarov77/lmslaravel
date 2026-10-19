@@ -26,7 +26,7 @@ const catalogSlugs = (() => {
 })()
 
 /** Маршруты, которые по замыслу доступны всем (публичные и служебные). */
-const PUBLIC_ROUTES = new Set(['/', '/login', '/reg', '/about', '/my', '/logout', '/datepicker', '/403', '/404', '/500', '/certificates/verify/:code?', '/:pathMatch(.*)*'])
+const PUBLIC_ROUTES = new Set(['/', '/login', '/reg', '/about', '/my', '/logout', '/datepicker', '/403', '/404', '/500', '/certificates/verify/:code?', '/:pathMatch(.*)*', '/two-factor/verify'])
 
 /**
  * Маршруты, доступные только авторизованному, но без доменного права.

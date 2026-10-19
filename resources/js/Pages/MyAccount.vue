@@ -169,8 +169,7 @@
                   type="text"
                   readonly
                   :value="secret"
-                  class="u-field__input"
-                  style="font-family: monospace; letter-spacing: 0.1em;"
+                  class="u-field__input u-mono"
                 />
                 <v-btn
                   size="x-small"

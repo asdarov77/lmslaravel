@@ -138,8 +138,14 @@ class TwoFactorController extends Controller
         }
 
         if ($this->google2fa->verifyKey($user->two_factor_secret, $request->code)) {
+            $token = $user->createToken('2fa-login')->plainTextToken;
+
             return response()->json([
-                'data' => ['verified' => true],
+                'data' => [
+                    'verified' => true,
+                    'token' => $token,
+                    'user' => $user,
+                ],
             ]);
         }
 
@@ -151,8 +157,15 @@ class TwoFactorController extends Controller
                 $user->two_factor_recovery_codes = json_encode(array_values($codes));
                 $user->save();
 
+                $token = $user->createToken('2fa-recovery')->plainTextToken;
+
                 return response()->json([
-                    'data' => ['verified' => true, 'used_recovery_code' => true],
+                    'data' => [
+                        'verified' => true,
+                        'used_recovery_code' => true,
+                        'token' => $token,
+                        'user' => $user,
+                    ],
                 ]);
             }
         }

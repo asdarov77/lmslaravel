@@ -49,6 +49,12 @@ const routes = [
         name: 'password.reset',
     },
     {
+        path: '/two-factor/verify',
+        meta: { titleKey: 'twoFactor.verifyTitle' },
+        component: () => import('../Pages/Auth/TwoFactorVerify.vue'),
+        name: 'twoFactor.verify',
+    },
+    {
         path: '/login',
         meta: { titleKey: 'login' },
         // Вход и регистрация — один экран с переключением на месте
@@ -96,6 +102,12 @@ const routes = [
         component: () => import('../Pages/UserList.vue'),
         name: 'user.list',
         meta: { permission: ['users.view'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.users' }], titleKey: 'users' },    },
+    {
+        path: '/user/create',
+        component: () => import('../Pages/User/UserItemEdit.vue'),
+        name: 'user.create',
+        meta: { permission: ['users.create'], breadcrumbs: [{ key: 'app.title', to: '/' }, { key: 'app.menu.users', to: '/user/list' }, { key: 'users.list.create' }], titleKey: 'users' },        props: () => ({ idEdit: null }),
+    },
     {
         path: '/user/edit/:idEdit',
         component: () => import('../Pages/User/UserItemEdit.vue'),

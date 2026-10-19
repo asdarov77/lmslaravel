@@ -89,9 +89,13 @@ export const navigationSections = [
         link: '/user/list',
         icon: 'mdi-account-multiple-outline',
         activeMatch: '/user',
-        children: [
-          { key: 'usersAdd', titleKey: 'app.menu.usersAdd', link: '/reg', icon: 'mdi-account-plus-outline', onlyFor: 'manager' },
-        ],
+        // Подпункт «Добавить пользователя» убран: он вёл на /reg —
+        // публичную форму регистрации, а не на создание пользователя.
+        // Права users.create у формы нет (она для посторонних), роль и
+        // группу оттуда задать нельзя, а `store` назначает обучаемого.
+        // То есть администратор нажимал «добавить» и попадал в чужую
+        // форму. Экрана создания пользователя в роутере нет, а пункт,
+        // ведущий не туда, хуже отсутствующего пункта.
       },
       {
         key: 'groups',
@@ -115,12 +119,18 @@ export const navigationSections = [
  *
  * Отдельный список, а не подмножество бокового: профиль — это «про меня»,
  * а не «разделы системы». Права те же, из маршрутов.
+ *
+ * Раньше здесь стояли «Учебный план», «Тренажёр» и «Настройки» — все три
+ * дословно повторяли пункты бокового меню, и выпадающее окно не отвечало
+ * ни на один вопрос, которого не решает сайдбар. Теперь здесь только то,
+ * что действительно «моё»: личные данные, мои сертификаты, моё расписание
+ * и раздел прав для тех, кому он доступен.
  */
 export const accountItems = [
   { key: 'profile', titleKey: 'account.items.profile', link: '/my', icon: 'mdi-account-outline' },
-  { key: 'plan', titleKey: 'account.items.plan', link: '/my/learning', icon: 'mdi-school-outline' },
-  { key: 'tutor', titleKey: 'app.menu.tutor', link: '/tutor', icon: 'mdi-brain' },
-  { key: 'settings', titleKey: 'account.items.settings', link: '/settings/', icon: 'mdi-cog-outline' },
+  { key: 'certificates', titleKey: 'app.menu.certificates', link: '/my/certificates', icon: 'mdi-certificate-outline' },
+  { key: 'schedule', titleKey: 'app.menu.schedule', link: '/my/schedule', icon: 'mdi-calendar-clock-outline' },
+  { key: 'permissions', titleKey: 'app.menu.permissions', link: '/permissions', icon: 'mdi-shield-key-outline' },
 ]
 
 export default navigationSections

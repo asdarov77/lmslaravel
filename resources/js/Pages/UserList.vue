@@ -5,7 +5,13 @@
       :subtitle="$t('users.list.subtitle')"
     >
       <template #actions>
-        <v-btn color="primary" variant="flat" :to="{ name: 'regist' }">
+        <!--
+          Кнопка вела на `regist` — публичную форму регистрации. Оттуда
+          нельзя задать роль и группу, а права создания пользователя у
+          формы нет, поэтому администратор из своей админки попадал на
+          регистрацию постороннего. Теперь это форма создания в админке.
+        -->
+        <v-btn color="primary" variant="flat" :to="{ name: 'user.create' }">
           <v-icon start icon="mdi-account-plus-outline" size="18" aria-hidden="true"></v-icon>
           {{ $t("users.list.create") }}
         </v-btn>
@@ -57,7 +63,7 @@
 
       <template #cell-group="{ value }">
         <span v-if="!value" class="u-muted">—</span>
-        <span v-else class="u-truncate" style="display: block; max-width: 24ch" :title="value">
+        <span v-else class="u-truncate u-clamp-group" :title="value">
           {{ value }}
         </span>
       </template>

@@ -173,7 +173,20 @@
       "tutorTitle": "Tutor",
       "tutorRunnerTitle": "Practice",
       "notFound": "Page not found",
-      "instructorProfile": "Instructor profile"
+      "instructorProfile": "Instructor profile",
+      "twoFactor": {
+        "verifyTitle": "2FA Verification",
+        "verifySubtitle": "Enter the code from your authenticator app for {{email}}",
+        "codeLabel": "Verification Code",
+        "codePlaceholder": "6-digit code",
+        "codeRequired": "Enter verification code",
+        "codeTooShort": "Code must be 6 digits",
+        "verifyBtn": "Verify",
+        "verified": "Two-factor authentication verified",
+        "recoveryHint": "No access to authenticator app?",
+        "useRecoveryCode": "Use a recovery code",
+        "backToLogin": "Back to login"
+      }
     },
     "nav": {
       "learning": "Learning",
@@ -222,7 +235,11 @@
     "quoteText": "The system allowed us to fully transition to online training in just a few weeks.",
     "quoteAuthor": "Training Center Director",
     "noAccount": "Don't have an account?",
-    "register": "Sign up"
+    "register": "Sign up",
+    "email": "Email",
+    "fioOrEmail": "Full name or Email",
+    "fioOrEmailPlaceholder": "Enter full name or Email",
+    "loginHint": "Sign in with full name or Email"
   },
   "status": {
     "rotor": {
@@ -362,7 +379,10 @@
     "notesSaved": "Saved at {time}",
     "notesLabel": "Your notes",
     "notesClear": "Clear",
-    "notesSave": "Save"
+    "notesSave": "Save",
+    "prevMatch": "Previous match",
+    "nextMatch": "Next match",
+    "searchError": "Search through materials failed"
   },
   "coursePreview": {
     "label": "Preview",
@@ -508,7 +528,9 @@
       "saved": "Roles assigned",
       "failed": "Failed to assign roles"
     },
-    "roleHintReadonly": "Roles are assigned on the “Assign roles” page (users.permissions permission)"
+    "roleHintReadonly": "Roles are assigned on the “Assign roles” page (users.permissions permission)",
+    "createPermissionsHint": "Permissions for the new user are granted separately, in the Roles section.",
+    "roleRequired": "Select a role"
   },
   "categories": {
     "list": {
@@ -1427,7 +1449,10 @@
     "editTitle": "Edit user",
     "labelSfery-deyatelnosti": "Field of activity",
     "labelSpecializatsiya": "Specialization",
-    "labelOrganizatsiya": "Organization"
+    "labelOrganizatsiya": "Organization",
+    "labelPassword": "Password",
+    "passwordRequired": "Enter a password",
+    "created": "User created"
   },
   "register": {
     "groupsUnavailable": "Group list unavailable: please sign in",

@@ -78,6 +78,17 @@
           </button>
         </div>
 
+        <!--
+          Инструменты страницы курса: поиск, избранное, форум.
+
+          Слот стоит ДО дерева намеренно. Раньше всё это лежало в
+          `sidebar-extra`, то есть под деревом из 77 разделов: при
+          ограниченной высоте панели редактор заметок (413px) вытеснял
+          список, и дерево схлопывалось до 16px, а панель инструментов
+          уезжала под дерево.
+        -->
+        <slot name="sidebar-top" />
+
         <nav class="cpl__sections">
           <p v-if="!sections.length" class="cpl__empty">{{ $t('common.empty') }}</p>
 
@@ -123,24 +134,13 @@
         </nav>
 
         <!--
-          Заметки студента. Раздел приватный: заметки одного пользователя
-          не должны видеть остальные. Хранение — localStorage по курсу.
+          Заметок здесь нет намеренно. Раньше в этой же панели стоял
+          свой блок на localStorage, но страница курса уже показывает
+          MaterialNotes — он ходит в /api/materials/{id}/note, поэтому
+          заметка переживает смену браузера и видна с другого устройства.
+          Два редактора в колонке 300px читались как дубль, и человек не
+          понимал, какой из них сохраняет.
         -->
-        <details class="cpl__notes">
-          <summary class="cpl__notes-head">
-            <v-icon size="16" aria-hidden="true">mdi-note-text-outline</v-icon>
-            <span>{{ $t('courseManifest.notes') }}</span>
-          </summary>
-          <textarea
-            v-model="notesText"
-            class="cpl__notes-area"
-            :placeholder="$t('courseManifest.notesPlaceholder')"
-            rows="4"
-            @blur="saveNotes"
-            @keydown.meta.s.prevent="saveNotes"
-            @keydown.ctrl.s.prevent="saveNotes"
-          />
-        </details>
 
         <slot name="sidebar-extra" />
       </aside>
@@ -166,7 +166,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -195,35 +195,6 @@ const MARK_LABEL = {
 
 const clampedProgress = computed(() => Math.min(100, Math.max(0, props.progress)))
 
-/** Ключ заметок: по курсу, чтобы заметки не пересекались. */
-const notesKey = computed(() => `course-notes-${props.activeId ?? 'unknown'}`)
-
-/** Текст заметок из хранилища. */
-const notesText = ref('')
-try {
-  notesText.value = localStorage.getItem(notesKey.value) || ''
-} catch {
-  notesText.value = ''
-}
-
-/** Смена курса — перечитываем заметки. */
-watch(() => props.activeId, () => {
-  try {
-    notesText.value = localStorage.getItem(notesKey.value) || ''
-  } catch {
-    notesText.value = ''
-  }
-})
-
-/** Сохранить заметки в хранилище. */
-const saveNotes = () => {
-  try {
-    localStorage.setItem(notesKey.value, notesText.value)
-  } catch {
-    // Приватный режим или переполнение — заметки живут до перезагрузки.
-  }
-}
-
 /**
  * Материалы содержания — те же узлы, что кликабельны в списке.
  * Темы и разделы в переходах не участвуют: «следующий» после последнего
@@ -249,7 +220,23 @@ const markLabel = (state) => t(MARK_LABEL[state] ?? MARK_LABEL.todo)
 .cpl {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 96px);
+
+  /*
+   * Высота фиксированная, а не «не меньше».
+   *
+   * Регресс, который закрывает этот блок: стояло min-height, поэтому
+   * колонка содержания, у которой нет своего ограничения, разрасталась
+   * под дерево из 77 разделов — на замере боковая панель была 5148px при
+   * окне 856px. Панель инструментов (поиск, избранное, дерево) уезжала
+   * на 4765px вниз и оказывалась за краем экрана: кнопок не было видно,
+   * а `.cpl` с overflow:hidden отрезал низ. Прокручивался документ
+   * целиком вместо колонок по отдельности.
+   *
+   * Теперь высота равна высоте окна, и обе колонки прокручиваются
+   * внутри себя, как и задумано.
+   */
+  height: calc(100vh - 96px);
+  max-height: calc(100vh - 96px);
   background: var(--c-surface-2);
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -352,7 +339,13 @@ const markLabel = (state) => t(MARK_LABEL[state] ?? MARK_LABEL.todo)
 .cpl__body {
   display: flex;
   flex: 1;
+  /*
+   * min-height: 0 обязателен во flex-контейнере: иначе колонка не может
+   * стать ниже содержимого и распирает родителя, даже если он ограничен.
+   * overflow: hidden не даёт содержимому выйти за пределы панели.
+   */
   min-height: 0;
+  overflow: hidden;
 }
 
 .cpl__sidebar {
@@ -381,7 +374,6 @@ const markLabel = (state) => t(MARK_LABEL[state] ?? MARK_LABEL.todo)
 }
 
 .cpl__sidebar--hidden .cpl__sidebar-title,
-.cpl__sidebar--hidden .cpl__notes,
 .cpl__sidebar--hidden .cpl__heading,
 /* Слот приходит извне, поэтому только через :deep. */
 .cpl__sidebar--hidden :deep(.cm-tree) {
@@ -414,64 +406,6 @@ const markLabel = (state) => t(MARK_LABEL[state] ?? MARK_LABEL.todo)
 .cpl__sidebar--hidden .cpl__mark {
   width: auto;
   font-size: var(--fs-base);
-}
-
-/* Заметки студента. */
-.cpl__notes {
-  margin-top: var(--sp-2);
-  border-top: 1px solid var(--c-border);
-  padding: var(--sp-2) 0;
-}
-
-.cpl__notes-head {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-1);
-  padding: var(--sp-2);
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--c-text-2);
-  cursor: pointer;
-  list-style: none;
-}
-
-.cpl__notes-head::-webkit-details-marker {
-  display: none;
-}
-
-.cpl__notes-head:hover {
-  color: var(--c-text-1);
-}
-
-.cpl__notes-area {
-  /*
-   * border-box обязателен: у textarea в теме остаётся content-box, и при
-   * width:100% плюс боковые отступы и padding поле вылезало за панель
-   * (317px в панели 300px) — панель получала горизонтальную прокрутку и
-   * содержимое уезжало за край.
-   */
-  box-sizing: border-box;
-  width: calc(100% - 2 * var(--sp-2));
-  margin: var(--sp-1) var(--sp-2);
-  padding: var(--sp-2);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-sm);
-  background: var(--c-surface-1);
-  color: var(--c-text-1);
-  font-size: var(--fs-sm);
-  font-family: inherit;
-  resize: vertical;
-  min-height: 80px;
-}
-
-.cpl__notes-area:focus {
-  outline: 2px solid var(--c-primary);
-  outline-offset: -1px;
-}
-
-.cpl__notes-area::placeholder {
-  color: var(--c-text-muted);
 }
 
 .cpl__sidebar-head {

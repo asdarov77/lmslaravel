@@ -17,6 +17,37 @@
   >
     <template #sidebar-extra>
       <div class="cm-tree">
+        <!-- Заметки и избранное живут под деревом, а инструменты — над ним. -->
+          <!-- Избранное. Раньше список был пустым без объяснения, а переключение
+               режима ещё и скрывало дерево, из-за чего казалось, что кнопка
+               «сломалась». Теперь режимы не исключают друг друга. -->
+          <div v-if="isFavorite" class="cm-favorites">
+            <div class="cm-favorites__head">
+              {{ $t('courseManifest.favorites') }}
+              <v-btn size="x-small" variant="text" @click="isFavorite = false">{{ $t('courseManifest.close') }}</v-btn>
+            </div>
+            <ul v-if="favorites.length" class="cm-favorites__list">
+              <li v-for="item in favorites" :key="item.id" class="cm-favorites__item">
+                <span class="cm-favorites__title">{{ item.title }}</span>
+                <v-btn icon="mdi-close" size="x-small" variant="text"
+                  :title="$t('courseManifest.removeFavorite')"
+                  @click="removeFavorite(item.course_id)"></v-btn>
+              </li>
+            </ul>
+            <p v-else class="cm-favorites__empty">{{ $t('courseManifest.favoritesEmpty') }}</p>
+          </div>
+
+          <!-- Заметки студента к текущему материалу. -->
+          <MaterialNotes
+            v-if="activeId"
+            :material-id="activeId"
+            :course-id="idEdit"
+          />
+      </div>
+    </template>
+
+    <template #sidebar-top>
+      <div class="cm-tree">
           <!-- Заголовок курса убран из сайдбара: он теперь один раз
                в верхней панели CoursePlayerLayout. Раньше надпись
                дублировалась и занимала три строки над инструментами. -->
@@ -41,7 +72,7 @@
                      за пределы колонки — шапка «ломалась» на разных ширинах.
                      Теперь это обычная flex-панель без фиксированных ширин
                      и отрицательных отступов. -->
-          <div class="cm-toolbar" role="toolbar" aria-:label="$t('common.labelPanel-kursa')">
+          <div class="cm-toolbar" role="toolbar" :aria-label="$t('common.labelPanel-kursa')">
             <div class="cm-toolbar__group">
               <button type="button"
                 class="cm-tool"
@@ -87,13 +118,6 @@
               </button>
             </div>
 
-            <!-- Заметки студента к текущему материалу -->
-            <MaterialNotes
-              v-if="activeId"
-              :material-id="activeId"
-              :course-id="idEdit"
-            />
-
             <div class="cm-toolbar__meta">
               <span v-if="activeTitle" class="cm-toolbar__current" :title="activeTitle">
                 {{ activeTitle }}
@@ -102,78 +126,86 @@
             </div>
           </div>
 
-          <!-- Избранное. Раньше список был пустым без объяснения, а переключение
-               режима ещё и скрывало дерево, из-за чего казалось, что кнопка
-               «сломалась». Теперь режимы не исключают друг друга. -->
-          <div v-if="isFavorite" class="cm-favorites">
-            <div class="cm-favorites__head">
-              {{ $t('courseManifest.favorites') }}
-              <v-btn size="x-small" variant="text" @click="isFavorite = false">{{ $t('courseManifest.close') }}</v-btn>
+          <div v-if="showSearch" class="cm-search">
+            <v-text-field
+              v-model="searchTerm"
+              :loading="isSearching"
+              density="compact"
+              variant="outlined"
+              rounded
+              class="cm-search__field"
+              append-inner-icon="mdi-magnify"
+              :label="$t('common.labelPoisk')"
+              :hint="$t('common.hintSearch')"
+              clearable
+              single-line
+              @click:append-inner="search"
+              @keyup.enter="search"
+              @click:clear="clearSearch"
+            />
+
+            <!--
+              Пока идёт запрос — скелетон результатов, а не пустое поле:
+              иначе список выглядел бы как «ничего не найдено» и человек
+              успевал нажать Enter ещё раз, породив второй запрос.
+            -->
+            <div v-if="isSearching" class="cm-search__results">
+              <span
+                v-for="n in 3"
+                :key="`sk${n}`"
+                class="cm-search__skeleton"
+              />
             </div>
-            <ul v-if="favorites.length" class="cm-favorites__list">
-              <li v-for="item in favorites" :key="item.id" class="cm-favorites__item">
-                <span class="cm-favorites__title">{{ item.title }}</span>
-                <v-btn icon="mdi-close" size="x-small" variant="text"
-                  :title="$t('courseManifest.removeFavorite')"
-                  @click="removeFavorite(item.course_id)"></v-btn>
-              </li>
-            </ul>
-            <p v-else class="cm-favorites__empty">{{ $t('courseManifest.favoritesEmpty') }}</p>
+
+            <template v-else-if="matchingFiles.length">
+              <p class="search-files__total-results">
+                {{ $t('courseManifest.foundTotal') }} {{ matchingFiles.length }}
+              </p>
+
+              <!--
+                Переход по найденным в материале местам. Показывает
+                только когда подсветка реально найдена: иначе кнопки
+                нажимались в пустоту, а счётчик врался.
+              -->
+              <div v-if="highlighted.length" class="cm-search__nav">
+                <v-btn
+                  icon="mdi-chevron-up"
+                  size="x-small"
+                  variant="text"
+                  :title="$t('courseManifest.prevMatch')"
+                  @click="scrollToPrev"
+                />
+                <span class="cm-search__nav-count">
+                  {{ currentHighlight + 1 }} / {{ highlighted.length }}
+                </span>
+                <v-btn
+                  icon="mdi-chevron-down"
+                  size="x-small"
+                  variant="text"
+                  :title="$t('courseManifest.nextMatch')"
+                  @click="scrollToNext"
+                />
+              </div>
+
+              <ul class="cm-search__list">
+                <li v-for="result in matchingFiles" :key="result.file">
+                  <v-btn
+                    class="cm-search__item"
+                    variant="text"
+                    block
+                    @click="loadContent(result.itemId, result.highlightedNodes)"
+                  >
+                    {{ result.title }}
+                  </v-btn>
+                </li>
+              </ul>
+            </template>
+
+            <p v-else class="search-files__no-results">
+              {{ $t('courseManifest.noResults') }}
+            </p>
           </div>
 
-          <v-row v-if="showSearch">
-            <v-text-field class="ml-5 mr-5" :loading="loading" density="compact" v-model="searchTerm" variant="outlined"
-              rounded append-inner-icon="mdi-magnify" :label="$t('common.labelPoisk')" @click:append-inner="search" @keyup.enter="search"
-              :hint="$t('common.hintSearch')" clearable single-line>
-            </v-text-field>
-
-            <!-- ------------------------------------------------ -->
-            <!-- результаты поиска -->
-
-            <!--                                            рабочий вариант                           -->
-            <!-- <div>
-              <ul v-if="matchingFiles.length > 0" class=" ml-2 mr-2 search-files__total-results">{{ $t('courseManifest.foundTotal') }} {{
-                matchingFiles.length }}
-                <v-btn-group>
-                  <v-btn @click="scrollToPrev"><span>&#9650;</span></v-btn>
-                  <v-btn @click="scrollToNext"><span>&#9660;</span></v-btn>
-                </v-btn-group>
-                <v-divider></v-divider>
-                <li v-for="result in matchingFiles" :key="result.file" style="white-space: nowrap;">
-                  <v-btn @click="loadContent(result.itemId, result.highlightedNodes )" class="text-truncate"
-                    :style="{ 'max-width': '100%', 'overflow': 'hidden', 'text-overflow': 'ellipsis' }">{{ result.title
-                    }}</v-btn>   
-                </li>
-              </ul>
-              <p v-else class="ml-5 mr-5 mt-1 search-files__no-results">{{ $t("courseManifest.noResults") }}</p>
-            </div> -->
-            <!--                                            рабочий вариант                           -->
-
-            <!--                                            рабочий эксперимент                           -->
-            <div>
-              <ul v-if="matchingFiles.length > 0" class=" ml-2 mr-2 search-files__total-results">{{ $t('courseManifest.foundTotal') }} {{
-                matchingFiles.length }}
-                <v-btn-group>
-                  <v-btn @click="scrollToPrev"><span>&#9650;</span></v-btn>
-                  <v-btn @click="scrollToNext"><span>&#9660;</span></v-btn>
-                </v-btn-group>
-                <v-divider></v-divider>
-                <li v-for="result in matchingFiles" :key="result.file" style="white-space: nowrap;">
-                  <v-btn @click="loadContent(result.itemId, result.highlightedNodes)" class="text-truncate"
-                    :style="{ 'max-width': '100%', 'overflow': 'hidden', 'text-overflow': 'ellipsis' }">{{ result.title
-                    }}</v-btn>
-                </li>
-              </ul>
-              <p v-else class="ml-5 mr-5 mt-1 search-files__no-results">{{ $t("courseManifest.noResults") }}</p>
-            </div>
-            <!--                                            рабочий эксперимент                           -->
-
-
-            <!-- ------------------------------------------------ -->
-            <!-- результаты поиска -->
-
-
-          </v-row>
           <!-- Список разделов/подразделов/модулей.
                      Подсветка при наведении — на CSS, а не через
                      @mouseover + document.getElementById: обработчик
@@ -200,7 +232,7 @@
             :title="$t('courseManifest.toTop')"
             @click="scrollToTop"
           ></v-btn>
-          <div id="iframe-container" :style="{ 'border-radius': '8px' }">
+          <div id="iframe-container" class="cm-frame">
             <p v-if="error" class="has-text-danger px-3 py-2">{{ error }}</p>
             <!-- Высота материала держится в состоянии Vue, а не в
                  инлайновом onload. Регресс: атрибут onload писал высоту
@@ -292,6 +324,11 @@ export default {
       //------------блок поиска---------------
       searchTerm: '',
       matchingFiles: [],
+      // Поиск идёт по содержимому файлов на сервере, поэтому он
+      // медленный и видимый. Раньше индикатор был привязан к флагу,
+      // который никто не выставлял, — запрос выглядел как «ничего не
+      // происходит».
+      isSearching: false,
       aircraftTitle: '', //передавать в контроллер 
       //------------конец блока поиска---------------
       path: '',
@@ -307,6 +344,9 @@ export default {
       // загрузка iframe
       highlighted: [],
       currentHighlight: 0,
+      // Что подсветить в следующем открытом материале. Раньше
+      // подсветка применялась по таймеру наугад (см. loadContent).
+      pendingHighlights: [],
       iframe: null,  //удалить для подсветки
       IframeisLoaded: false,
 
@@ -680,8 +720,10 @@ export default {
      * материал «схлопывался» до размера пустого iframe.
      */
     onFrameLoad(event) {
+      let doc = null;
+
       try {
-        const doc = event?.target?.contentDocument;
+        doc = event?.target?.contentDocument;
         const height = doc?.body?.scrollHeight ?? 0;
 
         if (height > 0) {
@@ -689,7 +731,12 @@ export default {
         }
       } catch (error) {
         // srcdoc-документ бывает недоступен (sandbox) — оставляем прошлую высоту.
+        return;
       }
+
+      // Подсветка — после того, как кадр готов и высота посчитана:
+      // переписывание ветки сдвигает высоту, и порядок важен.
+      this.applyHighlights(doc);
     },
 
     /**
@@ -840,7 +887,6 @@ export default {
         // устройстве, а не только в этом браузере.
         this.saveProgress(item_id, this.lessonPercent(item_id));
       } catch (error) {
-        console.log(error);
         this.contentHtml = "";
         /*
          * Показываем причину от backend, а не общую фразу: при записи на
@@ -897,43 +943,88 @@ export default {
     // },
 
     loadContent(item, hlHtml) {
-      this.isLoading = true;
-      this.getlink(item); // загружаем в iframe содержимое файла статического html
+      /*
+       * Подсветка применяется в onFrameLoad — когда кадр действительно
+       * готов. Раньше здесь стоял setTimeout(..., 1000): на тяжёлом
+       * материале он срабатывал ДО готовности кадра (подсветка
+       * пропадала), а на лёгком — зря замораживал страницу на секунду.
+       * Объём работы не изменился, а ожидание исчезло.
+       */
+      this.pendingHighlights = Array.isArray(hlHtml) ? hlHtml : [];
+      this.getlink(item);
+    },
 
-      //await this.onIframeLoaded();
+    /**
+     * Подсветка найденного в открытом материале.
+     *
+     * Раньше тело кадра переписывалось целиком:
+     * `iframeDoc.body.innerHTML = dom.documentElement.innerHTML`, где dom —
+     * результат DOMParser по всему документу. Это пересоздавало весь DOM
+     * материала заново: картинки запрашивались по второму разу, позиция
+     * прокрутки сбрасывалась, а на большом HTML (десятки тысяч узлов)
+     * страница подвисала — это и есть «отображение тормозит».
+     *
+     * Теперь правится только ветка вокруг найденного узла: остальное
+     * содержимое кадра не трогается.
+     */
+    applyHighlights(doc) {
+      const marks = this.pendingHighlights;
+      this.pendingHighlights = [];
 
-      //this.method(hlHtml)
+      if (!doc || !marks.length) return;
 
-      setTimeout(() => {
-        const iframe = this.$refs.myIframe;
-        const iframeDoc = iframe.contentDocument;
-        const dom = new DOMParser().parseFromString(iframeDoc.body.innerHTML, 'text/html');
-        try {
-          hlHtml.forEach((highlighted) => {
-            const nodeToReplace = dom.evaluate(highlighted.originalXpath, dom, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-            if (nodeToReplace) {
-              const parentNode = nodeToReplace.parentNode;
-              //const highlightedTextCon = document.createElement('span');
-              //highlightedTextCon.style.backgroundColor = 'yellow';
-              parentNode.innerHTML = highlighted.highlightedText;
-            }
-          });
-        } catch (e) {
-          console.log(e);
-        }
-        iframeDoc.body.innerHTML = dom.documentElement.innerHTML;
-        this.highlightNodes(iframeDoc);
+      try {
+        marks.forEach((mark) => {
+          const node = doc.evaluate(
+            mark.originalXpath,
+            doc,
+            null,
+            XPathResult.FIRST_ORDERED_NODE_TYPE,
+            null
+          ).singleNodeValue;
 
-      }, 1000) // делаем задержку чтобы на тяжелых страницах iframe прогрузился и успели раскраситься слова
-      this.isLoading = false;
+          if (!node || !node.parentNode) return;
+
+          /*
+           * Подменяется сам текстовый узел, а не его родитель.
+           *
+           * Сервер (`SearchController::highlightNodes`) отдаёт
+           * `originalXpath` путем к ТЕКСТОВОМУ узлу, а `highlightedText` —
+           * это содержимое именно этого узла, разбитое вокруг совпадения
+           * и с обёрнутым в <mark class="highlighted"> фрагментом.
+           *
+           * Раньше здесь стояло `node.parentNode.innerHTML = ...`, то есть
+           * перезаписывался весь родитель: его остальные дети исчезали.
+           * Если совпадение попадало в текст прямо внутри <body>
+           * (такой XPath сервер выдаёт для текста без обёртки),
+           * материал оставался в одном абзаце — то есть подсветка
+           * уничтожала содержимое вместо того, чтобы его выделить.
+           */
+          const holder = doc.createElement('span');
+          holder.innerHTML = mark.highlightedText;
+
+          while (holder.firstChild) {
+            node.parentNode.insertBefore(holder.firstChild, node);
+          }
+
+          node.parentNode.removeChild(node);
+        });
+      } catch (e) {
+        // XPath из ответа сервера может не совпасть с документом.
+        // Материал должен открыться и без подсветки.
+      }
+
+      this.highlightNodes(doc);
     },
 
     ///-------------------------------------------скроллинг --------------------------------------------------------------
 
     highlightNodes(iframe) {
-      this.highlighted = Array.from(iframe.querySelectorAll('.highlighted'));
-      this.currentHighlight = 0
-      this.scrollToHighlight(this.highlighted[this.currentHighlight]);
+      this.highlighted = iframe
+        ? Array.from(iframe.querySelectorAll('.highlighted'))
+        : [];
+      this.currentHighlight = 0;
+      this.scrollToHighlight(this.highlighted[0]);
     },
 
     // scrollToHighlight(node) {
@@ -951,8 +1042,21 @@ export default {
     //    })       
     // },
     scrollToHighlight(node) {
+      /*
+       * Раньше узла могло не оказаться — подсветка не нашлась — и
+       * `node.getBoundingClientRect()` бросал TypeError прямо из
+       * обработчика загрузки кадра. Материал при этом открывался,
+       * но консоль сыпала ошибками на каждый переход.
+       *
+       * Проверяется и сам кадр: подсветка применяется по событию
+       * `load`, и к этому моменту ссылка на iframe уже может быть
+       * пустой (переход на другой материал, размонтирование).
+       */
       const iframe = this.$refs.myIframe;
-      const iframeDocument = iframe.contentWindow.document;
+      const iframeDocument = iframe?.contentWindow?.document;
+
+      if (!node || !iframeDocument) return;
+
       const iframeRect = iframe.getBoundingClientRect();
       const nodeRect = node.getBoundingClientRect();
       const offsetTop = nodeRect.top - iframeRect.top + iframeDocument.documentElement.scrollTop;
@@ -1090,26 +1194,42 @@ export default {
         .then(() => this.getFavorites());
     },
     async search() {
-      const formData = {
-        //  query: this.searchTerm, path: this.path, aircraft: this.aircraft
-        query: this.searchTerm, path: this.path, aircraft: this.aircraft
+      const term = this.searchTerm.trim();
 
-      }
-      if (this.searchTerm.length < 3) {
+      if (term.length < 3) {
+        this.matchingFiles = [];
         toast.warning(this.$t("courseManifest.searchMinChars"));
         return;
       }
 
-      $api.post(apiUrl + `/api/search-files/`, formData)
+      this.isSearching = true;
+      const formData = {
+        query: term, path: this.path, aircraft: this.aircraft
+      }
 
-        .then(response => {
-          this.matchingFiles = unwrapArray(response);
-        })
-        .catch(error => {
-          console.log(error);
-        }).finally(() => {
-          // this.alert = true;
-        });
+      try {
+        const response = await $api.post(apiUrl + `/api/search-files/`, formData);
+        this.matchingFiles = unwrapArray(response) || [];
+      } catch (error) {
+        this.matchingFiles = [];
+        toast.error(this.$t("courseManifest.searchError"));
+      } finally {
+        this.isSearching = false;
+      }
+    },
+
+    /**
+     * Очистка поля поиска.
+     *
+     * Кнопка очистки у `v-text-field` с `clearable` сбрасывает только
+     * модель. Старые результаты при этом оставались на экране — человек
+     * видел список файлов, хотя искать уже нечего.
+     */
+    clearSearch() {
+      this.searchTerm = '';
+      this.matchingFiles = [];
+      this.highlighted = [];
+      this.currentHighlight = 0;
     },
 
   },
@@ -1117,13 +1237,21 @@ export default {
 </script>
 
 <style>
-.highlighted {
-  background-color: yellow;
-  display: inline-block;
-}
+/*
+  Блок НЕ scoped: класс .highlighted приходит из HTML, который сервер
+  отдаёт для результатов поиска по материалу.
+*/
 
-.v-card {
-  border: 1px solid lightgrey;
+/*
+  Подсветка найденного. Раньше стоял жёсткий `yellow`: в тёмной теме он
+  резал глаза, а в светлой не совпадал с палитрой. Теперь цвет из
+  токенов, поэтому подсветка следует за темой.
+*/
+.highlighted {
+  background-color: var(--c-warning-soft);
+  color: var(--c-warning);
+  border-radius: 2px;
+  display: inline-block;
 }
 
 /* --------------------------- панель инструментов --------------------------- */
@@ -1279,6 +1407,16 @@ export default {
   opacity: 1;
 }
 
+/*
+  Контейнер кадра с материалом. Скругление раньше стояло инлайном в
+  :style, а материал из iframe подписан по ссылке и не наследует
+  оформление страницы, поэтому скругление нужно здесь.
+*/
+.cm-frame {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
 /* Обе колонки прокручиваются независимо, шапка остаётся на месте.
    Регресс: у блока контента стоял только overflow:auto без высоты,
    из-за чего он разрастался на всю длину документа (4530px при
@@ -1317,6 +1455,85 @@ export default {
 .search-files__total-results {
   font-size: 0.875rem;
   color: var(--c-text-muted);
+}
+
+.search-files__no-results {
+  margin: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-sm);
+  color: var(--c-text-muted);
+}
+
+/* Поиск по материалам. Блок живёт в панели содержания шириной ~300px,
+   поэтому ширины и переносы заданы явно: v-row без него разъезжался,
+   а инлайновые стили на кнопках результатов обходили токены. */
+.cm-search {
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-surface-1);
+  min-width: 0;
+}
+
+.cm-search__field {
+  min-width: 0;
+}
+
+.cm-search__nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-1);
+}
+
+.cm-search__nav-count {
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cm-search__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.cm-search__item {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  padding: var(--sp-2);
+  text-align: left;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--fs-sm);
+}
+
+/* Скелетон результатов: та же высота, что у кнопки результата,
+   поэтому список не прыгает, когда ответ приходит.
+   Ключ кадров свой, а не общий с AppSkeleton: там он объявлен в
+   scoped-стиле и сюда не попадает. */
+.cm-search__skeleton {
+  display: block;
+  height: 32px;
+  margin-bottom: var(--sp-1);
+  border-radius: var(--radius-sm);
+  background: var(--c-skeleton);
+  animation: cm-search-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes cm-search-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cm-search__skeleton {
+    animation: none;
+  }
 }
 
 

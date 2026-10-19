@@ -11,6 +11,7 @@ import {
   createGroup,
   updateGroup,
   createUser,
+  registerUser,
   updateUser,
   deleteGroup,
   deleteUser,
@@ -263,9 +264,35 @@ const UserModule = {
               return Promise.reject(error)
             }
           },
-          async createUser({ commit }, data) {
+          async createUser({ commit, dispatch }, data) {
             try {
               const response = await createUser(data)
+              const payload = unwrap(response)
+              commit('SET_USER', payload && payload.user ? payload.user : payload)
+              /*
+               * Список перечитывается, иначе новый пользователь появляется
+               * только после ручного обновления страницы. Фильтры и
+               * страницу сбрасываем на вид «создать с нуля»: созданный
+               * может не попасть в текущую выборку, и человек решил бы,
+               * что кнопка не сработала.
+               */
+              await dispatch('fetchUsers', { page: 1 }).catch(() => {})
+              return Promise.resolve(response)
+            } catch (error) {
+              return Promise.reject(error)
+            }
+          },
+          /*
+           * Публичная саморегистрация (страница входа).
+           *
+           * Отдельное действие, а не вызов createUser: эндпоинт другой
+           * и открытый. Когда одно действие обслуживало оба сценария,
+           * починка админского создания уводила регистрацию посторонних
+           * под право `users.create`, где её нет.
+           */
+          async registerUser({ commit }, data) {
+            try {
+              const response = await registerUser(data)
               const payload = unwrap(response)
               commit('SET_USER', payload && payload.user ? payload.user : payload)
               return Promise.resolve(response)

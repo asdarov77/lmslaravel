@@ -142,10 +142,23 @@ class AuthController extends Controller
             'password' => 'required|string'
         ]);
 
-        // Check fio
-        $user = User::where('fio', $fields['fio'])->first();
+        // Поддержка входа по Email или ФИО
+        $loginValue = $fields['fio'];
+        $user = User::where('fio', $loginValue)
+            ->orWhere('email', $loginValue)
+            ->first();
+            
         if (!$user || !Hash::check($fields['password'], $user->password)) {
             return response()->json(['message' => 'неверный логин или пароль'], 401);
+        }
+
+        // Проверка 2FA: если включено, требуем код
+        if ($user->two_factor_enabled) {
+            return response()->json([
+                'requires_2fa' => true,
+                'email' => $user->email,
+                'message' => 'Требуется двухфакторная аутентификация',
+            ], 200);
         }
 
         $token = $user->createToken($request->fio)->plainTextToken;

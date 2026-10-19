@@ -157,9 +157,9 @@
           </v-col>
         </v-row>
 
-        <!-- Регресс: интерполяция была внутри HTML-комментария
-             (<!-- {{ error }} -->), поэтому пользователь видел красные
-             пустые блоки без единого слова. -->
+<!-- Регресс: интерполяция была внутри HTML-комментария
+     (строка вида <комментарий {{ error }} комментарий>), поэтому
+     пользователь видел красные пустые блоки без единого слова. -->
         <v-alert
           v-for="(error, index) in errors"
           :key="index"
@@ -496,12 +496,20 @@ export default {
 
 <style src="vue3-treeselect/dist/vue3-treeselect.css"></style>
 
-<style>
-.v-card-text {
+<!--
+  Блок был unscoped и правил классы Vuetify и vue3-treeselect во всём
+  приложении: `.v-card-text { font-size: 1rem }` менял кегль текста ВСЕХ
+  карточек на всех страницах, а правила деревовидного селекта попадали
+  в любой другой экран, где он встретится. Здесь нужен :deep — сами
+  классы лежат внутри дочерних компонентов, — но блок остаётся привязан
+  к этой странице.
+-->
+<style scoped>
+:deep(.v-card-text) {
   font-size: 1rem;
 }
 
-.vue-treeselect__control {
+:deep(.vue-treeselect__control) {
   height: 56px;
   border-bottom: 1px solid;
   background: var(--c-surface-3);
@@ -509,25 +517,25 @@ export default {
   border-radius: 5px;
 }
 
-.vue-treeselect__placeholder,
-.vue-treeselect__single-value {
+:deep(.vue-treeselect__placeholder),
+:deep(.vue-treeselect__single-value) {
   padding-left: 12px;
   line-height: 56px;
   color: var(--c-text-muted);
 }
 
-.vue-treeselect__control-arrow-container {
+:deep(.vue-treeselect__control-arrow-container) {
   width: 38px;
 }
 
-.vue-treeselect__multi-value-item {
+:deep(.vue-treeselect__multi-value-item) {
   cursor: pointer;
   color: var(--c-text-secondary);
   background-color: var(--c-surface-2);
   border-bottom: 3px solid;
 }
 
-.vue-treeselect--has-value .vue-treeselect__multi-value {
+:deep(.vue-treeselect--has-value .vue-treeselect__multi-value) {
   margin-bottom: 15px;
 }
 </style>

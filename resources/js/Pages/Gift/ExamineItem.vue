@@ -49,7 +49,7 @@
 
         <!--                блок финальный результаты                -->
         <v-card v-if='isFinishExamClicked'>
-          <v-card-text class="text-center font-weight-bold" style="font-size: 1.25rem;">{{ $t('gift.finished') }}</v-card-text>
+          <v-card-text class="text-center font-weight-bold exam-done-title">{{ $t('gift.finished') }}</v-card-text>
           <v-card-text>{{ $t('gift.totalQuestions', { n: questions.length }) }}</v-card-text>
           <v-card-text>{{ $t('gift.correctCount') }}: {{ correctAnswersCount }}</v-card-text>
           <v-card-text>{{ $t('gift.incorrectCount') }}: {{ incorrectAnswersCount }}</v-card-text>
@@ -78,10 +78,10 @@
             <v-col v-for="(question, index) in displayedQuestions" :key="index" cols="2" no-gutters>
 
 
-              <v-card elevation="3" class="ml-2 mt-2 mr-2 mb-2"
-                :style="{ backgroundColor: answerColors[question.id] || (selectedAnswers[question.id] !== undefined ? 'gray' : 'white'), color: 'black' }"
+              <v-card elevation="3" class="ml-2 mt-2 mr-2 mb-2 exam-q"
+                :class="`exam-q--${answerState(question)}`"
                 :outlined="current === index || answerStatus[question.id] !== undefined"
-                :border-color="answerColors[question.id] || (selectedAnswers[question.id] !== undefined ? 'gray' : 'white')"
+                :border-color="`var(--c-${answerState(question)})`"
                 @mouseover="current = index" @mouseleave="current = -1" @click="goToQuestion(question.id)"
                 v-bind:class="{ 'active-class': question.id === currentId }">
                 <!-- <v-card-text>{{ index + 1 }}</v-card-text> -->
@@ -137,12 +137,15 @@ export default {
       question: [],
       questions: [],
       selectedAnswers: {},
+      // Вердикт по вопросу: 'correct' | 'wrong'. Раньше здесь лежали
+      // русские строки «Правильно»/«Неправильно», которые нигде не
+      // показывались, а рядом держалась вторая карта для цветов. Обе
+      // сводились к одному ключу — иначе состояния разъезжались бы.
       answerStatus: {},
       nextId: 0, //следующий
       currentId: 0, // текущий
       isFinish: false,
       isAllChecked: false, //все ли вопросы отвечены
-      answerColors: {},  // Добавляем новое свойство для хранения цветов ответов
       correctAnswersCount: 0,
       incorrectAnswersCount: 0,
       // пагинация
@@ -174,12 +177,15 @@ export default {
 
     },
     progressColor() {
+      // Имена цветов темы Vuetify, а не 'green'/'orange'/'red' из
+      // палитры браузера: тема собрана из тех же токенов, поэтому цвет
+      // следует за светлой/тёмной, а не остаётся чужой константой.
       if (this.successPercentage >= 70) {
-        return 'green'
+        return 'success'
       } else if (this.successPercentage >= 40) {
-        return 'orange'
+        return 'warning'
       } else {
-        return 'red'
+        return 'error'
       }
     },
     progressIcon() {
@@ -203,13 +209,7 @@ export default {
     }
   },
 
-
-
-
   mounted() {
-    console.log(this.idEdit, "idEdit")
-    console.log(this.idCategory, "cat")
-
     // Получение списка вопросов с сервера.
     // Фильтры добавляются ТОЛЬКО когда они заданы: раньше строка собиралась
     // конкатенацией и уходила как /api/questions?aukstructure_id=NaN&category_id=NaN,
@@ -227,21 +227,23 @@ export default {
         this.questions = unwrapArray(response);
         if (this.questions[0]) this.goToQuestion(this.questions[0].id); // переходим к первому вопросу 
       })
-      .catch(error => {
-        console.log(error);
+      .catch(() => {
+        // Причина уже показана тостом в перехватчике httpClient.
+        // Дублировать её в консоль незачем, а пустой список вопросов
+        // отрисовывается как пустое состояние.
       });
 
     $api.get(apiUrl + '/api/grade-boundary')
       .then(response => {
         this.gradeBoundaries = unwrapArray(response);
       })
-      .catch(error => {
-        console.log(error);
+      .catch(() => {
+        // Без шкалы оценок getGrade вернёт 'N/A' — экзамен остаётся
+        // проходимым. Тост приходит из перехватчика.
       });
   },
   methods: {
     getGrade(percentage) {
-      console.log(percentage, "percentage")
       for (let i = this.gradeBoundaries.length - 1; i >= 0; i--) {
         if (percentage >= this.gradeBoundaries[i].boundary) {
           return this.gradeBoundaries[i].grade;
@@ -262,25 +264,41 @@ export default {
       return startIndex + index + 1;
     },
     finishExam() {
-      console.log('завершено тестирование')
       this.checkAnswers();
       this.currentId = null;
-      console.log(this.isFinishExamClicked, 'this.isFinishExamClicked')
       this.isFinishExamClicked = true;
-      console.log(this.isFinishExamClicked, 'after this.isFinishExamClicked')
-
     },
+    /**
+     * Состояние карточки вопроса в навигаторе экзамена.
+     *
+     * Возвращает ключ словаря токенов, а не цвет. Раньше здесь стояло
+     * `backgroundColor: 'green' | 'red' | 'gray' | 'white'` инлайново,
+     * вместе с `color: 'black'`. Это давало три проблемы: белые карточки
+     * в тёмной теме (белое пятно на тёмном экране), текст всегда чёрный —
+     * то есть на тёмно-зелёной заливке он не читался, и цвета из палитры
+     * браузера, не связанные с токенами проекта.
+     *
+     * Теперь состояние — правило в CSS, а окраска берётся из токенов,
+     * которые уже умеют меняться вместе с темой.
+     */
+    answerState(question) {
+      const verdict = this.answerStatus[question.id];
+
+      if (verdict === 'correct') return 'success';
+      if (verdict === 'wrong') return 'danger';
+
+      return this.selectedAnswers[question.id] !== undefined ? 'answered' : 'unanswered';
+    },
+
     checkAnswers() {
       this.questions.forEach(question => {
         const selectedAnswerId = this.selectedAnswers[question.id];
         const correctAnswerId = question.answers.find(answer => answer.is_correct).id;
         if (selectedAnswerId === correctAnswerId) {
-          this.answerStatus[question.id] = 'Правильно';
-          this.answerColors[question.id] = 'green';
+          this.answerStatus[question.id] = 'correct';
           this.correctAnswersCount++;
         } else {
-          this.answerStatus[question.id] = 'Неправильно';
-          this.answerColors[question.id] = 'red';
+          this.answerStatus[question.id] = 'wrong';
           this.incorrectAnswersCount++;
         }
       });
@@ -315,9 +333,11 @@ export default {
         .then(response => {
           this.question = unwrapResponse(response); // обернуть ответ в массив, чтобы использовать v-for
         })
-        .catch(error => {
-          console.log(error);
-        });
+.catch(error => {
+        // Причина уже показана тостом в перехватчике httpClient:
+        // дублировать её в консоль незачем. Пустой список вопросов
+        // отрисовывается как пустое состояние.
+      });
       if (this.currentId < this.questions.length) {
         this.nextId = this.currentId + 1;
         this.isFinish = false;
@@ -346,11 +366,8 @@ export default {
         studentAnswers.push(studentAnswer);
       }
       $api.post(apiUrl + '/api/student-answers', { studentAnswers })
-        .then(response => {
-          console.log(response);
-        })
         .catch(error => {
-          console.log(error);
+          // Причина уже показана тостом в перехватчике httpClient.
         });
     },
   },
@@ -358,7 +375,51 @@ export default {
 </script>
 
 
-<style>
+<!--
+  Блок unscoped, а селекторы здесь общие на вид — `.active-class` и
+  `.square` так и называются в других проектах, и любая страница,
+  где появится класс с таким именем, получила бы рамку и скругление
+  от экзамена. Все три класса принадлежат только этому шаблону.
+-->
+<style scoped>
+/*
+  Карточки навигатора по вопросам.
+
+  Фон — «мягкий» токен, текст и рамка — основной. В тёмной теме токены
+  разъезжаются в тёмные тона с светлым текстом, поэтому контраст держится
+  сам, без отдельной ветки для тёмной темы.
+*/
+.exam-q--success {
+  background: var(--c-success-soft);
+  color: var(--c-success);
+}
+
+.exam-q--danger {
+  background: var(--c-danger-soft);
+  color: var(--c-danger);
+}
+
+.exam-q--answered {
+  background: var(--c-surface-3);
+  color: var(--c-text-secondary);
+}
+
+.exam-q--unanswered {
+  background: var(--c-surface);
+  color: var(--c-text-secondary);
+}
+
+/* Ошибка проверки не должна теряться на карточке вопроса. */
+.exam-q--danger .v-card-text,
+.exam-q--success .v-card-text {
+  color: inherit;
+}
+
+/* Заголовок итога экзамена. Раньше кегль стоял инлайном в style=. */
+.exam-done-title {
+  font-size: var(--fs-xl);
+}
+
 .square {
   height: 50px;
   display: flex;
@@ -367,8 +428,10 @@ export default {
 }
 
 .active-class {
-  border-radius: 15px;
-  border: 3px solid blue;
+  border-radius: var(--radius-lg);
+  /* Раньше стоял синий из палитры браузера: он не переключался в тёмной
+     теме и не совпадал ни с одним токеном. */
+  border: 3px solid var(--c-primary);
 }
 
 .questions .cards {

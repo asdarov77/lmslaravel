@@ -88,7 +88,7 @@ const passthroughStub = name => ({
   template: '<div class="' + name.toLowerCase() + '-stub"></div>',
 })
 
-const mountPage = (component, setup = {}) => {
+const mountPage = (component, props = {}) => {
   // Страницы на <script setup> берут стор и роутер через useStore()/useRouter(),
   // которые читают их из provide, а не из $store/$router. Поэтому плагины
   // обязаны стоять: одних mocks недостаточно — страница падала бы на
@@ -110,6 +110,7 @@ const mountPage = (component, setup = {}) => {
   })
 
   return mount(component, {
+    props,
     global: {
       // i18n ставится плагином: опция верхнего уровня осталась от
       // VTU v1 и молча игнорируется, из-за чего $t был недоступен.
@@ -142,7 +143,7 @@ describe('UserItemEdit: нормализация group_id', () => {
     })
     http.patch.mockResolvedValue(envelope({ id: 37, fio: 'Тест' }))
 
-    const wrapper = mountPage(UserItemEdit)
+    const wrapper = mountPage(UserItemEdit, { idEdit: 37 })
     await tick()
 
     // Имитируем то, что реально отдавал v-combobox вместо id.
@@ -159,7 +160,7 @@ describe('UserItemEdit: нормализация group_id', () => {
   })
 
   it('пустая строка, null, undefined, 0 и мусор дают null', () => {
-    const wrapper = mountPage(UserItemEdit)
+    const wrapper = mountPage(UserItemEdit, { idEdit: 37 })
     expect(wrapper.vm.normalizeGroupId('')).toBeNull()
     expect(wrapper.vm.normalizeGroupId(null)).toBeNull()
     expect(wrapper.vm.normalizeGroupId(undefined)).toBeNull()
@@ -171,7 +172,7 @@ describe('UserItemEdit: нормализация group_id', () => {
   })
 
   it('числовая строка приводится к числу', () => {
-    const wrapper = mountPage(UserItemEdit)
+    const wrapper = mountPage(UserItemEdit, { idEdit: 37 })
     expect(wrapper.vm.normalizeGroupId('5')).toBe(5)
     expect(wrapper.vm.normalizeGroupId(7)).toBe(7)
   })
@@ -185,7 +186,7 @@ describe('UserItemEdit: нормализация group_id', () => {
     })
     http.patch.mockResolvedValue(envelope({ id: 37 }))
 
-    const wrapper = mountPage(UserItemEdit)
+    const wrapper = mountPage(UserItemEdit, { idEdit: 37 })
     await tick()
 
     wrapper.vm.form.values.fio = 'Полное Имя'
@@ -214,7 +215,7 @@ describe('UserItemEdit: разворачивание конверта', () => {
       return Promise.resolve(envelope([{ id: 1, groupname: 'Группа' }]))
     })
 
-    mountPage(UserItemEdit)
+    mountPage(UserItemEdit, { idEdit: 37 })
     await tick()
 
     expect(store.state.User.user).toMatchObject({ id: 37, fio: 'Пользователь' })
@@ -228,7 +229,7 @@ describe('UserItemEdit: разворачивание конверта', () => {
       return Promise.resolve(envelope(null))
     })
 
-    mountPage(UserItemEdit)
+    mountPage(UserItemEdit, { idEdit: 37 })
     await tick()
 
     expect(store.state.User.allGroups).toEqual([])
@@ -377,7 +378,7 @@ describe('UserItemEdit: список групп для выпадающего м
       return Promise.resolve(envelope([]))
     })
 
-    mountPage(UserItemEdit)
+    mountPage(UserItemEdit, { idEdit: 37 })
     await tick()
 
     // Без этого запроса allGroups оставался [] и v-select был пуст.
@@ -400,7 +401,7 @@ describe('UserItemEdit: список групп для выпадающего м
     })
     http.patch.mockResolvedValue(envelope({ id: 37, fio: 'Тест', group_id: 2 }))
 
-    const wrapper = mountPage(UserItemEdit)
+    const wrapper = mountPage(UserItemEdit, { idEdit: 37 })
     await tick()
 
     // v-select пишет выбранный id в значения формы.
@@ -424,7 +425,7 @@ describe('UserItemEdit: список групп для выпадающего м
       return Promise.resolve(envelope([]))
     })
 
-    const wrapper = mountPage(UserItemEdit)
+    const wrapper = mountPage(UserItemEdit, { idEdit: 37 })
     await tick()
 
     // Раньше текст складывался в собственный массив errors компонента.

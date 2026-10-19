@@ -124,11 +124,23 @@
           <div v-if="course.categories.length">
             <dt>{{ $t("catalog.categories") }}</dt>
             <dd>
+              <!--
+                Показаны первые три: у курса бывает шесть-семь
+                специальностей, и без ограничения карточка вырастала до
+                470px, а кнопка записи уезжала под экран. Остальные —
+                в подсказке по наведению, полный список не нужен для
+                решения «записываться или нет».
+              -->
               <span
-                v-for="category in course.categories"
+                v-for="category in visibleCategories(course)"
                 :key="category.id"
                 class="u-badge u-badge--muted catalog__chip"
               >{{ category.title }}</span>
+              <span
+                v-if="course.categories.length > CATEGORY_CHIPS"
+                class="u-badge u-badge--muted catalog__chip"
+                :title="allCategoryTitles(course)"
+              >+{{ course.categories.length - CATEGORY_CHIPS }}</span>
             </dd>
           </div>
         </dl>
@@ -220,6 +232,12 @@ export default {
     items: [],
     categories: [],
     meta: {},
+    /*
+     * Сколько специальностей помещается в карточку до свёртки в «+N».
+     * Лежит в data, а не отдельной константой модуля: значение нужно и
+     * шаблону, и методу, а шаблон Options API видит только поля data.
+     */
+    CATEGORY_CHIPS: 3,
     query: '',
     categoryId: null,
     mine: 'all',
@@ -296,6 +314,19 @@ export default {
   },
 
   methods: {
+    /**
+     * Первые три специальности карточки. Ограничение держит карточку
+     * в разумной высоте: у курса их бывает шесть-семь, каждая — отдельная
+     * строка, и блок съедал больше половины высоты.
+     */
+    visibleCategories(course) {
+      return (course.categories || []).slice(0, this.CATEGORY_CHIPS)
+    },
+
+    /** Полный список в подсказке у счётчика «+N». */
+    allCategoryTitles(course) {
+      return (course.categories || []).map((c) => c.title).join(', ')
+    },
     /** Прочитать фильтры из URL при входе на страницу. */
     applyQueryFromUrl() {
       const q = this.$route?.query || {}

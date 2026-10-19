@@ -1,56 +1,63 @@
 <template>
-  <div class="cm-notes" v-if="!isLoading">
+  <!--
+    Свёрнуто по умолчанию.
+
+    Развёрнутый редактор занимает 413px в боковой колонке 300px шириной и
+    рядом с деревом из 77 разделов вытеснял его почти в ноль: список
+    содержания схлопывался, а человек приходил на курс и не видел
+    материалов. Заметки — второстепенное, открывать их нужно осознанно.
+  -->
+  <details v-if="!isLoading" class="cm-notes">
+    <summary class="cm-notes__head">
+      <v-icon size="16" aria-hidden="true">mdi-note-text-outline</v-icon>
+      <span>{{ $t('courseManifest.notes') }}</span>
+      <span v-if="lastSaved" class="cm-notes__status">
+        {{ $t('courseManifest.notesSaved', { time: lastSaved }) }}
+      </span>
+    </summary>
+
     <v-alert v-if="error" type="error" dense text class="mb-3" data-test="notes-error">
       {{ error }}
     </v-alert>
 
-    <v-sheet class="cm-notes__editor" elevation="1">
-      <div class="cm-notes__header">
-        <h4 class="cm-notes__title">{{ $t('courseManifest.notes') }}</h4>
-        <span class="cm-notes__status" v-if="lastSaved">
-          {{ $t('courseManifest.notesSaved', { time: lastSaved }) }}
-        </span>
-      </div>
+    <v-textarea
+      v-model="content"
+      :label="$t('courseManifest.notesLabel')"
+      :placeholder="$t('courseManifest.notesPlaceholder')"
+      :counter="5000"
+      rows="6"
+      :loading="saving"
+      @input="onInput"
+      :disabled="saving"
+      data-test="notes-textarea"
+    />
 
-      <v-textarea
-        v-model="content"
-        :label="$t('courseManifest.notesLabel')"
-        :placeholder="$t('courseManifest.notesPlaceholder')"
-        :counter="5000"
-        rows="8"
-        :loading="saving"
-        @input="onInput"
-        :disabled="saving"
-        data-test="notes-textarea"
-      />
-
-      <div class="cm-notes__footer">
-        <span class="cm-notes__counter">
-          {{ content.length }} / 5000
-        </span>
-        <div class="cm-notes__actions">
-          <v-btn
-            variant="text"
-            @click="clearNotes"
-            :disabled="!content || saving"
-            data-test="notes-clear"
-          >
-            {{ $t('courseManifest.notesClear') }}
-          </v-btn>
-          <v-btn
-            color="primary"
-            variant="flat"
-            :loading="saving"
-            @click="saveNotes"
-            :disabled="!content.trim() || saving"
-            data-test="notes-save"
-          >
-            {{ $t('courseManifest.notesSave') }}
-          </v-btn>
-        </div>
+    <div class="cm-notes__footer">
+      <span class="cm-notes__counter">
+        {{ content.length }} / 5000
+      </span>
+      <div class="cm-notes__actions">
+        <v-btn
+          variant="text"
+          @click="clearNotes"
+          :disabled="!content || saving"
+          data-test="notes-clear"
+        >
+          {{ $t('courseManifest.notesClear') }}
+        </v-btn>
+        <v-btn
+          color="primary"
+          variant="flat"
+          :loading="saving"
+          @click="saveNotes"
+          :disabled="!content.trim() || saving"
+          data-test="notes-save"
+        >
+          {{ $t('courseManifest.notesSave') }}
+        </v-btn>
       </div>
-    </v-sheet>
-  </div>
+    </div>
+  </details>
 </template>
 
 <script>
@@ -173,44 +180,57 @@ export default {
   clientWidth 299).
 */
 .cm-notes {
-  margin-top: var(--sp-6);
+  margin-top: var(--sp-2);
   min-width: 0;
   max-width: 100%;
-}
-
-.cm-notes__editor {
-  background: var(--c-surface);
-  border: 1px solid var(--c-border);
-  border-radius: var(--c-radius-md);
-  overflow: hidden;
-}
-
-.cm-notes__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--sp-3) var(--sp-4);
-  border-bottom: 1px solid var(--c-border);
+  border-top: 1px solid var(--c-border);
   background: var(--c-surface-2);
 }
 
-.cm-notes__title {
-  font-size: var(--fs-lg);
-  font-weight: 600;
+/* Заголовок-сводка. Раньше это была шапка с заголовком и статусом,
+   а под ней сразу развёрнутое поле; заголовок нужен и как ручка
+   раскрытия, и как подпись. */
+.cm-notes__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--c-text-muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.cm-notes__head::-webkit-details-marker {
+  display: none;
+}
+
+.cm-notes__head:hover {
   color: var(--c-text);
 }
 
 .cm-notes__status {
+  margin-left: auto;
   font-size: var(--fs-xs);
+  text-transform: none;
+  letter-spacing: normal;
   color: var(--c-success);
   font-weight: 500;
+}
+
+/* Поля и кнопки внутри свёрнутого блока. */
+.cm-notes > :not(summary) {
+  margin-inline: var(--sp-3);
 }
 
 .cm-notes__footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--sp-3) var(--sp-4);
+  gap: var(--sp-2);
+  padding: var(--sp-3);
   border-top: 1px solid var(--c-border);
   background: var(--c-surface-2);
 }

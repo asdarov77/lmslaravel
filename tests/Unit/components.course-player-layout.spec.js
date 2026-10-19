@@ -222,6 +222,66 @@ describe('CoursePlayerLayout: содержание', () => {
   })
 })
 
+describe('CoursePlayerLayout: высота экрана ограничена окном', () => {
+  /*
+   * Регресс, найденный в браузере на реальном курсе (77 разделов).
+   *
+   * У `.cpl` стояло min-height, поэтому боковая колонка, у которой нет
+   * своего ограничения, разрасталась под дерево: на замере панель была
+   * 5148px при окне 856px. Панель инструментов уезжала на 4765px вниз,
+   * то есть кнопок «Поиск»/«Избранное»/«Дерево» не было видно вообще, а
+   * `overflow: hidden` отрезал низ. Прокручивался документ целиком,
+   * а не колонки по отдельности.
+   *
+   * Ни один тест этого не ловил: в jsdom нет раскладки, а проверка по
+   * исходнику CSS — единственный способ зафиксировать требование.
+   */
+  const css = () => readFileSync('resources/js/components/ui/CoursePlayerLayout.vue', 'utf8')
+
+  /*
+   * Комментарии вырезаются: правило объясняет, какое значение стояло
+   * раньше, и без этого любая проверка ловила бы сам комментарий.
+   */
+  const block = (sel) => {
+    const src = css().replace(/\/\*[\s\S]*?\*\//g, '')
+    const start = src.indexOf(sel + ' {')
+    return start === -1 ? '' : src.slice(start, src.indexOf('}', start))
+  }
+
+  it('.cpl ограничен высотой окна, а не «не меньше»', () => {
+    const rule = block('.cpl')
+
+    // min-height не ограничивает рост: колонка уходит вниз по своему
+    // содержимому. Нужна именно фиксированная высота.
+    expect(rule).not.toMatch(/min-height/)
+    expect(rule).toMatch(/height:\s*calc\(100vh/)
+    expect(rule).toMatch(/max-height:\s*calc\(100vh/)
+  })
+
+  it('тело экрана не даёт колонкам выйти за пределы панели', () => {
+    const rule = block('.cpl__body')
+
+    // min-height: 0 обязателен во flex-контейнере, иначе колонка не
+    // может стать ниже содержимого и распирает ограниченного родителя.
+    expect(rule).toMatch(/min-height:\s*0/)
+    expect(rule).toMatch(/overflow:\s*hidden/)
+  })
+
+  it('инструменты страницы приходят слотом НАД деревом', () => {
+    const src = css()
+
+    const top = src.indexOf('<slot name="sidebar-top" />')
+    const sections = src.indexOf('<nav class="cpl__sections">')
+    const extra = src.indexOf('<slot name="sidebar-extra" />')
+
+    // Панель инструментов кладётся под дерево — она съедает высоту
+    // панели, и список содержания схлопывается почти в ноль.
+    expect(top).toBeGreaterThan(-1)
+    expect(top, 'инструменты должны идти до дерева').toBeLessThan(sections)
+    expect(extra, 'заметки и избранное — после дерева').toBeGreaterThan(sections)
+  })
+})
+
 describe('CoursePlayerLayout: свёрнутая панель (рельс)', () => {
   it('оставляет колонку отметок и убирает всё, что в узкий рельс не влезает', async () => {
     const wrapper = mountLayout({ sidebarOpen: false })
@@ -239,8 +299,11 @@ describe('CoursePlayerLayout: свёрнутая панель (рельс)', () 
     )
     const rail = css.slice(css.indexOf('.cpl__sidebar--hidden {'))
     expect(rail).toContain('.cm-tree')
-    expect(rail).toContain('.cpl__notes')
     expect(rail).toContain('.cpl__heading')
+    // Блок заметок в макете больше нет: заметки живут в MaterialNotes
+    // (серверные), и в рельсе им места нет. Проверяем, что старый
+    // селектор не вернулся вместе с оставшимися стилями.
+    expect(rail).not.toContain('.cpl__notes')
     // Подпись в рельсе не помещается — она и не нужна, отметка остаётся.
     expect(rail).toContain('.cpl__section-text')
 
@@ -342,54 +405,31 @@ describe('CoursePlayerLayout: боковая панель', () => {
   })
 })
 
-describe('CoursePlayerLayout: заметки студента', () => {
-  it('сохраняет заметки в хранилище по ключу курса', () => {
+describe('CoursePlayerLayout: заметок в макете нет', () => {
+  /*
+   * Блок заметок на localStorage удалён: на странице курса заметки
+   * показывает MaterialNotes, он ходит в /api/materials/{id}/note.
+   * Проверяем, что дубль не вернулся вместе со своими стилями.
+   */
+  const source = () => readFileSync('resources/js/components/ui/CoursePlayerLayout.vue', 'utf-8')
+
+  it('не рендерит редактор заметок', () => {
     const wrapper = mountLayout({ activeId: 42 })
-
-    wrapper.vm.notesText = 'Моя заметка по курсу'
-    wrapper.vm.saveNotes()
-
-    expect(localStorage.getItem('course-notes-42')).toBe('Моя заметка по курсу')
-
+    expect(wrapper.find('.cpl__notes').exists()).toBe(false)
+    expect(wrapper.find('textarea.cpl__notes-area').exists()).toBe(false)
     wrapper.unmount()
   })
 
-  it('перечитывает заметки при смене курса', async () => {
-    localStorage.setItem('course-notes-42', 'Заметки курса 42')
-    localStorage.setItem('course-notes-99', 'Заметки курса 99')
-
+  it('не держит состояния заметок и не обращается к localStorage', () => {
     const wrapper = mountLayout({ activeId: 42 })
-    expect(wrapper.vm.notesText).toBe('Заметки курса 42')
-
-    await wrapper.setProps({ activeId: 99 })
-    await wrapper.vm.$nextTick()
-
-    expect(wrapper.vm.notesText).toBe('Заметки курса 99')
-
+    expect(wrapper.vm.notesText).toBeUndefined()
+    expect(wrapper.vm.saveNotes).toBeUndefined()
     wrapper.unmount()
   })
 
-  it('очищает заметки при пустом вводе', () => {
-    localStorage.setItem('course-notes-42', 'Текст')
-
-    const wrapper = mountLayout({ activeId: 42 })
-    wrapper.vm.notesText = ''
-    wrapper.vm.saveNotes()
-
-    expect(localStorage.getItem('course-notes-42')).toBe('')
-
-    wrapper.unmount()
-  })
-
-  it('не роняет при недоступном хранилище', () => {
-    const original = Storage.prototype.setItem
-    Storage.prototype.setItem = () => { throw new Error('quota') }
-
-    const wrapper = mountLayout({ activeId: 42 })
-    expect(() => wrapper.vm.saveNotes()).not.toThrow()
-
-    Storage.prototype.setItem = original
-    wrapper.unmount()
+  it('не оставил стилей удалённого блока', () => {
+    const css = source()
+    expect(css).not.toContain('cpl__notes')
   })
 })
 

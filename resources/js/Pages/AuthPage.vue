@@ -18,16 +18,19 @@
       :show-cancel="false"
       @submit="submitLogin"
     >
-      <FormField :label="t('login.fio')" name="fio" :error="login.errors.fio" :required="login.isRequired('fio')">
+      <FormField :label="t('login.fioOrEmail')" name="fio" :error="login.errors.fio" :required="login.isRequired('fio')">
         <v-text-field
           id="userLogin"
           v-bind="login.bind('fio')"
           name="login"
-          :placeholder="t('login.fio')"
+          :placeholder="t('login.fioOrEmailPlaceholder')"
           prepend-inner-icon="mdi-account-outline"
           autocomplete="username"
           autofocus
         />
+        <template #hint>
+          <span class="text-caption">{{ t('login.loginHint') }}</span>
+        </template>
       </FormField>
 
       <FormField
@@ -320,7 +323,7 @@ const register = useForm({
   },
 
   onSubmit: async ({ values }) => {
-    await store.dispatch('User/createUser', {
+    await store.dispatch('User/registerUser', {
       fio: values.fio,
       // Роль и группу отправляем только если их можно назначать: иначе
       // поля ушли бы «в пользу», а бэкенд их всё равно проигнорировал бы.

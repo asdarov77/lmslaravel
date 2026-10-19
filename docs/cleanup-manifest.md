@@ -146,12 +146,18 @@ Courses, UserList, CreateGroup, GroupItemEdit. Локальных полей
   initialization» на одной из страниц.
 
 ## Резервные копии страниц (суффиксы `copy`, `Orig`)
+
+Удалены. Их больше нет на диске:
+
 - `resources/js/Pages/Gift/ExamineForm copy.vue`
 - `resources/js/Pages/Gift/QuestionNewOrig.vue`
 - `resources/js/Pages/Group/GroupLearning Orig.vue`
 - `resources/js/Pages/User/UserPage copy.vue`
 
 ## Компоненты, вытесненные дизайн-системой или дублями
+
+Удалены:
+
 - `resources/js/components/About.vue`
 - `resources/js/components/FileUploader.vue`
 - `resources/js/components/Navbar.vue`
@@ -159,11 +165,17 @@ Courses, UserList, CreateGroup, GroupItemEdit. Локальных полей
 - `resources/js/components/Welcome.vue`
 
 ## Обёртки, оставшиеся от прежних правок
+
+Удалены:
+
 - `resources/js/Pages/Modal/Dialog.vue`
 - `resources/js/Pages/PermissionWrapper.vue`
 - `resources/js/Pages/Popup.vue`
 
 ## Незадействованные страницы и файлы
+
+Удалены:
+
 - `resources/js/Pages/Calendar.vue`
 - `resources/js/Pages/CourseManifestToday.vue`
 - `resources/js/Pages/CourseManifestVUE.vue`
@@ -173,10 +185,18 @@ Courses, UserList, CreateGroup, GroupItemEdit. Локальных полей
 - `resources/js/Pages/UploadFiles.vue`
 - `resources/js/Pages/User/RecursiveTable.vue`
 
+Про `RecursiveTable.vue` стоит помнить: он был единственным готовым
+рекурсивным деревом в проекте. Рекурсивной таблицы в интерфейсе сейчас
+нет — дерево содержания курса строится плоским списком с отступом по
+уровню (`CoursePlayerLayout`). Если рекурсивная таблица понадобится,
+забирать её неоткуда: сначала придётся решить, какие данные она будет
+показывать.
+
 ## Файлы, которые анализатор не видел
 
 `tools/reachability.py` сканирует только `*.vue` и `*.js`, поэтому файлы с
-нестандартным расширением в список не попадали. Проверены отдельно:
+нестандартным расширением в список не попадали. Проверены отдельно и
+удалены:
 
 - `resources/js/Pages/CourseManifestProba` — компонент на 31 КБ **без
   расширения**. Импортировать его невозможно: сборщик не подставляет `.vue`
@@ -184,13 +204,15 @@ Courses, UserList, CreateGroup, GroupItemEdit. Локальных полей
   черновик страницы просмотра курса.
 - `resources/js/Pages/file.txt` — текстовый файл рядом со страницами, ссылок
   нет.
-
 - `resources/js/Styles/app.scss` — 44 строки, из которых **все** строки
   комментарии: ни одного правила. Пакет `sass` в зависимостях не
   установлен, файл никем не импортируется. Это заготовка Vue CLI,
   оставшаяся после перехода на Vuetify.
 
 ## Barrel-файлы и устаревшая инициализация
+
+Удалены:
+
 - `resources/js/Pages/event-utils.js`
 - `resources/js/Pages/index.js`
 - `resources/js/Store/modules/index.js`
@@ -199,12 +221,112 @@ Courses, UserList, CreateGroup, GroupItemEdit. Локальных полей
 
 ## Файлы вне `resources/js`
 
+Удалены:
+
 - `index.html` в корне — самостоятельная страница-просмотрщик (20 КБ), к
   сборке и blade не подключена.
 - `example.txt` — 43 байта клавиатурной чехарды, файл не использовался.
+- `languagepacks.json` — пустой массив `[2]`, к продукту отношения не имеет.
 
 `merged_all.txt` оставлен по решению владельца: это дамп всех файлов
 проекта, который может пригодиться как подстраховка.
+
+---
+
+## Что осталось: собрано, но не подключено (2026-10-19)
+
+Проверено `tools/reachability.py` после чистки выше: 167 файлов достижимы,
+10 — нет. Это не черновики и не мусор, а готовые компоненты, которые
+никто не смонтировал. Удалять их без решения владельца нельзя: часть
+закрывает требования, которые записаны в `docs/design-redesign-plan.md`.
+
+| Файл | Что это | Почему не подключён |
+|---|---|---|
+| `components/ui/DropzoneUpload.vue` | Drag&drop с прогрессом и превью поверх `chunkUpload.js` | **Интегрирован в `FileLoadSimple.vue`** |
+| `components/ui/fields/CascadeSelect.vue` + `utils/cascade.js` | Каскад «категория → тип → самолёт» | В конструкторе курса категория — одно поле, каскада нет |
+| `components/ui/fields/RemoteAutocomplete.vue` + `composables/useRemoteOptions.js` | Поиск по справочникам с отменой устаревших ответов | Не требуется: справочники маленькие, хватает обычного select |
+| `components/ui/fields/DateRangeField.vue` | Период «с/по» со связанными min/max | В отчётах фильтр периода реализован иначе |
+| `components/ui/AvatarGroup.vue` | Стопка аватаров | Используется точечно, отдельный компонент не окупился |
+| `components/LanguageSelector.vue` | Выпадающий переключатель языка | По `docs/architecture.md` заменён кнопками RU/EN в футере: селект не открывался |
+| `components/ui/AppToast.vue` | Одиночный тост | Вытеснен общим стеком `ToastStack` + `useToast` |
+
+Вывод: из десяти файлов пять — осознанные замены (`LanguageSelector`,
+`AppToast` и их соседи), и их стоит удалить. `DropzoneUpload` и
+`CascadeSelect` — недоиспользованный функционал, а не мусор: решение
+по ним принимает владелец.
+
+---
+
+## Цвета не из палитры браузера — 2026-10-19
+
+Отдельный проход по строкам, где цвет задан словом, а не токеном. На
+экзамене это выглядело как «своя» страница, а в тёмной теме — как
+неисправность.
+
+`Pages/Gift/ExamineItem.vue`, навигатор вопросов:
+
+| Было | Стало |
+|---|---|
+| `backgroundColor: 'green' \| 'red' \| 'gray' \| 'white'` инлайново | Классы `exam-q--success/--danger/--answered/--unanswered` |
+| `color: 'black'` принудительно | Наследуется от токена состояния |
+| `progressColor` возвращал `'green'/'orange'/'red'` | `'success'/'warning'/'error'` — имена цветов темы Vuetify, собранной из тех же токенов |
+
+Почему это mattered: белые карточки в тёмной теме давали белое пятно на
+тёмном экране, а чёрный текст поверх цветной заливки не держал контраст.
+Схема «мягкий фон (`--c-*-soft`) + основной цвет текстом» контраст держит
+сама в обеих темах, без отдельной ветки для тёмной.
+
+Заодно схлопнуты две параллельные карты состояния вопроса: `answerStatus`
+и `answerStateMap`. Русские строки «Правильно»/«Неправильно» в
+`answerStatus` нигде не отображались — карта нужна была только как признак
+«отвечено». Теперь одна карта с ключами `correct`/`wrong`.
+
+## Одно от об двух сообщений — 2026-10-19
+
+`api/httpClient.js`, ветка 403. Запрос с флагом `stayOnPage` (материал
+курса, на который группа не записана) получал **два** сообщения: тост
+«в доступе отказано» из перехватчика и конкретную причину, которую
+страница ставит рядом с материалом. Комментарий в коде прямо говорил,
+что объяснять должна страница, но `report()` вызывался до проверки флага.
+
+Теперь при `stayOnPage` перехватчик молчит: уводить со страницы нельзя,
+и объяснять ошибку тоже не его дело. Покрыто
+`tests/Unit/httpClient.errors.spec.js`.
+
+## Отладочный вывод в консоль — 2026-10-19
+
+`Pages/Gift/ExamineItem.vue` содержал 11 живых `console.log`: дампы
+`idEdit`/`idCategory`, `console.log(percentage)`, `console.log('завершено
+тестирование')` и `console.log(error)` в четырёх `catch`. Убраны.
+
+`catch(error => { console.log(error) })` шёл вразрез с уже принятой в
+проекте схемой: перехватчик `httpClient` показывает тост сам, поэтому
+дубль в консоль — шум. Пустые `catch` заменены на комментарий с
+указанием, кто отвечает за сообщение.
+
+## Утечки глобальных стилей — 2026-10-19
+
+Отдельный класс находок, который не ловится `reachability.py`: файл
+жив и подключён правильно, но его unscoped-`<style>` правит элементы
+на **чужих** страницах. Проверено перебором всех файлов с блоком
+`<style>` без `scoped`.
+
+| Файл | Что утекало | Что стало |
+|---|---|---|
+| `Pages/CourseManifest.vue` | `.v-card { border: 1px solid lightgrey }` — перекрашивала каждую карточку Vuetify во всём приложении и не переключалась в тёмной теме | Правило убрано, рамка приходит из темы |
+| `Pages/Gift/QuestionItem.vue` | `button { background: var(--c-success); color: white; padding: 10px }` — зелёная заливка на **каждой** кнопке без класса Vuetify в приложении | `<style scoped>`, значения из токенов |
+| `Pages/Group/GroupLearning.vue` | `.v-card-text { font-size: 1rem }` — менял кегль текста всех карточек | `scoped` + `:deep()` для классов Vuetify и vue3-treeselect |
+| `Pages/Gift/ExamineItem.vue` | `.active-class { border: 3px solid blue }`, `.square` — общие на вид имена классов, unscoped | `<style scoped>`, синий заменён на `--c-primary` |
+
+Общее правило, которое стоит держать: `scoped` — по умолчанию.
+ unscoped-блок оправдан только когда правило должно попасть внутрь
+чужого документа. Единственный такой случай в проекте —
+`.highlighted` в `CourseManifest.vue`: класс приходит из HTML, который
+отдаёт сервер для результатов поиска по материалу.
+
+`Pages/EventCalendar.vue` остался unscoped осознанно: там единственный
+селектор — `.calendar__board .fc`, привязанный к классу, который
+существует только на этой странице.
 
 ## Данные, удалённые вместе с группами
 

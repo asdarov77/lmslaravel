@@ -1,5 +1,5 @@
 //import { createRouter,createWebHistory } from 'vue-router';
-import { createRouter,createWebHashHistory } from 'vue-router';
+import { createRouter,createWebHistory } from 'vue-router';
 import routes from './routes';
 import { TokenService } from '../services/storage.service';
 import store from '../Store';
@@ -28,8 +28,7 @@ NProgress.configure({
 onUnauthorizedHandler(name => router.push({ name }).catch(err => err));
 
 const router = createRouter({
-//    history: createWebHistory(),
-    history: createWebHashHistory(),
+    history: createWebHistory(),
     routes
 })
 

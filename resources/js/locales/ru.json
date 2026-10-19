@@ -173,7 +173,20 @@
       "tutorTitle": "Тренажёр",
       "tutorRunnerTitle": "Тренировка",
       "notFound": "Страница не найдена",
-      "instructorProfile": "Профиль преподавателя"
+      "instructorProfile": "Профиль преподавателя",
+      "twoFactor": {
+        "verifyTitle": "Подтверждение 2FA",
+        "verifySubtitle": "Введите код из приложения-аутентификатора для {{email}}",
+        "codeLabel": "Код подтверждения",
+        "codePlaceholder": "6-значный код",
+        "codeRequired": "Введите код подтверждения",
+        "codeTooShort": "Код должен содержать 6 цифр",
+        "verifyBtn": "Подтвердить",
+        "verified": "Двухфакторная аутентификация пройдена",
+        "recoveryHint": "Нет доступа к приложению?",
+        "useRecoveryCode": "Использовать код восстановления",
+        "backToLogin": "Вернуться к входу"
+      }
     },
     "nav": {
       "learning": "Обучение",
@@ -222,7 +235,11 @@
     "quoteText": "Система позволила нам полностью перевести обучение на онлайн-формат за считанные недели.",
     "quoteAuthor": "Руководитель учебного центра",
     "noAccount": "Нет аккаунта?",
-    "register": "Зарегистрироваться"
+    "register": "Зарегистрироваться",
+    "email": "Email",
+    "fioOrEmail": "ФИО или Email",
+    "fioOrEmailPlaceholder": "Введите ФИО или Email",
+    "loginHint": "Можно войти по ФИО или Email"
   },
   "status": {
     "rotor": {
@@ -362,7 +379,10 @@
     "notesSaved": "Сохранено в {time}",
     "notesLabel": "Ваши заметки",
     "notesClear": "Очистить",
-    "notesSave": "Сохранить"
+    "notesSave": "Сохранить",
+    "prevMatch": "Предыдущее совпадение",
+    "nextMatch": "Следующее совпадение",
+    "searchError": "Не удалось выполнить поиск по материалам"
   },
   "coursePreview": {
     "label": "Предпросмотр",
@@ -508,7 +528,9 @@
       "saved": "Роли назначены",
       "failed": "Не удалось назначить роли"
     },
-    "roleHintReadonly": "Роль назначается на странице «Назначение ролей» (право users.permissions)"
+    "roleHintReadonly": "Роль назначается на странице «Назначение ролей» (право users.permissions)",
+    "createPermissionsHint": "Права новому пользователю выдаются отдельно — в разделе «Назначение ролей».",
+    "roleRequired": "Выберите роль"
   },
   "categories": {
     "list": {
@@ -1427,7 +1449,10 @@
     "editTitle": "Редактирование пользователя",
     "labelSfery-deyatelnosti": "Сфера деятельности",
     "labelSpecializatsiya": "Специализация",
-    "labelOrganizatsiya": "Организация"
+    "labelOrganizatsiya": "Организация",
+    "labelPassword": "Пароль",
+    "passwordRequired": "Введите пароль",
+    "created": "Пользователь создан"
   },
   "register": {
     "groupsUnavailable": "Список групп недоступен: войдите в систему",

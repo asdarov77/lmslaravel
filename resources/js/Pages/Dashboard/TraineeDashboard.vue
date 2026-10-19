@@ -481,7 +481,17 @@ export default {
         ]);
 
         this.summary = learningApi.dashboard(dashRes);
-        this.plan = learningApi.planItems(planRes);
+        /*
+         * Блок ниже называется «Мои курсы», а /api/my/learning отдаёт
+         * строки плана: группа может быть записана на конкретные модули
+         * курса (у каждой строки свой parent_id), и один курс приходил
+         * двумя строками с одинаковым названием. На странице учебного
+         * плана это верно — там видно, на какие именно модули запись,
+         * — а здесь список выглядел как сбой данных.
+         */
+        this.plan = learningApi.planItems(planRes).filter(
+          (item, index, all) => all.findIndex(c => c.course_id === item.course_id) === index
+        );
       } catch (e) {
         // Пустые данные — валидное состояние (нет группы, нет курсов).
         // Сообщаем об ошибке только если пришёл отказ сервера.

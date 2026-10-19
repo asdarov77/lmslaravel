@@ -2,13 +2,33 @@
   <div class="u-page">
     <FormCard
       :heading-level="1"
-      :title="`${t('user.editTitle')} ${user.fio || ''}`"
+      :title="isCreate ? t('users.list.create') : `${t('user.editTitle')} ${user.fio || ''}`"
       :busy="form.submitting.value"
       @submit="submitForm"
       @cancel="cancel"
     >
       <FormField :label="t('user.labelFio')" name="fio" :error="form.errors.fio" :required="form.isRequired('fio')">
         <v-text-field v-bind="form.bind('fio')" autocomplete="name" />
+      </FormField>
+
+      <!--
+        Пароль только при создании. У существующего пользователя пароль
+        меняется отдельной страницей (/user/chpass/:id) — держать второе
+        поле на форме правки значило бы предлагать сменить пароль там,
+        где это не тот сценарий.
+      -->
+      <FormField
+        v-if="isCreate"
+        :label="t('user.labelPassword')"
+        name="password"
+        :error="form.errors.password"
+        :required="true"
+      >
+        <v-text-field
+          v-bind="form.bind('password')"
+          type="password"
+          autocomplete="new-password"
+        />
       </FormField>
 
       <!--
@@ -19,9 +39,33 @@
         суперадмином, минуя chroll. Теперь роль назначается только через
         «Назначение ролей» (users.permissions), а здесь она показана
         для чтения.
+
+        ИСКЛЮЧЕНИЕ — создание. У нового пользователя роли ещё нет, и
+        `store` без неё оставляет его в состоянии «Роль не назначена»:
+        он попадает в систему, но почти никуда не может. Поэтому при
+        создании роль выбирается, и это отдельный отделённый контрол.
       -->
-      <FormField :label="t('users.role')" :hint="t('users.roleHintReadonly')">
+      <FormField
+        v-if="!isCreate"
+        :label="t('users.role')"
+        :hint="t('users.roleHintReadonly')"
+      >
         <v-text-field :model-value="roleLabel" readonly />
+      </FormField>
+
+      <FormField
+        v-else
+        :label="t('users.role')"
+        name="role"
+        :error="form.errors.role"
+        :required="true"
+      >
+        <v-select
+          v-bind="form.bind('role')"
+          :items="roleOptions"
+          item-title="title"
+          item-value="value"
+        />
       </FormField>
 
       <FormField :label="t('user.labelTelefon')" name="phonenumber" :error="form.errors.phonenumber">
@@ -84,7 +128,7 @@
         />
       </FormField>
 
-      <div class="d-flex justify-space-between align-center mt-2">
+      <div v-if="!isCreate" class="d-flex justify-space-between align-center mt-2">
         <!-- Права вынесены в отдельный раздел /permissions: там свои
              правила доступа для администратора и инструктора. -->
         <v-btn
@@ -97,6 +141,9 @@
           {{ t('users.list.permissions') }}
         </v-btn>
       </div>
+      <p v-else class="u-muted mt-2">
+        {{ t('users.createPermissionsHint') }}
+      </p>
     </FormCard>
   </div>
 </template>
@@ -129,15 +176,40 @@ import { toast } from '../../composables/useToast'
  *    @vueform/multiselect с 40 строками переопределений цветов;
  *  - уход с несохранённой формой спрашивает подтверждение.
  */
+/**
+ * Создание и правка пользователя — одна форма.
+ *
+ * Раньше это была только правка: `idEdit` объявлялся обязательным, а
+ * кнопка «Добавить пользователя» вела на публичную регистрацию `/reg`,
+ * где нет ни прав администратора, ни выбора роли и группы. Теперь тот
+ * же компонент умеет и создавать: `idEdit = null`.
+ */
 const props = defineProps({
-  idEdit: { type: [Number, String], required: true },
+  idEdit: { type: [Number, String], default: null },
 })
+
+/** Режим создания: адрес без :idEdit. */
+const isCreate = computed(() => props.idEdit === null || props.idEdit === undefined || props.idEdit === '')
 
 const { t } = useI18n()
 const store = useStore()
 const router = useRouter()
 
 const rankOptions = ['капитан', 'майор', 'старший лейтенант', 'лейтенант']
+
+/**
+ * Роли для создания пользователя.
+ *
+ * Список — тот же, что бэкенд принимает в `users.role`: при отсутствии
+ * права `users.create` у роли нет, а `store` оставляет новичка без роли,
+ * и он почти никуда не попадёт. Значения не переводятся — это значения,
+ * которые уходят на сервер, а не подписи для чтения.
+ */
+const roleOptions = [
+  { title: t('account.roles.trainee'), value: 'trainee' },
+  { title: t('account.roles.instructor'), value: 'instructor' },
+  { title: t('account.roles.admin'), value: 'admin' },
+]
 
 const cityOptions = computed(() =>
   (Array.isArray(jsonData) ? jsonData : []).map((city) => ({ value: city, label: city }))
@@ -182,6 +254,8 @@ const normalizeGroupId = (value) => {
 const form = useForm({
   schema: {
     fio: { initial: '', rules: [required(t('register.fioRequired'))] },
+    password: { initial: '', rules: isCreate.value ? [required(t('user.passwordRequired')), minLength(6)] : [] },
+    role: { initial: '', rules: isCreate.value ? [required(t('users.roleRequired'))] : [] },
     phonenumber: { initial: '', rules: [minLength(6), phone(t('user.phoneInvalid'))] },
     city: { initial: '', rules: [] },
     country: { initial: '', rules: [] },
@@ -193,9 +267,34 @@ const form = useForm({
     group_id: { initial: null, rules: [] },
   },
 
-  draftKey: `user.edit.${props.idEdit}`,
+  draftKey: isCreate.value ? 'user.create' : `user.edit.${props.idEdit}`,
 
   onSubmit: async ({ values }) => {
+    if (isCreate.value) {
+      await store.dispatch('User/createUser', {
+        fio: values.fio,
+        password: values.password,
+        role: values.role,
+        group_id: normalizeGroupId(values.group_id),
+        phonenumber: values.phonenumber,
+        city: values.city,
+        country: values.country,
+        organization: values.organization,
+        position: values.position,
+        rank: values.rank,
+        spfere: values.spfere,
+        specialization: values.specialization,
+      })
+
+      toast.success(t('user.created'))
+      // Именно push, а не router.back(): на форму можно попасть прямым
+      // адресом (закладка, письмо, обновление страницы), и тогда истории
+      // «откуда пришли» просто нет — back() увёл бы на случайную
+      // предыдущую вкладку. После сохранения место назначено: список.
+      await router.push({ name: 'user.list' })
+      return
+    }
+
     const data = {
       ...user.value,
       fio: values.fio,
@@ -213,7 +312,8 @@ const form = useForm({
     await store.dispatch('User/updateUser', { id: props.idEdit, data })
 
     toast.success(t('user.updated'))
-    await router.back()
+    // См. пояснение в ветке создания: back() без истории уводит не туда.
+    await router.push({ name: 'user.list' })
   },
 })
 
@@ -234,6 +334,11 @@ onMounted(async () => {
   store.dispatch('User/fetchGroups').catch(() => {
     toast.warning(t('user.groupsUnavailable'))
   })
+
+  // При создании загружать нечего: пользователя ещё нет, а fetchUser(null)
+  // ушёл бы на /api/user/list/null и вернул 404 — тост об ошибке на
+  // пустом месте при первом же открытии формы.
+  if (isCreate.value) return
 
   // Заполняем форму загруженным пользователем. Значения в store больше не
   // правятся «на лету», поэтому после загрузки снимаем dirty — иначе
