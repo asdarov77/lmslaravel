@@ -230,3 +230,28 @@ return [ /* те же поля */ + 'signed' => $signer->urlFor($aircraft, $auk,
   CourseTree с раскрытием (связан с Рекурсивной таблицей из дизайн-плана 1.5); отказ от setTimeout-подсветки.
 - **Спринт 3 (P2):** очереди импорта, событийный прогресс, хеш-пути + immutable caching;
   решение по SCORM-sequencing (продуктовый вопрос владельцу курса).
+
+## 6. Статус плана на 2026-10-20 (сверено с кодом)
+
+Ни один пункт P0/P1 не выполнен — документ остаётся планом, а не отчётом. Проверено:
+
+| Пункт | Факт в коде |
+|---|---|
+| P0.1 player-endpoint | маршрута `course-player` в `routes/api.php` нет; `CourseManifest.vue mounted()` гоняет `fetchCourse/fetchCategory/fetchCategories/fetchAircrafts×2/fetchAircraft` + фильтр-запрос `/api/course` + `getFavorites()` |
+| P0.2 серверный кэш дерева | `Cache::remember` для манифеста/дерева отсутствует |
+| P0.3 клиентский LRU-кэш | кэша документов материалов нет: повторный клик на просмотренный модуль проходит всю цепочку заново |
+| P0.4 nginx X-Accel | инфраструктура есть (`ContentDelivery`, `content:nginx-config`, `deploy/nginx-content-delivery.conf`), но режим выбирается настройкой `settings.content_delivery`; по умолчанию — `php`. Включить на проде — задача эксплуатации, чек-лист ниже |
+| P1.1 tsvector-поиск | `SearchController::search` — прежний обход ФС (`$disk->files()` + `Str::contains`), право `content.manage,courses.manage` (обучающийся поиска не видит) |
+| P1.2 getlink | ~7 запросов, включая полный выбор `type=3` ради первого id |
+| P1.3 подсветка | `setTimeout(1000)` из горячего пути удалён (применение в `onFrameLoad`) — пункт закрыт досрочно, вне рамок P1 |
+| P1.4 дерево | `TreeView/TreeViewNode` — рекурсия есть; виртуализации и классов `--level-*` вместо inline `nodeStyle` — нет |
+
+**Чек-лист включения режима `nginx` (снимает главную причину «не справится при нагрузке»):**
+1. применить `php artisan content:nginx-config` вывод в боевой nginx (internal location выше try_files по приоритету);
+2. в `/settings` переключить раздачу на `nginx`;
+3. `php artisan content:check-exposure` — убедиться, что прямой доступ к файлам закрыт;
+4. прогнать Playwright-сценарий открытия курса и вложенных ресурсов (403 на CSS/картинки — признак неверного alias).
+
+**Минимальный фронтенд-фикс без бэкенда (1–2 часа, убрать половину задержки старта):**
+удалить дублирующий `fetchAircrafts` и лишние dispatch'и в `mounted()`, оставив один
+источник данных о курсе (фильтр-запрос), — это снижает старт с 6+1 запросов до 2.
