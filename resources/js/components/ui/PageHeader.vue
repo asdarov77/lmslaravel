@@ -1,6 +1,7 @@
 <template>
   <header class="u-page__head">
     <div class="u-page__head-text">
+      <Breadcrumbs v-if="$route.meta.breadcrumbs" />
       <h1 v-if="title" class="u-page__title">{{ title }}</h1>
       <p v-if="subtitle" class="u-page__subtitle">{{ subtitle }}</p>
       <slot name="head" />
@@ -13,8 +14,11 @@
 </template>
 
 <script setup>
+import Breadcrumbs from './Breadcrumbs.vue'
+import { defineProps } from 'vue'
+
 /**
- * Заголовок страницы: название, пояснение и действия справа.
+ * Заголовок страницы: название, хлебные крошки, пояснение и действия справа.
  *
  * Раньше каждая страница собирала шапку сама, по-разному: v-toolbar с
  * color="primary" на формах, h1 без отступов на списках, а на части

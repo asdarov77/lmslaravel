@@ -225,14 +225,14 @@ defineExpose({ start, reset })
 .u-tour__overlay {
   position: fixed;
   inset: 0;
-  background: rgba(16, 24, 40, 0.55);
+  background: var(--c-overlay);
 }
 
 .u-tour__spotlight {
   position: fixed;
   border: 2px solid var(--c-accent);
   border-radius: var(--radius-md);
-  box-shadow: 0 0 0 9999px rgba(16, 24, 40, 0.55), var(--shadow-glow);
+  box-shadow: 0 0 0 9999px var(--c-overlay), var(--shadow-glow);
   pointer-events: none;
   transition: all var(--dur-base) var(--ease-out);
   z-index: 1;

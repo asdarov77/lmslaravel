@@ -958,31 +958,52 @@ export default {
       // и «подвисание» материала. Теперь: контент загружаем через getlink(),
       // а подсветку применяем в onload-колбазе уже готового srcdoc-кадра,
       // точечно заменяя только узлы-совпадения (без перезаписи body целиком).
-      const applyHighlight = () => {
-        try {
-          const doc = this.$refs.myIframe?.contentDocument;
-          if (!doc || !hlHtml?.length) return;
-          hlHtml.forEach((highlighted) => {
-            const nodeToReplace = doc.evaluate(
-              highlighted.originalXpath, doc, null,
-              XPathResult.FIRST_ORDERED_NODE_TYPE, null
-            ).singleNodeValue;
-            if (nodeToReplace && nodeToReplace.parentNode) {
-              const holder = doc.createElement('div');
-              holder.innerHTML = highlighted.highlightedText;
-              nodeToReplace.parentNode.replaceChild(holder.firstChild ?? nodeToReplace, nodeToReplace);
-            }
-          });
-          this.highlightNodes(doc);
-        } catch (e) {
-          console.log(e);
-        } finally {
-          this.isLoading = false;
-        }
-      };
+      this.pendingHighlights = Array.isArray(hlHtml) ? hlHtml : [];
 
       // Подсвечиваем после фактической загрузки кадра, а не по таймеру.
-      this.getlink(item).then(() => this.$nextTick(applyHighlight));
+      this.getlink(item);
+    },
+
+    /**
+     * Применяет подсветку к загруженному кадру.
+     *
+     * Использует `pendingHighlights`, заполненный в `loadContent`.
+     * Заменяет только текстовые узлы-совпадения, не пересоздавая DOM целиком.
+     * Вызывается из `onFrameLoad` после загрузки кадра и из тестов напрямую.
+     */
+    applyHighlights(doc) {
+      const marks = this.pendingHighlights;
+      this.pendingHighlights = [];
+
+      if (!doc || !marks.length) return;
+
+      try {
+        marks.forEach((mark) => {
+          const node = doc.evaluate(
+            mark.originalXpath,
+            doc,
+            null,
+            XPathResult.FIRST_ORDERED_NODE_TYPE,
+            null
+          ).singleNodeValue;
+
+          if (!node || !node.parentNode) return;
+
+          const holder = doc.createElement('div');
+          holder.innerHTML = mark.highlightedText;
+
+          // Заменяем только сам текстовый узел, сохраняя соседние узлы.
+          while (holder.firstChild) {
+            node.parentNode.insertBefore(holder.firstChild, node);
+          }
+          node.parentNode.removeChild(node);
+        });
+      } catch (e) {
+        // XPath из ответа сервера может не совпасть с документом.
+        // Материал должен открыться и без подсветки.
+      }
+
+      this.highlightNodes(doc);
     },
 
     ///-------------------------------------------скроллинг --------------------------------------------------------------

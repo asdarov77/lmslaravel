@@ -89,49 +89,13 @@
         -->
         <slot name="sidebar-top" />
 
-        <nav class="cpl__sections">
-          <p v-if="!sections.length" class="cpl__empty">{{ $t('common.empty') }}</p>
-
-          <!--
-            Содержание идёт в исходном порядке: тема → раздел → модуль.
-            Один проход, а не два списка: раздельный рендер собрал бы сначала
-            все модули, потом все заголовки и разорвал структуру курса.
-
-            Кликабелен только модуль — за темой и разделом файла нет, и
-            клик по ним раньше лишь менял подсветку, выдавая это за переход.
-            Поэтому узел без материала рендерится НЕ как кнопка: это не
-            элемент управления, и в дереве доступности он таким не считается.
-          -->
-          <template v-for="section in sections" :key="section.id">
-            <button
-              v-if="section.isMaterial"
-              type="button"
-              class="cpl__section cpl__section--material"
-              :class="{ 'cpl__section--active': section.id === activeId }"
-              :title="section.title"
-              :aria-current="section.id === activeId ? 'page' : undefined"
-              @click="$emit('select-section', section)"
-            >
-              <!--
-                Отметка выполнения. Текстовые символы, а не картинки:
-                скринридер читает aria-label, а символ в тексте ещё и
-                переживает отключение иконок в настройках браузера.
-              -->
-              <span class="cpl__mark" :class="`cpl__mark--${section.state}`" :aria-label="markLabel(section.state)">
-                {{ MARK[section.state] }}
-              </span>
-              <span class="cpl__section-text">{{ section.title }}</span>
-            </button>
-
-            <div
-              v-else
-              class="cpl__heading"
-              :class="[`cpl__heading--l${section.level || 1}`]"
-            >
-              <span class="cpl__heading-text">{{ section.title }}</span>
-            </div>
-          </template>
-        </nav>
+        <TreeView
+          :nodes="treeNodes"
+          :active-id="activeId"
+          :expanded-nodes="expandedNodes"
+          @select="handleSelectSection"
+          @toggle="handleToggleSection"
+        />
 
         <!--
           Заметок здесь нет намеренно. Раньше в этой же панели стоял
@@ -166,8 +130,9 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import TreeView from './TreeView.vue'
 
 const { t } = useI18n()
 
@@ -196,24 +161,40 @@ const MARK_LABEL = {
 const clampedProgress = computed(() => Math.min(100, Math.max(0, props.progress)))
 
 /**
- * Материалы содержания — те же узлы, что кликабельны в списке.
- * Темы и разделы в переходах не участвуют: «следующий» после последнего
- * модуля раздела не должен упираться в заголовок следующего раздела.
+ * Преобразует плоский список sections в узлы для TreeView.
+ * sections уже имеют свойство level (1=тема, 2=раздел, 3=материал).
  */
-const materials = computed(() => props.sections.filter((s) => s.isMaterial))
+const treeNodes = computed(() => {
+  return props.sections.map(section => ({
+    id: section.id,
+    title: section.title,
+    level: section.level || 1,
+    isMaterial: section.level === 3,
+    state: section.state,
+    originalSection: section, // для доступа к state и другим полям
+  }))
+})
 
-const materialCount = computed(() => materials.value.length)
+/** Множество раскрытых узлов. */
+const expandedNodes = ref(new Set())
 
-const doneCount = computed(() => materials.value.filter((s) => s.state === 'done').length)
+/** Обработка выбора узла (только материалы). */
+const handleSelectSection = (node) => {
+  if (node.isMaterial) {
+    emit('select-section', node.originalSection)
+  }
+}
 
-/** Индекс активного материала среди материалов — для соседей. */
-const activeIndex = computed(() => materials.value.findIndex((s) => s.id === props.activeId))
-
-const canPrev = computed(() => activeIndex.value > 0)
-const canNext = computed(() => activeIndex.value > -1 && activeIndex.value < materials.value.length - 1)
-const hasNeighbours = computed(() => canPrev.value || canNext.value)
-
-const markLabel = (state) => t(MARK_LABEL[state] ?? MARK_LABEL.todo)
+/** Переключение раскрытия узла. */
+const handleToggleSection = (nodeId) => {
+  const newExpanded = new Set(expandedNodes.value)
+  if (newExpanded.has(nodeId)) {
+    newExpanded.delete(nodeId)
+  } else {
+    newExpanded.add(nodeId)
+  }
+  expandedNodes.value = newExpanded
+}
 </script>
 
 <style scoped>
@@ -349,7 +330,7 @@ const markLabel = (state) => t(MARK_LABEL[state] ?? MARK_LABEL.todo)
 }
 
 .cpl__sidebar {
-  width: 300px;
+  width: var(--layout-drawer-width);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -369,7 +350,7 @@ const markLabel = (state) => t(MARK_LABEL[state] ?? MARK_LABEL.todo)
  * колонка отметок материалов.
  */
 .cpl__sidebar--hidden {
-  width: 48px;
+  width: var(--layout-drawer-width-collapsed, 48px);
   align-items: center;
 }
 
@@ -570,6 +551,12 @@ const markLabel = (state) => t(MARK_LABEL[state] ?? MARK_LABEL.todo)
   z-index: 1200;
   border-radius: 0;
   height: 100vh;
+}
+
+@media (max-width: 1024px) {
+  .cpl__sidebar {
+    width: var(--layout-drawer-width-tablet, 260px);
+  }
 }
 
 @media (max-width: 768px) {

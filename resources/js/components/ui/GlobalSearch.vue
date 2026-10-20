@@ -236,9 +236,9 @@ export default {
   width: 100%;
   max-width: 420px;
   padding: var(--sp-1) var(--sp-3);
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid var(--c-white-alpha-35);
   border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--c-white-alpha-12);
   color: inherit;
   cursor: pointer;
   font: inherit;
@@ -246,8 +246,8 @@ export default {
 
 .u-search__trigger:hover,
 .u-search__trigger:focus-visible {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.6);
+  background: var(--c-white-alpha-20);
+  border-color: var(--c-white-alpha-60);
 }
 
 .u-search__hint {
@@ -264,7 +264,7 @@ export default {
 .u-search__kbd {
   flex: none;
   padding: 0 var(--sp-2);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 1px solid var(--c-white-alpha-40);
   border-radius: var(--radius-sm);
   font-size: 0.75rem;
   opacity: 0.85;

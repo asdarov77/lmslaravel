@@ -457,6 +457,20 @@ export default {
     window.addEventListener("resize", this._onResize);
 
     /*
+     * Глобальные хоткеи.
+     *
+     * Cmd/Ctrl+K — открыть палитру команд. Самый распространённый
+     * паттерн для командной палитры (GitHub, VS Code, Linear, Raycast).
+     */
+    this._onKeydown = (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+        event.preventDefault();
+        this.paletteOpen = true;
+      }
+    };
+    window.addEventListener("keydown", this._onKeydown);
+
+    /*
      * Снимаем скелетон после первой отрисовки.
      *
      * Раньше isLoading объявлялся и не использовался: страница оставалась
@@ -472,6 +486,10 @@ export default {
     if (this._onResize) {
       window.removeEventListener("resize", this._onResize);
       this._onResize = null;
+    }
+    if (this._onKeydown) {
+      window.removeEventListener("keydown", this._onKeydown);
+      this._onKeydown = null;
     }
   },
 

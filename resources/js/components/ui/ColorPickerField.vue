@@ -82,12 +82,12 @@ export default {
 }
 
 .color-picker-field__color-input::-webkit-color-swatch {
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--c-black-alpha-12);
   border-radius: 4px;
 }
 
 .color-picker-field__text-input {
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--c-black-alpha-12);
   border-radius: 6px;
   flex: 1;
   font-family: monospace;
