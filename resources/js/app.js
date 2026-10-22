@@ -38,6 +38,7 @@ import store from './Store';
 // import store  from './Store/test.js';
 import vuetify from './Vuetify';
 import canDirective from './plugins/can.directive';
+import vStagger from './directives/v-stagger';
 
 
 
@@ -46,6 +47,7 @@ import { languages } from './locales';
 import { defaultLocale } from './locales';
 import { createI18n, useI18n } from 'vue-i18n';
 import theme from './utils/theme';
+import { initWhiteLabel } from './utils/whiteLabel';
 
 
 
@@ -80,6 +82,7 @@ const app = createApp(App, {
 // приходят из GET /api/v1/me, поэтому элемент не «исчезает навсегда».
 // v-permission — старый алиас той же директивы (обратная совместимость).
 app.directive('can', canDirective);
+app.directive('stagger', vStagger);
 app.directive('permission', canDirective);
 
 /**
@@ -121,3 +124,6 @@ watch(i18n.global.locale, applyTitle)
 theme.init(vuetify);
 
 app.mount('#app');
+
+// White-label: загрузка и применение CSS-переменных бренда
+initWhiteLabel();

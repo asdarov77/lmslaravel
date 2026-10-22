@@ -85,6 +85,17 @@ const AuthModule = {
         SET_USER(state, user) {
             state.user = user;
         },
+        /**
+         * Обновляет только аватар.
+         *
+         * Отдельная мутация вместо SET_USER: после загрузки файла
+         * известен лишь путь к аватару, а перезаписывать им весь
+         * объект пользователя означало бы стереть права и роль,
+         * которых в ответе загрузки нет.
+         */
+        SET_USER_AVATAR(state, path) {
+            state.user = { ...(state.user || {}), avatar: path || null };
+        },
         SET_ROLE_SLUGS(state, slugs) {
             state.roleSlugs = Array.isArray(slugs)
                 ? [...new Set(slugs.map(canonicalRoleSlug).filter(Boolean))]
@@ -206,6 +217,42 @@ const AuthModule = {
                 commit("LOGOUT_SUCCESS");
             };
             return AuthService.logout().then(done).catch(done);
+        },
+
+/**
+         * Проверка 2FA кода при входе.
+         *
+         * Вызывается после успешной проверки логина/пароля, когда
+         * бэкенд вернул { requires_2fa: true }.
+         * Теперь бэкенд возвращает токен при успешной верификации.
+         */
+        async verifyTwoFactor({ commit, dispatch }, { email, code }) {
+            try {
+                const response = await AuthService.verifyTwoFactor({ email, code });
+                const payload = response.data?.data ?? response.data;
+
+                if (!payload?.verified) {
+                    throw new Error('Неверный код');
+                }
+
+                // Бэкенд теперь возвращает токен и пользователя при успешной верификации
+                const { token, user } = payload;
+
+                TokenService.saveToken(token);
+                UserService.saveUser(user);
+
+                commit("LOGIN_SUCCESS", token);
+                commit("SET_USER", user);
+                commit("SET_PERMISSIONS", permissionNames({ permissions: user.permissions }));
+                commit("SET_ROLE_SLUGS", roleSlugsFrom(user, user.roles));
+
+                // Синхронизируем права с сервером
+                await dispatch('fetchCurrentUser').catch(() => {});
+
+                return payload;
+            } catch (error) {
+                return Promise.reject(error);
+            }
         },
     },
 

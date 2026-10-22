@@ -27,10 +27,15 @@ describe('Меню: активный пункт', () => {
   })
 
   it('индикатор сделан тенью, а не рамкой', () => {
-    // border у v-list-item перебивается стилями Vuetify: полоса не
-    // появлялась, вычисленная ширина была 0px.
-    expect(menuSource).toMatch(/\.u-nav__item\s*\{[^}]*box-shadow: inset/)
-    expect(menuSource).not.toMatch(/\.u-nav__item\s*\{[^}]*border-left:/)
+    // border-left у v-list-item перебивается стилями Vuetify: полоса не
+    // появлялась, вычисленная ширина была 0px. Поэтому активный пункт
+    // помечается тенью и цветом рамки, а не левой полосой.
+    const activeRule = menuSource.slice(
+      menuSource.indexOf('.u-nav__item--active {')
+    )
+    expect(activeRule).toMatch(/box-shadow:/)
+    expect(activeRule).not.toMatch(/border-left:/)
+    expect(menuSource).not.toMatch(/border-left:\s*\d/)
   })
 
   it('фон наведения и активного пункта — из токенов', () => {
@@ -39,7 +44,23 @@ describe('Меню: активный пункт', () => {
   })
 
   it('активность считается по маршруту, а не по точному адресу', () => {
+    // Пункты меню рендерит сама LeftSideMenu (RenderNavItem удалён:
+    // его scoped-разметка не ложилась на v-list-item, и пункты выпадали
+    // из оформления — «артефакты»).
     expect(menuSource).toMatch(/:active="isActive\(item\)"/)
-    expect(menuSource).toMatch(/isActive\(item\)/)
+    expect(menuSource).toMatch(/:active="isActive\(child\)"/)
+
+    // Активным считается и вложенный адрес: /user/edit/7 начинается с
+    // activeMatch '/user', поэтому пункт не гаснет при уходе вглубь.
+    expect(menuSource).toMatch(/current\.startsWith\(item\.activeMatch \+ '\/'\)/)
+  })
+
+  it('меню не сворачивается', () => {
+    // Регресс: у меню было два механизма сворачивания (флаг разделов в
+    // localStorage и флаг collapsed), из-за чего панель «прыгала» сама.
+    // Теперь меню плоское и всегда развёрнутое.
+    expect(menuSource).not.toMatch(/nav-collapsed/)
+    expect(menuSource).not.toMatch(/nav-expanded-sections/)
+    expect(menuSource).not.toMatch(/<v-list-group/)
   })
 })

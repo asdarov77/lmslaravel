@@ -1,15 +1,56 @@
 <template>
   <v-progress-linear v-if="isLoading" color="primary" indeterminate></v-progress-linear>
 
-  <v-card color="#f5f5f5">
-    <v-row dense no-gutters>
-      <v-col cols="3">
-        <!-- <v-sheet rounded elevation="4" class="flex-child text-subtitle-1 pa-2 mt-1"> -->
-        <v-sheet class="my-sheet cm-tree pa-2 mt-1" color="#f5f5f5">
-          <!-- кнопки для поиска в тексте,добавления в избранное -->
-          <v-sheet class="mx-auto mt-0 mb-3" elevation=4 rounded=lg>
-            <div class="text-center" :style="{ fontSize: '20px' }">{{ titleauk.toUpperCase() }}</div>
-          </v-sheet>
+  <CoursePlayerLayout
+    :course-title="titleauk"
+    :active-title="activeTitle"
+    :sections="sections"
+    :active-id="activeId"
+    :progress="courseProgress"
+    :sidebar-open="showItems"
+    :is-fullscreen="isFullscreen"
+    @select-section="onSelectSection"
+    @prev="goPrev"
+    @next="goNext"
+    @toggle-sidebar="toggleList"
+    @toggle-fullscreen="toggleFullscreen"
+  >
+    <template #sidebar-extra>
+      <div class="cm-tree">
+        <!-- Заметки и избранное живут под деревом, а инструменты — над ним. -->
+          <!-- Избранное. Раньше список был пустым без объяснения, а переключение
+               режима ещё и скрывало дерево, из-за чего казалось, что кнопка
+               «сломалась». Теперь режимы не исключают друг друга. -->
+          <div v-if="isFavorite" class="cm-favorites">
+            <div class="cm-favorites__head">
+              {{ $t('courseManifest.favorites') }}
+              <v-btn size="x-small" variant="text" @click="isFavorite = false">{{ $t('courseManifest.close') }}</v-btn>
+            </div>
+            <ul v-if="favorites.length" class="cm-favorites__list">
+              <li v-for="item in favorites" :key="item.id" class="cm-favorites__item">
+                <span class="cm-favorites__title">{{ item.title }}</span>
+                <v-btn icon="mdi-close" size="x-small" variant="text"
+                  :title="$t('courseManifest.removeFavorite')"
+                  @click="removeFavorite(item.course_id)"></v-btn>
+              </li>
+            </ul>
+            <p v-else class="cm-favorites__empty">{{ $t('courseManifest.favoritesEmpty') }}</p>
+          </div>
+
+          <!-- Заметки студента к текущему материалу. -->
+          <MaterialNotes
+            v-if="activeId"
+            :material-id="activeId"
+            :course-id="idEdit"
+          />
+      </div>
+    </template>
+
+    <template #sidebar-top>
+      <div class="cm-tree">
+          <!-- Заголовок курса убран из сайдбара: он теперь один раз
+               в верхней панели CoursePlayerLayout. Раньше надпись
+               дублировалась и занимала три строки над инструментами. -->
 
           <!-- Вопросы по курсу. Форум живёт внутри курса: отдельный
                раздел в меню привёл бы в пустоту, потому что вопрос
@@ -31,7 +72,7 @@
                      за пределы колонки — шапка «ломалась» на разных ширинах.
                      Теперь это обычная flex-панель без фиксированных ширин
                      и отрицательных отступов. -->
-          <div class="cm-toolbar" role="toolbar" aria-label="Панель курса">
+          <div class="cm-toolbar" role="toolbar" :aria-label="$t('common.labelPanel-kursa')">
             <div class="cm-toolbar__group">
               <button type="button"
                 class="cm-tool"
@@ -85,108 +126,98 @@
             </div>
           </div>
 
-          <!-- Избранное. Раньше список был пустым без объяснения, а переключение
-               режима ещё и скрывало дерево, из-за чего казалось, что кнопка
-               «сломалась». Теперь режимы не исключают друг друга. -->
-          <div v-if="isFavorite" class="cm-favorites">
-            <div class="cm-favorites__head">
-              {{ $t('courseManifest.favorites') }}
-              <v-btn size="x-small" variant="text" @click="isFavorite = false">{{ $t('courseManifest.close') }}</v-btn>
+          <div v-if="showSearch" class="cm-search">
+            <v-text-field
+              v-model="searchTerm"
+              :loading="isSearching"
+              density="compact"
+              variant="outlined"
+              rounded
+              class="cm-search__field"
+              append-inner-icon="mdi-magnify"
+              :label="$t('common.labelPoisk')"
+              :hint="$t('common.hintSearch')"
+              clearable
+              single-line
+              @click:append-inner="search"
+              @keyup.enter="search"
+              @click:clear="clearSearch"
+            />
+
+            <!--
+              Пока идёт запрос — скелетон результатов, а не пустое поле:
+              иначе список выглядел бы как «ничего не найдено» и человек
+              успевал нажать Enter ещё раз, породив второй запрос.
+            -->
+            <div v-if="isSearching" class="cm-search__results">
+              <span
+                v-for="n in 3"
+                :key="`sk${n}`"
+                class="cm-search__skeleton"
+              />
             </div>
-            <ul v-if="favorites.length" class="cm-favorites__list">
-              <li v-for="item in favorites" :key="item.id" class="cm-favorites__item">
-                <span class="cm-favorites__title">{{ item.title }}</span>
-                <v-btn icon="mdi-close" size="x-small" variant="text"
-                  :title="$t('courseManifest.removeFavorite')"
-                  @click="removeFavorite(item.course_id)"></v-btn>
-              </li>
-            </ul>
-            <p v-else class="cm-favorites__empty">{{ $t('courseManifest.favoritesEmpty') }}</p>
+
+            <template v-else-if="matchingFiles.length">
+              <p class="search-files__total-results">
+                {{ $t('courseManifest.foundTotal') }} {{ matchingFiles.length }}
+              </p>
+
+              <!--
+                Переход по найденным в материале местам. Показывает
+                только когда подсветка реально найдена: иначе кнопки
+                нажимались в пустоту, а счётчик врался.
+              -->
+              <div v-if="highlighted.length" class="cm-search__nav">
+                <v-btn
+                  icon="mdi-chevron-up"
+                  size="x-small"
+                  variant="text"
+                  :title="$t('courseManifest.prevMatch')"
+                  @click="scrollToPrev"
+                />
+                <span class="cm-search__nav-count">
+                  {{ currentHighlight + 1 }} / {{ highlighted.length }}
+                </span>
+                <v-btn
+                  icon="mdi-chevron-down"
+                  size="x-small"
+                  variant="text"
+                  :title="$t('courseManifest.nextMatch')"
+                  @click="scrollToNext"
+                />
+              </div>
+
+              <ul class="cm-search__list">
+                <li v-for="result in matchingFiles" :key="result.file">
+                  <v-btn
+                    class="cm-search__item"
+                    variant="text"
+                    block
+                    @click="loadContent(result.itemId, result.highlightedNodes)"
+                  >
+                    {{ result.title }}
+                  </v-btn>
+                </li>
+              </ul>
+            </template>
+
+            <p v-else class="search-files__no-results">
+              {{ $t('courseManifest.noResults') }}
+            </p>
           </div>
 
-          <v-row v-if="showSearch">
-            <v-text-field class="ml-5 mr-5" :loading="loading" density="compact" v-model="searchTerm" variant="outlined"
-              rounded append-inner-icon="mdi-magnify" label="Поиск" @click:append-inner="search" @keyup.enter="search"
-              hint="Введи искомый текст для поиска" clearable single-line>
-            </v-text-field>
-
-            <!-- ------------------------------------------------ -->
-            <!-- результаты поиска -->
-
-            <!--                                            рабочий вариант                           -->
-            <!-- <div>
-              <ul v-if="matchingFiles.length > 0" class=" ml-2 mr-2 search-files__total-results">Всего найдено: {{
-                matchingFiles.length }}
-                <v-btn-group>
-                  <v-btn @click="scrollToPrev"><span>&#9650;</span></v-btn>
-                  <v-btn @click="scrollToNext"><span>&#9660;</span></v-btn>
-                </v-btn-group>
-                <v-divider></v-divider>
-                <li v-for="result in matchingFiles" :key="result.file" style="white-space: nowrap;">
-                  <v-btn @click="loadContent(result.itemId, result.highlightedNodes )" class="text-truncate"
-                    :style="{ 'max-width': '100%', 'overflow': 'hidden', 'text-overflow': 'ellipsis' }">{{ result.title
-                    }}</v-btn>   
-                </li>
-              </ul>
-              <p v-else class="ml-5 mr-5 mt-1 search-files__no-results">{{ $t("courseManifest.noResults") }}</p>
-            </div> -->
-            <!--                                            рабочий вариант                           -->
-
-            <!--                                            рабочий эксперимент                           -->
-            <div>
-              <ul v-if="matchingFiles.length > 0" class=" ml-2 mr-2 search-files__total-results">Всего найдено: {{
-                matchingFiles.length }}
-                <v-btn-group>
-                  <v-btn @click="scrollToPrev"><span>&#9650;</span></v-btn>
-                  <v-btn @click="scrollToNext"><span>&#9660;</span></v-btn>
-                </v-btn-group>
-                <v-divider></v-divider>
-                <li v-for="result in matchingFiles" :key="result.file" style="white-space: nowrap;">
-                  <v-btn @click="loadContent(result.itemId, result.highlightedNodes)" class="text-truncate"
-                    :style="{ 'max-width': '100%', 'overflow': 'hidden', 'text-overflow': 'ellipsis' }">{{ result.title
-                    }}</v-btn>
-                </li>
-              </ul>
-              <p v-else class="ml-5 mr-5 mt-1 search-files__no-results">{{ $t("courseManifest.noResults") }}</p>
-            </div>
-            <!--                                            рабочий эксперимент                           -->
-
-
-
-            <!-- ------------------------------------------------ -->
-            <!-- результаты поиска -->
-
-
-
-          </v-row>
           <!-- Список разделов/подразделов/модулей.
                      Подсветка при наведении — на CSS, а не через
                      @mouseover + document.getElementById: обработчик
                      на каждом узле заставлял браузер трогать DOM на
                      каждом движении мыши, из-за чего страница «дёргалась»
                      и рендерилась медленно (182 узла). -->
-          <div v-if="showItems" v-for="(item, index) in aukstructures" :key="item.id"
-            class="auk-node" :style="nodeStyle(item)" :data-type="item.type">
-            <div v-if="index !== 0"
-              class="auk-node__title"
-              :class="{
-                'auk-node__title--module': item.type === 3,
-                'auk-node__title--active': item.id === activeId,
-                'auk-node__title--visited': isVisited(item.id),
-              }"
-              :title="item.title"
-              @click="item.type === 3 ? openModule(item) : ''"
-            >
-              {{ item.title }}
-            </div>
-          </div>
-        </v-sheet>
-      </v-col>
+      </div>
+    </template>
 
-      <!-- ------------------------------------правый iframe ----------------------------------------------------------->
-
-      <v-col cols="9" class="cm-content-col">
-        <v-sheet rounded elevation="5" class="my-sheet cm-content pa-2 mt-2 mr-2"
+    <!-- ------------------------------------правый iframe ----------------------------------------------------------->
+    <template #default>
+        <v-sheet rounded class="my-sheet cm-content pa-2 mt-2 mr-2"
           ref="contentEl">
           <!-- Материал открывается длинным документом: без кнопки «вверх»
                приходилось прокручивать страницу мышью. Показывается только
@@ -201,7 +232,7 @@
             :title="$t('courseManifest.toTop')"
             @click="scrollToTop"
           ></v-btn>
-          <div id="iframe-container" :style="{ 'border-radius': '8px' }">
+          <div id="iframe-container" class="cm-frame">
             <p v-if="error" class="has-text-danger px-3 py-2">{{ error }}</p>
             <!-- Высота материала держится в состоянии Vue, а не в
                  инлайновом onload. Регресс: атрибут onload писал высоту
@@ -210,7 +241,7 @@
                  после первого же изменения состояния и оставался таким. -->
             <iframe class="hello px-5" :srcdoc="contentHtml" ref="myIframe" name="iframe_a"
               @load="onFrameLoad" :style="{ height: frameHeight }"
-              width="100%" scrolling="auto" title="Материал курса">
+              width="100%" scrolling="auto" :title="$t('courseManifest.material')">
             </iframe>
 
             <!-- <iframe class="hello px-5" :src="link" ref="myIframe" name="iframe_a" @load="updateDocHeight"  @load="onIframeLoaded" 
@@ -220,15 +251,16 @@
 
           </div>
         </v-sheet>
-      </v-col>
-    </v-row>
-  </v-card>
+    </template>
+  </CoursePlayerLayout>
 </template>
 
 <!-- <script> -->
-<script export default>
+<script>
 
 const apiUrl = import.meta.env.VITE_APP_URL;
+import CoursePlayerLayout from "../components/ui/CoursePlayerLayout.vue";
+import MaterialNotes from "./Course/MaterialNotes.vue";
 import $api from "../api/httpClient";
 import { unwrapResponse, unwrapArray, unwrapField, numericQuery } from "../api/envelope";
 import { mapState, mapGetters } from "vuex";
@@ -236,6 +268,8 @@ import { toast } from "../composables/useToast";
 
 export default {
   components: {
+    MaterialNotes,
+    CoursePlayerLayout,
   },
 
   props: {
@@ -249,7 +283,6 @@ export default {
     },
     treeData: Object,
   },
-
 
   data() {
 
@@ -281,6 +314,8 @@ export default {
 
       showItems: true,
       showSearch: false,
+      // Полноэкранный режим чтения материала.
+      isFullscreen: false,
       isFavorite: false, // добавить в избранное
       //---------------- блок имитации загрузки--------
       loaded: false,
@@ -289,6 +324,11 @@ export default {
       //------------блок поиска---------------
       searchTerm: '',
       matchingFiles: [],
+      // Поиск идёт по содержимому файлов на сервере, поэтому он
+      // медленный и видимый. Раньше индикатор был привязан к флагу,
+      // который никто не выставлял, — запрос выглядел как «ничего не
+      // происходит».
+      isSearching: false,
       aircraftTitle: '', //передавать в контроллер 
       //------------конец блока поиска---------------
       path: '',
@@ -304,14 +344,18 @@ export default {
       // загрузка iframe
       highlighted: [],
       currentHighlight: 0,
+      // Что подсветить в следующем открытом материале. Раньше
+      // подсветка применялась по таймеру наугад (см. loadContent).
+      pendingHighlights: [],
       iframe: null,  //удалить для подсветки
       IframeisLoaded: false,
 
     };
   },
 
-
   mounted() {
+    document.addEventListener("keydown", this.onKeydown);
+
     //   const iframe = this.$refs.myIframe;
     // iframe.addEventListener('load', () => {
     //   this.highlightNodes(iframe);
@@ -394,7 +438,6 @@ export default {
       });
   },
 
-
   beforeUnmount() {
     // Слушатель прокрутки жил на странице вечно и держал компонент,
     // из-за чего навигация копила их по одной на каждый переход.
@@ -403,6 +446,10 @@ export default {
       el?.removeEventListener('scroll', this.scrollHandler);
       this.scrollHandler = null;
     }
+  },
+
+  beforeDestroy() {
+    document.removeEventListener("keydown", this.onKeydown);
   },
 
   watch: {
@@ -432,6 +479,42 @@ export default {
     categoryCode() {
       return this.category ? this.category.code : null;
     },
+    /**
+     * Разделы для CoursePlayerLayout: плоский массив aukstructures
+     * превращается в список с уровнем вложенности и отметкой
+     * прочтения (done / partial / todo).
+     *
+     * Раньше «посещённый» раздел красился бледно-серым, а у активного
+     * менялся только цвет текста — в тёмной теме это было почти не
+     * различимо, и прогресс курса нельзя было оценить целиком.
+     */
+    sections() {
+      return this.aukstructures.map((item) => ({
+        id: item.id,
+        title: item.title,
+        level: Math.min(3, Math.max(1, item.type)),
+        /*
+         * Материал ли это (type 3). Тема и раздел — заголовки структуры,
+         * за ними файла нет: открывать их нечего. Признак передаётся
+         * явно, потому что level зажат в 1..3 и сам по себе не отвечает
+         * на вопрос «есть ли за узлом материал».
+         */
+        isMaterial: item.type === 3,
+        state: this.sectionState(item.id),
+      }));
+    },
+
+    /**
+     * Прогресс курса в процентах — по разделам, а не по страницам:
+     * длина материала не пропорциональна трудоёмкости.
+     */
+    courseProgress() {
+      if (!this.sections.length) return 0;
+      const weight = { done: 1, partial: 0.5, todo: 0 };
+      const sum = this.sections.reduce((acc, s) => acc + weight[s.state], 0);
+      return (sum / this.sections.length) * 100;
+    },
+
     getFirstAukId() {
       // Используем метод find() для поиска первого элемента, у которого type равен 3
       // Побочных эффектов здесь нет намеренно: раньше computed дёргал getlink(),
@@ -441,7 +524,6 @@ export default {
     },
   },
   // ----------------------------------------- методы --------------------------------------------------
-
 
   methods: {
     /**
@@ -459,6 +541,76 @@ export default {
 
     isVisited(id) {
       return this.visitedIds.includes(id);
+    },
+
+    /**
+     * Состояние раздела: прочитан / начат / не начат.
+     * «Начат» — раздел открыт прямо сейчас.
+     */
+    sectionState(id) {
+      if (id === this.activeId) return "partial";
+      return this.isVisited(id) ? "done" : "todo";
+    },
+
+    /**
+     * Клик по узлу содержания.
+     *
+     * Открывается только материал (type 3): за темой и разделом файла
+     * нет, и клик по ним раньше молча менял подсветку, создавая впечатление
+     * перехода. Тема и раздел кликабельны не будут (см. CoursePlayerLayout).
+     */
+    onSelectSection(section) {
+      if (!section?.isMaterial) return;
+
+      const item = this.aukstructures.find((entry) => entry.id === section.id);
+      if (!item) return;
+
+      this.openModule(item);
+    },
+
+    /**
+     * Соседний МАТЕРИАЛ относительно активного.
+     *
+     * Раньше переход шёл по всем узлам подряд, и «следующий» после темы
+     * приводил на заголовок без файла. Ориентируемся на список материалов.
+     */
+    neighbour(offset) {
+      const materials = this.sections.filter((s) => s.isMaterial);
+      if (!materials.length) return null;
+
+      const index = materials.findIndex((s) => s.id === this.activeId);
+      if (index === -1) {
+        // Активен заголовок (например, после смены курса): отправляем
+        // к первому материалу в нужную сторону.
+        return offset > 0 ? materials[0] : materials[materials.length - 1];
+      }
+
+      return materials[index + offset] ?? null;
+    },
+
+    goPrev() {
+      const target = this.neighbour(-1);
+      if (target) this.onSelectSection(target);
+    },
+
+    goNext() {
+      const target = this.neighbour(1);
+      if (target) this.onSelectSection(target);
+    },
+
+    /**
+     * Полный экран. Выход по Escape — ожидаемое поведение, поэтому
+     * вешаем слушатель и снимаем его при уходе со страницы: иначе
+     * после ухода с курса Escape переставал закрывать что-либо и
+     * оставался висеть на document.
+     */
+    toggleFullscreen() {
+      this.isFullscreen = !this.isFullscreen;
+    },
+
+    onKeydown(event) {
+      if (event.key !== "Escape") return;
+      if (this.isFullscreen) this.isFullscreen = false;
     },
 
     /** Открытие модуля: контент + отметка «посещён». */
@@ -575,8 +727,10 @@ export default {
      * материал «схлопывался» до размера пустого iframe.
      */
     onFrameLoad(event) {
+      let doc = null;
+
       try {
-        const doc = event?.target?.contentDocument;
+        doc = event?.target?.contentDocument;
         const height = doc?.body?.scrollHeight ?? 0;
 
         if (height > 0) {
@@ -584,7 +738,12 @@ export default {
         }
       } catch (error) {
         // srcdoc-документ бывает недоступен (sandbox) — оставляем прошлую высоту.
+        return;
       }
+
+      // Подсветка — после того, как кадр готов и высота посчитана:
+      // переписывание ветки сдвигает высоту, и порядок важен.
+      this.applyHighlights(doc);
     },
 
     /**
@@ -659,7 +818,6 @@ export default {
     // this.$refs.myIframe.height = this.$refs.myIframe.contentWindow.document.body.scrollHeight + 20;
     // },
 
-
     async getlink(item_id) {
       this.isLoading = true;
       this.activeId = item_id;
@@ -686,7 +844,17 @@ export default {
         // отдельным запросом, а документ показываем через srcdoc с
         // <base href>: все относительные ресурсы наследуют токен
         // из query-строки, поэтому стили и картинки тоже загружаются.
-        const response = await $api.get(apiUrl + "/api/getlink/" + item_id);
+        const response = await $api.get(apiUrl + "/api/getlink/" + item_id, {
+          /*
+           * stayOnPage: 403 здесь — это «группа не записана на ЭТОТ
+           * материал», а не «нет прав на страницу». Без флага глобальный
+           * перехватчик httpClient уводил со страницы целиком, и человек
+           * терял список материалов из-за одного недоступного — тем
+           * более что при записи на конкретные материалы (parent_id)
+           * закрытых модулей в курсе много, а открыт ровно один.
+           */
+          stayOnPage: true,
+        });
         const target = unwrapResponse(response) || {};
         const aircraft = (target.aircraft || "").trim();
         const auk = (target.auk || "").trim();
@@ -726,14 +894,30 @@ export default {
         // устройстве, а не только в этом браузере.
         this.saveProgress(item_id, this.lessonPercent(item_id));
       } catch (error) {
-        console.log(error);
         this.contentHtml = "";
-        this.error = "Не удалось загрузить материал курса";
+        /*
+         * Показываем причину от backend, а не общую фразу: при записи на
+         * отдельные материалы отказ означает «этот материал не входит в
+         * запись группы», и человеку нужно именно это знать, а не
+         * «не удалось загрузить».
+         */
+        const status = error?.response?.status;
+        const reason =
+          error?.response?.data?.data?.message ||
+          error?.response?.data?.error?.message ||
+          "";
+
+        if (status === 403 && reason) {
+          this.error = reason;
+        } else if (status === 403) {
+          this.error = "Материал недоступен для вашей группы";
+        } else {
+          this.error = "Не удалось загрузить материал курса";
+        }
       } finally {
         this.isLoading = false; // Установить isLoading в false после завершения загрузки
       }
     },
-
 
     // method(hlHtml) {
     //   //console.log(hltml, 'hltml')
@@ -804,9 +988,11 @@ export default {
     ///-------------------------------------------скроллинг --------------------------------------------------------------
 
     highlightNodes(iframe) {
-      this.highlighted = Array.from(iframe.querySelectorAll('.highlighted'));
-      this.currentHighlight = 0
-      this.scrollToHighlight(this.highlighted[this.currentHighlight]);
+      this.highlighted = iframe
+        ? Array.from(iframe.querySelectorAll('.highlighted'))
+        : [];
+      this.currentHighlight = 0;
+      this.scrollToHighlight(this.highlighted[0]);
     },
 
     // scrollToHighlight(node) {
@@ -824,14 +1010,26 @@ export default {
     //    })       
     // },
     scrollToHighlight(node) {
+      /*
+       * Раньше узла могло не оказаться — подсветка не нашлась — и
+       * `node.getBoundingClientRect()` бросал TypeError прямо из
+       * обработчика загрузки кадра. Материал при этом открывался,
+       * но консоль сыпала ошибками на каждый переход.
+       *
+       * Проверяется и сам кадр: подсветка применяется по событию
+       * `load`, и к этому моменту ссылка на iframe уже может быть
+       * пустой (переход на другой материал, размонтирование).
+       */
       const iframe = this.$refs.myIframe;
-      const iframeDocument = iframe.contentWindow.document;
+      const iframeDocument = iframe?.contentWindow?.document;
+
+      if (!node || !iframeDocument) return;
+
       const iframeRect = iframe.getBoundingClientRect();
       const nodeRect = node.getBoundingClientRect();
       const offsetTop = nodeRect.top - iframeRect.top + iframeDocument.documentElement.scrollTop;
       iframeDocument.documentElement.scrollTop = offsetTop;
     },
-
 
     scrollToNext() {
       if (this.highlighted.length > 0) {
@@ -851,29 +1049,6 @@ export default {
     },
     ///-----------------------------------конец-скроллинг--------------------------------------------------------------
 
-
-    showthumb(item_id) {
-      // У узла может не быть DOM-элемента (например, у первого элемента
-      // списка рендер скрыт условием index !== 0) — раньше это давало
-      // TypeError при наведении мыши.
-      const node = document.getElementById(item_id);
-      if (!node) return;
-      node.style.border = "2px doted grey ";
-      node.style.borderRadius = "4px";
-      if (item_id !== this.activeId)
-        node.style.background = "#D3D3D3";
-
-      node.style.transform = "scale(1.03)";
-    },
-    hidethumb(item_id) {
-      const node = document.getElementById(item_id);
-      if (!node) return;
-      node.style.border = "none";
-      if (item_id !== this.activeId)
-        node.style.background = "none";
-
-      node.style.transform = "scale(1.0)";
-    },
 
 
     getfirstauk: function (course_id) {
@@ -987,41 +1162,64 @@ export default {
         .then(() => this.getFavorites());
     },
     async search() {
-      const formData = {
-        //  query: this.searchTerm, path: this.path, aircraft: this.aircraft
-        query: this.searchTerm, path: this.path, aircraft: this.aircraft
+      const term = this.searchTerm.trim();
 
-      }
-      if (this.searchTerm.length < 3) {
+      if (term.length < 3) {
+        this.matchingFiles = [];
         toast.warning(this.$t("courseManifest.searchMinChars"));
         return;
       }
 
-      $api.post(apiUrl + `/api/search-files/`, formData)
+      this.isSearching = true;
+      const formData = {
+        query: term, path: this.path, aircraft: this.aircraft
+      }
 
-        .then(response => {
-          this.matchingFiles = unwrapArray(response);
-        })
-        .catch(error => {
-          console.log(error);
-        }).finally(() => {
-          // this.alert = true;
-        });
+      try {
+        const response = await $api.post(apiUrl + `/api/search-files/`, formData);
+        this.matchingFiles = unwrapArray(response) || [];
+      } catch (error) {
+        this.matchingFiles = [];
+        toast.error(this.$t("courseManifest.searchError"));
+      } finally {
+        this.isSearching = false;
+      }
+    },
+
+    /**
+     * Очистка поля поиска.
+     *
+     * Кнопка очистки у `v-text-field` с `clearable` сбрасывает только
+     * модель. Старые результаты при этом оставались на экране — человек
+     * видел список файлов, хотя искать уже нечего.
+     */
+    clearSearch() {
+      this.searchTerm = '';
+      this.matchingFiles = [];
+      this.highlighted = [];
+      this.currentHighlight = 0;
     },
 
   },
 };
 </script>
 
-
 <style>
-.highlighted {
-  background-color: yellow;
-  display: inline-block;
-}
+/*
+  Блок НЕ scoped: класс .highlighted приходит из HTML, который сервер
+  отдаёт для результатов поиска по материалу.
+*/
 
-.v-card {
-  border: 1px solid lightgrey;
+/*
+  Подсветка найденного. Раньше стоял жёсткий `yellow`: в тёмной теме он
+  резал глаза, а в светлой не совпадал с палитрой. Теперь цвет из
+  токенов, поэтому подсветка следует за темой.
+*/
+.highlighted {
+  background-color: var(--c-warning-soft);
+  color: var(--c-warning);
+  border-radius: 2px;
+  display: inline-block;
 }
 
 /* --------------------------- панель инструментов --------------------------- */
@@ -1034,12 +1232,29 @@ export default {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  padding: 6px 8px;
-  border-bottom: 1px solid #d0d0d0;
-  background: #fafafa;
+  padding: var(--sp-2) var(--sp-2);
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-surface-2);
   position: sticky;
   top: 0;
   z-index: 3;
+
+  /*
+    Блок заметок внутри панели не помещался и вылезал за её край:
+    scrollWidth 320 при clientWidth 299.
+
+    Причина — стандартная для flex: у детей по умолчанию
+    min-width: auto, то есть они не сжимаются уже своего содержимого.
+    Блок заметок — это v-textarea, у которой минимальная ширина
+    считается по содержимому, поэтому на узкой боковой колонке панель
+    разъезжалась. min-width: 0 разрешает сжатие до ширины колонки.
+  */
+  min-width: 0;
+}
+
+.cm-toolbar > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .cm-toolbar__group {
@@ -1047,6 +1262,7 @@ export default {
   align-items: center;
   gap: 4px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .cm-toolbar__meta {
@@ -1059,7 +1275,7 @@ export default {
 
 .cm-toolbar__current {
   font-size: 0.8125rem;
-  color: #555;
+  color: var(--c-text-muted);
   max-width: 320px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1076,7 +1292,7 @@ export default {
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
-  color: #444;
+  color: var(--c-text);
   cursor: pointer;
   font: inherit;
   font-size: 0.8125rem;
@@ -1085,20 +1301,20 @@ export default {
 }
 
 .cm-tool:hover:not(:disabled) {
-  background: #e8eef7;
-  color: #1a4d8f;
+  background: var(--c-surface-3);
+  color: var(--c-primary);
 }
 
 /* Клавиатурная доступность: фокус должен быть виден, иначе
    пользователь не понимает, где он находится. */
 .cm-tool:focus-visible {
-  outline: 2px solid #1a73e8;
+  outline: 2px solid var(--c-primary);
   outline-offset: 1px;
 }
 
 .cm-tool--on {
-  background: #1a73e8;
-  color: #fff;
+  background: var(--c-primary);
+  color: var(--c-on-primary);
 }
 
 .cm-tool:disabled {
@@ -1110,9 +1326,9 @@ export default {
 .cm-favorites {
   margin: 8px 4px;
   padding: 8px 10px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--c-border);
   border-radius: 6px;
-  background: #fff;
+  background: var(--c-surface);
 }
 
 .cm-favorites__head {
@@ -1138,7 +1354,7 @@ export default {
   justify-content: space-between;
   gap: 8px;
   padding: 4px 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--c-border);
 }
 
 .cm-favorites__title {
@@ -1151,12 +1367,22 @@ export default {
 .cm-favorites__empty {
   margin: 0;
   font-size: 0.875rem;
-  color: #777;
+  color: var(--c-text-muted);
 }
 
 /* ------------------------------ дерево материалов -------------------------- */
 .my-sheet {
   opacity: 1;
+}
+
+/*
+  Контейнер кадра с материалом. Скругление раньше стояло инлайном в
+  :style, а материал из iframe подписан по ссылке и не наследует
+  оформление страницы, поэтому скругление нужно здесь.
+*/
+.cm-frame {
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
 /* Обе колонки прокручиваются независимо, шапка остаётся на месте.
@@ -1179,58 +1405,6 @@ export default {
   }
 }
 
-.auk-node {
-  margin: 2px 0;
-  word-wrap: break-word;
-}
-
-.auk-node__title {
-  display: inline-block;
-  padding: 3px 6px;
-  border-radius: 4px;
-  line-height: 1.25;
-  /* Разделы и подразделы — не кликабельны, поэтому без курсора руки. */
-  cursor: default;
-}
-
-/* Раздел/подраздел приглушены, чтобы взгляд шёл к модулям. */
-.auk-node[data-type="0"] .auk-node__title,
-.auk-node[data-type="1"] .auk-node__title,
-.auk-node[data-type="2"] .auk-node__title {
-  color: #4b7a3a;
-  opacity: .78;
-  font-weight: 600;
-}
-
-.auk-node__title--module {
-  cursor: pointer;
-  color: #222;
-}
-
-.auk-node__title--module:hover {
-  background: #e8eef7;
-}
-
-/* Уже открытый модуль — светло-серым: видно, где пользователь был,
-   не спорит с подсветкой текущего пункта. */
-.auk-node__title--visited {
-  background: #ececec;
-  color: #666;
-}
-
-.auk-node__title--module.auk-node__title--visited:hover {
-  background: #dfe7f2;
-}
-
-/* Текущий модуль — синим, поверх посещённого. */
-.auk-node__title--active {
-  background: #1a73e8;
-  color: #fff;
-}
-
-.auk-node__title--active:hover {
-  background: #1667cf;
-}
 
 /* ------------------------------ кнопка «вверх» ----------------------------- */
 .cm-content-col {
@@ -1248,6 +1422,87 @@ export default {
 
 .search-files__total-results {
   font-size: 0.875rem;
-  color: #666;
+  color: var(--c-text-muted);
 }
+
+.search-files__no-results {
+  margin: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-sm);
+  color: var(--c-text-muted);
+}
+
+/* Поиск по материалам. Блок живёт в панели содержания шириной ~300px,
+   поэтому ширины и переносы заданы явно: v-row без него разъезжался,
+   а инлайновые стили на кнопках результатов обходили токены. */
+.cm-search {
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-surface-1);
+  min-width: 0;
+}
+
+.cm-search__field {
+  min-width: 0;
+}
+
+.cm-search__nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-1);
+}
+
+.cm-search__nav-count {
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cm-search__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.cm-search__item {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  padding: var(--sp-2);
+  text-align: left;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--fs-sm);
+}
+
+/* Скелетон результатов: та же высота, что у кнопки результата,
+   поэтому список не прыгает, когда ответ приходит.
+   Ключ кадров свой, а не общий с AppSkeleton: там он объявлен в
+   scoped-стиле и сюда не попадает. */
+.cm-search__skeleton {
+  display: block;
+  height: 32px;
+  margin-bottom: var(--sp-1);
+  border-radius: var(--radius-sm);
+  background: var(--c-skeleton);
+  animation: cm-search-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes cm-search-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cm-search__skeleton {
+    animation: none;
+  }
+}
+
+
 </style>

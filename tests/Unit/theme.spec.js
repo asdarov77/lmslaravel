@@ -224,9 +224,24 @@ describe('theme: токены', () => {
     expect(brand).toContain('var(--c-on-primary)')
     expect(brand).not.toMatch(/color:\s*#fff/)
 
+    // Профиль пользователя: раньше здесь был свой @vueform/multiselect
+    // с блоком переопределений и background-color: #f4f4f4, который
+    // оставался светлым в тёмной теме (контраст 1.1). После перевода на
+    // общий MultiSelectField проверяем, что сырой multiselect не вернулся,
+    // зашитых цветов нет, а сам компонент токенизирован.
     const edit = readFileSync('resources/js/Pages/User/UserItemEdit.vue', 'utf-8')
     expect(edit).not.toContain('background-color: #f4f4f4')
-    expect(edit).toContain('var(--c-surface-3)')
+    expect(edit).not.toMatch(/#[0-9a-fA-F]{3,6}\b/)
+    expect(edit).toContain("import MultiSelectField from '../../components/ui/fields/MultiSelectField.vue'")
+    // Именно импорт: упоминание пакета в комментарии допустимо, важен
+    // факт использования — страница не должна тянуть его напрямую.
+    expect(edit).not.toMatch(/import\s+Multiselect\s+from\s+'@vueform\/multiselect'/)
+
+    const multi = readFileSync('resources/js/components/ui/fields/MultiSelectField.vue', 'utf-8')
+    expect(multi).toContain('var(--c-surface)')
+    expect(multi).toContain('var(--c-text)')
+    expect(multi).toContain('var(--c-border)')
+    expect(multi).not.toMatch(/#[0-9a-fA-F]{3,6}\b/)
   })
 })
 

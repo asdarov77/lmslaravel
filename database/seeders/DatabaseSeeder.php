@@ -67,9 +67,51 @@ class DatabaseSeeder extends Seeder
             GradeSeeder::class,
             SettingSeeder::class,
             CategorySeeder::class,
+            // Самолёты идут ДО курсов: курсы ссылаются на них, а без
+            // aircraft_id каталог группирует всё в одну группу.
+            AircraftSeeder::class,
             CourseSeeder::class,
+            // Уроки и связи курс↔категория: без них каталог и форма
+            // записи групп показывают пустое дерево.
+            CourseLessonsSeeder::class,
 
         ]);
+
+        /*
+         * Демо-записи групп на курсы.
+         *
+         * Без них у обучаемого нет учебного плана: дашборд пуст,
+         * «продолжить обучение» нечего продолжать, расписание пустое.
+         * Группы и курсы уже созданы выше, поэтому берём их из базы.
+         */
+        $groupIds = \App\Models\Group::orderBy('id')->pluck('id')->all();
+        $courseIds = \App\Models\Course::orderBy('id')->pluck('id')->all();
+
+        if ($groupIds !== [] && $courseIds !== []) {
+            $rows = [];
+            $now = now();
+
+            foreach ($groupIds as $groupIndex => $groupId) {
+                foreach (array_slice($courseIds, $groupIndex, 3) as $courseId) {
+                    /*
+                     * firstOrNew, а не new: повторный запуск сидеров не
+                     * должен плодить копии записей. Три одинаковые
+                     * записи на один курс выглядят в расписании как три
+                     * отдельных периода обучения.
+                     */
+                    $row = \App\Models\Group2learning::firstOrNew([
+                        'group_id' => $groupId,
+                        'course_id' => $courseId,
+                    ]);
+
+                    // Периоды разнесены по группам, чтобы календарь и
+                    // статусы («активен», «завершён») не были одинаковыми.
+                    $row->study_from = $now->copy()->subMonths(2)->addDays($groupIndex * 3)->toDateString();
+                    $row->study_to = $now->copy()->addMonths(2)->addDays($groupIndex * 3)->toDateString();
+                    $row->save();
+                }
+            }
+        }
 
         //\App\Models\User::factory(10)->create();
 //        \App\Models\Group::factory(10)->create();

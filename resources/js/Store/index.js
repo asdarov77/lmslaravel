@@ -2,6 +2,7 @@ import { createStore } from 'vuex';
 import AuthModule from "./modules/AuthModule";
 import UserModule from "./modules/UserModule";
 import CourseModule from "./modules/CourseModule";
+import ExamModule from "./modules/ExamModule";
 import UiModule from "./modules/UiModule";
 import UserPageModule from "./modules/userPage.store";
 
@@ -11,6 +12,7 @@ const store = createStore({
         Auth: AuthModule,
         User: UserModule,
         Course: CourseModule,
+        Exam: ExamModule,
         Ui: UiModule,
         UserPage:UserPageModule
     }

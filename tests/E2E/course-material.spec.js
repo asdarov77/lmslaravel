@@ -127,7 +127,7 @@ test.describe('страница материала курса', () => {
 
     // Перерисовка при смене материала: новый документ должен
     // отрисоваться, кнопка «вверх» — скрыться (новое открытие сверху).
-    await page.locator('.auk-node__title--module').nth(1).click()
+    await page.locator('.cpl__section').nth(1).click()
     await page.waitForTimeout(2500)
 
     const afterSwitch = await page.evaluate(
@@ -171,7 +171,33 @@ test.describe('страница материала курса', () => {
     }
   })
 
-  test('наведение подсвечивает пункт, посещённый остаётся серым', async ({ page }) => {
+  /*
+   * Разметка страницы материала переехала в CoursePlayerLayout
+   * (.cpl__section*): прежние классы .auk-node__title--module и
+   * .auk-node__title--visited остались только в мёртвом CSS и в этом
+   * тесте, из-за чего он падал, ничего не проверяя.
+   *
+   * Проверяем то же самое по нынешним селекторам:
+   *  - наведение подсвечивает пункт;
+   *  - открытый раздел отличается от не начатого (метка состояния),
+   *  - открытый, но не текущий раздел остаётся помеченным;
+   *  - прогресс сохраняется в localStorage.
+   */
+  test('наведение подсвечивает пункт, открытый помечен как прочитанный', async ({ page }) => {
+    // Порядок важен: addInitScript выполняются в порядке регистрации.
+    // Очистку ставим ДО auth(), иначе она снесёт токен, который auth()
+    // только что положил, и гвард роутера уведёт на /login — тест
+    // падал бы, ожидая .cm-toolbar на странице входа.
+    // Очистка хранилища — ОДИН раз на контекст. В addInitScript очистка
+    // выполнялась на КАЖДОЙ загрузке документа, а часть страниц меняет
+    // адрес при инициализации: вторая загрузка стирала то, что приложение
+    // только что сохранило (прогресс, закреплённые курсы).
+    await page.addInitScript(() => {
+      if (!sessionStorage.getItem('__e2e_cleared')) {
+        localStorage.clear();
+        sessionStorage.setItem('__e2e_cleared', '1');
+      }
+    })
     const token = await auth(page)
     const course = await findCourseWithModules(page, token)
     test.skip(!course, 'нет курса с модулями')
@@ -182,56 +208,53 @@ test.describe('страница материала курса', () => {
     await page.waitForSelector('.cm-toolbar')
     await page.waitForTimeout(4000)
 
-    const modules = page.locator('.auk-node__title--module')
-    await expect(modules.first()).toBeVisible()
+    const sections = page.locator('.cpl__section')
+    await expect(sections.first()).toBeVisible()
 
-    const base = await modules
+    // 1. Наведение даёт подсветку.
+    const base = await sections
       .nth(2)
       .evaluate((el) => getComputedStyle(el).backgroundColor)
 
-    await modules.nth(2).hover()
+    await sections.nth(2).hover()
     await page.waitForTimeout(400)
-    const hovered = await modules
+    const hovered = await sections
       .nth(2)
       .evaluate((el) => getComputedStyle(el).backgroundColor)
 
     expect(hovered, 'при наведении есть подсветка').not.toBe(base)
-    expect(hovered).toBe('rgb(232, 238, 247)')
 
-    // Открытый модуль помечается посещённым и подсвечивается серым.
-    await modules.nth(2).click()
+    // 2. Раздел, который открыт прямо сейчас, — «начат».
+    await sections.nth(2).click()
     await page.waitForTimeout(2500)
 
-    // Открытый модуль — это ещё и текущий, а текущий красится синим
-    // поверх посещённого. Чтобы проверить именно серый, нужно увести
-    // «текущий» на другой пункт: тогда прежний останется посещённым,
-    // но перестанет быть активным.
-    await modules.nth(3).click()
+    const markOf = async (index) =>
+      sections.nth(index).evaluate((el) => {
+        const mark = el.querySelector('.cpl__mark')
+        return mark ? mark.className : ''
+      })
+
+    expect(await markOf(2), 'открытый раздел помечен как начатый').toContain(
+      'cpl__mark--partial'
+    )
+    expect(await markOf(4), 'не начатый раздел не помечен').toContain('cpl__mark--todo')
+
+    // 3. Переходим дальше: прежний раздел становится «прочитанным»,
+    //    текущим уже не является — и метка сохраняется.
+    await sections.nth(3).click()
     await page.waitForTimeout(2500)
     await page.mouse.move(5, 5)
     await page.waitForTimeout(400)
 
     const visited = await page.evaluate(() => {
-      const el = document.querySelector('.auk-node__title--visited')
-      return el ? getComputedStyle(el).backgroundColor : null
+      const el = document.querySelector('.cpl__mark--done')
+      return el ? el.closest('.cpl__section').innerText.replace(/\s+/g, ' ').trim() : null
     })
-    expect(visited, 'посещённый, но не текущий пункт подсвечен серым').toBe(
-      'rgb(236, 236, 236)'
-    )
+    expect(visited, 'прочитанный раздел помечен отдельной меткой').toBeTruthy()
 
-    // Под наведением посещённый пункт всё равно должен отличаться от
-    // обычного серого: это явное правило, а не побочный эффект.
-    await page.locator('.auk-node__title--visited').first().hover()
-    await page.waitForTimeout(400)
-    const visitedHovered = await page.evaluate(() => {
-      const el = document.querySelector('.auk-node__title--visited')
-      return el ? getComputedStyle(el).backgroundColor : null
-    })
-    expect(visitedHovered, 'посещённый под курсором подсвечивается').toBe('rgb(223, 231, 242)')
-    await page.mouse.move(5, 5)
-
+    // 4. Прогресс сохранён.
     const stored = await page.evaluate(
-      (id) => localStorage.getItem(`course-manifest-visited:${id}`),
+      (id) => window.localStorage.getItem(`course-manifest-visited:${id}`),
       course.id
     )
     expect(stored, 'прогресс сохраняется').toBeTruthy()
@@ -248,17 +271,17 @@ test.describe('страница материала курса', () => {
     await page.waitForSelector('.cm-toolbar')
     await page.waitForTimeout(4000)
 
-    const nodesBefore = await page.locator('.auk-node__title').count()
+    const nodesBefore = await page.locator('.cpl__section').count()
 
     await page.getByRole('button', { name: 'Поиск', exact: true }).click()
     await page.waitForTimeout(800)
-    expect(await page.locator('.auk-node__title').count(), 'дерево осталось на месте').toBe(
+    expect(await page.locator('.cpl__section').count(), 'дерево осталось на месте').toBe(
       nodesBefore
     )
 
     await page.getByRole('button', { name: 'Избранное', exact: true }).click()
     await page.waitForTimeout(1000)
-    expect(await page.locator('.auk-node__title').count(), 'дерево не пропало').toBe(nodesBefore)
+    expect(await page.locator('.cpl__section').count(), 'дерево не пропало').toBe(nodesBefore)
 
     // Пустое избранное должно объяснять себя, а не быть пустым списком.
     const emptyHint = await page.locator('.cm-favorites__empty').count()
@@ -288,7 +311,16 @@ test.describe('страница материала курса', () => {
     await page.waitForSelector('.cm-toolbar')
     await page.waitForTimeout(4000)
 
-    await page.locator('.auk-node__title--module').nth(4).click()
+    /*
+     * Берём ПОСЛЕДНИЙ раздел, а не пятый по счёту.
+     *
+     * Корневой узел курса в дереве намеренно не рисуется
+     * (v-if="index !== 0" в CourseManifest), поэтому в списке на одну
+     * строку меньше, чем разделов в базе. Привязка к индексу ломалась
+     * вслед за любым изменением числа демо-разделов.
+     */
+    const modules = page.locator('.cpl__section')
+    await modules.last().click()
     await page.waitForTimeout(2500)
 
     await page.getByRole('button', { name: 'В избранное', exact: true }).click()

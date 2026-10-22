@@ -85,9 +85,13 @@ class CatalogTest extends TestCase
 
     private function enrol(User $user, Course $course): void
     {
+        // Учебная запись несёт свою category_id: группа записана на курс
+        // в рамках конкретной специальности. Без неё материал курса с
+        // категориями не открыть (пилот не видит материалы бортинженера).
         Group2learning::factory()->create([
             'group_id' => $user->group_id,
             'course_id' => $course->id,
+            'category_id' => $course->categories->first()?->id,
         ]);
     }
 

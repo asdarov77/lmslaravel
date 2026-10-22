@@ -15,8 +15,15 @@ class GradeSeeder extends Seeder
             ['boundary' => 85, 'grade' => '5']
         ];
 
+        // upsert, а не create: повторный запуск сидеров не должен
+        // удваивать границы оценивания. Иначе пороги «0 → 2» и
+        // «0 → 2» оказываются двумя строками, и журнал считал бы их
+        // как два разных правила.
         foreach ($gradeBoundaries as $gradeBoundary) {
-            GradeBoundary::create($gradeBoundary);
+            GradeBoundary::updateOrCreate(
+                ['boundary' => $gradeBoundary['boundary']],
+                ['grade' => $gradeBoundary['grade']]
+            );
         }
     }
 }

@@ -55,18 +55,80 @@ class UserSeeder extends Seeder
     {
         $groupIds = $this->resolveGroupIds();
 
+        // Один хэш на всех: при 21 пользователе считать его в цикле
+        // бессмысленно дорого, а пароль у демо-пользователей общий.
+        $password = Hash::make('123');
+
         $rows = [];
         foreach (self::USERS as [$fio, $role, $groupNumber]) {
             $rows[] = [
                 'fio' => $fio,
                 'role' => $role,
-                // Один хэш на всех: раньше он считался 21 раз подряд.
-                'password' => Hash::make('123'),
+                'password' => $password,
                 'group_id' => $groupIds[$groupNumber],
+                // Почта нужна для восстановления пароля. Берём транслит
+                // ФИО: кириллические адреса не везде поддерживаются.
+                'email' => self::emailFor($fio),
             ];
         }
 
-        DB::table('users')->insert($rows);
+        /*
+         * Поштучный updateOrCreate по fio, а не пакетный insert.
+         *
+         * users.fio уникален, поэтому повторный запуск insert() падал
+         * с UniqueConstraintViolationException — а наполовину
+         * засеянная база хуже пустой. fio — естественный ключ
+         * человека, по нему и создаётся запись.
+         */
+        foreach ($rows as $row) {
+            $attributes = [
+                'role' => $row['role'],
+                'group_id' => $row['group_id'],
+                'email' => $row['email'],
+                'updated_at' => now(),
+            ];
+
+            /*
+             * Пароль пишется только при СОЗДАНИИ.
+             *
+             * Два требования противоречат друг другу: при вставке
+             * пароль обязателен (NOT NULL), а при обновлении его
+             * затирать нельзя — иначе повторный запуск сидеров сбрасывал
+             * бы пароли живых людей, заданные ими после создания.
+             */
+            if (! DB::table('users')->where('fio', $row['fio'])->exists()) {
+                $attributes['password'] = $row['password'];
+                $attributes['created_at'] = now();
+            }
+
+            DB::table('users')->updateOrInsert(['fio' => $row['fio']], $attributes);
+        }
+    }
+
+    /**
+     * Почтовый адрес из ФИО.
+     *
+     * Транслитерация, а не кириллический адрес: почтовые сервисы и
+     * старые клиенты кириллицу в from/to не принимают, а письмо со
+     * ссылкой восстановления обязано дойти.
+     */
+    private static function emailFor(string $fio): string
+    {
+        static $map = [
+            'а' => 'a', 'б' => 'b', 'в' => 'v', 'г' => 'g', 'д' => 'd',
+            'е' => 'e', 'ё' => 'e', 'ж' => 'zh', 'з' => 'z', 'и' => 'i',
+            'й' => 'y', 'к' => 'k', 'л' => 'l', 'м' => 'm', 'н' => 'n',
+            'о' => 'o', 'п' => 'p', 'р' => 'r', 'с' => 's', 'т' => 't',
+            'у' => 'u', 'ф' => 'f', 'х' => 'kh', 'ц' => 'ts', 'ч' => 'ch',
+            'ш' => 'sh', 'щ' => 'shch', 'ъ' => '', 'ы' => 'y', 'ь' => '',
+            'э' => 'e', 'ю' => 'yu', 'я' => 'ya',
+        ];
+
+        $ascii = strtr(mb_strtolower($fio), $map);
+        $slug = preg_replace('/[^a-z0-9]+/', '.', $ascii);
+        $slug = trim($slug, '.');
+
+        return $slug . '@example.com';
     }
 
     /**
@@ -82,8 +144,20 @@ class UserSeeder extends Seeder
 
         if (count($ids) < $needed) {
             // Групп меньше, чем требуется сидеру: досоздаём недостающие,
-            // чтобы FK users_group_id_foreign не нарушался.
-            Group::factory($needed - count($ids))->create();
+            // иначе FK users_group_id_foreign нарушится.
+            //
+            // Досоздаём группы с читаемыми именами, а не через фабрику.
+            // Фабрика даёт случайные слова («quas», «iure»), которые
+            // потом невозможно отличить ни в выпадающих списках, ни в
+            // отчётах. Имя — естественный ключ: повторный запуск обновит
+            // существующую группу, а не создаст «Группа 1 (2)».
+            foreach (range(1, $needed) as $number) {
+                Group::updateOrCreate(
+                    ['groupname' => 'Группа ' . $number],
+                    ['groupname' => 'Группа ' . $number]
+                );
+            }
+
             $ids = Group::orderBy('id')->pluck('id')->all();
         }
 

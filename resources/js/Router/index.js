@@ -1,5 +1,5 @@
 //import { createRouter,createWebHistory } from 'vue-router';
-import { createRouter,createWebHashHistory } from 'vue-router';
+import { createRouter,createWebHistory } from 'vue-router';
 import routes from './routes';
 import { TokenService } from '../services/storage.service';
 import store from '../Store';
@@ -28,8 +28,7 @@ NProgress.configure({
 onUnauthorizedHandler(name => router.push({ name }).catch(err => err));
 
 const router = createRouter({
-//    history: createWebHistory(),
-    history: createWebHashHistory(),
+    history: createWebHistory(),
     routes
 })
 
@@ -61,14 +60,19 @@ router.beforeEach(async (to , from, next) => {
         // возвращает null вместо throw.
         const token = TokenService.getToken();
         if(!token) {
-            if(to.name === 'login' || to.name === 'regist') // если не авторизован,то открываем доступ для регистрации и авторизации
-            {
+            // Публичные страницы: вход, регистрация и восстановление
+            // пароля. Последние нужны именно НЕавторизованному — на них
+            // пользователь попадает по прямой ссылке из письма, где он
+            // ещё не входил. Раньше список состоял только из login/regist,
+            // и ссылка из письма уводила на форму входа (бесконечное
+            // «забыл пароль → снова вход»), а сброс пароля был недостижим.
+            const PUBLIC_WITHOUT_TOKEN = ['login', 'regist', 'password.forgot', 'password.reset']
+
+            if (PUBLIC_WITHOUT_TOKEN.includes(to.name)) {
                 return next()
             }
-            else
-            {
-                return next({ name : 'login' })
-            }
+
+            return next({ name : 'login' })
         }
 
         // Публичные страницы ошибок доступны всем авторизованным

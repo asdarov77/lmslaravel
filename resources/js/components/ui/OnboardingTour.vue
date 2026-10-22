@@ -10,17 +10,17 @@
       <div class="u-tour__popover" :style="popoverStyle" role="document">
         <div class="u-tour__header">
           <span class="u-tour__counter">{{ index + 1 }} / {{ steps.length }}</span>
-          <button type="button" class="u-tour__skip" @click="skip">Пропустить</button>
+          <button type="button" class="u-tour__skip" @click="skip">{{ $t('onboarding.skip') }}</button>
         </div>
 
         <h3 class="u-tour__title">{{ current.title }}</h3>
         <p v-if="current.text" class="u-tour__text">{{ current.text }}</p>
 
         <div class="u-tour__footer">
-          <v-btn v-if="index > 0" variant="text" size="small" @click="prev">Назад</v-btn>
+          <v-btn v-if="index > 0" variant="text" size="small" @click="prev">{{ $t('onboarding.prev') }}</v-btn>
           <span class="u-tour__spacer" />
           <v-btn color="primary" variant="flat" size="small" @click="next">
-            {{ isLast ? 'Понятно' : 'Далее' }}
+            {{ isLast ? $t('onboarding.finish') : $t('onboarding.next') }}
           </v-btn>
         </div>
       </div>

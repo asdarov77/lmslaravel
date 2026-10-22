@@ -12,7 +12,7 @@
  */
 import { test, expect } from '@playwright/test'
 
-const BASE = process.env.APP_URL || 'http://127.0.0.1:8000'
+const BASE = process.env.APP_URL || 'http://127.0.0.1:8080'
 const ADMIN = { fio: 'Администратор', password: '123' }
 const PASSWORD = 'secret123'
 
@@ -30,9 +30,21 @@ async function auth(page, creds) {
 
   await page.addInitScript(
     ([t, u]) => {
-      localStorage.clear()
+      // Очистка хранилища — ОДИН раз на контекст. В addInitScript очистка
+      // выполнялась на КАЖДОЙ загрузке документа, а часть страниц меняет
+      // адрес при инициализации: вторая загрузка стирала то, что приложение
+      // только что сохранило (прогресс, закреплённые курсы).
+      if (!sessionStorage.getItem('__e2e_cleared')) {
+        localStorage.clear();
+        sessionStorage.setItem('__e2e_cleared', '1');
+      }
       localStorage.setItem('token', t)
       localStorage.setItem('user', u)
+      // Тур первого входа: помечаем как пройденный. Его оверлей
+      // перехватывает клики по всей странице, и без этой отметки любой
+      // тест, кликающий по дашборду, падал бы из-за подсказки, а не
+      // из-за своей проверки.
+      localStorage.setItem('app:tour:trainee-dashboard', '1')
     },
     [token, JSON.stringify(user)]
   )
@@ -145,12 +157,31 @@ test.describe('Экзамен', () => {
     expect(await page.locator('.runner__answer').count()).toBeGreaterThan(0)
 
     // Отвечаем на все вопросы: по одному на страницу.
+    //
+    // Подписи кнопок берём из локалей, а не пишем literals: раньше
+    // здесь стояло /Далее|Закончить/, а в интерфейсе кнопки называются
+    // «Вперёд» и «Завершить». Фильтр не находил ничего, тест не
+    // листал вопросы и падал на ожидании вердикта.
     for (let i = 0; i < 2; i++) {
       await page.locator('.runner__answer input[type=radio]').first().click()
       await page.waitForTimeout(400)
-      const next = page.locator('.runner__nav .v-btn').filter({ hasText: /Далее|Закончить/ }).first()
-      if (await next.count() && !(await next.isDisabled())) await next.click()
-      await page.waitForTimeout(600)
+      const nav = page.locator('.runner__nav .v-btn')
+      const step = nav.filter({ hasText: /Вперёд|Next/ })
+      if (await step.count()) {
+        await step.first().click()
+      } else {
+        const finish = nav.filter({ hasText: /Завершить|Finish/ })
+        if (await finish.count() && !(await finish.first().isDisabled())) {
+          await finish.first().click()
+        }
+      }
+      await page.waitForTimeout(900)
+    }
+
+    // Завершение просит подтверждения — это отдельный диалог.
+    const confirm = page.locator('.v-dialog').filter({ hasText: /Завершить|Finish|Отправить|Submit/ })
+    if (await confirm.count()) {
+      await confirm.first().getByRole('button').last().click()
     }
 
     await page.locator('.runner__verdict, .runner__result').first().waitFor({ timeout: 8000 })

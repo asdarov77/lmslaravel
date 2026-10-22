@@ -75,7 +75,12 @@ describe('шаблоны используют только компоненты 
       'v-btn-toggle',
       'v-progress-linear',
       'v-alert',
-    ])
+      // Stepper components (Vuetify 3)
+      'v-stepper-steps',
+      'v-stepper-step',
+      'v-stepper-items',
+      'v-stepper-content',
+    ]);
     const known = new Set(
       Object.keys(vuetifyComponents).map(n =>
         n

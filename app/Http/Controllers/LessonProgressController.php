@@ -134,6 +134,18 @@ class LessonProgressController extends Controller
 
         $row->save();
 
+        // XP начисляется только один раз на урок: ключ источника
+        // отсекает дубль, и перечитывание урока ничего не приносит.
+        if ($row->percent >= 100 && $row->completed_at !== null) {
+            \App\Support\Gamification::award(
+                $user,
+                'lesson_completed',
+                "lesson:{$lesson->id}",
+                (int) $course->id,
+                $row->completed_at
+            );
+        }
+
         return response()->json([
             'data' => [
                 'course_id' => $row->course_id,

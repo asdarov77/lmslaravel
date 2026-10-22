@@ -2,16 +2,18 @@
   <div class="form-actions" :class="{ 'u-is-busy': busy }">
     <slot>
       <v-btn type="submit" color="primary" variant="flat" :loading="busy">
-        {{ submitText }}
+        {{ submitLabel }}
       </v-btn>
       <v-btn v-if="showCancel" type="button" variant="text" :disabled="busy" @click="$emit('cancel')">
-        {{ cancelText }}
+        {{ cancelLabel }}
       </v-btn>
     </slot>
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 /**
  * Кнопки формы.
  *
@@ -25,12 +27,20 @@
  * раньше это происходило на 16 страницах, где индикатора загрузки
  * не было вовсе.
  */
-defineProps({
+const props = defineProps({
   busy: { type: Boolean, default: false },
-  submitText: { type: String, default: 'Сохранить' },
-  cancelText: { type: String, default: 'Отмена' },
+  // Пустая строка означает «взять перевод». Раньше дефолтом стоял
+  // русский текст, и в английском интерфейсе кнопки оставались
+  // русскими: язык формы не совпадал с языком страницы.
+  submitText: { type: String, default: '' },
+  cancelText: { type: String, default: '' },
   showCancel: { type: Boolean, default: true },
 })
+
+const { t: $t } = useI18n()
+
+const submitLabel = computed(() => props.submitText || $t('save'))
+const cancelLabel = computed(() => props.cancelText || $t('cancel'))
 
 defineEmits(['submit', 'cancel'])
 </script>

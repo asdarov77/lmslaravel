@@ -26,7 +26,7 @@ const catalogSlugs = (() => {
 })()
 
 /** Маршруты, которые по замыслу доступны всем (публичные и служебные). */
-const PUBLIC_ROUTES = new Set(['/', '/login', '/reg', '/about', '/my', '/logout', '/datepicker', '/403', '/404', '/500'])
+const PUBLIC_ROUTES = new Set(['/', '/login', '/reg', '/about', '/my', '/logout', '/datepicker', '/403', '/404', '/500', '/certificates/verify/:code?', '/:pathMatch(.*)*', '/two-factor/verify'])
 
 /**
  * Маршруты, доступные только авторизованному, но без доменного права.
@@ -62,7 +62,28 @@ const AUTH_ONLY_ROUTES = new Set([
   // Announcement::visibilityFor — так же, как /my/exams не требует
   // content.view.
   '/announcements',
+  // Восстановление пароля: доступно тому, кто ещё не может войти.
+  // Если требовать здесь права, забытый пароль нельзя было бы сбросить
+  // именно тогда, когда он потерян.
+  '/password/forgot', '/password/reset',
+  // Расписание обучаемого: контроллер сам подставляет группу
+  // пользователя, чужие фильтры всё равно игнорируются.
+  '/my/schedule',
+  // Форум: доступ = доступ к курсу (CourseAccess), а не право в меню.
+  '/forum/course/:idEdit', '/forum/topic/:idEdit',
+  // Задания: читать и сдаёт обучаемый своей группы, создавать и
+  // проверять — преподаватель. Право различается внутри страницы, и
+  // meta.permission здесь был бы либо слишком узким (закрыл бы сдачу),
+  // либо слишком широким (открыл бы создание всем).
+  '/assignments', '/assignments/:idEdit',
+  // Достижения: доступен любому вошедшему обучающемуся, права
+  // (trainee) проверяются через onlyFor в меню и на бэкенде
+  // через GamificationController (возвращает только свои данные).
+  '/gamification',
+  // Публичный профиль преподавателя: доступен любому вошедшему.
+  '/instructors/:id',
 ])
+
 
 const flat = (routes || []).flat(Infinity).filter(Boolean)
 

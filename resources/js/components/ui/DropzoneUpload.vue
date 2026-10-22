@@ -61,7 +61,7 @@
           icon="mdi-close"
           variant="text"
           size="small"
-          :aria-label="`Убрать ${task.name}`"
+          :aria-label="$t('files.removeFile', { name: task.name })"
           @click="remove(task)"
         />
       </li>

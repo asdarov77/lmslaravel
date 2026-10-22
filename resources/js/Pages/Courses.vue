@@ -101,6 +101,23 @@
             <span v-if="!course.visible" class="u-badge u-badge--warning">
               {{ $t("courses.list.hidden") }}
             </span>
+            <span v-if="course.status" class="u-badge" :class="statusBadgeClass(course.status)">
+              {{ statusLabel(course.status) }}
+            </span>
+          </div>
+
+          <div class="courses__card-instructors" v-if="course.instructors && course.instructors.length">
+            <v-avatar
+              v-for="instructor in course.instructors"
+              :key="instructor.id"
+              size="28"
+              color="primary"
+              class="mr-1"
+            >
+              <span class="text-white text-caption">
+                {{ instructor.fio.charAt(0).toUpperCase() }}
+              </span>
+            </v-avatar>
           </div>
 
           <!--
@@ -145,6 +162,21 @@
             <v-btn
               size="small"
               variant="text"
+              :color="isPinned(course.id) ? 'warning' : undefined"
+              :aria-label="`${$t('courses.list.pin')}: ${course.title}`"
+              :title="$t('courses.list.pin')"
+              @click="togglePin(course)"
+            >
+              <v-icon
+                :icon="isPinned(course.id) ? 'mdi-pin' : 'mdi-pin-outline'"
+                size="18"
+                aria-hidden="true"
+              ></v-icon>
+            </v-btn>
+
+            <v-btn
+              size="small"
+              variant="text"
               color="error"
               :aria-label="`${$t('courses.list.delete')}: ${course.title}`"
               :title="$t('courses.list.delete')"
@@ -177,6 +209,8 @@ import { mapState } from "vuex";
 import PageHeader from "../components/ui/PageHeader.vue";
 import EmptyState from "../components/ui/EmptyState.vue";
 import ConfirmDialog from "../components/ui/ConfirmDialog.vue";
+import { pinnedCourses } from "../utils/pinnedCourses";
+import { toast } from "../composables/useToast";
 
 export default {
   name: "Courses",
@@ -246,6 +280,59 @@ export default {
   },
 
   methods: {
+    /**
+     * Класс бейджа состояния курса.
+     *
+     * Метод, а не массив в шаблоне: у курса состояние приходит строкой
+     * из API, и набор классов должен быть собран в одном месте — иначе
+     * цвет статуса и его подпись разъезжаются между карточкой и
+     * списком.
+     */
+    statusBadgeClass(status) {
+      const classes = {
+        draft: 'u-badge--warning',
+        pending: 'u-badge--warning',
+        published: 'u-badge--success',
+        active: 'u-badge--success',
+        archived: 'u-badge--grey',
+        inactive: 'u-badge--grey',
+      }
+      return classes[status] ?? ''
+    },
+
+    statusLabel(status) {
+      const labels = {
+        draft: 'Черновик',
+        pending: 'На проверке',
+        published: 'Опубликован',
+        active: 'Активен',
+        archived: 'В архиве',
+        inactive: 'Неактивен',
+      }
+      return labels[status] ?? status
+    },
+
+    isPinned(id) {
+      return pinnedCourses.isPinned(id);
+    },
+
+    /**
+     * Закрепление курса из каталога.
+     *
+     * Ссылку берём на содержание курса: это основная страница, куда
+     * возвращаются после входа. Закрепление не должно зависеть от того,
+     * какая вкладка курса открыта в момент нажатия.
+     */
+    togglePin(course) {
+      pinnedCourses.toggle({
+        id: course.id,
+        title: course.title,
+        link: { name: 'courses.itemmani', query: { idEdit: course.id } },
+      });
+      this.$forceUpdate();
+      window.dispatchEvent(new CustomEvent('pinned-courses-changed'));
+    },
+
     setActiveCategory(category) {
       // «Все категории» приходит как { id: 0 }: сбрасываем выбор.
       this.activeCategory = category && category.id ? category : null;
@@ -449,5 +536,26 @@ export default {
   gap: var(--sp-1);
   padding-top: var(--sp-2);
   border-top: 1px solid var(--c-border);
+
+  /*
+   * Ряд действий переполнял карточку.
+   *
+   * Здесь пять элементов, и v-btn по умолчанию не сжимается
+   * (min-width 48px + внутренние отступы). В колонке сетки шириной
+   * около 300px они в сумме не помещались, ряд выходил за правый
+   * край карточки (проверено: кнопка «Удалить» заканчивалась на
+   * 42px правее границы), а карточка имеет overflow: visible — то
+   * есть кнопка физически уезжала на соседнюю колонку и висела
+   * поверх неё.
+   *
+   * flex-wrap: кнопки переносятся на вторую строку, а
+   * min-width: 0 позволяет им ужиматься до соседних.
+   */
+  flex-wrap: wrap;
+}
+
+.courses__actions > * {
+  min-width: 0;
+  flex: 0 0 auto;
 }
 </style>

@@ -91,6 +91,47 @@ describe('useLeaveGuard: переход внутри SPA', () => {
   })
 })
 
+describe('useLeaveGuard: confirmLeave (кнопка «Отмена»)', () => {
+  it('на чистой форме уходит без вопроса', async () => {
+    const confirm = vi.fn(async () => false)
+    const harness = makeHarness({ dirty: false, confirm })
+    const wrapper = await mountAtForm(harness)
+
+    expect(await harness.getGuard().confirmLeave()).toBe(true)
+    expect(confirm).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('на грязной форме спрашивает и удерживает при отказе', async () => {
+    const confirm = vi.fn(async () => false)
+    const harness = makeHarness({ dirty: true, confirm })
+    const wrapper = await mountAtForm(harness)
+
+    expect(await harness.getGuard().confirmLeave()).toBe(false)
+    expect(confirm).toHaveBeenCalledTimes(1)
+
+    // Отказ оставил форму грязной — уйти по-прежнему можно только
+    // через согласие.
+    expect(await harness.getGuard().confirmLeave()).toBe(false)
+    expect(confirm).toHaveBeenCalledTimes(2)
+
+    wrapper.unmount()
+  })
+
+  it('после согласия повторный уход вопроса не задаёт', async () => {
+    const confirm = vi.fn(async () => true)
+    const harness = makeHarness({ dirty: true, confirm })
+    const wrapper = await mountAtForm(harness)
+
+    expect(await harness.getGuard().confirmLeave()).toBe(true)
+    expect(await harness.getGuard().confirmLeave()).toBe(true)
+    expect(confirm).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
+})
+
 describe('useLeaveGuard: beforeunload', () => {
   it('отменяет закрытие вкладки при несохранённых изменениях', async () => {
     const harness = makeHarness({ dirty: true, confirm: async () => true })

@@ -10,6 +10,7 @@ import {
   fetchCoursecat,
   fetchCategories,
   fetchCategory,
+  fetchAukstructures,
   //fetchPermissions,  
   createCategory,
   updateCategory,
@@ -48,6 +49,9 @@ const CourseModule = {
     aircrafts: [],
     courses: [],
     categories: [],
+    // Темы/модули курса (aukstructures). Нужны выпадающим спискам
+    // мастера экзамена: без них список «Тема (модуль)» был пуст.
+    modules: [],
     totalCourses: 0,
     pagination: {
       page: 1,
@@ -115,7 +119,14 @@ const CourseModule = {
       state.courses = asArray(courses)
     },
     SET_COURSE(state, course) {
-      state.course = course
+      /*
+       * GET /api/course?course_id=N отдаёт МАССИВ из одного курса, а не
+       * объект. Раньше сюда клался массив как есть, и страница правки
+       * читала course.title — то есть undefined: форма открывалась
+       * пустой, и сохранение курса затирало заголовок. Разворачиваем
+       * список в первый элемент, чтобы состояние всегда было объектом.
+       */
+      state.course = Array.isArray(course) ? course[0] ?? null : (course ?? null)
     },
     SET_TOTAL_COURSES(state, totalCourses) {
       state.totalCourses = totalCourses
@@ -131,6 +142,10 @@ const CourseModule = {
     },
     SET_AIRCRAFTS(state, aircrafts) {
       state.aircrafts = asArray(aircrafts)
+    },
+
+    SET_MODULES(state, modules) {
+      state.modules = asArray(modules)
     },
     SET_AIRCRAFT(state, aircraft) {
       state.aircraft = aircraft
@@ -304,6 +319,26 @@ const CourseModule = {
         commit('SET_AIRCRAFT', unwrap(response))
         return Promise.resolve(response)
       } catch (error) {
+        return Promise.reject(error)
+      }
+    },
+
+    /**
+     * Темы/модули курса.
+     *
+     * Action был нужен мастеру экзамена, но отсутствовал: там стоял
+     * dispatch('Course/fetchModules'), которого в модуле не было.
+     * dispatch неизвестного action возвращает undefined, и следующий
+     * же `.catch()` на нём ронял onMounted — страница создания экзамена
+     * оставалась без справочников.
+     */
+    async fetchModules({ commit }, params = {}) {
+      try {
+        const response = await fetchAukstructures(params)
+        commit('SET_MODULES', unwrap(response))
+        return unwrap(response)
+      } catch (error) {
+        commit('SET_MODULES', [])
         return Promise.reject(error)
       }
     },
@@ -499,6 +534,16 @@ const CourseModule = {
           // name: `${user.last_name} ${user.first_name} ${user.mid_name}`,        
         }
       })
+    },
+
+    /** Темы/модули для выпадающих списков: только id и название. */
+    modules(state) {
+      return state.modules.map((mod) => ({
+        id: mod.id,
+        title: mod.title,
+        course_id: mod.course_id,
+        type: mod.type,
+      }))
     },
     categories(state) {
       return state.categories.map(category => {
