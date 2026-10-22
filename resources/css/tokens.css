@@ -57,6 +57,21 @@
   --c-text-muted: #5a6068;
   --c-text-inverse: #ffffff;
 
+  /* Alpha variants for common overlay colors. */
+  --c-white-alpha-04: rgba(255, 255, 255, 0.04);
+  --c-white-alpha-06: rgba(255, 255, 255, 0.06);
+  --c-white-alpha-08: rgba(255, 255, 255, 0.08);
+  --c-white-alpha-12: rgba(255, 255, 255, 0.12);
+  --c-white-alpha-20: rgba(255, 255, 255, 0.20);
+  --c-white-alpha-35: rgba(255, 255, 255, 0.35);
+  --c-white-alpha-40: rgba(255, 255, 255, 0.40);
+  --c-white-alpha-60: rgba(255, 255, 255, 0.60);
+  --c-white-alpha-82: rgba(255, 255, 255, 0.82);
+  --c-black-alpha-06: rgba(0, 0, 0, 0.06);
+  --c-black-alpha-12: rgba(0, 0, 0, 0.12);
+  --c-black-alpha-35: rgba(0, 0, 0, 0.35);
+  --c-black-alpha-60: rgba(0, 0, 0, 0.60);
+
   /* Статусы. Семантические роли вместо «зелёного/красного» из палитры:
      так они одинаковы на любом фоне и читаются дальтоникам. */
   --c-success: #1e7a3c;
@@ -83,6 +98,9 @@
   /* Акцент для посещённого/выделенного — приглушённый синий, чтобы
      не спорить с primary. */
   --c-highlight: #eceff3;
+
+  /* Оверлей для модалок/тура — тёмный полупрозрачный фон. */
+  --c-overlay: rgba(16, 24, 40, 0.55);
   --c-highlight-hover: #e2e7ee;
 
   /* Стеклянные поверхности: полупрозрачный фон + размытие заднего фона.
@@ -199,7 +217,9 @@
    * расходились. Теперь размер живёт рядом с остальными.
    */
   --layout-drawer-width: 300px;
+  --layout-drawer-width-tablet: 260px;
   --layout-drawer-width-mobile: 280px;
+  --layout-drawer-width-collapsed: 48px;
 
   /*
    * Ширина диалогов.

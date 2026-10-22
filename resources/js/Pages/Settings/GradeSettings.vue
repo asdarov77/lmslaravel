@@ -1,23 +1,11 @@
 <template>
-  <!--
-    Заголовок страницы добавлен: раньше его не было вовсе, страница
-    начиналась с таблицы — имени у неё не было ни для человека, ни для
-    навигации по заголовкам (WCAG 2.2 SC 1.3.1, 2.4.6).
-  -->
   <div class="u-page">
     <PageHeader :title="$t('settings.grades.title')" />
 
-    <!--
-      caption обязателен: без него скринридер не может озвучить
-      таблицу как «Таблица: название».
-    -->
+    <v-alert v-if="alert" :type="alert.type" density="compact" class="mb-4">{{ alert.text }}</v-alert>
+
     <table>
       <caption class="u-sr-only">{{ $t('settings.grades.title') }}</caption>
-      <!--
-        Внутри <thead> раньше стояло {{ newValue }} — отладочный вывод
-        переменной, которой в data() нет. Пустой интерполяционный узел
-        попадал в заголовок таблицы и попадал в accessibility-дерево.
-      -->
       <thead>
         <tr>
           <th>{{ $t('gradeSettings.grade') }}</th>
@@ -28,87 +16,104 @@
         <tr v-for="(grade, index) in gradeBoundaries" :key="index">
           <td>{{ grade.grade }}</td>
           <td>
-            <!--
-              aria-label обязателен: ячейка таблицы НЕ связывается с полем
-              внутри неё, поэтому без подписи каждое из четырёх полей
-              читалось как «поле ввода» — непонятно, границу какой оценки
-              человек сейчас правит (WCAG 2.2 SC 1.3.1, 4.1.2).
-            -->
-            <input
-              type="number"
-              v-model="grade.boundary"
-              :aria-label="`${$t('gradeSettings.boundary')} — ${$t('gradeSettings.grade')} ${grade.grade}`"
-              @change="updateGrade(index)"
-            />
+            <FormField
+              :label="$t('gradeSettings.boundary') + ' — ' + $t('gradeSettings.grade') + ' ' + grade.grade"
+              :name="`boundary_${index}`"
+              :error="boundaryErrors[index]"
+            >
+              <MaskedField
+                v-model="grade.boundary"
+                preset="integer"
+                :min="minBoundary(index)"
+                :max="maxBoundary(index)"
+                :aria-label="$t('gradeSettings.boundary') + ' — ' + $t('gradeSettings.grade') + ' ' + grade.grade"
+                @update:model-value="updateBoundary(index, $event)"
+              />
+            </FormField>
           </td>
-
         </tr>
       </tbody>
     </table>
   </div>
 </template>
 
-<script>
-import $api from "../../api/httpClient";
-import { unwrapArray } from "../../api/envelope";
-import PageHeader from "../../components/ui/PageHeader.vue";
-const apiUrl = import.meta.env.VITE_APP_URL;
-export default {
-  components: { PageHeader },
-  data() {
-    return {
-      // gradeBoundaries: [
-      //   { boundary: 0, grade: '2' },
-      //   { boundary: 35, grade: '3' },
-      //   { boundary: 65, grade: '4' },
-      //   { boundary: 85, grade: '5' }
-      // ],
-      gradeBoundaries: []
-    };
-  },
-  mounted() {
-    $api.get(apiUrl + '/api/grade-boundary')
-      .then(response => {
-        this.gradeBoundaries = unwrapArray(response);
-      })
-      .catch(error => {
-        console.log(error);
-      });
+<script setup>
+import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import PageHeader from '../../components/ui/PageHeader.vue'
+import FormField from '../../components/ui/FormField.vue'
+import MaskedField from '../../components/ui/fields/MaskedField.vue'
+import $api from '../../api/httpClient'
+import { unwrapArray } from '../../api/envelope'
 
+const { t } = useI18n()
 
-    // получение списка вопросов с сервера
+const props = defineProps({})
 
-  },
-  methods: {
-    updateGrade(index) {
-      const currentGrade = this.gradeBoundaries[index];
-      const previousGrade = this.gradeBoundaries[index - 1];
-      const nextGrade = this.gradeBoundaries[index + 1];
+const alert = ref(null)
+const gradeBoundaries = ref([])
+const boundaryErrors = ref({})
+const saving = ref(false)
 
-      if (index === 0) {
-        // Для первого элемента граница не должна быть меньше 0
-        currentGrade.boundary = Math.max(currentGrade.boundary, 0);
-      } else if (index === this.gradeBoundaries.length - 1) {
-        // Для последнего элемента граница не должна быть больше 100
-        currentGrade.boundary = Math.min(currentGrade.boundary, 100);
-      } else {
-        // Проверка, чтобы текущая граница не была больше следующей границы и не меньше предыдущей границы
-        currentGrade.boundary = Math.max(previousGrade.boundary, Math.min(currentGrade.boundary, nextGrade.boundary));
-      }
+const apiUrl = import.meta.env.VITE_APP_URL
 
-      const newValue = this.gradeBoundaries[index].boundary;
-      // Отправка значения на сервер с помощью Axios
-      $api.post('/api/grade-boundary', { index, value: newValue })
-        .then(response => {
-          console.log(response.data);
-        })
-        .catch(error => {
-          // Обработка ошибки при отправке запроса
-          console.error(error);
-        });
-    }
+const minBoundary = (index) => {
+  if (index === 0) return 0
+  return gradeBoundaries.value[index - 1]?.boundary ?? 0
+}
 
+const maxBoundary = (index) => {
+  if (index === gradeBoundaries.value.length - 1) return 100
+  return gradeBoundaries.value[index + 1]?.boundary ?? 100
+}
 
+const updateBoundary = async (index, value) => {
+  const boundaries = [...gradeBoundaries.value]
+  boundaries[index].boundary = value
+  gradeBoundaries.value = boundaries
+
+  // Validate against adjacent boundaries
+  const prevBoundary = boundaries[index - 1]?.boundary ?? 0
+  const nextBoundary = boundaries[index + 1]?.boundary ?? 100
+  boundaryErrors.value = {}
+
+  if (value < prevBoundary) {
+    boundaryErrors.value[index] = t('gradeSettings.boundaryCannotBeLess', { prev: prevBoundary })
+    return
   }
-};
+  if (value > nextBoundary) {
+    boundaryErrors.value[index] = t('gradeSettings.boundaryCannotBeGreater', { next: nextBoundary })
+    return
+  }
+
+  saving.value = true
+  try {
+    await $api.post('/api/grade-boundary', { index, value })
+  } catch (error) {
+    boundaryErrors.value[index] = error?.response?.data?.error?.message || t('gradeSettings.saveFailed')
+  } finally {
+    saving.value = false
+  }
+}
+
+const load = async () => {
+  try {
+    const response = await $api.get(apiUrl + '/api/grade-boundary')
+    gradeBoundaries.value = unwrapArray(response) || []
+  } catch (error) {
+    alert.value = { type: 'error', text: t('gradeSettings.loadFailed') }
+  }
+}
+
+// Watch for external changes to boundaries (e.g., from server response)
+watch(gradeBoundaries, (newBoundaries) => {
+  // Clear errors for indices that no longer exist
+  Object.keys(boundaryErrors.value).forEach((key) => {
+    if (parseInt(key) >= newBoundaries.length) {
+      delete boundaryErrors.value[key]
+    }
+  })
+}, { deep: true })
+
+load()
 </script>

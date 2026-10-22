@@ -9,6 +9,7 @@ use App\Http\Controllers\TutorController;
 use App\Http\Controllers\PrivateManiController;
 use App\Http\Controllers\Group2learningController;
 use App\Http\Controllers\LessonsController;
+use App\Http\Controllers\QuestionImportController;
 use App\Http\Controllers\AukstructureController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\CourseController;
@@ -218,6 +219,7 @@ Route::middleware(['auth:sanctum', 'permission:users.courses,create-tasks'])->gr
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/my/learning', [MyLearningController::class, 'plan']);
     Route::get('/my/dashboard', [MyLearningController::class, 'dashboard']);
+    Route::get('/my/recommended', [MyLearningController::class, 'recommended']);
 
     // Прогресс по урокам курса. Раньше он жил в localStorage и терялся
     // при смене устройства, поэтому «продолжить обучение» было видно
@@ -258,6 +260,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // /my/dashboard: там «моё обучение», а здесь «что происходит в
     // системе» — по области видимости актора.
     Route::get('/dashboard/summary', ManagerDashboardController::class);
+    // Бейджи меню (счётчики для непросмотренного).
+    Route::get('/menu-counters', [ManagerDashboardController::class, 'counters']);
 });
 
 // 2FA: настройка (только авторизованным) и верификация при входе.
@@ -427,12 +431,14 @@ Route::delete('/catalog/{course}/enroll', [CatalogController::class, 'unenroll']
 // Материал курса. Раньше эти три маршрута висели без middleware, и
 // любой вошедший читал манифест и ссылки любого курса по идентификатору.
 // С появлением витрины тот же обход позволял открыть незаписанный курс.
-Route::get('/coursemanifest/{id}', [CourseController::class, 'showmanifest'])
-    ->middleware('auth:sanctum')->whereNumber('id');
+Route::get('/coursemanifest/{id}', [CourseController::class, 'showmanifest'])    ->middleware('auth:sanctum')->whereNumber('id');
 Route::get('/getlink/{id}', [CourseController::class, 'getlink'])
     ->middleware('auth:sanctum')->whereNumber('id');
 Route::get('/getfirstauk/{id}', [CourseController::class, 'get_first_auk'])
     ->middleware('auth:sanctum')->whereNumber('id');
+// Единый endpoint открытия курса: курс + дерево + избранное + entry.
+Route::get('/course-player/{courseId}', [CourseController::class, 'player'])
+    ->middleware('auth:sanctum')->whereNumber('courseId');
 //-------------------- классы -----------------
 Route::get('/classes/', [AircraftController::class, 'indexclasses'])->middleware('auth:sanctum');
 Route::get('/classesfs/', [AircraftController::class, 'showclassesfs'])->middleware('auth:sanctum');
@@ -516,8 +522,10 @@ Route::get('/userauks', [UsersCoursesController::class, 'index'])->middleware('a
 // Раньше маршрут висел только на auth:sanctum, и любой вошедший читал
 // фрагменты учебного материала чужого курса, указав aircraft и path
 // в теле запроса.
+// P1.1: права проверяет сам SearchController через CourseAccess —
+// записанный обучаемый ищет в своём курсе, не записанный получает 403.
 Route::post('/search-files/', [SearchController::class, 'search'])
-    ->middleware(['auth:sanctum', 'permission:content.manage,courses.manage']);
+    ->middleware(['auth:sanctum']);
 
 // Глобальный поиск по LMS: курсы, темы, специальности и — по правам —
 // группы, люди и банк вопросов. Область видимости — по CourseVisibility,
@@ -539,6 +547,8 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
 Route::apiResource('gift', GiftController::class)->only(['index', 'show'])->middleware('auth:sanctum')->whereNumber('gift');
 Route::middleware(['auth:sanctum', 'permission:questions.manage'])->group(function () {
     Route::post('/gift', [GiftController::class, 'store']);
+    // Импорт банка вопросов из CSV/Excel.
+    Route::post('/questions/import', [QuestionImportController::class, 'store']);
     Route::put('/gift/{gift}', [GiftController::class, 'update'])->whereNumber('gift');
     Route::patch('/gift/{gift}', [GiftController::class, 'update'])->whereNumber('gift');
     Route::delete('/gift/{gift}', [GiftController::class, 'destroy'])->whereNumber('gift');

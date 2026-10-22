@@ -24,7 +24,8 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch, onBeforeUnmount } from 'vue'
+import { prefersReducedMotion } from '../../utils/motion'
 
 /**
  * KPI-карточка: крупная цифра, подпись, тренд и место под спарклайн.
@@ -37,6 +38,9 @@ import { computed } from 'vue'
  *
  * tone управляет цветом акцента всей карточки: neutral (по умолчанию),
  * success, warning, danger.
+ *
+ * Число анимируется (count-up) при смене значения после первого
+ * рендера; первое значение рисуется сразу — дашборд не ждёт tween.
  */
 const props = defineProps({
   label: { type: String, required: true },
@@ -54,8 +58,53 @@ const props = defineProps({
   tone: { type: String, default: 'neutral' },
 })
 
+const displayed = ref(props.value)
+
+let rafId = null
+
+function stopTween() {
+  if (rafId != null) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  }
+}
+
+function tweenTo(from, to) {
+  stopTween()
+  if (prefersReducedMotion().value) {
+    displayed.value = to
+    return
+  }
+  const dur = 400
+  let startAt
+  const step = (now) => {
+    if (startAt === undefined) startAt = now
+    const p = Math.min((now - startAt) / dur, 1)
+    const eased = 1 - (1 - p) ** 3
+    displayed.value = Math.round(from + (to - from) * eased)
+    if (p < 1) rafId = requestAnimationFrame(step)
+    else rafId = null
+  }
+  rafId = requestAnimationFrame(step)
+}
+
+watch(
+  () => props.value,
+  (to, from) => {
+    if (typeof to !== 'number' || typeof from !== 'number') {
+      stopTween()
+      displayed.value = to
+      return
+    }
+    const start = Number(rafId ? displayed.value : from)
+    tweenTo(start, to)
+  },
+)
+
+onBeforeUnmount(stopTween)
+
 const formattedValue = computed(() =>
-  typeof props.value === 'number' ? props.value.toLocaleString('ru-RU') : props.value,
+  typeof displayed.value === 'number' ? displayed.value.toLocaleString('ru-RU') : displayed.value,
 )
 
 const trendDirection = computed(() => {

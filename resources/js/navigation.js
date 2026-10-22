@@ -38,7 +38,7 @@ export const navigationSections = [
       // ведущий в пустоту, хуже отсутствующего пункта.
       { key: 'tutor', titleKey: 'app.menu.tutor', link: '/tutor', icon: 'mdi-brain' },
       { key: 'announcements', titleKey: 'app.menu.announcements', link: '/announcements', icon: 'mdi-bullhorn-outline' },
-      { key: 'assignments', titleKey: 'app.menu.assignments', link: '/assignments', icon: 'mdi-clipboard-text-outline' },
+      { key: 'assignments', titleKey: 'app.menu.assignments', link: '/assignments', icon: 'mdi-clipboard-text-outline', badgeCounter: 'review_queue' },
       { key: 'exams', titleKey: 'app.menu.exams', link: '/my/exams', icon: 'mdi-clipboard-check-outline' },
       { key: 'examsManage', titleKey: 'app.menu.examsManage', link: '/exams', icon: 'mdi-clipboard-list-outline', onlyFor: 'manager' },
       { key: 'certificates', titleKey: 'app.menu.certificates', link: '/my/certificates', icon: 'mdi-certificate-outline', onlyFor: 'trainee' },

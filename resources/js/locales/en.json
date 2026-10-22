@@ -727,7 +727,9 @@
       "loadFailed": "Could not load the course description",
       "saved": "Course description saved",
       "saveFailed": "Could not save the description"
-    }
+    },
+    "opensAt": "Open course from",
+    "closesAt": "Open course until"
   },
   "groupLearning": {
     "title": "Enroll user groups in courses",
@@ -745,7 +747,15 @@
     "labelKursy-i-moduli": "Courses and modules",
     "selectHint": "Select a class and category — the course list will appear",
     "selectedCount": "Selected modules: {count}",
-    "materialsOnlyHint": "Only modules can be selected — they are the unit of enrollment. Topics and sections show the structure."
+    "materialsOnlyHint": "Only modules can be selected — they are the unit of enrollment. Topics and sections show the structure.",
+    "groupRequired": "Select a group",
+    "classRequired": "Select a class",
+    "categoryRequired": "Select a category",
+    "coursesRequired": "Select at least one course",
+    "fromRequired": "Enter a start date",
+    "toRequired": "Enter an end date",
+    "toBeforeFrom": "End date cannot be before start date",
+    "loadCoursesError": "Failed to load group courses"
   },
   "classes": {
     "title": "Add class",
@@ -843,7 +853,10 @@
     "streakHint": "How many days in a row you studied. A dark cell is a day with no activity.",
     "streakUnit": "days in a row",
     "streakLegendFrom": "less",
-    "streakLegendTo": "more"
+    "streakLegendTo": "more",
+    "recommendedTitle": "Recommended",
+    "recommendedHint": "Courses your progress has not finished yet",
+    "recommendedPercent": "Completed: {n}%"
   },
   "calendar": {
     "title": "Training calendar",
@@ -1167,7 +1180,12 @@
       "passed": "passed"
     },
     "heroSubRole": "System overview as “{role}”",
-    "heroSubDefault": "System overview"
+    "heroSubDefault": "System overview",
+    "topCourses": "Top courses",
+    "topCoursesHint": "Where most enrolments are",
+    "topCoursesStudents": "Enrolments: {n}",
+    "reviewQueue": "Works to review",
+    "reviewQueueHint": "Submitted works awaiting a grade"
   },
   "catalog": {
     "title": "Course catalog",
@@ -1715,7 +1733,11 @@
   },
   "gradeSettings": {
     "grade": "Grade",
-    "boundary": "Boundary"
+    "boundary": "Boundary",
+    "boundaryCannotBeLess": "Lower boundary cannot be below the previous grade boundary ({prev})",
+    "boundaryCannotBeGreater": "Upper boundary cannot cross the next grade boundary ({next})",
+    "saveFailed": "Failed to save",
+    "loadFailed": "Failed to load grade settings"
   },
   "category": {
     "labelZagruzka": "Loading"
@@ -1911,7 +1933,17 @@
     "fieldGroup": "Group",
     "fieldDue": "Due date",
     "fieldMaxScore": "Max score",
-    "fieldPublish": "Publish immediately"
+    "fieldPublish": "Publish immediately",
+    "checkForm": "Check the form fields",
+    "editTitle": "Edit assignment",
+    "saveFailed": "Failed to save assignment",
+    "saved": "Assignment saved",
+    "errors": {
+      "titleRequired": "Enter a title",
+      "courseRequired": "Select a course",
+      "groupRequired": "Select a group",
+      "maxScoreInvalid": "Max score must be a positive number"
+    }
   },
   "certSettings": {
     "pageTitle": "Certificate template",
@@ -2072,5 +2104,11 @@
     "courseTitle": "Course",
     "description": "Description",
     "noCourses": "No courses yet"
-  }
+  },
+  "bank.import.title": "Import questions",
+  "bank.import.hint": "CSV or Excel: first column is the question, then options; prefix the correct one with '='.",
+  "bank.import.file": "File (CSV / XLSX)",
+  "bank.import.run": "Import",
+  "bank.import.done": "Imported: {imported}, skipped: {skipped}",
+  "bank.import.failed": "Failed to import the file"
 }

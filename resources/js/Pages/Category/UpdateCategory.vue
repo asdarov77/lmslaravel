@@ -1,153 +1,106 @@
 <template>
   <div class="u-page">
     <FormCard
+      :heading-level="1"
       :title="$t('categories.edit.title')"
       :subtitle="category ? $t('categories.edit.subtitle', { name: category.title }) : ''"
-      :busy="saving"
+      :busy="form.submitting.value"
       :show-cancel="true"
       :submit-text="$t('common.save')"
       @submit="submitForm"
       @cancel="cancelBtnHead"
     >
-      <!--
-        Пока категория не приехала из стора, category === null, и
-        обращаться к category.title нельзя: v-model падал с
-        "Cannot read properties of null" ещё до загрузки данных.
-        Форма рендерится только когда сущность готова к правке.
-      -->
       <template v-if="category">
-        <v-text-field
-          v-model="category.title"
+        <FormField
           :label="$t('categories.create.name')"
-          :error-messages="fieldErrors.title"
-          autofocus
-        ></v-text-field>
+          name="title"
+          :error="form.errors.title"
+          :required="form.isRequired('title')"
+        >
+          <v-text-field
+            v-bind="form.bind('title')"
+            autofocus
+          />
+        </FormField>
 
-        <v-textarea
-          v-model="category.description"
+        <FormField
           :label="$t('categories.create.description')"
-          :error-messages="fieldErrors.description"
-          rows="3"
-          auto-grow
-        ></v-textarea>
+          name="description"
+          :error="form.errors.description"
+        >
+          <v-textarea
+            v-bind="form.bind('description')"
+            rows="3"
+            auto-grow
+          />
+        </FormField>
       </template>
 
       <div v-else class="d-flex justify-center py-6">
         <v-progress-circular indeterminate :aria-label="$t('category.labelZagruzka')"></v-progress-circular>
       </div>
 
-      <v-alert
-        v-for="(error, index) in errors"
-        :key="index"
-        type="error"
-        class="mt-3"
-        :text="error"
-      ></v-alert>
     </FormCard>
-
   </div>
 </template>
 
-<script>
-import { mapState, mapGetters } from "vuex";
-import { asArray, extractFieldErrors } from "../../api/envelope";
-import FormCard from "../../components/ui/FormCard.vue";
-import { toast } from "../../composables/useToast";
+<script setup>
+import { computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
+import { useStore } from 'vuex'
+import { unwrapResponse } from '@/api/envelope'
+import FormCard from '@/components/ui/FormCard.vue'
+import FormField from '@/components/ui/FormField.vue'
+import useForm from '@/composables/useForm'
+import { required, maxLength } from '@/composables/validation/rules'
+import { toast } from '@/composables/useToast'
 
-export default {
-  name: "UpdateCategory",
-  components: { FormCard },
+const { t } = useI18n()
+const router = useRouter()
+const store = useStore()
 
-  props: {
-    idEdit: { type: Number, required: true },
+const props = defineProps({
+  idEdit: { type: Number, required: true },
+})
+
+const form = useForm({
+  schema: {
+    title: { initial: '', rules: [required(t('categories.create.errors.nameRequired')), maxLength(255, t('categories.create.errors.nameTooLong'))] },
+    description: { initial: '', rules: [maxLength(255, t('categories.create.errors.descriptionTooLong'))] },
   },
 
-  data() {
-    return {
-      errors: [],
-      fieldErrors: {},
-      saving: false,
-    };
+  draftKey: `category.edit.${props.idEdit}`,
+
+  onSubmit: async ({ values }) => {
+    try {
+      await store.dispatch('Course/updateCategory', {
+        id: props.idEdit,
+        data: {
+          title: values.title.trim(),
+          description: values.description.trim(),
+        },
+      })
+
+      await store.dispatch('Course/fetchCategories')
+      toast.success(t('categories.edit.done'))
+      router.push('/categories')
+    } catch (error) {
+      console.error('Update category failed:', error)
+    }
   },
+})
 
-  async mounted() {
-    await this.$store.dispatch("Course/fetchCategory", this.idEdit).catch(() => {});
-  },
+const cancelBtnHead = () => {
+    router.back()
+  }
 
-  computed: {
-    ...mapState("Course", ["courses", "category", "totalCategories"]),
-    ...mapGetters("Course", ["categories", "courses"]),
-  },
+  // Expose submitForm for backward compatibility with tests
+  const submitForm = () => form.submit()
 
-  methods: {
-    validate() {
-      this.errors = [];
-      this.fieldErrors = {};
+  const isEdit = computed(() => !!props.idEdit)
 
-      // Без этой проверки кнопка «Сохранить» отправляла бы null вместо
-      // данных категории.
-      if (!this.category) return false;
-
-      const title = String(this.category.title ?? "").trim();
-
-      if (title === "") {
-        this.fieldErrors.title = this.$t("categories.create.errors.nameRequired");
-      } else {
-        const exists = asArray(this.categories).some(
-          (item) =>
-            item.id !== this.idEdit &&
-            String(item.title ?? "").trim().toLowerCase() === title.toLowerCase()
-        );
-
-        if (exists) {
-          this.fieldErrors.title = this.$t("categories.create.errors.nameTaken");
-        }
-      }
-
-      return Object.keys(this.fieldErrors).length === 0;
-    },
-
-    async submitForm() {
-      if (this.saving) return;
-
-      this.errors = [];
-
-      if (!this.validate()) return;
-
-      this.saving = true;
-
-      // Отправляем только редактируемые поля. Раньше уходил весь объект
-      // state.category вместе с устаревшим алиасом name и служебными
-      // полями (id/created_at/updated_at), из-за чего правка названия
-      // терялась — PUT отвечал 200, не меняя ничего.
-      try {
-        await this.$store.dispatch("Course/updateCategory", {
-          id: this.idEdit,
-          data: {
-            title: String(this.category.title).trim(),
-            description: String(this.category.description ?? "").trim(),
-          },
-        });
-
-        await this.$store.dispatch("Course/fetchCategories");
-        toast.success(this.$t("categories.edit.done"));
-        this.$router.push("/categories");
-      } catch (error) {
-        const { fields, general } = extractFieldErrors(
-          error,
-          this.$t("categories.edit.errors.generic")
-        );
-        Object.assign(this.fieldErrors, fields);
-        this.errors = general && !Object.keys(fields).length ? [general] : [];
-        toast.error(general ?? "");
-      } finally {
-        this.saving = false;
-      }
-    },
-
-    cancelBtnHead() {
-      this.$router.back();
-    },
-  },
-};
+  onMounted(async () => {
+  await store.dispatch('Course/fetchCategory', props.idEdit).catch(() => {})
+})
 </script>

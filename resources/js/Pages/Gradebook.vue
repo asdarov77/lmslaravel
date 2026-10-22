@@ -12,11 +12,17 @@
         >
           {{ $t('gradebook.export') }}
         </v-btn>
+        <v-btn
+          variant="text"
+          :prepend-icon="viewMode === 'matrix' ? 'mdi-table' : 'mdi-account-tree'"
+          @click="viewMode = viewMode === 'matrix' ? 'tree' : 'matrix'"
+          class="ms-2"
+        >
+          {{ viewMode === 'matrix' ? $t('gradebook.treeView') : $t('gradebook.matrixView') }}
+        </v-btn>
       </template>
     </PageHeader>
 
-    <!-- Выбор группы: пока группы не выбрана, журнал не показывается.
-         Пустая таблица без объяснения выглядит как поломка. -->
     <div class="u-card u-card__body gb-filters" data-test="gb-filters">
       <v-select
         :items="groups"
@@ -42,6 +48,7 @@
         density="compact"
         clearable
         hide-details
+        @update:model-value="onCourse"
       />
     </div>
 
@@ -63,49 +70,91 @@
       :text="$t('gradebook.noExamsText')"
     />
 
-    <!-- Матрица. Первая колонка липкая: иначе при прокрутке вправо
-         не видно, кому принадлежит оценка. -->
-    <div v-else class="gb-wrap">
-      <table class="u-table gb-table" data-test="gb-table">
-        <caption class="u-sr-only">{{ $t('gradebook.caption') }}</caption>
-        <thead>
-          <tr>
-            <th scope="col" class="gb-table__student">{{ $t('gradebook.student') }}</th>
-            <th v-for="exam in exams" :key="exam.id" scope="col">
-              {{ exam.title }}
-              <span v-if="exam.course" class="gb-table__course">{{ exam.course }}</span>
-            </th>
-            <th scope="col" class="gb-table__avg">{{ $t('gradebook.average') }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="student in students" :key="student.id">
-            <th scope="row" class="gb-table__student">{{ student.fio }}</th>
-            <td v-for="exam in exams" :key="exam.id" class="gb-cell">
-              <button
-                v-if="cell(exam, student)"
-                type="button"
-                class="gb-grade"
-                :class="gradeClass(cell(exam, student))"
-                :title="cellTitle(exam, student)"
-                :data-test="`gb-cell-${exam.id}-${student.id}`"
-                @click="openEditor(exam, student)"
-              >
-                {{ cell(exam, student).grade }}
-                <span v-if="cell(exam, student).manual" class="gb-grade__manual" aria-hidden="true">•</span>
-              </button>
-              <span v-else class="gb-cell__empty" aria-label="—">—</span>
-            </td>
-            <td class="gb-table__avg">{{ average(student) || '—' }}</td>
-          </tr>
-        </tbody>
-      </table>
+    <template v-else>
+      <!-- Matrix view (original) -->
+      <div v-if="viewMode === 'matrix'" class="gb-wrap">
+        <table class="u-table gb-table" data-test="gb-table">
+          <caption class="u-sr-only">{{ $t('gradebook.caption') }}</caption>
+          <thead>
+            <tr>
+              <th scope="col" class="gb-table__student">{{ $t('gradebook.student') }}</th>
+              <th v-for="exam in exams" :key="exam.id" scope="col">
+                {{ exam.title }}
+                <span v-if="exam.course" class="gb-table__course">{{ exam.course }}</span>
+              </th>
+              <th scope="col" class="gb-table__avg">{{ $t('gradebook.average') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="student in students" :key="student.id">
+              <th scope="row" class="gb-table__student">{{ student.fio }}</th>
+              <td v-for="exam in exams" :key="exam.id" class="gb-cell">
+                <button
+                  v-if="cell(exam, student)"
+                  type="button"
+                  class="gb-grade"
+                  :class="gradeClass(cell(exam, student))"
+                  :title="cellTitle(exam, student)"
+                  :data-test="`gb-cell-${exam.id}-${student.id}`"
+                  @click="openEditor(exam, student)"
+                >
+                  {{ cell(exam, student).grade }}
+                  <span v-if="cell(exam, student).manual" class="gb-grade__manual" aria-hidden="true">•</span>
+                </button>
+                <span v-else class="gb-cell__empty" aria-label="—">—</span>
+              </td>
+              <td class="gb-table__avg">{{ average(student) || '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
 
-      <p class="gb-legend">
-        <span class="gb-grade__manual" aria-hidden="true">•</span>
-        {{ $t('gradebook.manualLegend') }}
-      </p>
-    </div>
+        <p class="gb-legend">
+          <span class="gb-grade__manual" aria-hidden="true">•</span>
+          {{ $t('gradebook.manualLegend') }}
+        </p>
+      </div>
+
+      <!-- Tree view (RecursiveTable) -->
+      <RecursiveTable
+        v-else
+        :columns="treeColumns"
+        :rows="treeRows"
+        :row-key="treeRowKey"
+        :parent-key="'parent_id'"
+        :tree-column-key="'name'"
+        :level-key="'_level'"
+        :title="$t('gradebook.treeTitle')"
+        :count="treeRows.length"
+        :selectable="true"
+        :loading="loading"
+        :aggregates="treeAggregates"
+        :default-expanded="true"
+        data-test="gb-tree"
+        @toggle="onTreeToggle"
+        @select="onTreeSelect"
+      >
+        <template #cell-grade="{ row, value }">
+          <span v-if="value !== null && value !== undefined" :class="gradeClass({ grade: value, manual: row.manual })">
+            {{ value }}
+            <span v-if="row.manual" class="gb-grade__manual" aria-hidden="true">•</span>
+          </span>
+          <span v-else class="u-muted">—</span>
+        </template>
+        <template #cell-correct="{ row, value }">
+          <span v-if="value !== null && value !== undefined">
+            {{ value }}/{{ row.total }}
+          </span>
+          <span v-else class="u-muted">—</span>
+        </template>
+        <template #cell-average="{ row, value }">
+          <span v-if="value !== null && value !== undefined" class="gb-table__avg">{{ value }}</span>
+          <span v-else class="u-muted">—</span>
+        </template>
+        <template #aggregate-grade="{ row }">
+          <span class="gb-table__avg">{{ row.avgGrade }}</span>
+        </template>
+      </RecursiveTable>
+    </template>
 
     <!-- Редактор ручной оценки -->
     <v-dialog v-model="editor.open" max-width="420">
@@ -156,6 +205,7 @@ import $api from '../api/httpClient'
 import { unwrapResponse } from '../api/envelope'
 import EmptyState from '../components/ui/EmptyState.vue'
 import PageHeader from '../components/ui/PageHeader.vue'
+import RecursiveTable from '../components/ui/RecursiveTable.vue'
 
 /**
  * Грейдбук преподавателя: журнал «обучаемые × экзамены».
@@ -169,7 +219,7 @@ import PageHeader from '../components/ui/PageHeader.vue'
  */
 export default {
   name: 'GradebookPage',
-  components: { EmptyState, PageHeader },
+  components: { EmptyState, PageHeader, RecursiveTable },
   data() {
     return {
       groups: [],
@@ -182,6 +232,7 @@ export default {
       courseId: null,
       loading: false,
       saving: false,
+      viewMode: 'matrix',
       editor: {
         open: false,
         exam: null,
@@ -195,8 +246,6 @@ export default {
   },
   computed: {
     gradeOptions() {
-      // Пороги задают возможные оценки: если в системе заведены «2» и
-      // «5», предлагать «1» и «6» незачем.
       const grades = [...new Set(Object.values(this.boundaries))].sort((a, b) => a - b)
 
       return grades.map((grade) => ({ title: String(grade), value: grade }))
@@ -205,9 +254,109 @@ export default {
     exportUrl() {
       return `${import.meta.env.VITE_APP_URL || ''}/api/gradebook/export?group_id=${this.groupId}`
     },
+
+    treeColumns() {
+      return [
+        { key: 'name', title: this.$t('gradebook.student'), width: '300px' },
+        { key: 'grade', title: this.$t('gradebook.grade'), width: '100px', align: 'center' },
+        { key: 'correct', title: this.$t('gradebook.correct'), width: '100px', align: 'center' },
+        { key: 'average', title: this.$t('gradebook.average'), width: '100px', align: 'right' },
+      ]
+    },
+
+    treeRows() {
+      const rows = []
+      let idCounter = 0
+
+      const addNode = (node) => {
+        node.id = node.id || `node_${idCounter++}`
+        rows.push(node)
+      }
+
+      this.exams.forEach((exam) => {
+        const examNode = {
+          id: `exam_${exam.id}`,
+          name: exam.title,
+          _level: 1,
+          _hasChildren: true,
+          grade: null,
+          correct: null,
+          total: null,
+          average: null,
+          examId: exam.id,
+          isExam: true,
+        }
+        addNode(examNode)
+
+        this.students.forEach((student) => {
+          const cell = this.cell(exam, student)
+          if (cell) {
+            const studentNode = {
+              id: `student_${student.id}_exam_${exam.id}`,
+              name: student.fio,
+              parent_id: examNode.id,
+              _level: 2,
+              _hasChildren: false,
+              grade: cell.grade,
+              correct: cell.correct,
+              total: cell.total,
+              average: cell.grade,
+              manual: cell.manual,
+              studentId: student.id,
+              examId: exam.id,
+              isStudent: true,
+            }
+            addNode(studentNode)
+          }
+        })
+      })
+
+      return rows
+    },
+
+    treeRowKey(row) {
+      return row.id
+    },
+
+    treeAggregates(rows) {
+      const aggregates = []
+      const examGroups = {}
+
+      rows.forEach((row) => {
+        if (row.isExam) {
+          examGroups[row.id] = { grades: [], count: 0 }
+        } else if (row.isStudent && row.grade !== null && row.grade !== undefined) {
+          const parentId = row.parent_id
+          if (examGroups[parentId]) {
+            examGroups[parentId].grades.push(Number(row.grade))
+            examGroups[parentId].count++
+          }
+        }
+      })
+
+      Object.entries(examGroups).forEach(([examId, data]) => {
+        if (data.grades.length > 0) {
+          const avg = (data.grades.reduce((a, b) => a + b, 0) / data.grades.length).toFixed(2)
+          aggregates.push({
+            id: `agg_${examId}`,
+            name: this.$t('gradebook.average'),
+            parent_id: examId,
+            _level: 2,
+            _hasChildren: false,
+            _parent: examId,
+            avgGrade: avg,
+            grade: null,
+            correct: null,
+            total: null,
+            average: avg,
+          })
+        }
+      })
+
+      return aggregates
+    },
   },
   async mounted() {
-    // Группы нужны до выбора: без них страница не знает, что показать.
     await this.loadGroups()
   },
   methods: {
@@ -221,8 +370,6 @@ export default {
         this.groups = payload.groups || []
 
         if (this.groups.length === 1) {
-          // Единственная группа — не заставляем человека выбирать её
-          // вручную: пустой журнал выглядит хуже, чем сразу данные.
           await this.onGroup(this.groups[0].id)
         }
       } finally {
@@ -326,6 +473,20 @@ export default {
       }
     },
 
+    onTreeToggle({ row, expanded }) {
+      // Could save expanded state to localStorage
+    },
+
+    onTreeSelect(row) {
+      if (row.isStudent && row.examId && row.studentId) {
+        const exam = this.exams.find((e) => e.id === row.examId)
+        const student = this.students.find((s) => s.id === row.studentId)
+        if (exam && student) {
+          this.openEditor(exam, student)
+        }
+      }
+    },
+
     async save() {
       this.saving = true
 
@@ -358,9 +519,9 @@ export default {
 }
 
 .gb-wrap {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
   overflow: auto;
 }
 
@@ -370,7 +531,7 @@ export default {
 }
 
 .gb-table thead th {
-  background: var(--surface-2);
+  background: var(--c-surface-2);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -380,13 +541,13 @@ export default {
   min-width: 220px;
   position: sticky;
   left: 0;
-  background: var(--surface);
+  background: var(--c-surface);
   text-align: left;
   z-index: 1;
 }
 
 .gb-table thead .gb-table__student {
-  background: var(--surface-2);
+  background: var(--c-surface-2);
   z-index: 2;
 }
 
@@ -410,7 +571,7 @@ export default {
 .gb-grade {
   background: none;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font: inherit;
   font-variant-numeric: tabular-nums;
@@ -453,5 +614,9 @@ export default {
   color: var(--c-text-muted);
   font-size: 0.75rem;
   margin-top: var(--sp-2);
+}
+
+.u-muted {
+  color: var(--c-text-muted);
 }
 </style>

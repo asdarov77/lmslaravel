@@ -98,6 +98,58 @@ class MyLearningController extends Controller
      * дашборд отдаёт агрегаты: сколько всего, сколько активных, что
      * заканчивается на этой неделе и какие экзамены уже сданы.
      */
+    public function recommended(Request $request)
+    {
+        $user = $request->user();
+
+        if (! $user || ! $user->group_id) {
+            return response()->json(['success' => true, 'data' => [], 'error' => null, 'meta' => null]);
+        }
+
+        $courses = Group2learning::with('course:id,title')
+            ->where('group_id', $user->group_id)
+            ->get()
+            ->pluck('course_id')
+            ->filter()
+            ->unique();
+
+        if ($courses->isEmpty()) {
+            return response()->json(['success' => true, 'data' => [], 'error' => null, 'meta' => null]);
+        }
+
+        $lessonProgress = \App\Models\LessonProgress::where('user_id', $user->id)
+            ->whereIn('course_id', $courses)
+            ->get(['course_id', 'percent'])
+            ->groupBy('course_id')
+            ->map(fn ($rows) => (int) round($rows->avg('percent')));
+
+        $totals = \App\Models\Aukstructure::whereIn('course_id', $courses)
+            ->select('course_id')
+            ->selectRaw('count(*) as total')
+            ->groupBy('course_id')
+            ->pluck('total', 'course_id');
+
+        $rows = $courses->map(function ($courseId) use ($lessonProgress, $totals) {
+            $percent = (int) ($lessonProgress[$courseId] ?? 0);
+
+            return [
+                'id' => (int) $courseId,
+                'title' => \App\Models\Course::query()->find($courseId)->title,
+                'percent' => $percent,
+                // Рекомендация = недоделанное. Завершённый курс
+                // пользователю не нужен, partida не выдаётся.
+                'recommended' => $percent < 100,
+                'lessons_total' => (int) ($totals[$courseId] ?? 0),
+            ];
+        })
+        ->filter(fn ($row) => $row['recommended'])
+        ->sortByDesc('lessons_total')
+        ->take(4)
+        ->values();
+
+        return response()->json(['success' => true, 'data' => $rows->all(), 'error' => null, 'meta' => null]);
+    }
+
     public function dashboard(Request $request)
     {
         $user = $request->user();

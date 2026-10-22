@@ -34,8 +34,53 @@
         <v-card-title class="text-body-1 font-weight-medium">{{ fio }}</v-card-title>
         <v-card-subtitle class="text-caption">
           {{ roleLabel }}
+          <!--
+            Прогресс XP — необязательный элемент: если движок геймификации
+            недоступен или права нет, меню продолжит работать без него.
+            Один запрос, не блокирующий открытие меню.
+          -->
+          <template v-if="xp">
+            &middot; {{ $t('gamification.xp') }} {{ xp }}
+          </template>
         </v-card-subtitle>
       </v-card-item>
+
+      <v-divider />
+
+      <!--
+        Строка переключателей, разбросанных ранее по шапке: тема,
+        плотность, язык. Компактные сегменты, а не отдельные кнопки.
+      -->
+      <div class="u-account__toggles" role="group" :aria-label="$t('app.menu.main')">
+        <ThemeToggle />
+        <button
+          type="button"
+          class="u-account__seg"
+          :aria-pressed="density !== 'compact'"
+          :title="$t('app.density')"
+          @click="toggleDensity"
+        >
+          <v-icon size="16" aria-hidden="true">mdi-view-compact</v-icon>
+        </button>
+        <div class="u-account__langs" role="group" :aria-label="$t('common.language')">
+          <button
+            type="button"
+            class="u-account__seg"
+            :class="{ 'u-account__seg--on': $i18n.locale === 'ru' }"
+            :aria-pressed="$i18n.locale === 'ru'"
+            aria-label="Русский"
+            @click="setLocale('ru')"
+          >RU</button>
+          <button
+            type="button"
+            class="u-account__seg"
+            :class="{ 'u-account__seg--on': $i18n.locale === 'en' }"
+            :aria-pressed="$i18n.locale === 'en'"
+            aria-label="English"
+            @click="setLocale('en')"
+          >EN</button>
+        </div>
+      </div>
 
       <v-divider />
 
@@ -71,6 +116,9 @@
 import { mapGetters, mapState } from 'vuex'
 import { accountItems } from '../../navigation'
 import { routePermissionIndex, requiredPermissions } from '../../utils/routePermissions'
+import ThemeToggle from '../../components/ui/ThemeToggle.vue'
+import density from '../../utils/density'
+import $api from '../../api/httpClient'
 
 /**
  * Меню профиля.
@@ -84,8 +132,11 @@ import { routePermissionIndex, requiredPermissions } from '../../utils/routePerm
  * его отсутствие.
  */
 export default {
+  components: { ThemeToggle },
+
   data: () => ({
     requiredBy: routePermissionIndex(),
+    xp: 0,
   }),
 
   computed: {
@@ -96,6 +147,9 @@ export default {
       return Boolean(this.accessToken && this.user)
     },
 
+    density() {
+      return density.read()
+    },
     fio() {
       return this.user?.fio || this.$t('account.anon')
     },
@@ -138,7 +192,34 @@ export default {
     },
   },
 
+  mounted() {
+    // XP приезжает отдельным запросом и подставляется, когда дойдёт.
+    this.loadXp()
+  },
+
   methods: {
+    setLocale(value) {      this.$store.commit('Ui/SET_LANGUAGE', value)
+      this.$i18n.locale = value
+    },
+
+    toggleDensity() {
+      density.toggle()
+      this.$store.commit('Ui/SET_DENSITY', density.read())
+    },
+
+    /**
+     * XP-плашка. Запрос отдельный и необязательный: он не должен
+     * блокировать открытие меню — при ошибке просто остаётся пустым.
+     */
+    async loadXp() {
+      try {
+        const response = await $api.get('/api/gamification/me')
+        this.xp = Number(response?.data?.data?.xp) || 0
+      } catch {
+        this.xp = 0
+      }
+    },
+
     /**
      * Выход на страницу авторизации.
      *
@@ -175,5 +256,46 @@ export default {
 
 .u-account__header {
   padding-top: 12px;
+}
+
+/* Строка переключателей: тема, плотность, язык — компактные сегменты. */
+.u-account__toggles {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+}
+
+.u-account__seg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--c-text-secondary);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.u-account__seg:hover {
+  background: var(--c-surface-2);
+}
+
+.u-account__seg--on {
+  background: var(--c-primary-soft);
+  border-color: var(--c-primary);
+  color: var(--c-primary);
+}
+
+.u-account__langs {
+  display: inline-flex;
+  gap: var(--sp-1);
+  margin-left: auto;
 }
 </style>

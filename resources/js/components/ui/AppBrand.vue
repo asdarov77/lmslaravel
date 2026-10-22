@@ -117,7 +117,7 @@ const showFull = computed(() => props.full)
     а сам компонент в светлых местах (карточки, подвал) остаётся
     вторичным тоном.
   */
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--c-white-alpha-82);
   font-weight: 400;
   font-size: 0.8125rem;
   overflow: hidden;

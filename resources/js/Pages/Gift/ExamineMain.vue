@@ -8,6 +8,14 @@
       </template>
       <template #actions>
         <v-btn
+          variant="tonal"
+          :disabled="!currentModule"
+          @click="importDialog = true"
+        >
+          <v-icon start icon="mdi-upload" size="18" aria-hidden="true"></v-icon>
+          {{ $t("bank.import.title") }}
+        </v-btn>
+        <v-btn
           color="primary"
           variant="tonal"
           :loading="loading"
@@ -223,6 +231,34 @@
       @confirm="doDelete"
     ></ConfirmDialog>
 
+    <v-dialog v-model="importDialog" max-width="520">
+      <div class="u-card bank__import" role="dialog" :aria-label="$t('bank.import.title')">
+        <h2 class="u-page__subtitle">{{ $t("bank.import.title") }}</h2>
+        <p class="u-muted bank__import-hint">{{ $t("bank.import.hint") }}</p>
+        <v-file-input
+          v-model="importFile"
+          :label="$t('bank.import.file')"
+          accept=".csv,.xlsx,.xls"
+          variant="outlined"
+          density="compact"
+        ></v-file-input>
+        <div class="d-flex justify-end gap-2">
+          <v-btn variant="text" @click="importDialog = false">
+            {{ $t("common.cancel") }}
+          </v-btn>
+          <v-btn
+            color="primary"
+            variant="flat"
+            :loading="importing"
+            :disabled="!importFile"
+            @click="doImport"
+          >
+            {{ $t("bank.import.run") }}
+          </v-btn>
+        </div>
+      </div>
+    </v-dialog>
+
   </div>
 </template>
 
@@ -276,6 +312,9 @@ export default {
       deleting: false,
       confirmDelete: false,
       pendingDelete: null,
+      importDialog: false,
+      importing: false,
+      importFile: null,
     };
   },
 
@@ -463,6 +502,30 @@ export default {
     notify(text, type = "success") {
       toast.byType(type, text);
     },
+
+    /** Импорт CSV/Excel в выбранный модуль; результат — toast с итогами. */
+    async doImport() {
+      if (!this.currentModule || !this.importFile) return;
+      this.importing = true;
+      try {
+        const fd = new FormData();
+        const file = Array.isArray(this.importFile) ? this.importFile[0] : this.importFile;
+        fd.append("file", file);
+        fd.append("aukstructure_id", this.currentModule);
+        const res = await $api.post("/api/questions/import", fd);
+        const payload = unwrapResponse(res) || {};
+        this.load();
+        this.importDialog = false;
+        this.importFile = null;
+        this.notify(
+          this.$t("bank.import.done", { imported: payload.imported || 0, skipped: payload.skipped || 0 })
+        );
+      } catch (e) {
+        this.notify(e?.response?.data?.error?.message || this.$t("bank.import.failed"), "error");
+      } finally {
+        this.importing = false;
+      }
+    },
   },
 };
 </script>
@@ -498,6 +561,14 @@ export default {
   gap: var(--sp-3);
   padding: var(--sp-4);
   margin-bottom: var(--sp-3);
+}
+
+.bank__import {
+  padding: var(--sp-4);
+}
+
+.bank__import-hint {
+  margin: var(--sp-1) 0 var(--sp-3);
 }
 
 .bank__filter-label {

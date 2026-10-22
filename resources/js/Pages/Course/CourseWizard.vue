@@ -387,6 +387,29 @@
               />
             </FormField>
 
+            <!--
+              Окно расписания: пока курс не открыт или уже закрыт,
+              материалы недоступны, независимо от флажка видимости.
+              Даты сохраняются в courses.opens_at / closes_at — бэкенд
+              принимает их, а раньше значения терялись молча.
+            -->
+            <div class="u-wizard__schedule">
+              <FormField :label="t('courses.opensAt')" name="opens_at">
+                <v-text-field
+                  v-model="form.values.opens_at"
+                  type="date"
+                  data-test="course-opens-at"
+                />
+              </FormField>
+              <FormField :label="t('courses.closesAt')" name="closes_at">
+                <v-text-field
+                  v-model="form.values.closes_at"
+                  type="date"
+                  data-test="course-closes-at"
+                />
+              </FormField>
+            </div>
+
             <h3 class="u-section__title mt-4">{{ t('course.wizard.checklist') }}</h3>
             <ul class="u-wizard__list">
               <li
@@ -532,6 +555,8 @@ const form = useForm({
     path: { initial: '', rules: [maxLength(255, t('course.errors.pathTooLong'))] },
     duration: { initial: '', rules: [min(0, t('course.errors.durationInvalid'))] },
     visible: { initial: true, rules: [] },
+    opens_at: { initial: '', rules: [] },
+    closes_at: { initial: '', rules: [] },
   },
 
   draftKey: isEdit.value ? `course.edit.${props.idEdit}` : 'course.create',
@@ -545,6 +570,8 @@ const form = useForm({
       category_id: values.category_id === '' ? null : values.category_id,
       duration: values.duration === '' ? null : Number(values.duration),
       visible: Boolean(values.visible),
+      opens_at: values.opens_at || null,
+      closes_at: values.closes_at || null,
     }
 
     if (isEdit.value) {
@@ -677,7 +704,12 @@ onMounted(async () => {
       path: course.path ?? '',
       duration: course.duration ?? '',
       visible: course.visible === undefined ? true : Boolean(course.visible),
+      opens_at: course.opens_at ?? '',
+      closes_at: course.closes_at ?? '',
+      // Дата в ISO может идти с временем — в поле date достаточно YYYY-MM-DD.
     })
+    form.values.opens_at = String(form.values.opens_at ?? '').slice(0, 10)
+    form.values.closes_at = String(form.values.closes_at ?? '').slice(0, 10)
 
     await loadManifest()
   }

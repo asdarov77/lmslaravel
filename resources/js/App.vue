@@ -289,6 +289,8 @@ export default {
        * При отсутствии значения (первый визит) меню открыто, как раньше.
        */
       drawer: readDrawer(),
+      // Свернутый rail меню: ширина 56 вместо токена (см. drawerWidth).
+      navRail: false,
       tab: true,
       courseItemShow: false,
       courseItemManiShow: false,
@@ -425,6 +427,10 @@ export default {
      * Поэтому токен читается и сразу переводится в число. Значение
      * по умолчанию продублировано на случай, если токен не задан.
      */
+    navRailWidth() {
+      return 56;
+    },
+
     drawerWidth() {
       const name = this.isNarrow
         ? "--layout-drawer-width-mobile"
@@ -433,7 +439,7 @@ export default {
       const raw = getComputedStyle(document.documentElement).getPropertyValue(name);
       const px = Number.parseFloat(raw);
 
-      return Number.isFinite(px) && px > 0 ? px : 300;
+      return this.navRail ? this.navRailWidth : (Number.isFinite(px) && px > 0 ? px : 300);
     },
 
     ...mapGetters("Auth", ["loggedIn", "isTrainee"]),
@@ -443,6 +449,10 @@ export default {
 
   mounted() {
     const hist = this.$router.options.history;
+
+    // Свернутый rail: меню сообщает о смене состояния событием,
+    // к localStorage напрямую App.vue не привязан.
+    this.navRail = window.localStorage.getItem('ui-nav-rail') === '1';
 
     // Плотность применяется к <html> при старте: без этого после
     // перезагрузки состояние в Vuex и разметка расходились бы.
@@ -455,6 +465,25 @@ export default {
       this.viewportWidth = window.innerWidth;
     };
     window.addEventListener("resize", this._onResize);
+
+    this._onRailChange = () => {
+      this.navRail = window.localStorage.getItem('ui-nav-rail') === '1';
+    };
+    window.addEventListener("ui-nav-rail-changed", this._onRailChange);
+
+    /*
+     * Глобальные хоткеи.
+     *
+     * Cmd/Ctrl+K — открыть палитру команд. Самый распространённый
+     * паттерн для командной палитры (GitHub, VS Code, Linear, Raycast).
+     */
+    this._onKeydown = (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+        event.preventDefault();
+        this.paletteOpen = true;
+      }
+    };
+    window.addEventListener("keydown", this._onKeydown);
 
     /*
      * Снимаем скелетон после первой отрисовки.
@@ -472,6 +501,14 @@ export default {
     if (this._onResize) {
       window.removeEventListener("resize", this._onResize);
       this._onResize = null;
+    }
+    if (this._onRailChange) {
+      window.removeEventListener("ui-nav-rail-changed", this._onRailChange);
+      this._onRailChange = null;
+    }
+    if (this._onKeydown) {
+      window.removeEventListener("keydown", this._onKeydown);
+      this._onKeydown = null;
     }
   },
 

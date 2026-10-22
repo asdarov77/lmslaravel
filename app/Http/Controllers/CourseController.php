@@ -15,6 +15,7 @@ use App\Models\Group;
 use App\Models\Group2learning;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Storage;
@@ -121,6 +122,8 @@ class CourseController extends Controller
             'duration' => 'nullable|integer|min:0',
             'status' => 'nullable|string|max:50',
             'visible' => 'nullable|boolean',
+            'opens_at' => 'nullable|date',
+            'closes_at' => 'nullable|date|after_or_equal:opens_at',
             'aircraft_id' => 'nullable|integer|exists:aircrafts,id',
             'category_id' => 'nullable|integer|exists:categories,id',
         ];
@@ -158,6 +161,12 @@ class CourseController extends Controller
 
         if ($request->has('visible')) {
             $attributes['visible'] = $request->boolean('visible');
+        }
+
+        foreach (['opens_at', 'closes_at'] as $key) {
+            if ($request->has($key)) {
+                $attributes[$key] = $request->input($key);
+            }
         }
 
         return $attributes;
@@ -226,8 +235,108 @@ class CourseController extends Controller
     //----------------------------------------------------
 
 
-    public function getlink(Request $request, $id)
+    /**
+     * GET /api/course-player/{course} — единый endpoint открытия курса.
+     *
+     * Возвращает одним ответом всё, что плеер тянет в mounted() шестью
+     * запросами: курс, дерево разделов, избранное и entry (составляющие
+     * подписанного пути к первому материалу). Дерево — только поля,
+     * нужные UI, разрезанное по категории через ?category_id=; entry
+     * считается сервером, поэтому кадр открывается без цепочки RTT.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $courseId
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function player(Request $request, $courseId)
     {
+        $course = Course::with('aircraft')->find($courseId);
+
+        if (! $course || ! $course->aircraft) {
+            abort(404, 'Курс не найден');
+        }
+
+        CourseAccess::authorizeOpen($request->user(), $course);
+
+        // Разрез по специальности: тот же код, что применял фронтенд,
+        // теперь единственный источник правды — сервер.
+        $code = null;
+        if ($request->filled('category_id')) {
+            $code = Category::where('id', (int) $request->query('category_id'))->value('code');
+        }
+
+        $query = Aukstructure::where('course_id', $course->id)
+            ->select('id', 'parent_id', 'type', 'title', 'categories')
+            ->orderBy('id');
+
+        /*
+         * P0.2: дерево в кэше, ключ с max(updated_at) узлов курса —
+         * самоневалидирующийся: любой реимпорт структуры меняет updated_at
+         * и превращает старый ключ в мусор, отдельное событие не нужно.
+         */
+        $stamp = DB::table('aukstructures')
+            ->where('course_id', $course->id)
+            ->max('updated_at');
+        $tree = collect(Cache::remember(
+            'player:tree:' . $course->id . ':' . $stamp,
+            now()->addMinutes(10),
+            fn () => $query->get()->all())
+        );
+
+        $visible = $code !== null
+            ? $tree->filter(fn ($auk) => $auk->categories !== null
+                && in_array(trim((string) $code), array_map('trim', explode(',', (string) $auk->categories)), true))
+            : $tree;
+
+        // entry: первый материал после разреза. Файла может не быть —
+        // тогда entry равен null и фронтенд показывает пустой кадр, как раньше.
+        $entry = null;
+        $firstId = $visible->firstWhere('type', 3)?->id;
+
+        if ($firstId) {
+            $link = Link::where('aukstructure_id', $firstId)->value('link');
+            $airpath = trim($course->aircraft->path);
+            $aukspath = trim($course->path);
+
+            $entry = [
+                'aukstructure_id' => (int) $firstId,
+                'aircraft' => $airpath,
+                'auk' => $aukspath,
+                'file' => (string) $link,
+                'signed_base' => \App\Support\PrivateContentSigner::signedPath($airpath, $aukspath),
+            ];
+        }
+
+        $favorites = DB::table('favorites')
+            ->where('user_id', $request->user()?->id)
+            ->get(['id', 'course_id', 'title']);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'course' => [
+                    'id' => $course->id,
+                    'title' => $course->title,
+                    'path' => $course->path,
+                    'aircraft_id' => $course->aircraft_id,
+                    'aircraft_title' => $course->aircraft->title,
+                ],
+                'tree' => $visible->values()->map(fn ($auk) => [
+                    'id' => $auk->id,
+                    'parent_id' => $auk->parent_id,
+                    'type' => $auk->type,
+                    'title' => $auk->title,
+                    'categories' => $auk->categories,
+                ]),
+                'favorites' => $favorites,
+                'entry' => $entry,
+            ],
+            'error' => null,
+            'meta' => null,
+        ]);
+    }
+
+    public function getlink(Request $request, $id)    {
         // Ссылка ведёт на файл материала, поэтому доступ к ней
         // ограничен так же, как к манифесту курса.
         $auk = Aukstructure::with(['course.aircraft'])->find($id);
@@ -253,7 +362,6 @@ class CourseController extends Controller
         $link = Link::where('aukstructure_id', $id)
             ->value('link');
 
-        $curCourseId = $auk->course_id;
         $course = $auk->course;   // уже загружен через with()
         $aircraft = $course->aircraft; // уже загружен через with()
 
@@ -266,29 +374,19 @@ class CourseController extends Controller
         $airpath = trim($aircraft->path);
         $aukspath = trim($course->path);
 
-        $firstId =
-            Aukstructure::where([
-                ['course_id', '=', $curCourseId],
-                ['type', '=', 3],
-            ])
-                ->orderBy('id')
-                ->value('id');
-
-        $firstLink = $firstId
-            ? Link::where('aukstructure_id', $firstId)
-                ->value('link')
-            : null;
-
-        $url = Config::get('app.private_path') . $airpath . "/" . $aukspath . "/" . $link;
-        $urlfirst = Config::get('app.private_path') . $airpath . "/" . $aukspath . "/" . $firstLink;
-
-        $file = $link != null ? $link : $firstLink;
+        /*
+         * P1.2: fallback «у модуля без файла отдать файл первого
+         * материала» убран — он делал полный выбор type=3 ради одного id
+         * и подсовывал чужой файл. Файл — из Link узла или ничего:
+         * фронтенд на пустой file показывает «файл не найден», а первый
+         * модуль открывает entry из course-player.
+         */
+        $link = Link::where('aukstructure_id', $id)->value('link');
 
         return [
             'aircraft' => $airpath,
             'auk'      => $aukspath,
-            'file'     => (string) $file,
-            'url'      => $link != null ? $url : $urlfirst,
+            'file'     => (string) $link,
         ];
     }
 

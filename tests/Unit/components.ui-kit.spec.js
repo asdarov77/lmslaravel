@@ -121,6 +121,19 @@ describe('UI-примитивы Фазы 1.3 монтируются', () => {
     wrapper.unmount()
   })
 
+  it('StatCard: count-up анимирует смену значения, первое рисуется сразу', async () => {
+    const wrapper = mount(StatCard, {
+      ...mountOptions,
+      props: { label: 'Студенты', value: 1200 },
+    })
+    const text = () => wrapper.text().replace(/\u00a0/g, ' ')
+    expect(text()).toContain('1 200')
+    await wrapper.setProps({ value: 1250 })
+    await new Promise((r) => setTimeout(r, 600))
+    expect(text()).toContain('1 250')
+    wrapper.unmount()
+  })
+
   it('ProgressBarRing: ограничивает значение 0..100', () => {
     const wrapper = mount(ProgressBarRing, { ...mountOptions, props: { value: 140 } })
     expect(wrapper.text()).toContain('100%')

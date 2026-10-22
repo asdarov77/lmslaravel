@@ -66,8 +66,11 @@
         <ButtonGroup
           class="mr-3"
           v-if="!loading"
-          @submitForm="uploadData"
-          @cancelBtn="cancelBtnHead"
+          :busy="saving"
+          :submit-text="$t('common.save')"
+          :cancel-text="$t('common.cancel')"
+          @submit="uploadData"
+          @cancel="cancelBtnHead"
         ></ButtonGroup>
       </v-card-actions>
     </v-card>

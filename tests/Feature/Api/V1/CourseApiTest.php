@@ -64,6 +64,35 @@ class CourseApiTest extends TestCase
                  ]);
     }
 
+    /** Расписание: окно сохраняется и валидируется. */
+    public function test_can_save_course_schedule_window(): void
+    {
+        Sanctum::actingAs($this->adminUser);
+
+        $response = $this->postJson('/api/v1/courses', [
+            'name' => 'Курс с расписанием',
+            'category_id' => $this->category->id,
+            'opens_at' => '2026-01-01',
+            'closes_at' => '2026-06-30',
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertStringContainsString('2026-01-01', (string) $response->json('data.opens_at'));
+        $this->assertStringContainsString('2026-06-30', (string) $response->json('data.closes_at'));
+    }
+
+    public function test_schedule_window_validates_order(): void
+    {
+        Sanctum::actingAs($this->adminUser);
+
+        $this->postJson('/api/v1/courses', [
+            'name' => 'Курс с перепутанным окном',
+            'category_id' => $this->category->id,
+            'opens_at' => '2026-06-30',
+            'closes_at' => '2026-01-01',
+        ])->assertStatus(422);
+    }
+
     public function test_can_update_course(): void
     {
         Sanctum::actingAs($this->adminUser);

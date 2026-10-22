@@ -241,3 +241,28 @@ return [ /* те же поля */ + 'signed' => $signer->urlFor($aircraft, $auk,
   CourseTree с раскрытием (связан с Рекурсивной таблицей из дизайн-плана 1.5); отказ от setTimeout-подсветки.
 - **Спринт 3 (P2):** очереди импорта, событийный прогресс, хеш-пути + immutable caching;
   решение по SCORM-sequencing (продуктовый вопрос владельцу курса).
+
+## 6. Статус плана на 2026-10-20 (сверено с кодом)
+
+Обновлено 2026-10-22: P0.1 выполнен, P0.3 закрывается клиентским кэшем, P0.4 — задача эксплуатации.
+
+| Пункт | Факт в коде |
+|---|---|
+| P0.1 player-endpoint | **Сделан.** `GET /api/course-player/{courseId}` (`CourseController::player`): курс + компактное дерево (id/parent_id/type/title/categories, разрез по `?category_id=` сервером) + избранное текущего пользователя + entry (первый материал после разреза со `signed_base`). Gated `CourseAccess::authorizeOpen`, тесты — `CourseContentAccessTest`. `CourseManifest.vue` ходит в него одним запросом (`loadPlayerData()`), шестерка dispatch'ей заменена одним `fetchAircrafts`; entry открывает кадр сразу, без `getlink` |
+| P0.2 серверный кэш дерева | **Сделан (2026-10-22).** `Cache::remember('player:tree:{id}:{max(updated_at)}', 10min)` в `CourseController::player`: ключ с max(updated_at) узлов — самоневалидирующийся при реимпорте, отдельное событие не нужно. Кэш подписи не делался: `PrivateContentSigner::signedPath` — чистая функция, выгоды мало |
+| P0.3 клиентский LRU-кэш | **Сделан (2026-10-22).** `resources/js/utils/docCache.js` (15 документов, LRU, ключ `course:item`), используется в `getlink()` и entry: повторный клик — мгновенный srcdoc без сети. Не реактивен намеренно. Prefetch следующего модуля и stale-while-revalidate не делались (shortcut в доке утилиты) |
+| P0.4 nginx X-Accel | инфраструктура есть (`ContentDelivery`, `content:nginx-config`, `deploy/nginx-content-delivery.conf`), но режим выбирается настройкой `settings.content_delivery`; по умолчанию — `php`. Включить на проде — задача эксплуатации, чек-лист ниже |
+| P1.1 tsvector-поиск | **Сделан (2026-10-22).** Миграция `lesson_search_index` (plain_text + генерируемый БД `to_tsvector('russian')` tsvector + GIN); наполнение — `App\Support\LessonSearchIndexer` + команда `courses:index-content` (+ self-heal из контроллера при пустом индексе курса); `POST /api/search-files` переписан на `websearch_to_tsquery('russian')` с `ts_rank` (PHP читает и подсвечивает только 25 найденных файлов, формат ответа прежний); права — `CourseAccess::authorizeOpen`, записанный обучаемый ищет в своём курсе. Фронт: отмена предыдущего запроса (AbortController). Тесты — `LessonSearchIndexTest` |
+| P1.2 getlink | **Закрыт (2026-10-22):** fallback «файл первого материала» убран (полный выбор `type=3` исчез), мёртвые `$url`/`$urlfirst` и весь смысл fastest — фронт использует только aircraft/auk/file, а первый модуль открывает entry из course-player |
+| P1.3 подсветка | `setTimeout(1000)` из горячего пути удалён (применение в `onFrameLoad`) — пункт закрыт досрочно, вне рамок P1 |
+| P1.4 дерево | **Закрыт (2026-10-22).** Рекурсия в `TreeView/TreeViewNode` (одна проходка computed, раскрытие/collapse, отметки visited), inline `nodeStyle` удалён из CourseManifest — уровни только на классах; виртуализация для >300 узлов сознательно не добавлялась: vue-virtual-scroller в зависимостях нет, реальные курсы ~180 узлов, а окно рендера cgda будет первый курс >300 (см. также RecursiveTable с собственной виртуализацией) |
+
+**Чек-лист включения режима `nginx` (снимает главную причину «не справится при нагрузке»):**
+1. применить `php artisan content:nginx-config` вывод в боевой nginx (internal location выше try_files по приоритету);
+2. в `/settings` переключить раздачу на `nginx`;
+3. `php artisan content:check-exposure` — убедиться, что прямой доступ к файлам закрыт;
+4. прогнать Playwright-сценарий открытия курса и вложенных ресурсов (403 на CSS/картинки — признак неверного alias).
+
+**Минимальный фронтенд-фикс без бэкенда (1–2 часа, убрать половину задержки старта):**
+удалить дублирующий `fetchAircrafts` и лишние dispatch'и в `mounted()`, оставив один
+источник данных о курсе (фильтр-запрос), — это снижает старт с 6+1 запросов до 2.

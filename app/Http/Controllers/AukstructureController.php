@@ -63,7 +63,10 @@ class AukstructureController extends Controller
             'identifier' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $item = Aukstructure::create($validated);
+        $item = Aukstructure::create([
+            ...$validated,
+            'description' => \App\Support\HtmlSanitizer::clean($validated['description'] ?? null),
+        ]);
 
         return response()->json([
             'data' => $item,
@@ -100,7 +103,9 @@ class AukstructureController extends Controller
             'identifier' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $item->update($validated);
+        $item->update(array_merge($validated, [
+            'description' => \App\Support\HtmlSanitizer::clean($validated['description'] ?? null),
+        ]));
 
         return response()->json([
             'data' => $item->fresh(),

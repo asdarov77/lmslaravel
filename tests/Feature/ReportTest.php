@@ -218,6 +218,36 @@ class ReportTest extends TestCase
         $this->assertStringContainsString('Группа CSV', $csv);
     }
 
+    /** Экспорт в XLSX: реальный zip-контейнер xlsx. */
+    public function test_export_xlsx_returns_excel_file(): void
+    {
+        $admin = $this->userWith('admin');
+        $course = Course::factory()->create(['title' => 'Курс для XLSX']);
+        $group = Group::factory()->create(['groupname' => 'Группа XLSX']);
+        $this->enroll($course, $group);
+
+        $response = $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/reports/export?report=enrollment&format=xlsx');
+
+        $response->assertOk();
+        $this->assertStringStartsWith('PK', (string) $response->getContent());
+    }
+
+    /** Экспорт в PDF: валидный pdf-заголовок. */
+    public function test_export_pdf_returns_pdf_file(): void
+    {
+        $admin = $this->userWith('admin');
+        $course = Course::factory()->create(['title' => 'Курс для PDF']);
+        $group = Group::factory()->create(['groupname' => 'Группа PDF']);
+        $this->enroll($course, $group);
+
+        $response = $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/reports/export?report=enrollment&format=pdf');
+
+        $response->assertOk();
+        $this->assertStringStartsWith('%PDF', (string) $response->getContent());
+    }
+
     public function test_unknown_report_is_rejected(): void
     {
         $admin = $this->userWith('admin');

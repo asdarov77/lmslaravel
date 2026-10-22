@@ -13,7 +13,7 @@
 </template>
 
 <script>
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { prefersReducedMotion } from '../../utils/motion'
@@ -39,6 +39,24 @@ export default {
     const { t } = useI18n()
     const reducedMotion = prefersReducedMotion()
 
+    // Direction-aware: глубина маршрута по числу сегментов пути.
+    // «Вглубь» (подробная страница) слайдит влево, «наверх» (к списку)
+    // — вправо, на той же глубине — flat.
+    const direction = ref('forward')
+    const depthOf = (path) =>
+      String(path || '').replace(/\?.*$/, '').replace(/\/+$/, '').split('/').filter(Boolean).length
+
+    watch(
+      () => route.fullPath,
+      (newPath, oldPath) => {
+        if (!oldPath) return
+        const to = depthOf(newPath)
+        const from = depthOf(oldPath)
+        direction.value = to === from ? 'flat' : to > from ? 'forward' : 'back'
+      },
+      { flush: 'pre' },
+    )
+
     // CSS переменные для длительностей (передаются в CSS через style binding)
     const pageEnterDur = computed(() => reducedMotion.value ? 0 : props.enterDuration)
     const pageLeaveDur = computed(() => reducedMotion.value ? 0 : props.leaveDuration)
@@ -47,6 +65,7 @@ export default {
       '--page-slide-distance': `${props.slideDistance}px`,
       '--page-enter-dur': `${pageEnterDur.value}ms`,
       '--page-leave-dur': `${pageLeaveDur.value}ms`,
+      '--page-direction': direction.value,
     }))
 
     // Переключатель reduced-motion (слушаем системную настройку)
@@ -72,6 +91,7 @@ export default {
       reducedMotion,
       pageEnterDur,
       pageLeaveDur,
+      direction,
       transitionStyles,
     }
   },
@@ -79,8 +99,12 @@ export default {
   methods: {
     onBeforeEnter(el) {
       if (this.reducedMotion) return
+      // Направление: forward — слайд влево (углубление), back — вправо,
+      // flat — слабый слайд без смены глубины.
+      const sign = this.direction === 'back' ? -1 : 1
+      const dist = this.direction === 'flat' ? Math.round(this.slideDistance / 2) : this.slideDistance
       el.style.opacity = '0'
-      el.style.transform = `translateX(${this.slideDistance}px)`
+      el.style.transform = `translateX(${dist * sign}px)`
     },
 
     onAfterEnter(el) {

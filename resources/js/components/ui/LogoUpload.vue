@@ -136,7 +136,7 @@ export default {
 }
 
 .logo-upload__img {
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--c-black-alpha-12);
   border-radius: 8px;
   height: 64px;
   object-fit: contain;
@@ -145,9 +145,9 @@ export default {
 }
 
 .logo-upload__remove {
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--c-black-alpha-60);
   border-radius: 50%;
-  color: #fff;
+  color: var(--c-text-inverse);
   height: 28px;
   position: absolute;
   right: -10px;

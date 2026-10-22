@@ -360,16 +360,17 @@ describe('CourseManifest: посещённые материалы', () => {
 })
 
 describe('CourseManifest: стиль узла дерева', () => {
-  it('отступ и кегль зависят от уровня', async () => {
+  it('inline nodeStyle удалён: уровни узла на классах TreeView', async () => {
     const wrapper = mountPage()
     await tick()
     await tick()
 
-    expect(wrapper.vm.nodeStyle({ type: 0 }).paddingLeft).toBe('0px')
-    expect(wrapper.vm.nodeStyle({ type: 1 }).paddingLeft).toBe('8px')
-    expect(wrapper.vm.nodeStyle({ type: 3 }).paddingLeft).toBe('32px')
-    expect(wrapper.vm.nodeStyle({ type: 0 }).fontSize).toBe('30px')
-    expect(wrapper.vm.nodeStyle({ type: 3 }).fontSize).toBe('18px')
+    // P1.4: паддинг и кегль зависит от level через --level-классы
+    // TreeViewNode, а не inline-стили (inline перерисовывают все узлы
+    // при смене активного).
+    expect(wrapper.vm.nodeStyle).toBeUndefined()
+    const TreeView = (await import('../../resources/js/components/ui/TreeViewNode.vue')).default
+    expect(TreeView).toBeTruthy()
   })
 
   it('узлы дерева не завязаны на document.getElementById', async () => {

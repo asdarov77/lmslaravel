@@ -727,7 +727,9 @@
       "loadFailed": "Не удалось загрузить описание курса",
       "saved": "Описание курса сохранено",
       "saveFailed": "Не удалось сохранить описание"
-    }
+    },
+    "opensAt": "Открыть курс с",
+    "closesAt": "Открыть курс до"
   },
   "groupLearning": {
     "title": "Запись групп пользователей на курсы",
@@ -745,7 +747,15 @@
     "labelKursy-i-moduli": "Курсы и модули",
     "selectHint": "Выберите класс и категорию — после этого появится список курсов",
     "selectedCount": "Выбрано модулей: {count}",
-    "materialsOnlyHint": "Отметить можно только модули — они и есть единица записи. Темы и разделы показывают структуру."
+    "materialsOnlyHint": "Отметить можно только модули — они и есть единица записи. Темы и разделы показывают структуру.",
+    "groupRequired": "Выберите группу",
+    "classRequired": "Выберите класс",
+    "categoryRequired": "Выберите категорию",
+    "coursesRequired": "Выберите хотя бы один курс",
+    "fromRequired": "Укажите дату начала",
+    "toRequired": "Укажите дату окончания",
+    "toBeforeFrom": "Дата окончания не может быть раньше начала",
+    "loadCoursesError": "Не удалось загрузить курсы группы"
   },
   "classes": {
     "title": "Добавление класса",
@@ -843,7 +853,10 @@
     "streakHint": "Сколько дней подряд вы занимались. Тёмная клетка — день без активности.",
     "streakUnit": "дней подряд",
     "streakLegendFrom": "меньше",
-    "streakLegendTo": "больше"
+    "streakLegendTo": "больше",
+    "recommendedTitle": "Рекомендованные",
+    "recommendedHint": "Курсы, которые прогресс ещё не закрыл",
+    "recommendedPercent": "Пройдено: {n}%"
   },
   "calendar": {
     "title": "Календарь обучения",
@@ -1167,7 +1180,12 @@
       "passed": "сдано"
     },
     "heroSubRole": "Сводка по системе в роли «{role}»",
-    "heroSubDefault": "Сводка по системе"
+    "heroSubDefault": "Сводка по системе",
+    "topCourses": "Топ курсов",
+    "topCoursesHint": "Где больше всего зачислений",
+    "topCoursesStudents": "Зачислений: {n}",
+    "reviewQueue": "Работы на проверку",
+    "reviewQueueHint": "Сданные работы, ждущие оценки"
   },
   "catalog": {
     "title": "Каталог курсов",
@@ -1715,7 +1733,11 @@
   },
   "gradeSettings": {
     "grade": "Оценка",
-    "boundary": "Граница"
+    "boundary": "Граница",
+    "boundaryCannotBeLess": "Нижняя граница не может быть меньше границ предыдущей оценки ({prev})",
+    "boundaryCannotBeGreater": "Верхняя граница не может пересекать границу следующей оценки ({next})",
+    "saveFailed": "Не удалось сохранить",
+    "loadFailed": "Не удалось загрузить настройки оценок"
   },
   "category": {
     "labelZagruzka": "Загрузка"
@@ -1911,7 +1933,17 @@
     "fieldGroup": "Группа",
     "fieldDue": "Срок сдачи",
     "fieldMaxScore": "Максимальный балл",
-    "fieldPublish": "Опубликовать сразу"
+    "fieldPublish": "Опубликовать сразу",
+    "checkForm": "Проверьте поля формы",
+    "editTitle": "Редактирование задания",
+    "saveFailed": "Не удалось сохранить задание",
+    "saved": "Задание сохранено",
+    "errors": {
+      "titleRequired": "Укажите название",
+      "courseRequired": "Выберите курс",
+      "groupRequired": "Выберите группу",
+      "maxScoreInvalid": "Максимальный балл должен быть положительным числом"
+    }
   },
   "certSettings": {
     "pageTitle": "Бланк сертификата",
@@ -2072,5 +2104,11 @@
     "courseTitle": "Курс",
     "description": "Описание",
     "noCourses": "Пока нет курсов"
-  }
+  },
+  "bank.import.title": "Импорт вопросов",
+  "bank.import.hint": "CSV или Excel: первый столбец — вопрос, дальше варианты; верный помечается знаком «=» перед текстом.",
+  "bank.import.file": "Файл (CSV / XLSX)",
+  "bank.import.run": "Импортировать",
+  "bank.import.done": "Импортировано: {imported}, пропущено: {skipped}",
+  "bank.import.failed": "Не удалось импортировать файл"
 }

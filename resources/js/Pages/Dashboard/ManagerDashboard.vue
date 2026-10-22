@@ -110,6 +110,40 @@
 
         <p v-else class="dash__muted">{{ $t('manager.recentEmpty') }}</p>
       </section>
+
+      <!-- Топ курсов: где зачисления и активность попыток -->
+      <section v-if="topCourses.length" class="u-card dash__panel u-card--glass u-hover-lift">
+        <h2 class="u-card__title">{{ $t('manager.topCourses') }}</h2>
+        <p class="u-page__subtitle">{{ $t('manager.topCoursesHint') }}</p>
+
+        <ul class="dash__list">
+          <li v-for="(row, index) in topCourses" :key="row.id" class="dash__list-row" data-stagger :data-stagger-index="index">
+            <div>
+              <span class="dash__list-title">{{ row.title }}</span>
+              <span class="dash__list-sub">{{ $t('manager.topCoursesStudents', { n: row.students }) }}</span>
+            </div>
+            <span class="u-badge">{{ row.attempts }}</span>
+          </li>
+        </ul>
+      </section>
+
+      <!-- Работы на проверку: сданные без оценки -->
+      <section v-if="reviewQueue.length" class="u-card dash__panel u-card--glass u-hover-lift">
+        <h2 class="u-card__title">{{ $t('manager.reviewQueue') }}</h2>
+        <p class="u-page__subtitle">{{ $t('manager.reviewQueueHint') }}</p>
+
+        <ul class="dash__list">
+          <li v-for="row in reviewQueue" :key="row.id" class="dash__list-row">
+            <div>
+              <span class="dash__list-title">{{ row.assignment }}</span>
+              <span class="dash__list-sub">{{ row.student }}</span>
+            </div>
+            <v-btn size="x-small" variant="text" color="primary" to="/assignments">
+              {{ $t('manager.open') }}
+            </v-btn>
+          </li>
+        </ul>
+      </section>
       </div>
     </template>
 
@@ -144,6 +178,8 @@ export default {
     stats: [],
     attention: [],
     recent: [],
+    topCourses: [],
+    reviewQueue: [],
     // Ряды для графиков: приходят готовыми, считаются на сервере.
     trends: { attempts_by_month: [], groups: [] },
     loading: true,
@@ -197,6 +233,8 @@ export default {
       this.stats = Array.isArray(data.stats) ? data.stats : []
       this.attention = Array.isArray(data.attention) ? data.attention : []
       this.recent = Array.isArray(data.recent) ? data.recent : []
+      this.topCourses = Array.isArray(data.top_courses) ? data.top_courses : []
+      this.reviewQueue = Array.isArray(data.review_queue) ? data.review_queue : []
       this.trends = {
         attempts_by_month: Array.isArray(data.trends?.attempts_by_month) ? data.trends.attempts_by_month : [],
         groups: Array.isArray(data.trends?.groups) ? data.trends.groups : [],

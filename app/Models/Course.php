@@ -34,11 +34,41 @@ class Course extends Model
         'long_description',
         'path',
         'visible',
+        'opens_at',
+        'closes_at',
         'aircraft_id',
         'category_id',
         'status',
         'duration',
     ];
+
+    protected $casts = [
+        'opens_at' => 'date',
+        'closes_at' => 'date',
+    ];
+
+    /**
+     * Открыт ли курс сейчас: окно расписания, если задано, перекрывает
+     * флаг visible. Не задано окно — курс просто читает visible.
+     */
+    public function isOpenNow(): bool
+    {
+        if (! $this->visible) {
+            return false;
+        }
+
+        $today = now()->toDateString();
+
+        if ($this->opens_at !== null && $today < $this->opens_at) {
+            return false;
+        }
+
+        if ($this->closes_at !== null && $today > $this->closes_at) {
+            return false;
+        }
+
+        return true;
+    }
 
     /**
      * Поля API v1, которые являются алиасами существующих колонок.
