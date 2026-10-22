@@ -313,7 +313,6 @@ export default {
 
   mounted() {
     //   const iframe = this.$refs.myIframe;
-    //   const iframeDoc = iframe.contentDocument;
     // iframe.addEventListener('load', () => {
     //   this.highlightNodes(iframe);
     // });
@@ -381,6 +380,14 @@ export default {
         //удалить возможно
         this.path = course.path; // папка с АУК        
         this.aircraft = course.aircraft_id;
+
+        // Автооткрытие первого модуля (см. docs/course-player-performance.md §1.2):
+        // без этого страница открывалась пустым кадром до первого клика — часть
+        // воспринимаемой «задержки открытия курса» была именно отсутствием
+        // entry-материала. Открываем, только если пользователь ещё ничего не выбрал.
+        if (!this.activeId && this.getFirstAukId) {
+          this.getlink(this.getFirstAukId);
+        }
       })
       .catch((err) => {
         console.error(err);
@@ -760,34 +767,38 @@ export default {
 
     loadContent(item, hlHtml) {
       this.isLoading = true;
-      this.getlink(item); // загружаем в iframe содержимое файла статического html
-
-      //await this.onIframeLoaded();
-
-      //this.method(hlHtml)
-
-      setTimeout(() => {
-        const iframe = this.$refs.myIframe;
-        const iframeDoc = iframe.contentDocument;
-        const dom = new DOMParser().parseFromString(iframeDoc.body.innerHTML, 'text/html');
+      // Регресс производительности (см. docs/course-player-performance.md §1.2, P1.3):
+      // раньше подсветка шла через setTimeout(1000) с прямой мутацией
+      // iframeDoc.body.innerHTML — на тяжёлых документах iframe не успевал
+      // прогрузиться (гонка), а перестройка всего <body> вызывала full reflow
+      // и «подвисание» материала. Теперь: контент загружаем через getlink(),
+      // а подсветку применяем в onload-колбазе уже готового srcdoc-кадра,
+      // точечно заменяя только узлы-совпадения (без перезаписи body целиком).
+      const applyHighlight = () => {
         try {
+          const doc = this.$refs.myIframe?.contentDocument;
+          if (!doc || !hlHtml?.length) return;
           hlHtml.forEach((highlighted) => {
-            const nodeToReplace = dom.evaluate(highlighted.originalXpath, dom, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-            if (nodeToReplace) {
-              const parentNode = nodeToReplace.parentNode;
-              //const highlightedTextCon = document.createElement('span');
-              //highlightedTextCon.style.backgroundColor = 'yellow';
-              parentNode.innerHTML = highlighted.highlightedText;
+            const nodeToReplace = doc.evaluate(
+              highlighted.originalXpath, doc, null,
+              XPathResult.FIRST_ORDERED_NODE_TYPE, null
+            ).singleNodeValue;
+            if (nodeToReplace && nodeToReplace.parentNode) {
+              const holder = doc.createElement('div');
+              holder.innerHTML = highlighted.highlightedText;
+              nodeToReplace.parentNode.replaceChild(holder.firstChild ?? nodeToReplace, nodeToReplace);
             }
           });
+          this.highlightNodes(doc);
         } catch (e) {
           console.log(e);
+        } finally {
+          this.isLoading = false;
         }
-        iframeDoc.body.innerHTML = dom.documentElement.innerHTML;
-        this.highlightNodes(iframeDoc);
+      };
 
-      }, 1000) // делаем задержку чтобы на тяжелых страницах iframe прогрузился и успели раскраситься слова
-      this.isLoading = false;
+      // Подсвечиваем после фактической загрузки кадра, а не по таймеру.
+      this.getlink(item).then(() => this.$nextTick(applyHighlight));
     },
 
     ///-------------------------------------------скроллинг --------------------------------------------------------------
