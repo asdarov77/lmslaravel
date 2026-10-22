@@ -8,11 +8,11 @@ use App\Http\Requests\Course\FilterRequest;
 use Illuminate\Http\Request;
 use App\Models\Course;
 use App\Support\CourseAccess;
-use App\Models\Aircraft;
 use App\Models\Aukstructure;
 use App\Models\Link;
 use App\Models\Category;
 use App\Models\Group;
+use App\Models\Group2learning;
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -230,7 +230,7 @@ class CourseController extends Controller
     {
         // Ссылка ведёт на файл материала, поэтому доступ к ней
         // ограничен так же, как к манифесту курса.
-        $auk = Aukstructure::with('course')->find($id);
+        $auk = Aukstructure::with(['course.aircraft'])->find($id);
 
         if (! $auk || ! $auk->course) {
             abort(404, 'Тема не найдена');
@@ -238,71 +238,55 @@ class CourseController extends Controller
 
         CourseAccess::authorizeOpen($request->user(), $auk->course);
 
-        $link = (Link::where('aukstructure_id', $id)
-            ->value('link')
-        );
-        // $curCourse = Aukstructure::find($id)->where('type', 3)->firstOrFail();
-        // $curCourseId = $curCourse->id;
-        // Находка: find() возвращает null, а обращение ->course_id давало 500.
-        $curCourse = Aukstructure::find($id);
-        if (!$curCourse) {
-            return response()->json([
-                'message' => 'Aukstructure не найден',
-            ], 404);
-        }
-        $curCourseId = $curCourse->course_id;
+        /*
+         * Запись может относиться не к курсу, а к отдельным материалам
+         * внутри него: группа отмечается галочками по узлам дерева, и
+         * каждая отметка пишется своей строкой с parent_id.
+         *
+         * Обе проверки — и по материалу, и по специальности — живут в
+         * CourseAccess. Спецразделение раньше проверялось отдельным
+         * блоком прямо здесь, и две проверки доступа в двух местах
+         * разъезжались: новая точка проверки могла забыть про одну из них.
+         */
+        CourseAccess::authorizeOpenModule($request->user(), $auk->course, (int) $id);
 
-        //$aukstruct = Aukstructure::find($id);
-        //$auks = Course::find($aukstruct->course_id);
-        $auks = Course::where('id',  $curCourse->course_id)
-            ->first();        
-        // Если курс удалён, а aircraft_id остался, или самолёт не найден —
-        // раньше это давало 500 на обращении ->path у null.
-        $aircraft = $auks ? Aircraft::find($auks->aircraft_id) : null;
-        if (! $auks || ! $aircraft) {
+        $link = Link::where('aukstructure_id', $id)
+            ->value('link');
+
+        $curCourseId = $auk->course_id;
+        $course = $auk->course;   // уже загружен через with()
+        $aircraft = $course->aircraft; // уже загружен через with()
+
+        if (! $course || ! $aircraft) {
             return response()->json([
                 'message' => 'Курс для Aukstructure не найден',
             ], 404);
         }
-        $airpath = $aircraft->path;
-        $aukspath = trim($auks->path);
-        //dd($airpath);
-         $firstId = 
-            (Aukstructure::where
-            ([            
-               ['course_id','=',$curCourseId],
-               ['type','=',3] 
-            ])
-              //  ->value('id')        
-              ->get()
-              ->pluck('id')
-              ->first()
-            );
 
-    $firstLink= (Link::where('aukstructure_id', $firstId)
-    ->value('link')
-);
+        $airpath = trim($aircraft->path);
+        $aukspath = trim($course->path);
+
+        $firstId =
+            Aukstructure::where([
+                ['course_id', '=', $curCourseId],
+                ['type', '=', 3],
+            ])
+                ->orderBy('id')
+                ->value('id');
+
+        $firstLink = $firstId
+            ? Link::where('aukstructure_id', $firstId)
+                ->value('link')
+            : null;
 
         $url = Config::get('app.private_path') . $airpath . "/" . $aukspath . "/" . $link;
-        $urlfirst = Config::get('app.private_path'). $airpath ."/" .$aukspath. "/" . $firstLink;
-        //dd($id,$aukspath,$airpath,$link,$urlfirst,$firstLink,$curCourseId);
-        // $response = [
-        //     'url' => $url,
-        //     'urlfirst' => $urlfirst,
-        // ];
-        //return $response;
+        $urlfirst = Config::get('app.private_path') . $airpath . "/" . $aukspath . "/" . $firstLink;
 
-        // Раньше возвращалась только строка пути. Этого мало: контент
-        // курсов отдаётся по подписи (PrivateContentSigner), а она
-        // считается от пары aircraft|auk. Фронтенд получал «api/private/КЛЕН/01/file.html»
-        // без expires/signature, middleware отвечал 403, и iframe оставался
-        // пустым. Теперь отдаём составляющие — фронтенд сам запрашивает
-        // подпись и подставляет её в <base href> документа.
         $file = $link != null ? $link : $firstLink;
 
         return [
-            'aircraft' => trim($airpath),
-            'auk'      => trim($aukspath),
+            'aircraft' => $airpath,
+            'auk'      => $aukspath,
             'file'     => (string) $file,
             'url'      => $link != null ? $url : $urlfirst,
         ];
@@ -381,14 +365,11 @@ class CourseController extends Controller
 
     public function showmanifest(Request $request, $id)
     {
-        $course = Course::findOrFail($id);
+        $course = Course::with(['categories','aircraft'])->findOrFail($id);
 
         // Манифест — это уже содержимое курса (путь к материалам и
         // структура тем), а не описание в каталоге.
         CourseAccess::authorizeOpen($request->user(), $course);
-
-        $course->categories;
-        $course->aircraft;
         // склейка пути        
         //         $courses_path = Config::get('app.courses_path'); // usr/local/share
         //         $aircraft_path = trim($course->aircraft->path); // Ил-76

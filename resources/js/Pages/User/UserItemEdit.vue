@@ -1,407 +1,373 @@
 <template>
-  <v-card>
-    <v-card-title class="first-row"
-    >Редактирование пользователя {{ user.fio }}
-    </v-card-title
+  <div class="u-page">
+    <FormCard
+      :heading-level="1"
+      :title="isCreate ? t('users.list.create') : `${t('user.editTitle')} ${user.fio || ''}`"
+      :busy="form.submitting.value"
+      @submit="submitForm"
+      @cancel="cancel"
     >
-    <v-row class="first-row">
-      <v-col>
-        <v-text-field
-            variant="solo"
-            label="ФИО"
-            type="text"
-            v-model="user.fio"
-        ></v-text-field>
-      </v-col>
-      <v-col>
-        <!--
-            Роль только для чтения. Поле было v-combobox, то есть
-            свободный текст, и PATCH /api/user/{id} писал его прямо в
-            users.role — а это один из двух источников роли наряду с
-            role_user. В итоге любой, у кого есть users.update, мог
-            вписать «Администратор» и стать суперадмином, минуя chroll
-            (который запрещает менять собственные роли).
-            Теперь роль назначается только через «Назначение ролей»
-            (users.permissions), а здесь она показана для чтения.
-        -->
-        <v-text-field
-            variant="solo"
-            :model-value="roleLabel"
-            dense
-            readonly
-            :label="$t('users.role')"
-            :hint="$t('users.roleHintReadonly')"
-            persistent-hint
-        ></v-text-field>
-      </v-col>
-      <v-col>
-        <v-text-field
-            variant="solo"
-            id="phonenumber"
-            name="phonenumber"
-            label="Телефон"
-            v-model="user.phonenumber"
-            type="text"
-        ></v-text-field>
-      </v-col>
-    </v-row>
-    <v-row>
-      <v-col>
-        <Multiselect
-            id="city"
-            v-model="user.city"
-            :selected="value"
-            :options="options"
-            placeholder="Город"
-            :searchable="true"
-            trackBy="city"
-            label="city"
-            noResultsText="нет такого города"
-        >
-        </Multiselect>
-      </v-col>
-      <v-col>
-        <v-text-field
-            variant="solo"
-            id="country"
-            name="country"
-            label="Страна"
-            v-model="user.country"
-            type="text"
-        ></v-text-field>
-      </v-col>
-      <v-col>
-        <v-text-field
-            variant="solo"
-            id="organization"
-            name="organization"
-            label="Организация"
-            v-model="user.organization"
-            type="text"
-        ></v-text-field>
-      </v-col>
-    </v-row>
-    <v-row>
-      <v-col>
-        <v-text-field
-            variant="solo"
-            id="position"
-            name="position"
-            label="Должность"
-            v-model="user.position"
-            type="text"
-        ></v-text-field>
-      </v-col>
-      <v-col>
-        <v-select
-            attach="false"
-            
-            variant="solo"
-            v-model="user.rank"
-            dense
-            label="Воинское звание"
-            :items="['капитан', 'майор', 'старший лейтенант', 'лейтенант']"            
-        ></v-select>
-      </v-col>
-      <v-col>
-        <v-combobox
-            variant="solo"
-            v-model="user.spfere"
-            dense
-            label="Сфера деятельности"
-            :items="sfereOptions"
-        ></v-combobox>
-      </v-col>
-    </v-row>
-    <v-row>
-      <v-col>
-        <v-text-field
-            variant="solo"
-            id="specialization"
-            name="specialization"
-            label="Специализация"
-            v-model="user.specialization"
-            type="text"
-        ></v-text-field>
-      </v-col>
-      <v-col>
-        <!--
-          v-autocomplete, а не v-select: список групп виртуализируется,
-          а сам список разрастается (десятки групп). У v-select без
-          filter поле ввода не фильтрует, и нужную группу приходилось
-          искать долгой прокруткой. v-autocomplete ищет по item-title
-          из коробки.
-        -->
-        <v-autocomplete
-            variant="outlined"
-            density="comfortable"
-            label="Группа"
-            :items="allGroups"
-            v-model="user.group_id"
-            item-value="id"
-            item-title="groupname"
-            :no-data-text="$t('common.noGroupsFound')"
-            clearable
-        ></v-autocomplete>
-      </v-col>
-      <v-col></v-col>
-    </v-row>
-    <div class="d-flex justify-space-between">
-      <!-- <div class="d-flex justify-space-around"> -->
-      <!-- <v-btn
-        tile
-        color="green"
-        class="my-3"
-        :to="{
-          name: 'user.chroll',
-          params: {
-            idEdit: user.id,
-          },
-        }"
+      <FormField :label="t('user.labelFio')" name="fio" :error="form.errors.fio" :required="form.isRequired('fio')">
+        <v-text-field v-bind="form.bind('fio')" autocomplete="name" />
+      </FormField>
+
+      <!--
+        Пароль только при создании. У существующего пользователя пароль
+        меняется отдельной страницей (/user/chpass/:id) — держать второе
+        поле на форме правки значило бы предлагать сменить пароль там,
+        где это не тот сценарий.
+      -->
+      <FormField
+        v-if="isCreate"
+        :label="t('user.labelPassword')"
+        name="password"
+        :error="form.errors.password"
+        :required="true"
       >
-        Роль</v-btn
-      > -->
-      <!-- Права вынесены в отдельный раздел /permissions: там свои
-           правила доступа для администратора и инструктора. -->
-      <div>
+        <v-text-field
+          v-bind="form.bind('password')"
+          type="password"
+          autocomplete="new-password"
+        />
+      </FormField>
+
+      <!--
+        Роль только для чтения. Поле было v-combobox, то есть свободный
+        текст, и PATCH /api/user/{id} писал его прямо в users.role — а это
+        один из двух источников роли наряду с role_user. В итоге любой, у
+        кого есть users.update, мог вписать «Администратор» и стать
+        суперадмином, минуя chroll. Теперь роль назначается только через
+        «Назначение ролей» (users.permissions), а здесь она показана
+        для чтения.
+
+        ИСКЛЮЧЕНИЕ — создание. У нового пользователя роли ещё нет, и
+        `store` без неё оставляет его в состоянии «Роль не назначена»:
+        он попадает в систему, но почти никуда не может. Поэтому при
+        создании роль выбирается, и это отдельный отделённый контрол.
+      -->
+      <FormField
+        v-if="!isCreate"
+        :label="t('users.role')"
+        :hint="t('users.roleHintReadonly')"
+      >
+        <v-text-field :model-value="roleLabel" readonly />
+      </FormField>
+
+      <FormField
+        v-else
+        :label="t('users.role')"
+        name="role"
+        :error="form.errors.role"
+        :required="true"
+      >
+        <v-select
+          v-bind="form.bind('role')"
+          :items="roleOptions"
+          item-title="title"
+          item-value="value"
+        />
+      </FormField>
+
+      <FormField :label="t('user.labelTelefon')" name="phonenumber" :error="form.errors.phonenumber">
+        <MaskedField
+          v-bind="form.bind('phonenumber')"
+          preset="phone"
+          :label="t('user.labelTelefon')"
+          :clearable="true"
+        />
+      </FormField>
+
+      <FormField :label="t('user.city')" name="city">
+        <MultiSelectField
+          v-model="form.values.city"
+          :options="cityOptions"
+          :multiple="false"
+          :placeholder="t('user.city')"
+          :no-results-text="t('user.cityNotFound')"
+        />
+      </FormField>
+
+      <FormField :label="t('user.labelStrana')" name="country">
+        <v-text-field v-bind="form.bind('country')" autocomplete="country-name" />
+      </FormField>
+
+      <FormField :label="t('user.labelOrganizaciya')" name="organization">
+        <v-text-field v-bind="form.bind('organization')" autocomplete="organization" />
+      </FormField>
+
+      <FormField :label="t('user.labelDolzhnost')" name="position">
+        <v-text-field v-bind="form.bind('position')" />
+      </FormField>
+
+      <FormField :label="t('user.labelVoinskoe-zvanie')" name="rank">
+        <v-select v-bind="form.bind('rank')" :items="rankOptions" />
+      </FormField>
+
+      <FormField :label="t('user.labelSfera-deyatelnosti')" name="spfere">
+        <v-combobox v-bind="form.bind('spfere')" :items="sfereOptions" />
+      </FormField>
+
+      <FormField :label="t('user.labelSpecializaciya')" name="specialization">
+        <v-text-field v-bind="form.bind('specialization')" />
+      </FormField>
+
+      <!--
+        v-autocomplete, а не v-select: список групп виртуализируется, а
+        сам список разрастается (десятки групп). У v-select без filter
+        поле ввода не фильтрует, и нужную группу приходилось искать долгой
+        прокруткой. v-autocomplete ищет по item-title из коробки.
+      -->
+      <FormField :label="t('user.labelGruppa')" name="group_id" :error="form.errors.group_id">
+        <v-autocomplete
+          v-bind="form.bind('group_id')"
+          :items="allGroups"
+          item-value="id"
+          item-title="groupname"
+          :no-data-text="t('common.noGroupsFound')"
+          clearable
+        />
+      </FormField>
+
+      <div v-if="!isCreate" class="d-flex justify-space-between align-center mt-2">
+        <!-- Права вынесены в отдельный раздел /permissions: там свои
+             правила доступа для администратора и инструктора. -->
         <v-btn
-          class="my-3 ml-3"
-          color="success"
           variant="tonal"
-          :disabled="!canSeePermissions"
-          :to="{ name: 'permissions.manage', query: { user: user.id } }"
+          color="primary"
+          prepend-icon="mdi-shield-key-outline"
+          :disabled="!canSeePermissions || !userId"
+          :to="{ name: 'permissions.manage', query: { user: userId } }"
         >
-          {{ $t("users.list.permissions") }}
+          {{ t('users.list.permissions') }}
         </v-btn>
       </div>
-      <ButtonGroup @submitForm="submitForm" @cancelBtn="cancelBtnHead"></ButtonGroup>
-    </div>
-    <!-- <v-select
-      label="Разрешения"
-      type="text"
-      :items="permissions"
-      v-model="user.permissions"
-      multiple
-      item-value="id"
-      item-title="name"
-      empty-option
-    ></v-select> -->
-
-    <v-alert v-if="errors.length" type="error" density="compact" class="mb-4">
-            <div v-for="error in errors" :key="error">{{ error }}</div>
-          </v-alert>
-  </v-card>
+      <p v-else class="u-muted mt-2">
+        {{ t('users.createPermissionsHint') }}
+      </p>
+    </FormCard>
+  </div>
 </template>
 
-<script>
+<script setup>
+import { computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useStore } from 'vuex'
+import { useRouter } from 'vue-router'
+import FormCard from '../../components/ui/FormCard.vue'
+import FormField from '../../components/ui/FormField.vue'
+import MaskedField from '../../components/ui/fields/MaskedField.vue'
+import MultiSelectField from '../../components/ui/fields/MultiSelectField.vue'
+import useForm from '../../composables/useForm'
+import useLeaveGuard from '../../composables/useLeaveGuard'
+import { required, minLength, phone } from '../../composables/validation/rules'
+import jsonData from '../User/russia.min.json'
+import sferejsonData from '../User/sfere.json'
+import { toast } from '../../composables/useToast'
 
-import $api from "../../api/httpClient";
-import {mapState, mapGetters} from 'vuex'
-import jsonData from "../User/russia.min.json";
-import sferejsonData from "../User/sfere.json";
-//import UserLearning from "./UserLearning.vue";
-//import jsonData from "../User/city.json";
-import Multiselect from "@vueform/multiselect";
-import ButtonGroup from "../../components/ButtonGroup.vue";
+/**
+ * Редактирование профиля пользователя.
+ *
+ * Переведено на useForm (Фаза 2). Что изменилось по сути:
+ *  - поля лежат в схеме формы, а не пишутся прямо в store.state.User
+ *    (раньше правка поля сразу меняла «сохранённого» пользователя, и
+ *    отмена не возвращала исходные значения);
+ *  - телефон маскируется MaskedField вместо свободного текста;
+ *  - город — единый MultiSelectField под токенами, а не отдельный
+ *    @vueform/multiselect с 40 строками переопределений цветов;
+ *  - уход с несохранённой формой спрашивает подтверждение.
+ */
+/**
+ * Создание и правка пользователя — одна форма.
+ *
+ * Раньше это была только правка: `idEdit` объявлялся обязательным, а
+ * кнопка «Добавить пользователя» вела на публичную регистрацию `/reg`,
+ * где нет ни прав администратора, ни выбора роли и группы. Теперь тот
+ * же компонент умеет и создавать: `idEdit = null`.
+ */
+const props = defineProps({
+  idEdit: { type: [Number, String], default: null },
+})
 
-export default {
-  components: {Multiselect, ButtonGroup},
-  props:
-      {
-        idEdit: {
-          type: Number,
-          required: true
-        },
-      },
-  data() {
-    return {
-      dialog: false,
-      dialogReg: false,
-      errors: [],
-      options: jsonData,
-      sfereOptions: sferejsonData,
-      value: [],
-    };
+/** Режим создания: адрес без :idEdit. */
+const isCreate = computed(() => props.idEdit === null || props.idEdit === undefined || props.idEdit === '')
+
+const { t } = useI18n()
+const store = useStore()
+const router = useRouter()
+
+const rankOptions = ['капитан', 'майор', 'старший лейтенант', 'лейтенант']
+
+/**
+ * Роли для создания пользователя.
+ *
+ * Список — тот же, что бэкенд принимает в `users.role`: при отсутствии
+ * права `users.create` у роли нет, а `store` оставляет новичка без роли,
+ * и он почти никуда не попадёт. Значения не переводятся — это значения,
+ * которые уходят на сервер, а не подписи для чтения.
+ */
+const roleOptions = [
+  { title: t('account.roles.trainee'), value: 'trainee' },
+  { title: t('account.roles.instructor'), value: 'instructor' },
+  { title: t('account.roles.admin'), value: 'admin' },
+]
+
+const cityOptions = computed(() =>
+  (Array.isArray(jsonData) ? jsonData : []).map((city) => ({ value: city, label: city }))
+)
+
+const sfereOptions = Array.isArray(sferejsonData) ? sferejsonData : []
+
+const allGroups = computed(() => store.state.User.allGroups || [])
+const user = computed(() => store.state.User.user || {})
+const userId = computed(() => user.value.id ?? null)
+
+/** Раздел прав открыт администратору и инструктору. */
+const canSeePermissions = computed(() => store.getters['Auth/can']?.('users.permissions', 'users.view') ?? false)
+
+/**
+ * Роль для показа. Берём связь role_user (её назначает chroll), а если
+ * её нет — строку users.role, в которой значения исторически записаны
+ * по-разному: «Обучаемый» или «trainee».
+ */
+const roleLabel = computed(() => {
+  const roles = user.value?.roles
+  if (Array.isArray(roles) && roles.length > 0) {
+    return roles
+      .map((role) => (typeof role === 'object' && role !== null ? role.rolename || role.slug : role))
+      .filter(Boolean)
+      .join(', ')
+  }
+
+  return user.value?.role || '—'
+})
+
+/** Приводит group_id к number|null — иначе в bigint уходит объект и прилетает 500. */
+const normalizeGroupId = (value) => {
+  if (value === null || value === undefined || value === '') return null
+  const raw = typeof value === 'object' ? value.id : value
+  if (raw === null || raw === undefined || raw === '') return null
+  const id = Number(raw)
+
+  return Number.isInteger(id) && id > 0 ? id : null
+}
+
+const form = useForm({
+  schema: {
+    fio: { initial: '', rules: [required(t('register.fioRequired'))] },
+    password: { initial: '', rules: isCreate.value ? [required(t('user.passwordRequired')), minLength(6)] : [] },
+    role: { initial: '', rules: isCreate.value ? [required(t('users.roleRequired'))] : [] },
+    phonenumber: { initial: '', rules: [minLength(6), phone(t('user.phoneInvalid'))] },
+    city: { initial: '', rules: [] },
+    country: { initial: '', rules: [] },
+    organization: { initial: '', rules: [] },
+    position: { initial: '', rules: [] },
+    rank: { initial: '', rules: [] },
+    spfere: { initial: '', rules: [] },
+    specialization: { initial: '', rules: [] },
+    group_id: { initial: null, rules: [] },
   },
-  computed: {
-    ...mapState('User', ['allGroups', 'user']),
-    //...mapGetters('User', ['users','groups']),
-    ...mapGetters('Auth', ['can']),
 
-    /** Раздел прав открыт администратору и инструктору — остальным кнопка не нужна. */
-    canSeePermissions() {
-      return this.can(...['users.permissions', 'users.view'])
-    },
+  draftKey: isCreate.value ? 'user.create' : `user.edit.${props.idEdit}`,
 
-    /**
-     * Роль для показа. Берём связь role_user (её назначает chroll), а
-     * если её нет — строку users.role, в которой значения исторически
-     * записаны по-разному: «Обучаемый» или «trainee». Показываем как
-     * есть: поле только для чтения, и подменять текст здесь нечем.
-     */
-    roleLabel() {
-      const roles = this.user?.roles
-      if (Array.isArray(roles) && roles.length > 0) {
-        return roles
-          .map((role) => (typeof role === 'object' && role !== null ? role.rolename || role.slug : role))
-          .filter(Boolean)
-          .join(', ')
-      }
-      return this.user?.role || '—'
-    },
+  onSubmit: async ({ values }) => {
+    if (isCreate.value) {
+      await store.dispatch('User/createUser', {
+        fio: values.fio,
+        password: values.password,
+        role: values.role,
+        group_id: normalizeGroupId(values.group_id),
+        phonenumber: values.phonenumber,
+        city: values.city,
+        country: values.country,
+        organization: values.organization,
+        position: values.position,
+        rank: values.rank,
+        spfere: values.spfere,
+        specialization: values.specialization,
+      })
+
+      toast.success(t('user.created'))
+      // Именно push, а не router.back(): на форму можно попасть прямым
+      // адресом (закладка, письмо, обновление страницы), и тогда истории
+      // «откуда пришли» просто нет — back() увёл бы на случайную
+      // предыдущую вкладку. После сохранения место назначено: список.
+      await router.push({ name: 'user.list' })
+      return
+    }
+
+    const data = {
+      ...user.value,
+      fio: values.fio,
+      phonenumber: values.phonenumber,
+      city: values.city,
+      country: values.country,
+      organization: values.organization,
+      position: values.position,
+      rank: values.rank,
+      spfere: values.spfere,
+      specialization: values.specialization,
+      group_id: normalizeGroupId(values.group_id),
+    }
+
+    await store.dispatch('User/updateUser', { id: props.idEdit, data })
+
+    toast.success(t('user.updated'))
+    // См. пояснение в ветке создания: back() без истории уводит не туда.
+    await router.push({ name: 'user.list' })
   },
+})
 
-  created() {
-    this.$store.dispatch('User/fetchUser', this.idEdit)
-    // Группы в выпадающем «Группа» не появлялись при прямом заходе на
-    // страницу редактирования: fetchGroups звал только ряд страниц
-    // (UserList/GroupList/MyAccount/Register), а здесь его не было вовсе,
-    // поэтому allGroups оставался пустым.
-    this.$store.dispatch('User/fetchGroups').catch(error => {
-      console.error(error)
-      this.errors.push('Не удалось загрузить список групп')
-    })
-  },
-  methods: {
+const { confirmLeave } = useLeaveGuard(() => form.dirty.value, { message: t('common.leaveConfirm') })
 
-    cancelBtnRegistration(){      
-      // this.$store
-      //     .dispatch('Course/categories')
-      //     .catch(error => console.error(error))
-      this.$store.dispatch('User/fetchUser', this.idEdit)
-      this.dialogReg = false
-    },
-    cancelBtnHead(){
-      this.$router.back()
-    },
+onMounted(async () => {
+  /*
+   * Загрузка пользователя — ОДИН раз, ниже, с await и .catch().
+   * Раньше здесь стоял второй, необработанный dispatch того же action:
+   * запрос уходил дважды, а отказ (например 403, когда инструктор открыл
+   * карточку администратора) всплывал как необработанное исключение —
+   * «Request failed with status code 403» в консоли поверх корректной
+   * страницы «В доступе отказано».
+   */
 
-    // Приводит group_id к number|null. Защищает от отправки в API
-    // объекта/массива/пустой строки, что приводит к 500 на стороне БД.
-    normalizeGroupId(value) {
-      if (value === null || value === undefined || value === '') return null
-      const raw = typeof value === 'object' ? value.id : value
-      if (raw === null || raw === undefined || raw === '') return null
-      const id = Number(raw)
-      return Number.isInteger(id) && id > 0 ? id : null
-    },
+  // Группы в выпадающем «Группа» не появлялись при прямом заходе на
+  // страницу: fetchGroups звал только ряд страниц, а здесь его не было.
+  store.dispatch('User/fetchGroups').catch(() => {
+    toast.warning(t('user.groupsUnavailable'))
+  })
 
-    submitForm() {
-       if (!this.errors.length) {
-         const formData = {
-           permission_id: this.user.permissions,
-         };
+  // При создании загружать нечего: пользователя ещё нет, а fetchUser(null)
+  // ушёл бы на /api/user/list/null и вернул 404 — тост об ошибке на
+  // пустом месте при первом же открытии формы.
+  if (isCreate.value) return
 
-        //  let urlToUp = "/api/user/chperm/" + this.idEdit;
+  // Заполняем форму загруженным пользователем. Значения в store больше не
+  // правятся «на лету», поэтому после загрузки снимаем dirty — иначе
+  // подтверждение ухода спрашивало бы сразу, без единого изменения.
+  await Promise.all([store.dispatch('User/fetchUser', props.idEdit).catch(() => {})])
 
-        //  $api
-        //    .put(urlToUp, formData)
-        //    .then((response) => {
-        //      //this.$router.push("/user/list");
-        //      // this.$router.back();
-        //    })
-        //    .catch((error) => {
-        //      if (error.response) {
-        //        for (const property in error.response.data) {
-        //          this.errors.push(
-        //            `${property}: ${error.response.data[property]}`
-        //          );
-        //        }
+  const loaded = store.state.User.user || {}
+  form.reset({
+    fio: loaded.fio ?? '',
+    phonenumber: loaded.phonenumber ?? '',
+    city: loaded.city ?? '',
+    country: loaded.country ?? '',
+    organization: loaded.organization ?? '',
+    position: loaded.position ?? '',
+    rank: loaded.rank ?? '',
+    spfere: loaded.spfere ?? '',
+    specialization: loaded.specialization ?? '',
+    group_id: loaded.group_id ?? null,
+  })
+})
 
-        //      } else if (error.message) {
-        //        this.errors.push("Something went wrong. Please try again");
+const submitForm = () => {
+  form.submit()
+}
 
-        //      }
-        //    });
-       }
+const cancel = async () => {
+  if (await confirmLeave()) router.back()
+}
 
-
-      // if (!this.errors.length) {
-      //   const formData = {
-      //     fio: this.user.fio,
-      //     role: this.user.role,
-      //     phonenumber: this.user.phonenumber,
-      //     city: this.user.city,
-      //     country: this.user.country,
-      //     organization: this.user.organization,
-      //     position: this.user.position,
-      //     rank: this.user.rank,
-      //     spfere: this.user.spfere,
-      //     specialization: this.user.specialization,
-      //     group_id: this.user.group_id,
-      //     permission_id: this.user.permissions,
-      //   };
-
-
-      // v-select отдаёт id числом, но allGroups может содержать и строки,
-      // а при очистке приходит null/"". Приводим к number|null,
-      // иначе в bigint уходит объект/строка и прилетает 500.
-      const data = {
-        ...this.user,
-        group_id: this.normalizeGroupId(this.user.group_id),
-      }
-
-      this.$store
-          //        .dispatch('User/updateUser', {id:this.idEdit,data:this.users})
-          .dispatch('User/updateUser', {id: this.idEdit, data: data})
-          .then(() => {
-          })
-          .catch(error => {
-            console.error(error)
-          })
-          .finally(() => this.$router.back())
-    },
-
-    // },
-  },
-};
+// Тесты дёргают эти методы — в <script setup> наружу ничего не торчит.
+defineExpose({ submitForm, cancel, form, normalizeGroupId })
 </script>
-
-<style src="@vueform/multiselect/themes/default.css">
-</style>
-<style>
-.v-card {
-  padding: 10px;
-}
-
-.first-row {
-  margin-top: 20px;
-}
-
-/* Фон через токен, а не константой: зашитый светло-серый оставался
-     светлым и в тёмной теме, а цвет подписи задаёт Vuetify —
-     получалось белым по белому (контраст 1.1). */
-.multiselect {
-  background-color: var(--c-surface-3);
-  height: 56px;
-  border: none;
-  box-shadow: 0 3px 1px -2px var(--v-shadow-key-umbra-opacity, rgba(0, 0, 0, 0.2)), 0 2px 2px 0 var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.14)), 0 1px 5px 0 var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.12));
-}
-
-.multiselect.is-active {
-  box-shadow: 0 3px 1px -2px var(--v-shadow-key-umbra-opacity, rgba(0, 0, 0, 0.2)), 0 2px 2px 0 var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.14)), 0 1px 5px 0 var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.12));
-
-}
-
-.multiselect-search {
-  background-color: var(--c-surface-3);
-
-}
-
-.multiselect-placeholder {
-  font-weight: normal;
-  color: var(--c-text-secondary);
-}
-
-.v-field {
-  background-color: var(--c-surface-3);
-}
-
-.multiselect-option.is-selected, .multiselect-option.is-selected.is-pointed {
-  background: rgba(0, 0, 0, 0.16);
-}
-
-.multiselect-dropdown ul li span {
-  color: black;
-}
-</style>
-

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
 
 /**
  * Страница материала курса (CourseManifest).
@@ -190,6 +191,126 @@ describe('CourseManifest: высота кадра не схлопывается'
   })
 })
 
+describe('CourseManifest: подсветка найденного', () => {
+  /*
+   * Регресс, который закрывает этот блок: подсветка применялась через
+   * `setTimeout(1000)` и переписыванием `iframeDoc.body.innerHTML` по
+   * результату DOMParser. Пересоздание всего DOM заново гоняло картинки
+   * и сбрасывало прокрутку — на большом материале страница подвисала, а
+   * таймер успевал до готовности кадра мимо.
+   */
+  it('loadContent копит подсветку и не ждёт таймер', async () => {
+    const wrapper = mountPage()
+    await tick()
+    await tick()
+
+    const getlink = vi.spyOn(wrapper.vm, 'getlink').mockResolvedValue()
+    wrapper.vm.loadContent(103, [{ originalXpath: '//p', highlightedText: '<b>x</b>' }])
+
+    expect(wrapper.vm.pendingHighlights).toHaveLength(1)
+    expect(getlink).toHaveBeenCalledWith(103)
+
+    getlink.mockRestore()
+    wrapper.unmount()
+  })
+
+  it('не-Массив в выделении не роняет открытие материала', async () => {
+    const wrapper = mountPage()
+    await tick()
+    await tick()
+
+    const getlink = vi.spyOn(wrapper.vm, 'getlink').mockResolvedValue()
+    expect(() => wrapper.vm.loadContent(103, undefined)).not.toThrow()
+    expect(wrapper.vm.pendingHighlights).toEqual([])
+
+    getlink.mockRestore()
+    wrapper.unmount()
+  })
+
+  it('applyHighlights правит только ветку найденного узла', async () => {
+    const wrapper = mountPage()
+    await tick()
+    await tick()
+
+    const doc = document.implementation.createHTMLDocument('mat')
+    doc.body.innerHTML = '<p id="hit">найдено тут</p><div id="keep">не трогать</div>'
+
+    // Сервер отдаёт путь к ТЕКСТОВОМУ узлу и его содержимое, разбитое
+    // вокруг совпадения. Раньше здесь подменялся родитель целиком,
+    // и все его остальные дети исчезали.
+    wrapper.vm.pendingHighlights = [
+      { originalXpath: '/html/body/p/text()', highlightedText: 'найдено <mark class="highlighted">тут</mark>' },
+    ]
+    wrapper.vm.applyHighlights(doc)
+
+    expect(doc.querySelector('#hit .highlighted').textContent).toBe('тут')
+    expect(doc.querySelector('#hit').textContent).toBe('найдено тут')
+    // Главный признак: остальной документ не пересоздан.
+    expect(doc.querySelector('#keep').textContent).toBe('не трогать')
+    expect(wrapper.vm.pendingHighlights).toEqual([])
+  })
+
+  it('несовпавший XPath оставляет материал открытым, а не ломает его', async () => {
+    const wrapper = mountPage()
+    await tick()
+    await tick()
+
+    const doc = document.implementation.createHTMLDocument('mat')
+    doc.body.innerHTML = '<p>материал</p>'
+
+    wrapper.vm.pendingHighlights = [
+      { originalXpath: '//table[@id="нет-такого"]', highlightedText: '<b>x</b>' },
+    ]
+
+    expect(() => wrapper.vm.applyHighlights(doc)).not.toThrow()
+    expect(doc.querySelector('p').textContent).toBe('материал')
+  })
+
+  it('отсутствие совпадений не роняет прокрутку', async () => {
+    const wrapper = mountPage()
+    await tick()
+    await tick()
+
+    // Раньше здесь стояло node.getBoundingClientRect() без проверки,
+    // и клик по результату без подсветки давал TypeError.
+    expect(() => wrapper.vm.scrollToHighlight(undefined)).not.toThrow()
+  })
+
+  it('подсветка применяется при загрузке кадра', async () => {
+    const wrapper = mountPage()
+    await tick()
+    await tick()
+
+    const doc = document.implementation.createHTMLDocument('mat')
+    doc.body.innerHTML = '<p id="hit">найдено тут</p>'
+
+    wrapper.vm.pendingHighlights = [
+      { originalXpath: '/html/body/p/text()', highlightedText: 'найдено <mark class="highlighted">тут</mark>' },
+    ]
+    wrapper.vm.onFrameLoad({ target: { contentDocument: doc } })
+
+    expect(wrapper.vm.pendingHighlights).toEqual([])
+    expect(wrapper.vm.highlighted.length).toBe(1)
+  })
+})
+
+describe('CourseManifest: оформление не течёт на другие страницы', () => {
+  it('не перекрашивает карточки Vuetify во всём приложении', () => {
+    const css = readFileSync('resources/js/Pages/CourseManifest.vue', 'utf-8')
+
+    // Регресс: unscoped-правило `.v-card { border: 1px solid lightgrey }`
+    // меняло рамку каждой карточки на всех страницах.
+    expect(css).not.toMatch(/^\.v-card\s*\{/m)
+    expect(css).not.toContain('lightgrey')
+  })
+
+  it('подсветка взята из токенов, а не из палитры браузера', () => {
+    const css = readFileSync('resources/js/Pages/CourseManifest.vue', 'utf-8')
+
+    expect(css).not.toMatch(/background-color:\s*yellow/)
+  })
+})
+
 describe('CourseManifest: посещённые материалы', () => {
   it('открытый модуль помечается посещённым и переживает перезагрузку', async () => {
     const wrapper = mountPage()
@@ -360,5 +481,44 @@ describe('CourseManifest: без ошибок в консоли', () => {
 
     const fatal = consoleErrors.filter((line) => !/Failed to load resource/.test(line))
     expect(fatal, `ошибки в консоли: ${fatal.join('; ')}`).toEqual([])
+  })
+})
+
+/*
+ * Фаза 3.4: страница материала перестала быть источником истины по
+ * цвету.
+ *
+ * Линтер столбов относит CourseManifest к файлам-наследии и потому
+ * лишь предупреждает о hex-цветах, а не запрещает их. Проверка жёстче:
+ * страница должна держаться на токенах, иначе в тёмной теме панель
+ * инструментов и подсветка миниатюры остаются светлыми пятнами.
+ */
+describe('CourseManifest: цвет только из токенов', () => {
+  const read = () => readFileSync('resources/js/Pages/CourseManifest.vue', 'utf-8')
+
+  it('не содержит hex-цветов в стилях и скрипте', () => {
+    const source = read()
+    // HTML-сущности вроде &#9650; — это стрелки, а не цвета.
+    const hex =
+      source.match(/#[0-9a-fA-F]{3,6}\b/g)?.filter((m) => !source.includes(`&#${m.slice(1)};`)) ?? []
+
+    expect(hex, `найдены hex-цвета: ${hex.join(', ')}`).toHaveLength(0)
+  })
+
+  it('панель инструментов окрашена токенами', () => {
+    const source = read()
+    const toolbar = source.slice(source.indexOf('.cm-toolbar {'), source.indexOf('.cm-toolbar__group'))
+
+    expect(toolbar).toContain('var(--c-border)')
+    expect(toolbar).toContain('var(--c-surface-2)')
+  })
+
+  it('мёртвые методы подсветки миниатюры удалены', () => {
+    // showthumb/hidethumb нигде не вызывались и только динамически
+    // красили узлы в серый — в тёмной теме это было серое пятно.
+    const source = read()
+
+    expect(source).not.toContain('showthumb')
+    expect(source).not.toContain('hidethumb')
   })
 })

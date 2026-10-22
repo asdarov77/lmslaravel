@@ -81,20 +81,27 @@ test.describe('Импортированный класс: контент кур�
     })
     await page.waitForTimeout(6000)
 
-    // Дерево разделов/подразделов/модулей должно быть построено.
+    /*
+     * Дерево разделов рисует CoursePlayerLayout, а не сам манифест.
+     *
+     * Раньше проверка искала узлы внутри .my-sheet — это ПАНЕЛЬ МАТЕРИАЛА,
+     * а не дерево. Узлы переехали в отдельную левую панель с классами
+     * .cpl__section, поэтому .my-sheet находился, узлов в нём не было,
+     * и проверка падала на работающей странице.
+     */
     const tree = await page.evaluate(() => {
-      const sheet = document.querySelector('.my-sheet')
-      if (!sheet) return { rendered: false, nodes: 0 }
+      const panel = document.querySelector('.cpl__sections')
+      if (!panel) return { rendered: false, nodes: 0 }
       return {
         rendered: true,
-        nodes: sheet.querySelectorAll('div[style*="font-size"]').length,
-        title: sheet.querySelector('.text-center')?.textContent?.trim() ?? ''
+        nodes: panel.querySelectorAll('.cpl__section').length,
+        title: (document.querySelector('.cm-toolbar__current')?.textContent ?? '').trim(),
       }
     })
 
     expect(tree.rendered, 'манифест курса отрисован').toBe(true)
     expect(tree.nodes, 'дерево разделов непустое').toBeGreaterThan(1)
-    expect(tree.title.length, 'заголовок курса непустой').toBeGreaterThan(0)
+    expect(tree.title.length, 'название открытого материала непустое').toBeGreaterThan(0)
 
     // Документ курса должен отдаться успешно.
     expect(privateStatuses.length, 'браузер запросил приватный контент').toBeGreaterThan(0)

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CertificateSetting;
 use App\Models\Course;
 use App\Models\Exam;
 use App\Models\ExamAttempt;
@@ -11,6 +12,8 @@ use App\Support\CourseAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * Сертификаты об окончании курса.
@@ -34,6 +37,12 @@ class CertificateController extends Controller
 {
     /** Сколько уроков и экзаменов нужно закрыть для выдачи. */
     private const LESSON_THRESHOLD = 100;
+
+    /** Ключ единственной строки настроек бланка. */
+    private const SETTINGS_KEY = 'default';
+
+    /** Куда кладутся логотипы. Логотип публичен: он печатается на листе. */
+    private const DISK = 'public';
 
     /**
      * Список сертификатов, доступных обучаемому.
@@ -104,7 +113,7 @@ class CertificateController extends Controller
         abort_unless($status['available'], 403, 'Курс ещё не завершён');
 
         return response()->json([
-            'data' => [
+            'data' => array_merge($this->settingsPayload(), $this->awardCertificateXp($user, $course), [
                 'fio' => $user->fio ?? $user->name,
                 'course' => $rows['course']->title,
                 'module_title' => $rows['module_title'],
@@ -116,8 +125,180 @@ class CertificateController extends Controller
                 'exams_passed' => $status['exams_passed'],
                 'exams_total' => $status['exams_total'],
                 'code' => $this->code($user->id, $course->id),
-            ],
+            ]),
         ]);
+    }
+
+    /**
+     * Скачать сертификат как PDF.
+     *
+     * GET /api/my/certificates/{course}/download
+     */
+    public function download(Request $request, Course $course)
+    {
+        $user = $request->user();
+        abort_if($user === null, 401);
+
+        $rows = collect($this->planRows($user))->firstWhere('course.id', $course->id);
+
+        if ($rows === null) {
+            abort(404);
+        }
+
+        CourseAccess::authorizeOpen($user, $course);
+
+        $status = $this->statusFor($user, $rows);
+
+        abort_unless($status['available'], 403, 'Курс ещё не завершён');
+
+        $certificateData = array_merge($this->settingsPayload(), [
+            'fio' => $user->fio ?? $user->name,
+            'course' => $rows['course']->title,
+            'module_title' => $rows['module_title'],
+            'study_from' => $rows['study_from'],
+            'study_to' => $rows['study_to'],
+            'issued_at' => Carbon::now()->toDateString(),
+            'lessons_done' => $status['lessons_done'],
+            'lessons_total' => $status['lessons_total'],
+            'exams_passed' => $status['exams_passed'],
+            'exams_total' => $status['exams_total'],
+            'code' => $this->code($user->id, $course->id),
+        ]);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('certificates.pdf', $certificateData);
+        $pdf->setPaper('A4', 'portrait');
+
+        return $pdf->download("certificate-{$course->id}-{$user->id}.pdf");
+    }
+
+    /**
+     * Настройки бланка сертификата.
+     *
+     * GET /api/certificates/settings
+     */
+    public function settings(Request $request)
+    {
+        $actor = $request->user();
+        abort_if($actor === null, 401);
+
+        // Читать бланк может тот, кто имеет право его менять: страница
+        // настроек и предпросмотр живут рядом.
+        abort_unless($actor->hasPermission('certificates.manage'), 403);
+
+        return response()->json(['data' => $this->settingsPayload()]);
+    }
+
+    /**
+     * Сохранение настроек бланка.
+     *
+     * PUT /api/certificates/settings
+     */
+    public function updateSettings(Request $request)
+    {
+        $actor = $request->user();
+        abort_if($actor === null, 401);
+        abort_unless($actor->hasPermission('certificates.manage'), 403);
+
+        $validated = $request->validate([
+            'organization' => ['nullable', 'string', 'max:255'],
+            'signatory_name' => ['nullable', 'string', 'max:255'],
+            'signatory_title' => ['nullable', 'string', 'max:255'],
+            'footer_note' => ['nullable', 'string', 'max:500'],
+            'logo' => ['nullable', 'file', 'image', 'max:2048'],
+            // Пустая строка означает «убрать логотип», а не «не менять».
+            'remove_logo' => ['sometimes', 'boolean'],
+        ], [], [
+            'organization' => 'организация',
+            'logo' => 'логотип',
+        ]);
+
+        $settings = CertificateSetting::firstOrNew(['key' => self::SETTINGS_KEY]);
+
+        foreach (['organization', 'signatory_name', 'signatory_title', 'footer_note'] as $field) {
+            if (array_key_exists($field, $validated)) {
+                $settings->{$field} = $validated[$field];
+            }
+        }
+
+        if ($request->boolean('remove_logo')) {
+            if ($settings->logo_path) {
+                Storage::disk(self::DISK)->delete($settings->logo_path);
+            }
+
+            $settings->logo_path = null;
+        } elseif (! empty($validated['logo'])) {
+            $path = $this->replaceLogo($settings->logo_path, $validated['logo']);
+            $settings->logo_path = $path;
+        }
+
+        $settings->save();
+
+        return response()->json(['data' => $this->settingsPayload()]);
+    }
+
+    /**
+     * Заменяет логотип, не накапливая старые файлы.
+     *
+     * Имя файла — случайное: исходное имя приходит от клиента и может
+     * содержать путь или перезаписать чужой файл.
+     */
+    private function replaceLogo(?string $oldPath, $file): string
+    {
+        if ($oldPath) {
+            Storage::disk(self::DISK)->delete($oldPath);
+        }
+
+        return $file->storeAs(
+            'certificates/logo',
+            Str::random(24) . '.' . ($file->extension() ?: 'png'),
+            self::DISK
+        );
+    }
+
+    /**
+     * Начисляет XP за сертификат.
+     *
+     * Ключ источника — «курс», поэтому повторное открытие страницы
+     * платит один раз, а следующий сертификат по другому курсу —
+     * ещё раз.
+     *
+     * @return array<string, mixed>
+     */
+    private function awardCertificateXp($user, Course $course): array
+    {
+        \App\Support\Gamification::award(
+            $user,
+            'certificate_issued',
+            'certificate:' . $course->id,
+            (int) $course->id
+        );
+
+        $xp = \App\Support\Gamification::totalXp($user);
+
+        return ['xp' => $xp, 'level' => \App\Support\Gamification::levelProgress($xp)];
+    }
+
+    /**
+     * Бланк для фронта.
+     *
+     * @return array<string, mixed>
+     */
+    private function settingsPayload(): array
+    {
+        $settings = CertificateSetting::firstWhere('key', self::SETTINGS_KEY);
+
+        return [
+            'organization' => $settings?->organization,
+            'signatory_name' => $settings?->signatory_name,
+            'signatory_title' => $settings?->signatory_title,
+            'footer_note' => $settings?->footer_note,
+            // Путь, а не готовый URL: за сервером может стоять nginx с
+            // другим префиксом, и собранный здесь адрес был бы неверным.
+            'logo_path' => $settings?->logo_path,
+            'logo_url' => $settings?->logo_path
+                ? Storage::disk(self::DISK)->url($settings->logo_path)
+                : null,
+        ];
     }
 
     /**
@@ -156,11 +337,29 @@ class CertificateController extends Controller
             abort(404);
         }
 
+        $moduleTitle = null;
+        $issuedAt = null;
+
+        $learning = Group2learning::where('course_id', $courseId)
+            ->whereHas('course', fn ($q) => $q)
+            ->first();
+
+        if ($learning) {
+            $moduleTitle = $learning->parent_id
+                ? \App\Models\Aukstructure::find($learning->parent_id)?->title
+                : null;
+            $issuedAt = $learning->study_to
+                ? Carbon::parse($learning->study_to)->format('d.m.Y')
+                : null;
+        }
+
         return response()->json([
             'data' => [
                 'valid' => true,
                 'fio' => $user->fio ?? $user->name,
                 'course' => $course->title,
+                'module_title' => $moduleTitle,
+                'issued_at' => $issuedAt,
             ],
         ]);
     }

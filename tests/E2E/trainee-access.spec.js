@@ -16,7 +16,7 @@
  */
 import { test, expect } from "@playwright/test";
 
-const BASE = process.env.APP_URL || "http://127.0.0.1:8000";
+const BASE = process.env.APP_URL || 'http://127.0.0.1:8080';
 const HASH = BASE + "/#";
 
 const ADMIN = { fio: "Администратор", password: "123" };
@@ -49,7 +49,14 @@ async function auth(page, creds) {
 
     await page.addInitScript(
         ([t, u]) => {
-            localStorage.clear();
+            // Очистка хранилища — ОДИН раз на контекст. В addInitScript очистка
+            // выполнялась на КАЖДОЙ загрузке документа, а часть страниц меняет
+            // адрес при инициализации: вторая загрузка стирала то, что приложение
+            // только что сохранило (прогресс, закреплённые курсы).
+            if (!sessionStorage.getItem('__e2e_cleared')) {
+              localStorage.clear();
+              sessionStorage.setItem('__e2e_cleared', '1');
+            }
             localStorage.setItem("token", t);
             localStorage.setItem("user", u);
         },
@@ -208,10 +215,28 @@ test.describe("Обучаемый: доступ к своему учебному
             }
 
             // Пустая группа меню не остаётся.
+            //
+            // Проверяем именно ПУСТЫЕ группы, а не их количество: меню
+            // обучаемого состоит из нескольких непустых секций
+            // («Обучение», «Методический кабинет»), и требование
+            // «v-list-group == 0» проверяло не то свойство — оно
+            // начало падать после того, как секции отфильтровали
+            // пункты правильно.
+            const emptyGroups = await page.locator("nav .v-list-group").evaluateAll((els) =>
+                els
+                    .map((el) => ({
+                        title:
+                            el
+                                .querySelector(".v-list-group__header, .v-list-group__title")
+                                ?.textContent?.trim() ?? "",
+                        items: el.querySelectorAll(".v-list-item").length,
+                    }))
+                    .filter((g) => g.items === 0),
+            );
             expect(
-                await page.locator("nav .v-list-group").count(),
-                "пустая группа «Управление пользователями» не рендерится",
-            ).toBe(0);
+                emptyGroups.map((g) => g.title),
+                "пустые группы меню не рендерятся",
+            ).toEqual([]);
 
             // 2. Учебный план показывает его курс.
             await expect(
@@ -275,9 +300,12 @@ test.describe("Обучаемый: доступ к своему учебному
                 waitUntil: "domcontentloaded",
             });
             await page.waitForTimeout(2000);
+            // Показатели дашборда рисует StatCard: .u-stat / .u-stat__value.
+            // Прежние .dash__stat / .dash__stat-value остались от старой
+            // вёрстки и не находятся, поэтому stats был пустым.
             const stats = await page.evaluate(() =>
-                [...document.querySelectorAll(".dash__stat")].map(
-                    (s) => s.querySelector(".dash__stat-value")?.innerText,
+                [...document.querySelectorAll(".u-stat")].map(
+                    (s) => s.querySelector(".u-stat__value")?.innerText,
                 ),
             );
             // Счётчики курсов и активных обязаны быть непустыми — это доказывает,

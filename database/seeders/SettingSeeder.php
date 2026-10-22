@@ -17,8 +17,16 @@ class SettingSeeder extends Seeder
             ['name' => 'name6', 'value' => '105',  'type' => 'type3'],
         ];
 
+        /*
+         * updateOrCreate по name.
+         *
+         * Настройка опознаётся именем, а не id: повторный запуск
+         * обновляет значение, а не добавляет вторую такую же строку.
+         * Раньше здесь шёл insert(), и настройки удваивались при
+         * каждом запуске сидеров.
+         */
         foreach ($settings as $_settings) {
-            Setting::create($_settings);
+            Setting::updateOrCreate(['name' => $_settings['name']], $_settings);
         }
     }
 }

@@ -47,7 +47,7 @@ class CatalogController extends Controller
         // CourseVisibility: показывать надо все опубликованные курсы,
         // иначе записаться было бы не на что.
         $courses = Course::query()
-            ->with(['categories:id,title', 'aircraft:id,title,path'])
+            ->with(['categories:id,title', 'aircraft:id,title,path', 'instructors:id,fio'])
             ->when($validated['q'] ?? null, fn ($q, $term) => $q->whereRaw('LOWER(courses.title) LIKE ?', ['%'.mb_strtolower($term).'%']))
             ->when($validated['category_id'] ?? null, fn ($q, $id) => $q->whereHas(
                 'categories',
@@ -189,6 +189,13 @@ class CatalogController extends Controller
     {
         $topics = $course->aukstructures()->count();
 
+        // Преподаватели курса (первый или все)
+        $instructors = $course->instructors->map(fn ($i) => [
+            'id' => $i->id,
+            'fio' => $i->fio,
+            'avatar_url' => $i->avatar_url,
+        ])->all();
+
         return [
             'id' => $course->id,
             'title' => $course->title,
@@ -204,6 +211,7 @@ class CatalogController extends Controller
             // Ссылки на материал намеренно не отдаются: витрина
             // показывает описание, содержимое открывает CourseAccess.
             'to' => '/courses/desc/'.$course->id,
+            'instructors' => $instructors,
         ];
     }
 

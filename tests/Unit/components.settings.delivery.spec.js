@@ -18,6 +18,7 @@ import ru from '../../resources/js/locales/ru.json'
 import en from '../../resources/js/locales/en.json'
 
 import ContentDeliverySettings from '../../resources/js/Pages/Settings/ContentDeliverySettings.vue'
+import * as preflight from '../../resources/js/utils/preflight'
 
 const vuetify = createVuetify({ components: vuetifyComponents, directives: vuetifyDirectives })
 const i18n = createI18n({
@@ -143,5 +144,67 @@ describe('ContentDeliverySettings', () => {
 
     expect(wrapper.vm.alert.text).toBe('Сервис недоступен')
     expect(wrapper.vm.nginx).toBe(false)
+  })
+})
+
+describe('ContentDeliverySettings: preflight', () => {
+  it('проба сообщает, что nginx стоит перед приложением', async () => {
+    const spy = vi.spyOn(preflight, 'probeDelivery').mockResolvedValue({
+      ok: true,
+      status: 404,
+      server: 'nginx',
+      isNginx: true,
+      verdict: 'nginx-in-front',
+      detail: 'nginx отдал 404 на внутренний location',
+    })
+
+    const wrapper = mountSettings()
+    await flush()
+
+    await wrapper.find('[data-test="delivery-preflight"]').trigger('click')
+    await flush()
+
+    expect(spy).toHaveBeenCalled()
+    expect(wrapper.find('[data-test="delivery-preflight-result"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="delivery-preflight-result"]').text()).toContain('nginx')
+
+    spy.mockRestore()
+  })
+
+  it('при PHP-обработке показывает предупреждение и конфиг nginx', async () => {
+    const spy = vi.spyOn(preflight, 'probeDelivery').mockResolvedValue({
+      ok: false,
+      status: 404,
+      server: '',
+      isNginx: false,
+      verdict: 'php-direct',
+      detail: 'Ответ пришёл без заголовка Server — запрос обработал PHP',
+    })
+
+    const wrapper = mountSettings()
+    await flush()
+
+    await wrapper.vm.runPreflight()
+    await flush()
+
+    const result = wrapper.find('[data-test="delivery-preflight-result"]')
+    expect(result.exists()).toBe(true)
+    expect(result.text()).toMatch(/PHP/)
+    // Сниппет собирается из значения internal, пришедшего с сервера.
+    expect(wrapper.find('.delivery-snippet').text()).toContain('/_protected-content')
+
+    spy.mockRestore()
+  })
+
+  it('проба не ломает страницу, если сеть недоступна', async () => {
+    const spy = vi.spyOn(preflight, 'probeDelivery').mockRejectedValue(new Error('boom'))
+
+    const wrapper = mountSettings()
+    await flush()
+
+    await expect(wrapper.vm.runPreflight()).rejects.toBeTruthy()
+    expect(wrapper.vm.probing).toBe(false)
+
+    spy.mockRestore()
   })
 })

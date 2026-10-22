@@ -148,6 +148,24 @@ class ExamController extends Controller
     }
 
     /**
+     * Получение одного экзамена.
+     *
+     * GET /api/exams/{exam}
+     */
+    public function show($id)
+    {
+        $exam = Exam::with(['course', 'module', 'category', 'group'])->findOrFail($id);
+
+        if (! $this->manages($request->user()) && ! $this->assignedTo($exam, $request->user())) {
+            return $this->fail('Экзамен недоступен', 403);
+        }
+
+        return response()->json([
+            'data' => $this->present($exam, $request->user()),
+        ]);
+    }
+
+    /**
      * Вопросы экзамена БЕЗ правильных ответов.
      *
      * GET /api/exams/{exam}/questions
@@ -255,15 +273,86 @@ class ExamController extends Controller
 
         $score = $total > 0 ? round($correct / $total, 4) : 0.0;
 
+        $passed = $score >= (float) $exam->passing_score;
+
         $attempt = ExamAttempt::create([
             'exam_id' => $exam->id,
             'user_id' => $actor->id,
             'total_count' => $total,
             'correct_count' => $correct,
             'score' => $score,
-            'passed' => $score >= (float) $exam->passing_score,
+            'passed' => $passed,
             'submitted_at' => now(),
         ]);
+
+        /*
+         * Уведомление о сдаче.
+         *
+         * Только что сданный экзамен и так на экране, поэтому
+         * уведомление получает преподаватель — это и есть смысл
+         * события: увидеть результат без проверки раздела. Неудачные
+         * попытки не отправляются, иначе лента забивалась бы шумом.
+         */
+        if ($passed) {
+            // XP — за экзамен, а не за попытку: пересдача после
+            // неудачи не должна платить дважды.
+            \App\Support\Gamification::award(
+                $actor,
+                'exam_passed',
+                "exam:{$exam->id}",
+                $exam->course_id,
+                $attempt->submitted_at
+            );
+
+            try {
+                \App\Support\Notifications::toPermission(
+                    'exams.manage',
+                    'exam_passed',
+                    'Экзамен сдан: ' . $exam->title,
+                    $actor->fio . ' сдал(а) экзамен: ' . (int) round($score * 100) . '%',
+                    '/exams/' . $exam->id,
+                    [
+                        'dedup_key' => 'exam_passed:' . $attempt->id,
+                        'exam_id' => $exam->id,
+                        'user_id' => $actor->id,
+                    ]
+                );
+            } catch (\Throwable $e) {
+                // Уведомление не должно ронять сдачу экзамена: результат
+                // уже записан, и из-за недоступности колокольчика он
+                // потерялся бы вместе с ответом 500.
+                report($e);
+            }
+        }
+
+        // Разбор по вопросам: собираем детальную информацию для каждого ответа
+        $questionDetails = [];
+        foreach ($validated['answers'] as $given) {
+            $questionId = (int) $given['question_id'];
+            $answerId = (int) $given['answer_id'];
+
+            if (! $correctIds->contains($questionId)) {
+                continue;
+            }
+
+            $question = DB::table('questions')->where('id', $questionId)->first();
+            $answer = DB::table('answers')->where('id', $answerId)->first();
+            $correctAnswer = DB::table('answers')
+                ->where('question_id', $questionId)
+                ->where('is_correct', true)
+                ->first();
+
+            if ($question) {
+                $questionDetails[] = [
+                    'question_id' => $questionId,
+                    'question_text' => $question->question_text,
+                    'given_answer_id' => $answerId,
+                    'given_answer_text' => $answer?->answer ?? null,
+                    'is_correct' => $answer?->is_correct ?? false,
+                    'correct_answer_text' => $correctAnswer?->answer ?? null,
+                ];
+            }
+        }
 
         return response()->json([
             'data' => [
@@ -273,8 +362,9 @@ class ExamController extends Controller
                 'score' => $score,
                 'passed' => $attempt->passed,
                 'passing_score' => (float) $exam->passing_score,
-            'question_limit' => $exam->question_limit,
+                'question_limit' => $exam->question_limit,
                 'attempts_left' => max(0, $exam->max_attempts - $exam->attempts()->where('user_id', $actor->id)->count()),
+                'question_details' => $questionDetails,
             ],
         ], 201);
     }

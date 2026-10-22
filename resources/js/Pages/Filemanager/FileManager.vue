@@ -135,6 +135,21 @@
           {{ $t("files.selection.count", { n: selectedFileIds.length }) }}
         </span>
 
+        <v-btn-toggle v-model="viewMode" mandatory class="fm-view-toggle">
+          <v-btn
+            value="grid"
+            icon="mdi-view-grid"
+            :title="$t('files.viewGrid')"
+            data-test="fm-view-grid"
+          />
+          <v-btn
+            value="list"
+            icon="mdi-view-list"
+            :title="$t('files.viewList')"
+            data-test="fm-view-list"
+          />
+        </v-btn-toggle>
+
         <v-btn
           size="small"
           variant="text"
@@ -180,7 +195,72 @@
       </span>
     </div>
 
+    <!--
+      Сетка. Одиночный клик по карточке ВЫБИРАЕТ строку, а не открывает
+      папку.
+
+      Раньше здесь стояло @click="openFolder(row.id)" для любой строки.
+      Для папки это работало, а для ФАЙЛА — нет: у файла нет папки с
+      таким id, и клик по файлу уводил в каталог с чужим содержимым
+      (или в 404). То же самое делало невозможным обычное выделение
+      файлов для переноса и удаления.
+
+      Открыть папку или скачать файл — кликом по самому имени.
+    -->
+    <!-- Сетка тоже обязана объяснять пустую папку. Раньше пустое состояние
+         жило только в DataTable, а DataTable рисуется v-else: в сетке пустая
+         папка показывала просто белый прямоугольник без единого слова. -->
+    <div v-if="viewMode === 'grid' && !loading && rows.length === 0" class="fm-grid__empty">
+      <EmptyState
+        icon="mdi-folder-open-outline"
+        :title="$t('files.empty.title')"
+        :text="$t('files.empty.text')"
+      />
+    </div>
+
+    <div v-else-if="viewMode === 'grid'" class="fm-grid">
+      <div
+        v-for="row in rows"
+        :key="rowKey(row)"
+        class="fm-grid__item"
+        :class="{ 'fm-grid__item--selected': isRowSelected(row) }"
+        :data-test="'fm-grid-' + row.kind + '-' + row.id"
+        @click="toggleRow(row, !isRowSelected(row))"
+      >
+        <div class="fm-grid__icon">
+          <v-icon
+            size="48"
+            :icon="row.kind === 'folder' ? 'mdi-folder' : fileIcon(row)"
+            :color="row.kind === 'folder' ? 'primary' : 'secondary'"
+          />
+        </div>
+        <button
+          type="button"
+          class="fm-grid__name"
+          :title="row.name"
+          :data-test="'fm-grid-open-' + row.kind + '-' + row.id"
+          @click.stop="row.kind === 'folder' ? openFolder(row.id) : download(row)"
+        >
+          {{ row.name }}
+        </button>
+        <div class="fm-grid__meta">
+          <span v-if="row.kind === 'folder'">{{ $t("files.table.items", { n: row.item_count || 0 }) }}</span>
+          <span v-else>{{ formatBytes(row.size) }}</span>
+        </div>
+        <div class="fm-grid__actions">
+          <v-checkbox-btn
+            :model-value="isRowSelected(row)"
+            :aria-label="selectLabel(row)"
+            :data-test="'fm-select-' + row.kind + '-' + row.id"
+            @update:model-value="toggleRow(row, $event)"
+            @click.stop
+          />
+        </div>
+      </div>
+    </div>
+
     <DataTable
+      v-else
       :columns="columns"
       :rows="rows"
       :loading="loading"
@@ -209,13 +289,6 @@
             :color="row.kind === 'folder' ? 'primary' : undefined"
             aria-hidden="true"
           ></v-icon>
-
-          <!--
-            Папка открывается, файл скачивается. Разные действия на
-            одном и том же «имени» — привычно пользователю файловых
-            менеджеров, и неожиданно, если и то и другое открывает
-            диалог.
-          -->
           <a
             v-if="row.kind === 'folder'"
             href="#"
@@ -225,7 +298,6 @@
           >
             {{ row.name }}
           </a>
-
           <button
             v-else
             type="button"
@@ -259,7 +331,6 @@
           >
             <v-icon icon="mdi-download-outline" size="18" aria-hidden="true"></v-icon>
           </v-btn>
-
           <v-btn
             size="small"
             variant="text"
@@ -271,7 +342,6 @@
           >
             <v-icon icon="mdi-pencil-outline" size="18" aria-hidden="true"></v-icon>
           </v-btn>
-
           <v-btn
             size="small"
             variant="text"
@@ -283,7 +353,6 @@
           >
             <v-icon icon="mdi-folder-move-outline" size="18" aria-hidden="true"></v-icon>
           </v-btn>
-
           <v-btn
             size="small"
             variant="text"
@@ -299,12 +368,20 @@
       </template>
     </DataTable>
 
-    <!-- Скрытый input файлов: кнопка и перетаскивание ведут в один сценарий -->
+    <!--
+      Скрытый input файлов: кнопка и перетаскивание ведут в один сценарий.
+
+      aria-label обязателен даже при class="fm-input": поле остаётся в
+      дереве доступности, и без имени оно читалось как «выбор файла» без
+      назначения — зачем на странице это поле, человек не понимал
+      (WCAG 2.2 SC 4.1.2).
+    -->
     <input
       ref="fileInput"
       type="file"
       multiple
       class="fm-input"
+      :aria-label="$t('files.fileInput')"
       data-test="fm-file-input"
       @change="onPicked"
     />
@@ -379,6 +456,12 @@
       </v-card>
     </v-dialog>
 
+    <!--
+      Удаление. Диалог был потерян при добавлении панели предпросмотра:
+      askDeleteRow() ставил deleteDialog = true, а размечать было нечем —
+      корзина в строке не делала ровно ничего, и необратимое действие
+      оставалось без подтверждения и без обратной связи.
+    -->
     <ConfirmDialog
       v-model="deleteDialog"
       :title="deleteDialogTitle"
@@ -390,12 +473,109 @@
     >
       {{ deleteDialogText }}
     </ConfirmDialog>
+
+    <!-- Панель предпросмотра -->
+    <v-navigation-drawer
+      v-model="previewFile"
+      right
+      temporary
+      fixed
+      width="480"
+      :model-value="previewFile !== null"
+      @update:model-value="closePreview"
+      :open-on-hover="false"
+      data-test="fm-preview"
+    >
+      <!--
+        Тело слота вычисляется ВСЕГДА, даже когда панель закрыта
+        (v-navigation-drawer прячет её, но не размонтирует содержимое).
+        Обращения previewFile.kind / previewFile.name при
+        previewFile === null давали
+        «TypeError: Cannot read properties of null (reading 'kind')»
+        по несколько раз на КАЖДЫЙ рендер страницы — даже когда
+        предпросмотр никто не открывал.
+        Поэтому всё содержимое обёрнуто в v-if="previewFile".
+      -->
+      <v-card v-if="previewFile" class="fm-preview">
+        <v-card-title class="fm-preview__title">
+          <span v-if="previewLoading" class="fm-preview__loading">
+            <v-progress-circular indeterminate size="16" class="mr-2" />
+            {{ $t("files.preview.loading") }}
+          </span>
+          <template v-else>
+            <v-icon :icon="previewFile.kind === 'folder' ? 'mdi-folder' : fileIcon(previewFile)" size="20" class="mr-2" />
+            {{ previewFile.name }}
+          </template>
+        </v-card-title>
+
+        <v-divider></v-divider>
+
+        <v-card-text class="fm-preview__body">
+          <template v-if="previewLoading">
+            <div class="fm-preview__placeholder">
+              <v-progress-circular indeterminate size="48" color="primary" />
+            </div>
+          </template>
+
+          <template v-else-if="previewFile.kind === 'folder'">
+            <div class="fm-preview__folder">
+              <v-icon size="64" icon="mdi-folder" color="primary" />
+              <p class="fm-preview__text">{{ $t("files.preview.folder") }}</p>
+            </div>
+          </template>
+
+          <template v-else-if="isImage(previewFile)">
+            <img
+              :src="previewUrl(previewFile)"
+              class="fm-preview__image"
+              :alt="previewFile.name"
+              @error="previewImageError"
+            />
+          </template>
+
+          <template v-else-if="isPdf(previewFile)">
+            <iframe
+              :src="previewUrl(previewFile)"
+              class="fm-preview__pdf"
+              title="PDF preview"
+            ></iframe>
+          </template>
+
+          <template v-else-if="isText(previewFile)">
+            <pre class="fm-preview__text">{{ previewText }}</pre>
+          </template>
+
+          <template v-else>
+            <div class="fm-preview__placeholder">
+              <v-icon size="64" icon="mdi-file-outline" color="grey" />
+              <p class="fm-preview__text">{{ $t("files.preview.unsupported") }}</p>
+            </div>
+          </template>
+        </v-card-text>
+
+        <v-card-actions class="fm-preview__actions">
+          <v-btn variant="text" @click="closePreview">
+            {{ $t("common.close") }}
+          </v-btn>
+          <v-btn
+            color="primary"
+            variant="flat"
+            :disabled="previewLoading"
+            @click="download(previewFile)"
+          >
+            <v-icon start icon="mdi-download-outline" />
+            {{ $t("files.actions.download") }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-navigation-drawer>
   </div>
 </template>
 
 <script>
 import PageHeader from "../../components/ui/PageHeader.vue";
 import DataTable from "../../components/ui/DataTable.vue";
+import EmptyState from "../../components/ui/EmptyState.vue";
 import ConfirmDialog from "../../components/ui/ConfirmDialog.vue";
 import { toast } from "../../composables/useToast";
 import { extractFieldErrors } from "../../api/envelope";
@@ -446,7 +626,7 @@ import {
  */
 export default {
   name: "FileManager",
-  components: { PageHeader, DataTable, ConfirmDialog },
+  components: { PageHeader, DataTable, ConfirmDialog, EmptyState },
 
   data() {
     return {
@@ -479,6 +659,13 @@ export default {
       deleteDialog: false,
       deleteRows: [],
       deleteNonEmptyFolder: null,
+      viewMode: 'grid',
+
+      /** Файл для предпросмотра (null = скрыт). */
+      previewFile: null,
+
+      /** Загрузка превью. */
+      previewLoading: false,
 
       /**
        * Список задач загрузки ЗДЕСЬ, а не внутри очереди.
@@ -562,6 +749,17 @@ export default {
       }
 
       return this.$t("files.delete.manyTitle", { n: this.deleteRows.length });
+    },
+
+    /**
+     * Единичный выделенный файл для предпросмотра.
+     */
+    singleSelectedFile() {
+      if (this.selected.length !== 1) return null
+      const key = this.selected[0]
+      if (!key.startsWith('d:')) return null
+      const id = Number(key.slice(2))
+      return this.files.find(f => f.id === id) ?? null
     },
 
     deleteDialogText() {
@@ -1248,5 +1446,99 @@ function isNotEmptyFolderError(error) {
 
 .fm-dialog__actions {
   padding: var(--sp-2) var(--sp-4) var(--sp-4);
+}
+
+.fm-view-toggle {
+  flex-shrink: 0;
+}
+
+.fm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+}
+
+.fm-grid__empty {
+  padding: var(--sp-4);
+}
+
+.fm-grid__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+  position: relative;
+}
+
+.fm-grid__item:hover {
+  border-color: var(--c-primary);
+  box-shadow: var(--shadow-2);
+  transform: translateY(-2px);
+}
+
+.fm-grid__item--selected {
+  border-color: var(--c-primary);
+  background: var(--c-primary-soft);
+}
+
+.fm-grid__icon {
+  color: var(--c-text-muted);
+}
+
+.fm-grid__item:hover .fm-grid__icon {
+  color: var(--c-primary);
+}
+
+/*
+  Имя в сетке — кнопка: одиночный клик по карточке выделяет строку,
+  а открыть папку или скачать файл нужно по самому имени. Раньше это
+  был <div>, и нажать его было нечем.
+*/
+.fm-grid__name {
+  font-size: var(--fs-sm);
+  text-align: center;
+  word-break: break-word;
+  max-width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.fm-grid__name:hover {
+  text-decoration: underline;
+}
+
+.fm-grid__name:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.fm-grid__meta {
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.fm-grid__actions {
+  position: absolute;
+  top: var(--sp-1);
+  right: var(--sp-1);
+}
+
+@media (max-width: 768px) {
+  .fm-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: var(--sp-2);
+  }
 }
 </style>

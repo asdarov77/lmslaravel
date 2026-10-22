@@ -169,11 +169,17 @@ class ContentApiTest extends TestCase
     }
 
     /**
-     * Находка: apiResource(settings) требует store(), но в контроллере
-     * есть только index() и update() — поэтому POST /api/settings даёт 500.
-     * Обновление настроек идёт через PUT -> update().
+     * POST /api/settings больше не существует.
+     *
+     * Раньше он был объявлен и падал с 500: метода store() в
+     * SettingsController не было никогда, а таблица настроек —
+     * key-value, создавать в ней нечего. Теперь маршрута нет, и
+     * Laravel отвечает 405 (метод не поддерживается), а не 500.
+     *
+     * Утверждение именно на 405: для клиента «маршрута нет» и
+     * «метод сломан» — разные вещи, и первое проверяемо.
      */
-    public function test_settings_store_method_is_missing_returns_500()
+    public function test_settings_store_route_is_not_available()
     {
         $this->admin();
 
@@ -181,7 +187,12 @@ class ContentApiTest extends TestCase
 
         $this->postJson('/api/settings', [
             ['name' => $setting->name, 'value' => 'new'],
-        ])->assertStatus(500);
+        ])->assertStatus(405);
+
+        $this->assertDatabaseHas('settings', [
+            'name' => $setting->name,
+            'value' => 'old',
+        ]);
     }
 
     /**
@@ -203,22 +214,66 @@ class ContentApiTest extends TestCase
 
         $setting = Setting::factory()->create(['value' => 'old']);
 
-        $this->putJson("/api/settings/{$setting->id}", [
+        // В адресе — ИМЯ настройки, а не её id: значения ищутся по name,
+        // а маршрут был ограничен whereNumber('setting') и потому не
+        // пропускал ни одно настоящее имя.
+        $this->putJson("/api/settings/{$setting->name}", [
             ['name' => $setting->name, 'value' => 'new'],
-        ])->assertStatus(200);
+        ])->assertStatus(200)->assertJsonPath('success', true);
 
         $this->assertDatabaseHas('settings', ['name' => $setting->name, 'value' => 'new']);
     }
 
-    public function test_settings_update_ignores_unknown_name()
+    /**
+     * Тело принимается и «голым» массивом, и под ключом settings —
+     * на клиентах встречаются обе формы.
+     */
+    public function test_settings_update_accepts_named_payload_shape()
     {
         $this->admin();
 
-        $this->putJson('/api/settings/1', [
+        $setting = Setting::factory()->create(['value' => 'old']);
+
+        $this->putJson("/api/settings/{$setting->name}", [
+            'settings' => [['name' => $setting->name, 'value' => 'new']],
+        ])->assertStatus(200)->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('settings', ['name' => $setting->name, 'value' => 'new']);
+    }
+
+    /**
+     * Неизвестное имя — ошибка, а не «успех».
+     *
+     * Раньше update молча игнорировал такие элементы: где('name')->update()
+     * не находит строку и ничего не делает, а ответ был 200 со словами
+     * «Настройки успешно обновлены». Человек думал, что настройка
+     * сохранена, и менял её неделю, пока не замечал, что ничего не
+     * происходит.
+     */
+    public function test_settings_update_rejects_unknown_name()
+    {
+        $this->admin();
+
+        $this->putJson('/api/settings/probe_unknown', [
             ['name' => 'нетакого', 'value' => 'x'],
-        ])->assertStatus(200);
+        ])->assertStatus(422)->assertJsonPath('success', false);
 
         $this->assertDatabaseMissing('settings', ['name' => 'нетакого']);
+    }
+
+    /**
+     * Настройки со своим предметным классом (выдача материала, тренажёр)
+     * общим маршрутом не правятся: у каждой свои правила значения.
+     */
+    public function test_settings_update_refuses_special_settings()
+    {
+        $this->admin();
+
+        $this->putJson('/api/settings/content_delivery', [
+            ['name' => 'content_delivery', 'value' => 'nginx'],
+        ])->assertStatus(422)->assertJsonPath('success', false);
+
+        $this->assertDatabaseHas('settings', ['name' => 'content_delivery', 'value' => 'php']);
     }
 
     // --------------------------------------------------------- GRADE BOUNDARY

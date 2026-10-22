@@ -146,12 +146,18 @@ Courses, UserList, CreateGroup, GroupItemEdit. Локальных полей
   initialization» на одной из страниц.
 
 ## Резервные копии страниц (суффиксы `copy`, `Orig`)
+
+Удалены. Их больше нет на диске:
+
 - `resources/js/Pages/Gift/ExamineForm copy.vue`
 - `resources/js/Pages/Gift/QuestionNewOrig.vue`
 - `resources/js/Pages/Group/GroupLearning Orig.vue`
 - `resources/js/Pages/User/UserPage copy.vue`
 
 ## Компоненты, вытесненные дизайн-системой или дублями
+
+Удалены:
+
 - `resources/js/components/About.vue`
 - `resources/js/components/FileUploader.vue`
 - `resources/js/components/Navbar.vue`
@@ -159,11 +165,17 @@ Courses, UserList, CreateGroup, GroupItemEdit. Локальных полей
 - `resources/js/components/Welcome.vue`
 
 ## Обёртки, оставшиеся от прежних правок
+
+Удалены:
+
 - `resources/js/Pages/Modal/Dialog.vue`
 - `resources/js/Pages/PermissionWrapper.vue`
 - `resources/js/Pages/Popup.vue`
 
 ## Незадействованные страницы и файлы
+
+Удалены:
+
 - `resources/js/Pages/Calendar.vue`
 - `resources/js/Pages/CourseManifestToday.vue`
 - `resources/js/Pages/CourseManifestVUE.vue`
@@ -173,10 +185,18 @@ Courses, UserList, CreateGroup, GroupItemEdit. Локальных полей
 - `resources/js/Pages/UploadFiles.vue`
 - `resources/js/Pages/User/RecursiveTable.vue`
 
+Про `RecursiveTable.vue` стоит помнить: он был единственным готовым
+рекурсивным деревом в проекте. Рекурсивной таблицы в интерфейсе сейчас
+нет — дерево содержания курса строится плоским списком с отступом по
+уровню (`CoursePlayerLayout`). Если рекурсивная таблица понадобится,
+забирать её неоткуда: сначала придётся решить, какие данные она будет
+показывать.
+
 ## Файлы, которые анализатор не видел
 
 `tools/reachability.py` сканирует только `*.vue` и `*.js`, поэтому файлы с
-нестандартным расширением в список не попадали. Проверены отдельно:
+нестандартным расширением в список не попадали. Проверены отдельно и
+удалены:
 
 - `resources/js/Pages/CourseManifestProba` — компонент на 31 КБ **без
   расширения**. Импортировать его невозможно: сборщик не подставляет `.vue`
@@ -184,13 +204,15 @@ Courses, UserList, CreateGroup, GroupItemEdit. Локальных полей
   черновик страницы просмотра курса.
 - `resources/js/Pages/file.txt` — текстовый файл рядом со страницами, ссылок
   нет.
-
 - `resources/js/Styles/app.scss` — 44 строки, из которых **все** строки
   комментарии: ни одного правила. Пакет `sass` в зависимостях не
   установлен, файл никем не импортируется. Это заготовка Vue CLI,
   оставшаяся после перехода на Vuetify.
 
 ## Barrel-файлы и устаревшая инициализация
+
+Удалены:
+
 - `resources/js/Pages/event-utils.js`
 - `resources/js/Pages/index.js`
 - `resources/js/Store/modules/index.js`
@@ -199,12 +221,22 @@ Courses, UserList, CreateGroup, GroupItemEdit. Локальных полей
 
 ## Файлы вне `resources/js`
 
+Удалены:
+
 - `index.html` в корне — самостоятельная страница-просмотрщик (20 КБ), к
   сборке и blade не подключена.
 - `example.txt` — 43 байта клавиатурной чехарды, файл не использовался.
+- `languagepacks.json` — пустой массив `[2]`, к продукту отношения не имеет.
 
 `merged_all.txt` оставлен по решению владельца: это дамп всех файлов
 проекта, который может пригодиться как подстраховка.
+
+**Уточнение (2026-10-22):** `merged_all.txt` фактически используется как эталон
+первоначальной версии при сравнении производительности плеера
+(`docs/course-player-performance.md` §1, §3) — из корня его не удалять, но при
+возможности перенести в `docs/archive/merged_all.txt`, чтобы не путать сборщиков.
+Файлы `index.html`, `example.txt` и пустой `languagepacks.json` на 2026-10-22
+всё ещё присутствуют в репозитории — удалить по этому манифесту (задача открыта).
 
 ## Данные, удалённые вместе с группами
 

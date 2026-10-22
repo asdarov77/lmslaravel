@@ -180,6 +180,44 @@ describe('useForm: submit', () => {
     expect(form.serverError.value).toBe('Проверьте поля')
     expect(form.submitting.value).toBe(false)
   })
+
+  it('во время onSubmit форма уже не «грязная» — редирект не блокируется', async () => {
+    // Регрессия: onSubmit обычно уходит с формы через router.push, а
+    // useLeaveGuard видел несохранённые изменения, спрашивал подтверждение
+    // и отменял редирект после УСПЕШНОГО сохранения.
+    let dirtyDuringSubmit = null
+    const { form } = withForm({
+      schema: { name: { initial: '', rules: [required()] } },
+      onSubmit: async ({ form: self }) => {
+        dirtyDuringSubmit = self.dirty.value
+      },
+    })
+
+    form.values.name = 'Группа'
+    expect(await form.submit()).toBe(true)
+    expect(dirtyDuringSubmit).toBe(false)
+  })
+
+  it('после неудачной отправки форма снова «грязная» и черновик восстановлен', async () => {
+    vi.useFakeTimers()
+    const { form } = withForm({
+      schema: { name: { initial: '', rules: [required()] } },
+      draftKey: 'test-draft-4',
+      onSubmit: async () => {
+        throw makeServerError()
+      },
+    })
+
+    form.values.name = 'Группа'
+    await vi.advanceTimersByTimeAsync(700)
+    expect(localStorage.getItem('form-draft:test-draft-4')).toBeTruthy()
+
+    expect(await form.submit()).toBe(false)
+    expect(form.dirty.value).toBe(true)
+    expect(localStorage.getItem('form-draft:test-draft-4')).toContain('Группа')
+
+    vi.useRealTimers()
+  })
 })
 
 describe('useForm: черновик', () => {

@@ -43,16 +43,13 @@ done
 # Файлы в старом стиле, которые ещё предстоит мигрировать (Фази 2–3).
 # Пути относительно resources/js/Pages/.
 LEGACY_FILES=(
-  # --- Фаза 3.1: Auth-экраны ---
-  "Login.vue"
-  "Register.vue"
-  "User/UserChpass.vue"
+  # Auth-экраны (Login, Register, UserChpass, ForgotPassword, ResetPassword)
+  # переведены на useForm в Фазе 2.3.1 и из списка убраны.
   # --- Фаза 2.3.3: Банк вопросов ---
   "Gift/QuestionItem.vue"
   "Gift/ExamineItem.vue"
-  # --- Фаза 2.3.2: Конструктор курса ---
-  "Course/RegisterCourse.vue"
-  "Course/UpdateCourse.vue"
+  # --- Фаза 2.3.2: Конструктор курса (RegisterCourse/UpdateCourse
+  #     заменены мастером CourseWizard; AddClass остаётся отдельной страницей) ---
   "Course/AddClass.vue"
   "CourseItem.vue"
   # --- Фаза 3.4: Просмотр курса ---
@@ -80,6 +77,8 @@ PAGES_DIR="resources/js/Pages"
 
 VIOLATIONS=0
 WARNINGS=0
+# Файлы, где hex — данные пипетки цвета; попадают в итоговую сноску.
+HEX_DATA_NOTES=()
 
 check() {
   local pattern="$1" label="$2" file="$3" line="$4" snippet="$5"
@@ -111,9 +110,35 @@ while IFS= read -r -d '' file; do
   done < <(grep -n 'style="width:' "$file" 2>/dev/null | cut -d: -f1)
 
   # 3. hex-цвета
+  #
+  # Граница слова \b обязательна: без неё «#default» в слоте Vue
+  # («defa» — валидные hex-символы) ловился как цвет.
+  #
+  # HEX_DATA_FILES — исключение для страниц, где hex это ДАННЫЕ, а не
+  # оформление: значения цветов, которые пользователь выбирает пипеткой
+  # и которые кладутся в настройки white-label. Запрещать их нельзя —
+  # это и есть предмет страницы. Оформление при этом проверяется
+  # по-прежнему: зашитый цвет в CSS-блоке такого файла — нарушение.
+  HEX_DATA_FILES=("WhiteLabel/Settings.vue")
+  is_hex_data_file() {
+    local base entry
+    base="$(basename "$1")"
+    for entry in "${HEX_DATA_FILES[@]}"; do
+      [[ "$base" == "$(basename "$entry")" ]] && return 0
+    done
+    return 1
+  }
   while IFS=: read -r line _; do
-    [[ -n "$line" ]] && check "" "hex-цвет" "$file" "$line" "$(sed -n "${line}p" "$file" | tr -s ' ' | cut -c1-70)"
-  done < <(grep -nE '#[0-9a-fA-F]{3,6}' "$file" 2>/dev/null | cut -d: -f1)
+    [[ -n "$line" ]] || continue
+    if is_hex_data_file "$file"; then
+      printf '%s  ~ %s:%s  hex как ДАННЫЕ (пипетка цвета): %s%s\n' \
+        "$YELLOW" "${file#resources/js/Pages/}" "$line" \
+        "$(sed -n "${line}p" "$file" | tr -s ' ' | cut -c1-70)" "$OFF"
+      HEX_DATA_NOTES+=("${file#resources/js/Pages/}")
+    else
+      check "" "hex-цвет" "$file" "$line" "$(sed -n "${line}p" "$file" | tr -s ' ' | cut -c1-70)"
+    fi
+  done < <(grep -nE '#[0-9a-fA-F]{3,6}\b' "$file" 2>/dev/null | cut -d: -f1)
 
   # 4. <v-toolbar> внутри карточек форм
   while IFS=: read -r line _; do

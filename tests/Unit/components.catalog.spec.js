@@ -18,6 +18,7 @@ import * as vuetifyComponents from 'vuetify/components'
 import * as vuetifyDirectives from 'vuetify/directives'
 import { createI18n } from 'vue-i18n'
 import { createStore } from 'vuex'
+import { createRouter, createMemoryHistory } from 'vue-router'
 import ru from '../../resources/js/locales/ru.json'
 import en from '../../resources/js/locales/en.json'
 
@@ -43,6 +44,15 @@ const clearToasts = () => clear()
 
 global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
 global.visualViewport = { addEventListener() {}, removeEventListener() {}, offsetLeft: 0, offsetTop: 0, width: 1024, height: 768, scale: 1 }
+
+const router = createRouter({
+  history: createMemoryHistory(),
+  routes: [
+    { path: '/', name: 'dashboard', component: { template: '<div />' } },
+    { path: '/catalog', name: 'catalog.index', component: { template: '<div />' } },
+    { path: '/courses/itemmani', name: 'courses.itemmani', component: { template: '<div />' } },
+  ],
+})
 
 const fetchCatalog = vi.fn()
 const enrollCourse = vi.fn()

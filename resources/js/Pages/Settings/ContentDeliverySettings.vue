@@ -43,6 +43,42 @@
       </template>
     </DataTable>
 
+    <!--
+      Preflight. Переключатель включается без «Сохранить», и если nginx
+      не настроен, материалы начинают отдаваться ПУСТЫМИ: 200 без тела,
+      без ошибок в логах. Здесь администратор может проверить это до
+      переключения и увидеть, какой именно location надо вписать.
+    -->
+    <SectionCard class="mt-6" :title="$t('settings.delivery.preflightTitle')">
+      <v-btn
+        variant="tonal"
+        color="primary"
+        prepend-icon="mdi-stethoscope"
+        :loading="probing"
+        data-test="delivery-preflight"
+        @click="runPreflight"
+      >
+        {{ $t('settings.delivery.preflightRun') }}
+      </v-btn>
+
+      <v-alert
+        v-if="preflight"
+        :type="preflightAlert.type"
+        variant="tonal"
+        density="compact"
+        class="mt-3"
+        data-test="delivery-preflight-result"
+        :text="preflightAlert.text"
+      />
+
+      <div v-if="preflight" class="mt-3">
+        <p class="text-caption text-medium-emphasis mb-1">
+          {{ $t('settings.delivery.preflightConfig') }}
+        </p>
+        <pre class="delivery-snippet">{{ snippet }}</pre>
+      </div>
+    </SectionCard>
+
     <p class="text-caption text-medium-emphasis mt-4">
       {{ $t('settings.delivery.workerHint') }}
     </p>
@@ -71,10 +107,12 @@
 import $api from '../../api/httpClient'
 import { unwrapResponse } from '../../api/envelope'
 import DataTable from '../../components/ui/DataTable.vue'
+import SectionCard from '../../components/ui/SectionCard.vue'
+import { nginxSnippet, probeDelivery } from '../../utils/preflight'
 
 export default {
   name: 'ContentDeliverySettings',
-  components: { DataTable },
+  components: { DataTable, SectionCard },
   data() {
     return {
       loading: true,
@@ -83,6 +121,8 @@ export default {
       source: '',
       internal: '',
       alert: null,
+      probing: false,
+      preflight: null,
     }
   },
   computed: {
@@ -101,6 +141,20 @@ export default {
     },
     nginx() {
       return this.mode === 'nginx'
+    },
+
+    /** Куск конфига nginx со значением internal из настроек. */
+    snippet() {
+      return nginxSnippet(this.internal)
+    },
+
+    /** Человеческий вердикт пробы: ok/ошибка по типу результата. */
+    preflightAlert() {
+      if (!this.preflight) return null
+
+      const type = this.preflight.ok ? 'success' : 'warning'
+
+      return { type, text: this.preflight.detail }
     },
   },
   async mounted() {
@@ -124,6 +178,24 @@ export default {
         }
       } finally {
         this.loading = false
+      }
+    },
+
+    /**
+     * Проба перед переключением режима.
+     *
+     * Проверка честно ограничена: браузер может выяснить, кто обработал
+     * внутренний location (nginx или PHP), но не может подтвердить, что
+     * location прописан правильно — для этого нужен реальный файл,
+     * как в tools/verify-nginx-delivery.sh.
+     */
+    async runPreflight() {
+      this.probing = true
+
+      try {
+        this.preflight = await probeDelivery(this.internal, this.$baseUrl ?? '')
+      } finally {
+        this.probing = false
       }
     },
 
@@ -155,3 +227,20 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+/* Конфиг nginx показывается как есть: его вставляют в конфигурацию
+   сервера вручную, и перенос строк здесь важнее оформления. */
+.delivery-snippet {
+  margin: 0;
+  padding: var(--sp-3);
+  overflow-x: auto;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface-3);
+  color: var(--c-text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-normal);
+}
+</style>

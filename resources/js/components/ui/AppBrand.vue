@@ -1,5 +1,5 @@
 <template>
-  <span class="u-brand" data-test="app-brand">
+  <span class="u-brand" :class="{ 'u-brand--on-primary': onPrimary }" data-test="app-brand">
     <!--
         Знак рисуется цветом currentColor, а не зашитым: он должен
         одинаково читаться и на светлой, и на тёмной теме, где primary
@@ -54,6 +54,14 @@ const { t } = useI18n({ useScope: 'global' })
 const props = defineProps({
   /** Показывать ли полное название (нужна ширина). */
   full: { type: Boolean, default: false },
+  /**
+   * Компонент стоит на насыщенном фоне (шапка).
+   *
+   * Тогда полное название рисуется светлым: тёмно-серый --c-text-secondary
+   * на синем app-bar давал тёмно-синий по тёмно-синему и текст был
+   * практически не виден.
+   */
+  onPrimary: { type: Boolean, default: false },
 })
 
 const short = computed(() => t('app.brand'))
@@ -98,12 +106,31 @@ const showFull = computed(() => props.full)
 }
 
 .u-brand__full {
-  color: var(--c-text-secondary);
+  /*
+    Контраст на синей шапке.
+
+    Раньше здесь стоял var(--c-text-secondary) — тёмно-серний, рассчитанный
+    на СВЕТЛЫЙ фон. На app-bar (color="primary", синий) он давал тёмно-синий
+    по тёмно-синему: «Система управления обучением» рядом с «LMS» было
+    почти не видно (проверено на скриншоте). Теперь цвет задан явно
+    белым с прозрачностью — на любом насыщенном фоне шапки читается,
+    а сам компонент в светлых местах (карточки, подвал) остаётся
+    вторичным тоном.
+  */
+  color: rgba(255, 255, 255, 0.82);
   font-weight: 400;
   font-size: 0.8125rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/*
+    Вне шапки (карточки, подвал) полное название остаётся вторичным —
+    там светлый фон, и белый был бы нечитаем.
+*/
+.u-brand:not(.u-brand--on-primary) .u-brand__full {
+  color: var(--c-text-secondary);
 }
 
 /*

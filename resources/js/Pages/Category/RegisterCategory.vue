@@ -1,6 +1,7 @@
 <template>
   <div class="u-page">
     <FormCard
+      :heading-level="1"
       :title="$t('categories.create.title')"
       :subtitle="$t('categories.create.subtitle')"
       :busy="saving"

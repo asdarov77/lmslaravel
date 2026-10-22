@@ -85,5 +85,14 @@ class RouteServiceProvider extends ServiceProvider
 
         RateLimiter::for('register', fn (Request $request) => Limit::perMinute($perMinute(5))
             ->by('register:' . $request->ip()));
+
+        /*
+         * Восстановление пароля ограничаем жёстче входа: иначе можно
+         * долбить почтовый ящик пользователя письмами-заглушками. Один
+         * запрос с IP в 5 минут — этого хватает и для забывчивого
+         * пользователя, и не даёт превратить форму в спам-рассылку.
+         */
+        RateLimiter::for('forgot', fn (Request $request) => Limit::perMinute($perMinute(1))
+            ->by('forgot:' . $request->ip()));
     }
 }

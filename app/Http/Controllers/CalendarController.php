@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CalendarEvent;
 use App\Models\Course;
 use App\Models\Group;
 use App\Models\Group2learning;
@@ -236,6 +237,44 @@ class CalendarController extends Controller
             default => $events->concat($deadlineEvents)->values(),
         };
 
+        // Пользовательские события из таблицы calendar_events.
+        //
+        // Видимость повторяет ленту: событие без группы видно всем,
+        // событие группы — только ей. Раньше брался CalendarEvent::all()
+        // без всякой фильтрации, то есть событие одной группы появлялось
+        // в календаре всех, включая обучаемого с другим расписанием.
+        $visibleCustomQuery = CalendarEvent::query()
+            ->where(fn ($q) => $q->whereNull('group_id'));
+
+        if ($groupId !== null) {
+            $visibleCustomQuery->orWhere('group_id', $groupId);
+        } elseif (! $maySeeAllGroups) {
+            // Своей группы нет — показывать нечего.
+            $visibleCustomQuery->whereRaw('1 = 0');
+        }
+
+        $customEvents = $visibleCustomQuery
+            ->orderBy('start')
+            ->get()
+            ->map(function (CalendarEvent $event) {
+                return [
+                    'id' => 'custom-'.$event->id,
+                    'title' => $event->title,
+                    'start' => $event->start->toDateString(),
+                    'end' => $event->end->copy()->addDay()->toDateString(),
+                    'allDay' => true,
+                    'extendedProps' => [
+                        'kind' => 'custom',
+                        'event_id' => $event->id,
+                        'can_delete' => auth('sanctum')->user()?->isSuperAdmin()
+                            || auth('sanctum')->user()?->id === $event->user_id,
+                    ],
+                ];
+            })
+            ->values();
+
+        $events = $events->concat($customEvents)->values();
+
         return response()->json([
             'data' => [
                 'events' => $events,
@@ -325,5 +364,105 @@ class CalendarController extends Controller
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * Создание события календаря (quick-add из интерфейса).
+     *
+     * POST /api/calendar/events
+     *
+     * Право — exams.manage или grading.manage (то же, что у самой
+     * страницы календаря). Группа берётся из тела запроса: событие
+     * без группы видно всем, с группой — только ей.
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'start' => ['required', 'date'],
+            'end' => ['nullable', 'date', 'after_or_equal:start'],
+            'group_id' => ['nullable', 'integer', 'exists:groups,id'],
+        ]);
+
+        $user = auth('sanctum')->user();
+
+        $groupId = $validated['group_id'] ?? null;
+
+        // Группу выбирать можно только ту, которой управляешь, — иначе
+        // можно было бы «прибить» событие к чужой группе.
+        if ($groupId !== null && ! $this->mayUseGroup($user, $groupId)) {
+            return response()->json([
+                'success' => false,
+                'error' => ['code' => '403', 'message' => 'Недостаточно прав для этой группы'],
+            ], 403);
+        }
+
+        $event = CalendarEvent::create([
+            'title' => $validated['title'],
+            'start' => $validated['start'],
+            'end' => $validated['end'] ?? $validated['start'],
+            'user_id' => $user?->id,
+            'group_id' => $groupId,
+        ]);
+
+        return response()->json([
+            'data' => [
+                'id' => $event->id,
+                'title' => $event->title,
+                'start' => $event->start->toDateString(),
+                'end' => $event->end->toDateString(),
+            ],
+        ], 201);
+    }
+
+    /**
+     * Удаление события календаря.
+     *
+     * DELETE /api/calendar/events/{event}
+     *
+     * Удалить может автор события или суперадмин. Раньше проверки
+     * принадлежности не было вовсе: право на календарь давало
+     * удаление чужой записи.
+     */
+    public function destroy(CalendarEvent $event)
+    {
+        $user = auth('sanctum')->user();
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'error' => ['code' => '401', 'message' => 'Требуется авторизация'],
+            ], 401);
+        }
+
+        if (! $user->isSuperAdmin() && $event->user_id !== null && $event->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'error' => ['code' => '403', 'message' => 'Можно удалять только свои события'],
+            ], 403);
+        }
+
+        $event->delete();
+
+        return response()->json(null, 204);
+    }
+
+    /**
+     * Может ли пользователь назначить событие этой группе.
+     *
+     * Суперадмин и методист (users.courses) — любую; остальные — только
+     * свою.
+     */
+    private function mayUseGroup(?\App\Models\User $user, int $groupId): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isSuperAdmin() || $user->hasPermission('users.courses')) {
+            return true;
+        }
+
+        return $user->group_id === $groupId;
     }
 }

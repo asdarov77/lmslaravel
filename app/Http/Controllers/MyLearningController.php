@@ -112,6 +112,21 @@ class MyLearningController extends Controller
         $today = Carbon::today();
         $weekAhead = $today->copy()->addDays(7);
 
+        /*
+         * Счётчики — по КУРСАМ, а не по строкам плана.
+         *
+         * В `group2learnings` одна строка на курс в группу, но курс может
+         * занимать несколько строк: группа записана на конкретные
+         * материалы (parent_id). Это разные записи, но для человека это
+         * один курс.
+         *
+         * Раньше счётчики считали `$plan->count()` и фильтровали `$plan`,
+         * то есть по строкам. Из-за этого на дашборде стояло
+         * «Курсов 2 / Активных 4» — четыре активных курса из двух
+         * невозможны, и человек принимал это за ошибку данных.
+         */
+        $planByCourse = $plan->groupBy('course_id');
+
         // Сколько раз обучаемый открывал материалы по каждому курсу.
         $visits = $user
             ? \App\Models\Favorite::where('user_id', $user->id)
@@ -186,17 +201,26 @@ class MyLearningController extends Controller
         return response()->json([
             'data' => [
                 'courses' => [
-                    'total' => $plan->count(),
+                    'total' => $courses->count(),
                     'distinct' => $courses->count(),
-                    'active' => $plan->filter(function ($r) use ($today, $weekAhead) {
-                        $from = $this->date($r->study_from);
-                        $to = $this->date($r->study_to);
+                    /*
+                     * Активен курс, если активна ХОТЯ БЫ одна его запись:
+                     * период у строк один и тот же, но не полагаться на
+                     * это — записи заводят вручную и правят по одной.
+                     */
+                    'active' => $planByCourse->filter(function ($rows) use ($today, $weekAhead) {
+                        return $rows->contains(function ($r) use ($today, $weekAhead) {
+                            $from = $this->date($r->study_from);
+                            $to = $this->date($r->study_to);
 
-                        return $to === null || $to >= $today
-                            ? ($from === null || $from <= $weekAhead)
-                            : false;
+                            return $to === null || $to >= $today
+                                ? ($from === null || $from <= $weekAhead)
+                                : false;
+                        });
                     })->count(),
-                    'completed' => $plan->filter(fn ($r) => $this->status($this->date($r->study_from), $this->date($r->study_to)) === 'completed')->count(),
+                    'completed' => $planByCourse->filter(function ($rows) {
+                        return $rows->contains(fn ($r) => $this->status($this->date($r->study_from), $this->date($r->study_to)) === 'completed');
+                    })->count(),
                     'started' => $started,
                 ],
                 /*
@@ -209,19 +233,46 @@ class MyLearningController extends Controller
                  * дате. Считать «осталось N дней» до конца занятий значило
                  * показывать неверный срок.
                  */
-                'upcoming' => $plan
-                    ->map(function ($r) use ($today) {
-                        $due = $this->date($r->deadline) ?? $this->date($r->study_to);
+                'upcoming' => $planByCourse
+                    ->map(function ($rows) use ($today) {
+                        /*
+                         * У курса несколько записей (по parent_id), и
+                         * срок у них может различаться. Карточка нужна
+                         * одна на курс — иначе на дашборде один и тот же
+                         * курс печатался двумя одинаковыми карточками.
+                         * Берём самую раннюю: «подходит к завершению»
+                         * должно показывать настоящий дедлайн, а не самый
+                         * поздний из возможных.
+                         */
+                        $due = $rows
+                            ->map(function ($r) {
+                                $date = $this->date($r->deadline) ?? $this->date($r->study_to);
+
+                                return [
+                                    'due' => $date,
+                                    'row' => $r,
+                                ];
+                            })
+                            ->filter(fn ($r) => $r['due'] !== null)
+                            ->sortBy('due')
+                            ->first();
+
+                        if ($due === null) {
+                            return null;
+                        }
+
+                        $row = $due['row'];
 
                         return [
-                            'course_id' => $r->course_id,
-                            'title' => $r->course->title ?? null,
-                            'due_at' => $due?->toDateString(),
-                            'source' => $this->date($r->deadline) !== null ? 'deadline' : 'study_to',
-                            'days_left' => $due === null ? null : (int) $today->diffInDays($due, false),
+                            'course_id' => $row->course_id,
+                            'title' => $row->course->title ?? null,
+                            'due_at' => $due['due']->toDateString(),
+                            'source' => $this->date($row->deadline) !== null ? 'deadline' : 'study_to',
+                            'days_left' => (int) $today->diffInDays($due['due'], false),
                         ];
                     })
-                    ->filter(fn ($r) => $r['days_left'] !== null && $r['days_left'] >= 0 && $r['days_left'] <= 7)
+                    ->filter()
+                    ->filter(fn ($r) => $r['days_left'] >= 0 && $r['days_left'] <= 7)
                     ->sortBy('days_left')
                     ->values()
                     ->all(),
