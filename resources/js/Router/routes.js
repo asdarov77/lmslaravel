@@ -611,7 +611,10 @@ const routes = [
         meta: { permission: ['settings.manage'] },        component: () => import('../Pages/Settings/GradeSettings.vue'),
     },
     {
-        path: '/settings/',
+        // С в 9.1: маршрут без слэша — `activeMatch` на пункте меню
+        // сравнивался по префиксу и ломался на trailing slash.
+        path: '/settings',
+        alias: '/settings/',
         name: 'allSettings',
         meta: { permission: ['settings.manage'] },        component: () => import('../Pages/Settings/AllSettings.vue'),
     },

@@ -22,6 +22,16 @@ import AccountMenu from '../../resources/js/Pages/Navigation/AccountMenu.vue'
 import LogoutApp from '../../resources/js/Pages/Navigation/LogoutApp.vue'
 import ru from '../../resources/js/locales/ru.json'
 
+/**
+ * Список сессий для подтверждения выхода («Выйти» спрашивает у бэка).
+ * По умолчанию параллельных сессий нет — выход молча; тест с >0 меняет
+ * возвращаемое значение глобальной заглушки.
+ */
+const sessionsGet = vi.hoisted(() =>
+  vi.fn(async () => ({ data: { success: true, data: { extra_sessions: 0, sessions: [] } } }))
+)
+vi.mock('../../resources/js/api/httpClient', () => ({ default: { get: (...a) => sessionsGet(...a) } }))
+
 const vuetify = createVuetify({ components: vuetifyComponents, directives: vuetifyDirectives })
 const i18n = createI18n({ legacy: false, globalInjection: true, locale: 'ru', fallbackLocale: 'ru', messages: { ru } })
 
@@ -83,19 +93,50 @@ const mountWith = (component, harness) =>
   mount(component, { global: { plugins: [vuetify, i18n, harness.store, harness.router] } })
 
 beforeEach(async () => {
+  // Заглушка сессий возвращается к «параллельных нет» перед каждым тестом:
+  // тест с подтверждением меняет реализацию глобальной заглушки.
+  sessionsGet.mockImplementation(
+    async () => ({ data: { success: true, data: { extra_sessions: 0, sessions: [] } } })
+  )
   const harness = makeHarness()
   await harness.router.push('/courses/list')
   await harness.router.isReady()
 })
 
 describe('Выход: меню профиля', () => {
+  it('при параллельных сессиях сначала показывает подтверждение', async () => {
+    vi.mocked(sessionsGet).mockClear()
+    sessionsGet.mockImplementation(async () =>
+      ({ data: { success: true, data: { extra_sessions: 1, sessions: [{ id: 9, name: 'mobile' }] } } })
+    )
+    const harness = makeHarness()
+    await harness.router.push('/courses/list')
+
+    const wrapper = mountWith(AccountMenu, harness)
+
+    await wrapper.vm.askLogout()
+    await harness.router.isReady()
+
+    // Разлогин не начался: ждём решения человека, а не делаем молча.
+    expect(harness.events).not.toContain('logout:start')
+    expect(harness.router.currentRoute.value.name).toBe('courses.list')
+
+    // Подтверждение — тогда выходим.
+    await wrapper.vm.doLogout()
+    await harness.router.isReady()
+    expect(harness.events).toContain('logout:done')
+    expect(harness.router.currentRoute.value.name).toBe('login')
+
+    wrapper.unmount()
+  })
+
   it('гасит сессию ДО перехода на страницу авторизации', async () => {
     const harness = makeHarness()
     await harness.router.push('/courses/list')
 
     const wrapper = mountWith(AccountMenu, harness)
 
-    await wrapper.vm.logout()
+    await wrapper.vm.askLogout()
     await harness.router.isReady()
 
     const doneIndex = harness.events.indexOf('logout:done')
@@ -114,7 +155,7 @@ describe('Выход: меню профиля', () => {
     await harness.router.push('/courses/list')
 
     const wrapper = mountWith(AccountMenu, harness)
-    await wrapper.vm.logout()
+    await wrapper.vm.askLogout()
     await harness.router.isReady()
 
     expect(harness.router.currentRoute.value.name).toBe('login')
@@ -132,7 +173,7 @@ describe('Выход: меню профиля', () => {
     // должен оказаться на странице входа, а не внутри приложения.
     harness.store._actions['Auth/logout'][0] = async () => { throw new Error('network down') }
 
-    await wrapper.vm.logout()
+    await wrapper.vm.askLogout()
     await harness.router.isReady()
 
     expect(harness.router.currentRoute.value.name).toBe('login')

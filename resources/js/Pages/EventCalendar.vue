@@ -692,13 +692,14 @@ export default {
      */
 
     /** Открытие формы создания по клику на дату. */
-    openEventForm(info) {
-      const picked = this.pickDate(info) || this.todayIso();
+openEventForm(info) {
+      const picked = this.pickDate(info) || this.todayIso()
 
-      this.eventForm.start = picked;
-      this.eventForm.end = picked;
-      this.eventForm.title = '';
-      this.eventForm.open = true;
+      this.eventForm.start = picked
+      this.eventForm.end = picked
+      this.eventForm.title = ''
+      this.eventForm.open = true
+      this.$nextTick(() => this.$refs.eventFormInput?.focus())
     },
 
     /** Кнопка «Добавить событие»: дата по умолчанию — сегодня. */

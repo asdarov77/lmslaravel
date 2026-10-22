@@ -105,10 +105,19 @@
           :title="$t('app.menu.logout')"
           class="text-error"
           data-test="account-logout"
-          @click="logout"
+          @click="askLogout"
         />
       </v-list>
     </v-card>
+    <ConfirmDialog
+      v-model="confirmLogout"
+      icon="mdi-alert-outline"
+      :title="$t('app.menu.logoutConfirmTitle')"
+      :text="$t('app.menu.logoutConfirmText')"
+      :confirm-text="$t('app.menu.logout')"
+      :busy="loggingOut"
+      @confirm="doLogout"
+    />
   </v-menu>
 </template>
 
@@ -117,8 +126,10 @@ import { mapGetters, mapState } from 'vuex'
 import { accountItems } from '../../navigation'
 import { routePermissionIndex, requiredPermissions } from '../../utils/routePermissions'
 import ThemeToggle from '../../components/ui/ThemeToggle.vue'
+import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
 import density from '../../utils/density'
 import $api from '../../api/httpClient'
+import { unwrapResponse } from '../../api/envelope'
 
 /**
  * Меню профиля.
@@ -132,11 +143,13 @@ import $api from '../../api/httpClient'
  * его отсутствие.
  */
 export default {
-  components: { ThemeToggle },
+  components: { ThemeToggle, ConfirmDialog },
 
   data: () => ({
     requiredBy: routePermissionIndex(),
     xp: 0,
+    confirmLogout: false,
+    loggingOut: false,
   }),
 
   computed: {
@@ -232,7 +245,36 @@ export default {
      *
      * Теперь сначала гасится сессия, и только потом меняется маршрут.
      */
-    async logout() {
+    /**
+     * 9.1: выход с подтверждением, если у пользователя есть параллельные
+     * сессии. Сессии знает только бэк (токен был несовпадеверо удалён),
+     * поэтому спрашиваем у него состояние до разлогина — если extra
+     * сессий нет, выходим молча, без лишнего диалога.
+     */
+    /** Клик по «Выйти»: сессии знает бэк — без параллельных выходим молча. */
+    async askLogout() {
+      let extra = 0
+      try {
+        const res = await $api.get('/api/my/sessions')
+        extra = Number(unwrapResponse(res)?.extra_sessions) || 0
+      } catch {
+        // Не получилось узнать сессии: считаем, что их нет —
+        // не наказываем пользователя за сброс лишнего вопроса.
+      }
+
+      if (extra > 0) {
+        this.confirmLogout = true
+        return
+      }
+      await this.doLogout()
+    },
+
+    async doLogout() {
+      // Меню-попап под диалогом закрывается навигацией, а сам диалог
+      // сбрасываем сразу — иначе стенит открытым пожизненно, если
+      // разлогин бросит и переход сорвётся.
+      this.confirmLogout = false
+      this.loggingOut = true
       try {
         await this.$store.dispatch('Auth/logout')
       } catch {
@@ -240,6 +282,7 @@ export default {
         // показываться пользователю: локальная сессия всё равно
         // закрывается в finally экшена, а маршрут меняется ниже.
       } finally {
+        this.loggingOut = false
         // Ошибка сети не должна оставить пользователя в приложении:
         // локальная сессия всё равно закрыта в finally экшена.
         await this.$router.push({ name: 'login' }).catch(() => {})

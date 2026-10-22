@@ -392,10 +392,6 @@ export default {
     // Единый endpoint открытия курса (P0.1): один запрос вместо шести.
     // Подробности — docs/course-player-performance.md, раздел 2.
     this.loadPlayerData();
-
-    if (!this.aircrafts) {
-      this.$store.dispatch("Course/fetchAircrafts");
-    }
   },
 
   beforeUnmount() {

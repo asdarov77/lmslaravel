@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 use App\Http\Filters\AukstructureFilter;
 use App\Http\Requests\Aukstructure\FilterRequest;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use App\Models\Aukstructure;
 
 /**
@@ -123,5 +124,76 @@ class AukstructureController extends Controller
         $item->delete();
 
         return response()->json(null, 204);
+    }
+
+    /**
+     * Раздел 8 (остаток бэка): переупорядочивание узлов курса.
+     *
+     * POST /api/aukstructure/reorder { course_id, ids: [..] }
+     * ids — полный список узлов курса в новом порядке: договорённость
+     * «прислал всё» проще дельт и не может рассинхронизироваться.
+     * Узлы, не попавшие в список, в хвост не передвигаются — их позиции
+     * не трогаются (частичный список не должен перетряхивать дерево).
+     */
+    public function reorder(Request $request)
+    {
+        $validated = $request->validate([
+            'course_id' => ['required', 'integer', 'exists:courses,id'],
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+        ]);
+
+        $ids = $validated['ids'];
+        $duplicate = count($ids) !== count(array_unique($ids));
+        if ($duplicate) {
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'error' => 'В списке порядка есть повторяющиеся узлы',
+                'meta' => null,
+            ], 422);
+        }
+
+        // Все id обязаны принадлежать курсу (иначе за узлом другого курса
+        // зашита чужая позиция).
+        $foreign = Aukstructure::whereIn('id', $ids)
+            ->where('course_id', '<>', $validated['course_id'])
+            ->count();
+        if ($foreign > 0) {
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'error' => 'В списке есть узлы из другого курса',
+                'meta' => null,
+            ], 422);
+        }
+
+        $count = Aukstructure::where('course_id', $validated['course_id'])->count();
+        if (count($ids) !== $count) {
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'error' => "Список порядка отображает не все узлы курса ({$count} узлов, пришло " . count($ids) . ')',
+                'meta' => null,
+            ], 422);
+        }
+
+        // Один UPDATE по CASE: параметр курса — positional '?' вместо named,
+        // чтобы не смешивать стили плейсхолдеров в одном запросе.
+        $cases = implode(' ', collect($ids)
+            ->map(fn ($id, $i) => 'WHEN ' . (int) $id . ' THEN ' . ($i + 1))->all());
+        $bindings = array_merge([$validated['course_id']], array_map('intval', $ids));
+        DB::update(
+            'UPDATE aukstructures SET position = CASE id ' . $cases . " END
+             WHERE course_id = ? AND id IN (" . implode(',', array_fill(0, count($ids), '?')) . ')',
+            $bindings
+        );
+
+        return response()->json([
+            'success' => true,
+            'data' => ['reordered' => count($ids)],
+            'error' => null,
+            'meta' => null,
+        ]);
     }
 }

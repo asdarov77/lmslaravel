@@ -45,7 +45,9 @@
       "unpinAll": "Unpin all",
       "coursesAdd": "Create course",
       "usersAdd": "Add user",
-      "groupsAdd": "Create group"
+      "groupsAdd": "Create group",
+      "logoutConfirmTitle": "Sign out?",
+      "logoutConfirmText": "You have active sessions in other windows or on other devices. Signing out here keeps your data, but you will need to sign in again."
     },
     "contacts": "Contacts",
     "files": "Files",
@@ -1817,7 +1819,10 @@
       "materialDeleted": "Material deleted",
       "materialSaveError": "Failed to save material",
       "materialDeleteError": "Failed to delete material",
-      "materialsEmpty": "No materials in this module yet. Click \"Add material\" to create the first one."
+      "materialsEmpty": "No materials in this module yet. Click \"Add material\" to create the first one.",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "reorderFailed": "Failed to save the new order"
     },
     "editTitle": "Edit Course",
     "addTitle": "Create Course",
@@ -1967,11 +1972,16 @@
       "footerNote": "For example, “Issued without a seal mark”. Up to 500 characters."
     },
     "actions": {
-      "save": "Save template"
+      "save": "Save template",
+      "saved": "Settings saved"
     },
     "errors": {
       "load": "Could not load the template settings",
-      "save": "Could not save the template"
+      "save": "Could not save the template",
+      "organizationRequired": "Organization name is required",
+      "signatoryNameRequired": "Signatory name is required",
+      "signatoryTitleRequired": "Signatory title is required",
+      "saved": "Settings saved"
     }
   },
   "gamification": {
@@ -2110,5 +2120,8 @@
   "bank.import.file": "File (CSV / XLSX)",
   "bank.import.run": "Import",
   "bank.import.done": "Imported: {imported}, skipped: {skipped}",
-  "bank.import.failed": "Failed to import the file"
+  "bank.import.failed": "Failed to import the file",
+  "course.wizard.moveUp": "Move up",
+  "course.wizard.moveDown": "Move down",
+  "course.wizard.reorderFailed": "Failed to save the new order"
 }

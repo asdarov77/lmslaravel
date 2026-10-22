@@ -28,6 +28,21 @@
       рендереров) и ничего не сворачивается. Вложенность осталась только
       содержательная — подпункты показываются сразу, с отступом.
     -->
+    <!--
+      «Продолжить обучение»: точка возврата из /api/my/dashboard
+      (continue.course_id). Пункт динамический — outside статических
+      секций navigation, появился как только обучаемый что-то открыл.
+    -->
+    <router-link
+      v-if="resumeCourse"
+      :to="{ name: 'courses.itemmani', query: { idEdit: resumeCourse.course_id } }"
+      class="u-nav__resume"
+      data-test="nav-resume"
+    >
+      <v-icon icon="mdi-play-circle" size="18" aria-hidden="true"></v-icon>
+      <span class="u-nav__resume-text">{{ resumeCourse.title }}</span>
+    </router-link>
+
     <v-list density="compact" nav class="u-nav__list">
       <template v-for="section in visibleSections" :key="section.key">
         <button
@@ -154,6 +169,7 @@ export default {
     collapsed: readCollapsed(),
     rail: false,
     badges: {},
+    resumeCourse: null,
   }),
 
   computed: {
@@ -194,6 +210,17 @@ export default {
         const data = unwrapResponse(res) || {}
         if (data.review_queue > 0) {
           this.badges = { review_queue: data.review_queue > 99 ? '99+' : data.review_queue }
+        }
+      })
+      .catch(() => {})
+
+    // «Продолжить»: только для обучаемого — у остальных длиннее обусловлено
+    // своим дашбордом; провал тихий, меню и без этого пункта полноценно.
+    $api.get('/api/my/dashboard')
+      .then((res) => {
+        const data = unwrapResponse(res) || {}
+        if (data.continue && data.continue.course_id) {
+          this.resumeCourse = data.continue
         }
       })
       .catch(() => {})
@@ -344,8 +371,36 @@ export default {
 
 .u-nav--rail .u-nav__section--toggle,
 .u-nav--rail .u-nav__item-text,
-.u-nav--rail .v-badge {
+.u-nav--rail .v-badge,
+.u-nav--rail .u-nav__resume {
   display: none;
+}
+
+/* Пункт «Продолжить» над списком секций. */
+.u-nav__resume {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: var(--sp-2) var(--sp-3) var(--sp-1);
+  padding: var(--sp-2) var(--sp-2);
+  border-radius: var(--radius-md);
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  text-decoration: none;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.u-nav__resume:hover {
+  background: var(--c-primary-soft);
+  filter: brightness(0.97);
+}
+
+.u-nav__resume-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .u-nav--rail .u-nav__item {

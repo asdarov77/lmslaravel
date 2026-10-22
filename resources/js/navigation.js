@@ -38,17 +38,13 @@ export const navigationSections = [
       // ведущий в пустоту, хуже отсутствующего пункта.
       { key: 'tutor', titleKey: 'app.menu.tutor', link: '/tutor', icon: 'mdi-brain' },
       { key: 'announcements', titleKey: 'app.menu.announcements', link: '/announcements', icon: 'mdi-bullhorn-outline' },
+      // 9.1: секция catalog из одного пункта слита с learning.
+      { key: 'catalog', titleKey: 'app.menu.catalog', link: '/catalog', icon: 'mdi-bookshelf' },
       { key: 'assignments', titleKey: 'app.menu.assignments', link: '/assignments', icon: 'mdi-clipboard-text-outline', badgeCounter: 'review_queue' },
       { key: 'exams', titleKey: 'app.menu.exams', link: '/my/exams', icon: 'mdi-clipboard-check-outline' },
       { key: 'examsManage', titleKey: 'app.menu.examsManage', link: '/exams', icon: 'mdi-clipboard-list-outline', onlyFor: 'manager' },
       { key: 'certificates', titleKey: 'app.menu.certificates', link: '/my/certificates', icon: 'mdi-certificate-outline', onlyFor: 'trainee' },
       { key: 'gamification', titleKey: 'app.menu.gamification', link: '/gamification', icon: 'mdi-chart-line', onlyFor: 'trainee' },
-    ],
-  },
-  {
-    key: 'catalog',
-    items: [
-      { key: 'catalog', titleKey: 'app.menu.catalog', link: '/catalog', icon: 'mdi-bookshelf' },
     ],
   },
   {
@@ -108,7 +104,7 @@ export const navigationSections = [
         ],
       },
       { key: 'permissions', titleKey: 'app.menu.permissions', link: '/permissions', icon: 'mdi-shield-key-outline' },
-      { key: 'settings', titleKey: 'app.menu.settings', link: '/settings/', icon: 'mdi-cog-outline' },
+      { key: 'settings', titleKey: 'app.menu.settings', link: '/settings', icon: 'mdi-cog-outline' },
       { key: 'grades', titleKey: 'app.menu.grades', link: '/grade-boundary/', icon: 'mdi-percent-outline' },
     ],
   },
@@ -128,7 +124,8 @@ export const navigationSections = [
  */
 export const accountItems = [
   { key: 'profile', titleKey: 'account.items.profile', link: '/my', icon: 'mdi-account-outline' },
-  { key: 'certificates', titleKey: 'app.menu.certificates', link: '/my/certificates', icon: 'mdi-certificate-outline' },
+  // «Мои сертификаты» — только в обучаемом меню секции learning: доубль
+  // в профиле удалён (9.1), переход остаётся с пункта сайдбара.
   { key: 'schedule', titleKey: 'app.menu.schedule', link: '/my/schedule', icon: 'mdi-calendar-clock-outline' },
   { key: 'permissions', titleKey: 'app.menu.permissions', link: '/permissions', icon: 'mdi-shield-key-outline' },
 ]

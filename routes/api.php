@@ -218,6 +218,7 @@ Route::middleware(['auth:sanctum', 'permission:users.courses,create-tasks'])->gr
 // (/group/learning, право users.courses) и отдавал обучаемому 403.
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/my/learning', [MyLearningController::class, 'plan']);
+    Route::get('/my/sessions', [AuthController::class, 'mySessions']);
     Route::get('/my/dashboard', [MyLearningController::class, 'dashboard']);
     Route::get('/my/recommended', [MyLearningController::class, 'recommended']);
 
@@ -305,6 +306,8 @@ Route::apiResource('aukstructure', AukstructureController::class)
     ->whereNumber('aukstructure');
 Route::middleware(['auth:sanctum', 'permission:content.manage'])->group(function () {
     Route::post('/aukstructure', [AukstructureController::class, 'store']);
+    // Раздел 8: переупорядочивание узлов курса одним списком.
+    Route::post('/aukstructure/reorder', [AukstructureController::class, 'reorder']);
     Route::put('/aukstructure/{aukstructure}', [AukstructureController::class, 'update'])->whereNumber('aukstructure');
     Route::patch('/aukstructure/{aukstructure}', [AukstructureController::class, 'update'])->whereNumber('aukstructure');
     Route::delete('/aukstructure/{aukstructure}', [AukstructureController::class, 'destroy'])->whereNumber('aukstructure');

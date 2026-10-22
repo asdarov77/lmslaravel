@@ -99,12 +99,10 @@
       <template #structure>
         <!--
           Структуру наполняют импорт классов и файловый менеджер, а эта
-          форма её не создаёт: отдельного эндпоинта правки дерева у
-          бэкенда нет (у aukstructure есть только CRUD отдельного узла,
-          без операции переупорядочивания). Поэтому здесь честный список
-          того, что уже есть, и переходы к инструментам, которые дерево
-          наполняют, — вместо редактора, который молча не сохранял бы
-          изменения.
+          форма её не создаёт: FXMLLoader существует CRUD отдельно taken
+          узла, а порядок задаёт POST /api/aukstructure/reorder (полный
+          список узлов курса в новом порядке). Поэтому здесь список
+          с кнопками перемещения и переходы к инструментам наполнения.
         -->
         <div class="u-wizard">
           <div>
@@ -135,9 +133,26 @@
               />
 
               <ul v-else class="u-wizard__list">
-                <li v-for="lesson in lessons" :key="lesson.id" class="u-wizard__list-item">
+                <li v-for="(lesson, index) in lessons" :key="lesson.id" class="u-wizard__list-item">
                   <v-icon icon="mdi-bookmark-outline" size="16" aria-hidden="true" />
                   <span>{{ lesson.title }}</span>
+                  <span class="u-wizard__list-spacer"></span>
+                  <v-btn
+                    icon="mdi-arrow-up"
+                    size="x-small"
+                    variant="text"
+                    :disabled="reordering || index === 0"
+                    :aria-label="t('course.wizard.moveUp')"
+                    @click="moveLesson(index, -1)"
+                  />
+                  <v-btn
+                    icon="mdi-arrow-down"
+                    size="x-small"
+                    variant="text"
+                    :disabled="reordering || index === lessons.length - 1"
+                    :aria-label="t('course.wizard.moveDown')"
+                    @click="moveLesson(index, 1)"
+                  />
                 </li>
               </ul>
 
@@ -513,6 +528,35 @@ const activeStep = ref(initialStep())
 
 const lessons = ref([])
 const manifestLoading = ref(false)
+const reordering = ref(false)
+
+/**
+ * Пересылка урока на шаг «Структура»: локальный перестановка —
+ * оптимистичный, порядок отправляется целиком (конвенция reorder:
+ * «прислал всё»); провал откатывает перестановку.
+ */
+const moveLesson = async (index, delta) => {
+  const target = index + delta
+  if (target < 0 || target >= lessons.value.length) return
+
+  const next = [...lessons.value]
+  ;[next[index], next[target]] = [next[target], next[index]]
+  const before = lessons.value
+  lessons.value = next
+
+  reordering.value = true
+  try {
+    await $api.post('/api/aukstructure/reorder', {
+      course_id: props.idEdit,
+      ids: next.map((lesson) => lesson.id),
+    })
+  } catch (error) {
+    lessons.value = before
+    toast.error(error?.response?.data?.error || t('course.wizard.reorderFailed'))
+  } finally {
+    reordering.value = false
+  }
+}
 
 // Геттер берём по плоскому ключу 'Course/categories': в этой сборке
 // vuex namespaced-геттеры не собираются в store.getters.Course.
@@ -925,6 +969,10 @@ defineExpose({ form, submitForm: finish, lessons, checklist })
   list-style: none;
   display: grid;
   gap: var(--sp-1);
+}
+
+.u-wizard__list-spacer {
+  flex: 1;
 }
 
 .u-wizard__list-item {

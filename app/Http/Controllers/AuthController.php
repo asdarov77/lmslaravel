@@ -301,14 +301,49 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * список живых сессий (access-токенов Sanctum) текущего пользователя
+     * без себя самого из текущего токена. Нужен фронту на пункте
+     * «Выйти»: при параллельных сессиях предупреждаем о выходе.
+     */
+    public function mySessions(Request $request)
+    {
+        $user = $request->user();
+        $currentId = $user->currentAccessToken()?->id;
+
+        $sessions = $user->tokens()
+            ->get()
+            ->filter(fn ($t) => $t->id !== $currentId && (!$t->expires_at || $t->expires_at->isFuture()))
+            ->values()
+            ->map(fn ($t) => [
+                'id' => $t->id,
+                'name' => $t->name,
+                'last_used_at' => optional($t->last_used_at)->toIso8601String(),
+            ]);
+
+        return response()->json(['success' => true, 'data' => ['sessions' => $sessions, 'extra_sessions' => $sessions->count()]]);
+    }
+
     public function logout(Request $request)
     {
-        // Удаляем текущий токен (которым выполнен запрос)
-        $request->user()->currentAccessToken()->delete();
+        $user = $request->user();
+        $currentToken = $user->currentAccessToken();
+        // Транзитный токен (actingAs/session) в БД не лежит — из суммы
+        // вычитаем единицу только если текущий токен действительно там есть.
+        $extraSessions = max(
+            0,
+            $user->tokens()->count() - ($currentToken && ! $currentToken instanceof \Laravel\Sanctum\TransientToken ? 1 : 0)
+        );
 
+        // Удаляем текущий токен (которым выполнен запрос)
+        $currentToken?->delete();
+
+        // Без ключа 'data' конверт кладёт весь ответ в data неявно —
+        // фронт читает extra_sessions через unwrapResponse.
         return response()->json([
             'success' => true,
-            'message' => 'Успешный выход из системы'
+            'message' => 'Успешный выход из системы',
+            'extra_sessions' => $extraSessions,
         ], 200);
     }
 

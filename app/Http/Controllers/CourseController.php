@@ -266,8 +266,8 @@ class CourseController extends Controller
         }
 
         $query = Aukstructure::where('course_id', $course->id)
-            ->select('id', 'parent_id', 'type', 'title', 'categories')
-            ->orderBy('id');
+            ->select('id', 'parent_id', 'type', 'title', 'categories', 'position')
+            ->orderByRaw('coalesce(position, id)');
 
         /*
          * P0.2: дерево в кэше, ключ с max(updated_at) узлов курса —
@@ -327,6 +327,7 @@ class CourseController extends Controller
                     'type' => $auk->type,
                     'title' => $auk->title,
                     'categories' => $auk->categories,
+                    'position' => $auk->position,
                 ]),
                 'favorites' => $favorites,
                 'entry' => $entry,
