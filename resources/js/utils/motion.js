@@ -24,15 +24,17 @@ export function prefersReducedMotion() {
 
   let mediaQuery = null
 
+  const canMatch = () => typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+
   const update = () => {
-    if (typeof window !== 'undefined') {
+    if (canMatch()) {
       reduced.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     }
   }
 
   // Инициализация
   const init = () => {
-    if (typeof window === 'undefined') return
+    if (!canMatch()) return
 
     update()
 

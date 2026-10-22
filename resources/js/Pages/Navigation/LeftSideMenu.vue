@@ -1,5 +1,15 @@
 <template>
-  <nav class="u-nav" :aria-label="$t('app.menu.main')">
+  <nav class="u-nav" :class="{ 'u-nav--rail': rail }" :aria-label="$t('app.menu.main')">
+    <button
+      type="button"
+      class="u-nav__rail-toggle"
+      :title="rail ? $t('app.menu.expand') : $t('app.menu.collapse')"
+      :aria-label="rail ? $t('app.menu.expand') : $t('app.menu.collapse')"
+      @click="toggleRail"
+    >
+      <v-icon size="18" aria-hidden="true">{{ rail ? 'mdi-menu-open' : 'mdi-menu' }}</v-icon>
+    </button>
+
     <!--
       Пункты меню.
 
@@ -20,30 +30,54 @@
     -->
     <v-list density="compact" nav class="u-nav__list">
       <template v-for="section in visibleSections" :key="section.key">
-        <div class="u-nav__section">{{ section.title }}</div>
+        <button
+          type="button"
+          class="u-nav__section u-nav__section--toggle"
+          :aria-expanded="!isCollapsed(section.key) ? 'true' : 'false'"
+          @click="toggleSection(section.key)"
+        >
+          {{ section.title }}
+          <v-icon
+            v-if="!rail"
+            size="16"
+            :class="{ 'u-nav__chevron--closed': isCollapsed(section.key) }"
+            aria-hidden="true"
+          >mdi-chevron-up</v-icon>
+        </button>
 
-        <template v-for="item in section.items" :key="item.key">
-          <v-list-item
-            :to="item.link"
-            :prepend-icon="item.icon"
-            :active="isActive(item)"
-            class="u-nav__item"
-          >
-            <v-list-item-title class="u-nav__item-text" data-test="nav-item">{{ item.title }}</v-list-item-title>
-          </v-list-item>
-
-          <!-- Подпункты раскрыты всегда: скрывать их нечем — их мало. -->
-          <template v-if="item.children && item.children.length">
+        <template v-if="!isCollapsed(section.key) || rail">
+          <template v-for="item in section.items" :key="item.key">
             <v-list-item
-              v-for="child in item.children"
-              :key="child.key"
-              :to="child.link"
-              :prepend-icon="child.icon"
-              :active="isActive(child)"
-              class="u-nav__item u-nav__item--sub"
+              :to="item.link"
+              :prepend-icon="item.icon"
+              :active="isActive(item)"
+              class="u-nav__item"
+              :title="rail ? item.title : undefined"
             >
-              <v-list-item-title class="u-nav__item-text" data-test="nav-item-sub">{{ child.title }}</v-list-item-title>
+              <v-list-item-title class="u-nav__item-text" data-test="nav-item">{{ item.title }}</v-list-item-title>
+              <template #append>
+                <v-badge
+                  v-if="badges[item.badgeCounter]"
+                  :content="badges[item.badgeCounter]"
+                  inline
+                  color="warning"
+                ></v-badge>
+              </template>
             </v-list-item>
+
+            <!-- Подпункты раскрыты всегда: скрывать их нечем — их мало. -->
+            <template v-if="!rail && item.children && item.children.length">
+              <v-list-item
+                v-for="child in item.children"
+                :key="child.key"
+                :to="child.link"
+                :prepend-icon="child.icon"
+                :active="isActive(child)"
+                class="u-nav__item u-nav__item--sub"
+              >
+                <v-list-item-title class="u-nav__item-text" data-test="nav-item-sub">{{ child.title }}</v-list-item-title>
+              </v-list-item>
+            </template>
           </template>
         </template>
       </template>
@@ -92,10 +126,24 @@
 
 <script>
 import { mapGetters } from 'vuex'
+import $api from '../../api/httpClient'
+import { unwrapResponse } from '../../api/envelope'
 import { navigationSections } from '../../navigation'
 import { routePermissionIndex } from '../../utils/routePermissions'
 import { visibleSections as buildVisibleSections } from '../../utils/navigationVisibility'
 import { pinnedCourses } from '../../utils/pinnedCourses'
+
+/** Ключи localStorage для состояния меню. */
+const NAV_COLLAPSED_KEY = 'ui-nav-collapsed'
+const NAV_RAIL_KEY = 'ui-nav-rail'
+
+function readCollapsed() {
+  try {
+    return JSON.parse(window.localStorage.getItem(NAV_COLLAPSED_KEY) || '{}') || {}
+  } catch (e) {
+    return {}
+  }
+}
 
 export default {
   name: 'LeftSideMenu',
@@ -103,6 +151,9 @@ export default {
   data: () => ({
     requiredBy: routePermissionIndex(),
     pinnedList: pinnedCourses.list(),
+    collapsed: readCollapsed(),
+    rail: false,
+    badges: {},
   }),
 
   computed: {
@@ -135,6 +186,17 @@ export default {
 
   mounted() {
     window.addEventListener('pinned-courses-changed', this.reloadPinned)
+    this.rail = window.localStorage.getItem(NAV_RAIL_KEY) === '1'
+
+    // Бейджи: один запрос в фоне, тихий провал — меню работает и без них.
+    $api.get('/api/menu-counters')
+      .then((res) => {
+        const data = unwrapResponse(res) || {}
+        if (data.review_queue > 0) {
+          this.badges = { review_queue: data.review_queue > 99 ? '99+' : data.review_queue }
+        }
+      })
+      .catch(() => {})
   },
 
   beforeUnmount() {
@@ -142,6 +204,26 @@ export default {
   },
 
   methods: {
+    isCollapsed(key) {
+      return Boolean(this.collapsed[key])
+    },
+
+    toggleSection(key) {
+      if (this.rail) return
+
+      this.collapsed = { ...this.collapsed, [key]: !this.collapsed[key] }
+      try {
+        window.localStorage.setItem(NAV_COLLAPSED_KEY, JSON.stringify(this.collapsed))
+      } catch (e) {}
+    },
+
+    toggleRail() {
+      this.rail = !this.rail
+      try {
+        window.localStorage.setItem(NAV_RAIL_KEY, this.rail ? '1' : '0')
+      } catch (e) {}
+      window.dispatchEvent(new CustomEvent('ui-nav-rail-changed'))
+    },
     /**
      * Активен ли пункт.
      *
@@ -203,16 +285,83 @@ export default {
 }
 
 /* Заголовок секции. */
-.u-nav__section {
+.u-nav__section--toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: calc(100% - var(--sp-2));
   padding: var(--sp-3) var(--sp-3) var(--sp-1);
+  margin: 0 var(--sp-1);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
   font-size: var(--fs-2xs);
   font-weight: var(--fw-semibold);
   letter-spacing: 0.05em;
+  text-align: start;
   text-transform: uppercase;
   color: var(--c-text-muted);
+  cursor: pointer;
 }
 
-/* Пункт меню. */
+.u-nav__section--toggle:hover {
+  color: var(--c-text);
+}
+
+.u-nav__chevron--closed {
+  transform: rotate(180deg);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.u-nav__rail-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-end;
+  width: 36px;
+  height: 36px;
+  margin: var(--sp-2) var(--sp-2) 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--c-text-muted);
+  cursor: pointer;
+}
+
+.u-nav__rail-toggle:hover {
+  background: var(--c-surface-2);
+  color: var(--c-text);
+}
+
+/* Свернутый rail: только иконки, 56px. */
+.u-nav--rail {
+  align-items: stretch;
+}
+
+.u-nav--rail .u-nav__list {
+  padding-inline: var(--sp-1);
+}
+
+.u-nav--rail .u-nav__section--toggle,
+.u-nav--rail .u-nav__item-text,
+.u-nav--rail .v-badge {
+  display: none;
+}
+
+.u-nav--rail .u-nav__item {
+  justify-content: center;
+}
+
+.u-nav--rail .u-nav__item :deep(.v-list-item__prepend > .v-icon) {
+  margin-inline-end: 0;
+}
+
+/* Закреплённые курсы — в rail не нужны. */
+.u-nav--rail .u-nav__pinned-shell {
+  display: none;
+}
+
+/* Закреплённые курсы. */
 .u-nav__item {
   min-height: 40px;
   border-radius: var(--radius-md);

@@ -1,509 +1,481 @@
 <template>
   <div class="u-page">
-  <!--
-    Заголовок страницы добавлен: раньше его не было вовсе, страница
-    начиналась сразу с полей — то есть у неё не было имени ни для
-    человека, ни для навигации по заголовкам (WCAG 2.2 SC 1.3.1,
-    2.4.6).
-  -->
     <PageHeader :title="$t('groupLearning.title')" />
 
-    <v-card class="u-card u-card--elevated" style="max-width: 900px;">
+    <FormCard
+      :busy="form.submitting.value"
+      @submit="submitForm"
+      @cancel="cancel"
+    >
+      <v-alert
+        v-if="form.serverError.value"
+        type="error"
+        variant="tonal"
+        class="mb-4"
+        :text="form.serverError.value"
+      />
 
-    <v-card-text>
-      <v-form @submit.prevent="submitForm">
-        <!-- ============================ выбор группы ============================ -->
-        <!-- Регресс: поля выбора группы не было вовсе. Группа бралась только
-             из маршрута (/group/learning/:idEdit), а пункт меню вёл на
-             жёстко зашитый /group/learning/1 — то есть записать можно было
-             только группу №1, и непонятно было, какую именно. -->
+      <!-- Выбор группы -->
+      <FormField
+        :label="$t('groupLearning.group')"
+        name="group_id"
+        :error="form.errors.group_id"
+        :required="form.isRequired('group_id')"
+      >
         <v-select
-          :label="$t('groupLearning.group')"
-          type="text"
+          v-bind="form.bind('group_id')"
           :items="allGroups"
-          v-model="form.group_id"
-          item-value="id"
           item-title="groupname"
-          :disabled="loading"
-          :error-messages="fieldErrors.group_id"
-          @update:modelValue="onGroupChange"
-        ></v-select>
-
-        <v-select
-          :label="$t('groupLearning.class')"
-          type="text"
-          :items="aircrafts"
-          v-model="form.aircraft_id"
           item-value="id"
-          item-title="path"
-          :disabled="loading"
-          :error-messages="fieldErrors.aircraft_id"
-          @update:modelValue="changeAir"
-        ></v-select>
-
-        <v-select
-          :label="$t('groupLearning.categories')"
-          type="text"
-          :items="catFilter"
-          v-model="form.category_id"
-          item-value="id"
-          item-title="title"
-          :disabled="loading || !form.aircraft_id"
-          :error-messages="fieldErrors.category_id"
-          @update:modelValue="changeCat"
-        ></v-select>
-
-        <v-divider class="my-3"></v-divider>
-
-        <!-- Дерево курсов: раздел -> подраздел -> модуль. В выбор идут
-             только модули (type 3), они и есть единица записи. -->
-        <v-alert
-          v-if="!hasAircraft"
-          type="info"
-          variant="tonal"
+          :placeholder="$t('groupLearning.selectGroup')"
+          :disabled="form.submitting.value"
+          variant="outlined"
           density="compact"
-          class="mb-3"
-          :text="$t('groupLearning.selectHint')"
-        ></v-alert>
+          hide-details
+        />
+      </FormField>
 
+      <!-- Выбор класса (ВС) с каскадом к категориям -->
+      <FormField
+        :label="$t('groupLearning.class')"
+        name="aircraft_id"
+        :error="form.errors.aircraft_id"
+        :required="form.isRequired('aircraft_id')"
+        :hint="$t('groupLearning.classHint')"
+      >
+        <CascadeSelect
+          v-model="form.values.aircraft_id"
+          :options="aircraftOptions"
+          :placeholder="$t('groupLearning.selectAircraft')"
+          :disabled="form.submitting.value"
+          :clearable="true"
+          @update:model-value="onAircraftChange"
+        />
+      </FormField>
+
+      <!-- Выбор категории (зависит от выбранного класса) -->
+      <FormField
+        :label="$t('groupLearning.categories')"
+        name="category_id"
+        :error="form.errors.category_id"
+        :required="form.isRequired('category_id')"
+        :disabled="!form.values.aircraft_id"
+      >
+        <RemoteAutocomplete
+          v-model="form.values.category_id"
+          :options="categoryOptions"
+          :placeholder="$t('groupLearning.selectCategory')"
+          :disabled="form.submitting.value || !form.values.aircraft_id"
+          :clearable="true"
+          :search-debounce="0"
+        />
+      </FormField>
+
+      <v-divider class="my-4" />
+
+      <!-- Дерево курсов/модулей -->
+      <FormField
+        v-if="form.values.aircraft_id && form.values.category_id"
+        :label="$t('groupLearning.courses')"
+        name="course_ids"
+        :error="form.errors.course_ids"
+        :required="form.isRequired('course_ids')"
+        :hint="$t('groupLearning.materialsOnlyHint')"
+      >
         <treeselect
-          v-if="form.aircraft_id && form.category_id"
           :key="treeselectKey"
           :placeholder="$t('groupLearning.coursesPlaceholder')"
           :default-expand-level="1"
-          v-model="form.course_ids"
-          :options="options"
+          v-model="form.values.course_ids"
+          :options="courseOptions"
           :multiple="true"
           :clearable="false"
-          :disabled="loading || saving"
+          :disabled="form.submitting.value"
         />
-        <p v-if="form.aircraft_id && form.category_id" class="text-caption text-medium-emphasis mt-2">
-          {{ $t("groupLearning.materialsOnlyHint") }}
-        </p>
+      </FormField>
 
-        <v-alert
-          v-if="form.course_ids.length"
-          type="info"
-          variant="tonal"
-          density="compact"
-          class="mt-3"
-          :text="$t('groupLearning.selectedCount', { count: form.course_ids.length })"
-        ></v-alert>
+      <v-alert
+        v-else-if="form.values.aircraft_id && !form.values.category_id"
+        type="info"
+        variant="tonal"
+        density="compact"
+        class="mb-3"
+        :text="$t('groupLearning.selectCategoryFirst')"
+      />
 
-        <v-divider class="my-3"></v-divider>
+      <v-alert
+        v-else-if="!form.values.aircraft_id"
+        type="info"
+        variant="tonal"
+        density="compact"
+        class="mb-3"
+        :text="$t('groupLearning.selectAircraftFirst')"
+      />
 
+      <v-alert
+        v-if="form.values.course_ids.length"
+        type="success"
+        variant="tonal"
+        density="compact"
+        class="mt-3"
+        :text="$t('groupLearning.selectedCount', { count: form.values.course_ids.length })"
+      />
+
+      <v-divider class="my-4" />
+
+      <!-- Преподаватель -->
+      <FormField
+        :label="$t('groupLearning.instructor')"
+        name="teacher"
+        :error="form.errors.teacher"
+      >
+        <RemoteAutocomplete
+          v-model="form.values.teacher"
+          :options="instructorOptions"
+          :placeholder="$t('groupLearning.selectInstructor')"
+          :clearable="true"
+          :search-debounce="150"
+        />
+      </FormField>
+
+      <!-- Тип занятия -->
+      <FormField
+        :label="$t('groupLearning.lessonType')"
+        name="typeOfLesson"
+        :error="form.errors.typeOfLesson"
+      >
         <v-select
-          :label="$t('groupLearning.instructor')"
-          type="text"
-          :items="instructors"
-          v-model="form.teacher"
-          item-value="fio"
-          item-title="fio"
-          clearable
-          :disabled="loading"
-        ></v-select>
-
-        <!-- Регресс: у select со строковыми items стояло item-value="id".
-             У строки нет поля id, поэтому модель всегда становилась
-             undefined, и вид занятия молча не сохранялся. -->
-        <v-select
-          :label="$t('groupLearning.lessonType')"
-          type="text"
+          v-bind="form.bind('typeOfLesson')"
           :items="lessonTypes"
-          v-model="form.typeOfLesson"
-          :disabled="loading"
-        ></v-select>
+          :placeholder="$t('groupLearning.selectLessonType')"
+          :disabled="form.submitting.value"
+          variant="outlined"
+          density="compact"
+          hide-details
+        />
+      </FormField>
 
-        <v-divider class="my-3"></v-divider>
+      <v-divider class="my-4" />
 
-        <v-row>
-          <v-col>
-            <v-text-field
-              type="date"
-              v-model="form.study_from"
-              :label="$t('group.labelNachalo')"
-              variant="outlined"
-              :disabled="loading"
-              :error-messages="fieldErrors.study_from"
-            ></v-text-field>
-          </v-col>
-          <v-col>
-            <v-text-field
-              type="date"
-              v-model="form.study_to"
-              :label="$t('group.labelKonec')"
-              variant="outlined"
-              :disabled="loading"
-              :error-messages="fieldErrors.study_to"
-            ></v-text-field>
-          </v-col>
-          <v-col>
-            <!--
-              Дедлайн — дата, к которой обучающийся обязан закончить
-              модуль. Не путать с «конецом» периода: конец означает, что
-              группа больше не занимается, дедлайн — когда сдавать.
-              Необязателен, поэтому оставляем пустым по умолчанию.
-            -->
-            <v-text-field
-              type="date"
-              v-model="form.deadline"
-              :label="$t('plan.deadline')"
-              variant="outlined"
-              :disabled="loading"
-              clearable
-              :min="form.study_from"
-              :error-messages="fieldErrors.deadline"
-            ></v-text-field>
-          </v-col>
-        </v-row>
+      <!-- Период обучения (DateRangeField) -->
+      <FormField
+        :label="$t('groupLearning.period')"
+        name="period"
+        :error="form.errors.period"
+        :required="form.isRequired('period')"
+        :hint="$t('groupLearning.periodHint')"
+      >
+        <DateRangeField
+          v-model="periodRange"
+          :start-label="$t('groupLearning.studyFrom')"
+          :end-label="$t('groupLearning.studyTo')"
+          :required="true"
+          :min-date="today"
+          @update:model-value="onPeriodChange"
+        />
+      </FormField>
 
-<!-- Регресс: интерполяция была внутри HTML-комментария
-     (строка вида <комментарий {{ error }} комментарий>), поэтому
-     пользователь видел красные пустые блоки без единого слова. -->
-        <v-alert
-          v-for="(error, index) in errors"
-          :key="index"
-          type="error"
-          variant="tonal"
-          class="mb-2"
-          :text="error"
-        ></v-alert>
-      </v-form>
-    </v-card-text>
+      <!-- Дедлайн -->
+      <FormField
+        :label="$t('plan.deadline')"
+        name="deadline"
+        :error="form.errors.deadline"
+        :hint="$t('groupLearning.deadlineHint')"
+      >
+        <MaskedField
+          v-model="form.values.deadline"
+          preset="date"
+          :placeholder="$t('groupLearning.selectDeadline')"
+          :clearable="true"
+          :disabled="form.submitting.value"
+        />
+      </FormField>
 
-    <v-card-actions>
-      <v-spacer></v-spacer>
-      <ButtonGroup
-        @submitForm="submitForm"
-        @cancelBtn="cancelBtnHead"
-      ></ButtonGroup>
-    </v-card-actions>
-
-    </v-card>
+      <!-- Ошибки валидации на уровне формы (не полей) -->
+      <v-alert
+        v-for="(error, index) in form.nonFieldErrors"
+        :key="index"
+        type="error"
+        variant="tonal"
+        class="mb-2"
+        :text="error"
+      />
+    </FormCard>
   </div>
 </template>
 
-<script>
-import { mapState } from "vuex";
-import $api from "../../api/httpClient";
-import { asArray, unwrapArray, unwrapResponse, numericQuery } from "../../api/envelope";
-import { canonicalRoleSlug } from "../../utils/roles";
-import ButtonGroup from "../../components/ButtonGroup.vue";
-import { toast } from "../../composables/useToast";
-import PageHeader from "../../components/ui/PageHeader.vue";
-import Treeselect from "vue3-treeselect";
-import "vue3-treeselect/dist/vue3-treeselect.css";
+<script setup>
+import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useStore } from 'vuex'
+import { useRoute, useRouter } from 'vue-router'
+import $api from '../../api/httpClient'
+import { unwrapArray, numericQuery, asArray } from '../../api/envelope'
+import { canonicalRoleSlug } from '../../utils/roles'
+import { toast } from '../../composables/useToast'
+import useForm from '../../composables/useForm'
+import useLeaveGuard from '../../composables/useLeaveGuard'
+import PageHeader from '../../components/ui/PageHeader.vue'
+import FormCard from '../../components/ui/FormCard.vue'
+import FormField from '../../components/ui/FormField.vue'
+import DateRangeField from '../../components/ui/fields/DateRangeField.vue'
+import MaskedField from '../../components/ui/fields/MaskedField.vue'
+import CascadeSelect from '../../components/ui/fields/CascadeSelect.vue'
+import RemoteAutocomplete from '../../components/ui/fields/RemoteAutocomplete.vue'
+import Treeselect from 'vue3-treeselect'
+import 'vue3-treeselect/dist/vue3-treeselect.css'
 
-export default {
-  name: "GroupLearning",
-  components: { ButtonGroup, Treeselect, PageHeader },
+const { t } = useI18n()
+const store = useStore()
+const route = useRoute()
+const router = useRouter()
 
-  props: {
-    /** Группа из маршрута. Не обязательна: группу можно выбрать в форме. */
-    idEdit: { type: Number, default: null },
-  },
+const props = defineProps({
+  idEdit: { type: Number, default: null },
+})
 
-  data() {
-    return {
-      errors: [],
-      fieldErrors: {},
-      loading: true,
-      saving: false,
+const today = new Date().toISOString().slice(0, 10)
 
-      // Форма хранится локально, а не в сторе: state.group — это
-      // редактируемая группа, смешивать её с формой записи нельзя.
-      form: {
-        group_id: null,
-        aircraft_id: null,
-        category_id: null,
-        course_ids: [],
-        teacher: null,
-        typeOfLesson: "Лекция",
-        study_from: new Date().toISOString().slice(0, 10),
-        study_to: null,
-        deadline: null,
-      },
-
-      catFilter: [],
-      options: [],
-      // id узла дерева -> id курса-владельца. Treeselect возвращает только
-      // выбранные id, а сохранять нужно и курс, и модуль.
-      nodeCourse: {},
-      // Пересоздаёт treeselect при смене класса/категории: у vue3-treeselect
-      // нет реактивного сброса выбранных значений, и без этого в дереве
-      // оставались id модулей от предыдущей категории.
-      treeselectKey: 0,
-    };
-  },
-
-  computed: {
-    ...mapState("User", ["allGroups", "users"]),
-    ...mapState("Course", ["aircrafts", "categories"]),
-
-    lessonTypes() {
-      return ["Лекция", "Практическое занятие", "Самостоятельная подготовка"];
+const form = useForm({
+  schema: {
+    group_id: {
+      initial: null,
+      rules: [],
     },
-
-    instructors() {
-      // Раньше отбор шёл по строке user.role === "Инструктор". У части
-      // записей роль записана как 'instructor', и такие инструкторы
-      // просто исчезали из списка. Сверяем канонический slug.
-      return this.users.filter((user) => canonicalRoleSlug(user.role) === "instructor");
+    aircraft_id: {
+      initial: null,
+      rules: [],
     },
-
-    hasAircraft() {
-      return Boolean(this.form.aircraft_id && this.form.category_id);
+    category_id: {
+      initial: null,
+      rules: [],
     },
-  },
-
-  async created() {
-    await this.load();
-  },
-
-  methods: {
-    async load() {
-      this.loading = true;
-
-      // Группы нужны обязательно: без них не выбрать, кому записывать курс.
-      await Promise.all([
-        this.$store.dispatch("User/fetchGroups"),
-        this.$store.dispatch("User/fetchUsers"),
-        this.$store.dispatch("Course/fetchCategories"),
-        this.$store.dispatch("Course/fetchAircrafts"),
-      ]).catch((error) => console.error(error));
-
-      this.loading = false;
-
-      // Если пришли с маршрута /group/learning/:id — подставляем группу,
-      // но остаёмся на форме: выбор всё равно за пользователем.
-      const fromRoute = Number(this.idEdit);
-
-      if (Number.isInteger(fromRoute) && fromRoute > 0) {
-        this.form.group_id = fromRoute;
-        this.onGroupChange();
-      }
+    course_ids: {
+      initial: [],
+      rules: [],
     },
-
-    onGroupChange() {
-      this.fieldErrors.group_id = "";
+    teacher: {
+      initial: null,
+      rules: [],
     },
-
-    changeAir(id_air) {
-      this.fieldErrors.aircraft_id = "";
-      this.resetCourses();
-
-      // Категории принадлежат конкретному классу.
-      // Сравнение строгое по числу: id из v-select приходит числом,
-      // а из маршрута мог прийти строкой.
-      this.form.category_id = null;
-      this.catFilter = id_air
-        ? this.categories.filter((category) => Number(category.aircraft_id) === Number(id_air))
-        : [];
+    typeOfLesson: {
+      initial: 'Лекция',
+      rules: [],
     },
-
-    async changeCat(id_cat) {
-      this.fieldErrors.category_id = "";
-      this.resetCourses();
-
-      if (!id_cat || !this.form.aircraft_id) return;
-
-      const params = numericQuery({
-        aircraft_id: this.form.aircraft_id,
-        category_id: id_cat,
-      });
-
-      try {
-        const response = await $api.get("/api/course", { params });
-        const courses = unwrapArray(response);
-
-        // В дерево идут только разделы/подразделы, а их потомки — модули.
-        // Дерево строится из плоского списка aukstructures по parent_id.
-        const nodeCourse = {};
-
-        this.options = courses.map((course) => ({
-          id: `course-${course.id}`,
-          // vue3-treeselect читает именно `label` и `children`.
-          // Без переименования title -> label узлы рендерятся пустыми,
-          // а при выборе падает «Cannot read properties of null (reading 'id')».
-          label: course.title,
-          children: this.flatToHierarchy(asArray(course.aukstructures), course.id, nodeCourse),
-        }));
-
-        this.nodeCourse = nodeCourse;
-
-        this.treeselectKey += 1;
-      } catch (error) {
-        this.options = [];
-        this.errors.push("Не удалось загрузить список курсов");
-        console.error(error);
-      }
+    study_from: {
+      initial: today,
+      rules: [],
     },
-
-    resetCourses() {
-      this.form.course_ids = [];
-      this.options = [];
-      this.nodeCourse = {};
-      this.treeselectKey += 1;
+    study_to: {
+      initial: null,
+      rules: [],
     },
-
-    /**
-     * Плоский список aukstructures -> иерархия по parent_id
-     * с ключами treeselect (id / label / children).
-     *
-     * Узлы без родителя становятся корнями. Модули (type 3) — это
-     * листья: именно их id уходят в запись, поэтому у них нет id,
-     * который можно было бы спутать с другим деревом.
-     */
-    flatToHierarchy(flat, courseId, nodeCourse) {
-      const byId = new Map();
-
-      flat.forEach((item) => {
-        if (!item) return;
-        // label обязателен для treeselect, title из БД не подходит.
-        nodeCourse[item.id] = courseId;
-        byId.set(item.id, {
-          id: item.id,
-          label: item.title,
-          /*
-           * Единица записи — модуль (type 3). Тема и раздел остаются в
-           * дереве для контекста, но отметить их нельзя: иначе в запись
-           * попадал parent_id раздела, ограничение не работало (доступ
-           * считался по course_id), а форма обещала ровно обратное.
-           * isDisabled оставляет узел видимым и неотмечаемым, а не
-           * выбрасывает его из дерева.
-           */
-          isDisabled: Number(item.type) !== 3,
-          children: [],
-        });
-      });
-
-      const roots = [];
-
-      byId.forEach((node) => {
-        const parent = byId.get(node.parent_id);
-
-        if (parent && parent !== node) {
-          parent.children.push(node);
-        } else {
-          roots.push(node);
-        }
-      });
-
-      return roots;
-    },
-
-    /** Приводит ответ API к списку строк с читаемым сообщением. */
-    collectErrors(error) {
-      const details = error?.response?.data?.error?.details;
-
-      if (details && typeof details === "object") {
-        Object.entries(details).forEach(([field, messages]) => {
-          const text = Array.isArray(messages) ? messages.join(" ") : String(messages);
-          this.fieldErrors[field.replace(/\.\d+$/, "")] = text;
-        });
-        return;
-      }
-
-      this.errors.push(
-        error?.response?.data?.error?.message || error?.message || "Не удалось сохранить запись"
-      );
-    },
-
-    validate() {
-      this.errors = [];
-      this.fieldErrors = {};
-
-      if (!this.form.group_id) {
-        this.fieldErrors.group_id = "Выберите группу";
-      }
-      if (!this.form.aircraft_id) {
-        this.fieldErrors.aircraft_id = "Выберите класс";
-      }
-      if (!this.form.category_id) {
-        this.fieldErrors.category_id = "Выберите категорию";
-      }
-      if (this.form.course_ids.length === 0) {
-        this.errors.push("Выберите хотя бы один курс или модуль");
-      }
-      if (!this.form.study_from) {
-        this.fieldErrors.study_from = "Укажите дату начала";
-      }
-      if (!this.form.study_to) {
-        this.fieldErrors.study_to = "Укажите дату окончания";
-      } else if (this.form.study_from && this.form.study_to < this.form.study_from) {
-        this.fieldErrors.study_to = "Дата окончания не может быть раньше даты начала";
-      }
-
-      return Object.keys(this.fieldErrors).length === 0 && this.errors.length === 0;
-    },
-
-    async submitForm() {
-      // Защита от повторного клика: запрос уходит один раз.
-      if (this.saving) return;
-
-      if (!this.validate()) {
-        toast.error(this.$t("groupLearning.checkForm"));
-        return;
-      }
-
-      this.saving = true;
-      this.alert = false;
-
-      try {
-        // Раскрываем выбранные узлы в «курс + модуль»: сам курс в course_id,
-        // конкретный модуль (aukstructure) — в parent_id. Раньше туда уходил
-        // просто id узла, и учебный план открывал несуществующий курс.
-        const entries = Array.from(new Set(this.form.course_ids)).map((nodeId) => {
-          const asCourse = /^course-(\d+)$/.exec(String(nodeId));
-
-          return asCourse
-            ? { course_id: Number(asCourse[1]), parent_id: null }
-            : { course_id: this.nodeCourse[nodeId], parent_id: nodeId };
-        }).filter((entry) => entry.course_id);
-
-        await this.$store.dispatch("Course/fetchGroup2learnings", {
-          group_id: this.form.group_id,
-          entries,
-          category_id: this.form.category_id,
-          teacher: this.form.teacher,
-          typeOfLesson: this.form.typeOfLesson,
-          study_from: this.form.study_from,
-          study_to: this.form.study_to,
-          // null, а не пустая строка: бэкенд валидирует deadline как
-          // date, и пустая строка дала бы 422.
-          deadline: this.form.deadline || null,
-        });
-
-        toast.success(this.$t("groupLearning.enrolled"));
-        // Уходим только после успеха. Раньше redirect стоял в finally,
-        // поэтому и неудачное сохранение выбрасывало на список групп,
-        // и сообщение об ошибке пользователь уже не видел.
-        this.$router.push("/groups/list");
-      } catch (error) {
-        this.collectErrors(error);
-        toast.error(this.errors[0] || this.$t("groupLearning.saveFailed"));
-      } finally {
-        this.saving = false;
-      }
-    },
-
-    cancelBtnHead() {
-      this.$router.go(-1);
+    deadline: {
+      initial: null,
+      rules: [],
     },
   },
-};
+
+  draftKey: 'groupLearning',
+
+  async onSubmit({ values }) {
+    // Валидация перед отправкой
+    const errors = []
+    const fieldErrors = {}
+
+    if (!values.group_id) fieldErrors.group_id = t('groupLearning.groupRequired')
+    if (!values.aircraft_id) fieldErrors.aircraft_id = t('groupLearning.classRequired')
+    if (!values.category_id) fieldErrors.category_id = t('groupLearning.categoryRequired')
+    if (!values.course_ids?.length) errors.push(t('groupLearning.coursesRequired'))
+    if (!values.study_from) fieldErrors.study_from = t('groupLearning.fromRequired')
+    if (!values.study_to) fieldErrors.study_to = t('groupLearning.toRequired')
+    else if (values.study_from && values.study_to < values.study_from) {
+      fieldErrors.study_to = t('groupLearning.toBeforeFrom')
+    }
+
+    if (Object.keys(fieldErrors).length > 0) {
+      form.setFieldErrors(fieldErrors)
+    }
+    if (errors.length > 0) {
+      form.setNonFieldErrors(errors)
+    }
+
+    if (Object.keys(fieldErrors).length > 0 || errors.length > 0) {
+      toast.error(t('groupLearning.checkForm'))
+      return false
+    }
+
+    // Подготовка данных для сохранения
+    const entries = Array.from(new Set(values.course_ids)).map((nodeId) => {
+      const asCourse = /^course-(\d+)$/.exec(String(nodeId))
+      return asCourse
+        ? { course_id: Number(asCourse[1]), parent_id: null }
+        : { course_id: nodeCourse.value[nodeId], parent_id: nodeId }
+    }).filter((entry) => entry.course_id)
+
+    try {
+      await store.dispatch('Course/fetchGroup2learnings', {
+        group_id: values.group_id,
+        entries,
+        category_id: values.category_id,
+        teacher: values.teacher,
+        typeOfLesson: values.typeOfLesson,
+        study_from: values.study_from,
+        study_to: values.study_to,
+        deadline: values.deadline || null,
+      })
+
+      toast.success(t('groupLearning.enrolled'))
+      await router.push('/groups/list')
+    } catch (error) {
+      collectErrors(error)
+      toast.error(form.nonFieldErrors[0] || t('groupLearning.saveFailed'))
+      throw error
+    }
+  },
+})
+
+const { confirmLeave } = useLeaveGuard(() => form.dirty.value, { message: t('common.leaveConfirm') })
+
+const aircraftOptions = computed(() =>
+  (store.state.Course.aircrafts || []).map((a) => ({
+    value: a.id,
+    label: a.path,
+  }))
+)
+
+const instructorOptions = computed(() => {
+  const users = store.state.User.users || []
+  return users
+    .filter((u) => canonicalRoleSlug(u.role) === 'instructor')
+    .map((u) => ({ value: u.fio, label: u.fio }))
+})
+
+const periodRange = ref({ start: today, end: null })
+
+const onPeriodChange = (range) => {
+  form.setFieldValue('study_from', range.start)
+  form.setFieldValue('study_to', range.end || null)
+  periodRange.value = range
+}
+
+const categoryOptions = ref([])
+
+const onAircraftChange = async (aircraftId) => {
+  form.setFieldValue('category_id', null)
+  form.setFieldValue('course_ids', [])
+  categoryOptions.value = []
+  courseOptions.value = []
+  treeselectKey.value += 1
+
+  if (!aircraftId) return
+
+  // Загружаем категории для выбранного класса
+  const categories = (store.state.Course.categories || []).filter(
+    (c) => Number(c.aircraft_id) === Number(aircraftId)
+  )
+  categoryOptions.value = categories.map((c) => ({
+    value: c.id,
+    label: c.title,
+  }))
+}
+
+const courseOptions = ref([])
+const nodeCourse = ref({})
+const treeselectKey = ref(0)
+
+watch(() => form.values.category_id, async (categoryId) => {
+  if (!categoryId || !form.values.aircraft_id) {
+    courseOptions.value = []
+    nodeCourse.value = {}
+    treeselectKey.value += 1
+    return
+  }
+
+  form.setFieldValue('course_ids', [])
+  treeselectKey.value += 1
+
+  try {
+    const params = numericQuery({
+      aircraft_id: form.values.aircraft_id,
+      category_id: categoryId,
+    })
+    const response = await $api.get('/api/course', { params })
+    const courses = unwrapArray(response)
+
+    const nodeCourseMap = {}
+    courseOptions.value = courses.map((course) => ({
+      id: `course-${course.id}`,
+      label: course.title,
+      children: flatToHierarchy(asArray(course.aukstructures), course.id, nodeCourseMap),
+    }))
+    nodeCourse.value = nodeCourseMap
+  } catch (error) {
+    courseOptions.value = []
+    form.setNonFieldErrors([t('groupLearning.loadCoursesError')])
+    console.error(error)
+  }
+})
+
+const flatToHierarchy = (flat, courseId, nodeCourseMap) => {
+  const byId = new Map()
+
+  flat.forEach((item) => {
+    if (!item) return
+    nodeCourseMap[item.id] = courseId
+    byId.set(item.id, {
+      id: item.id,
+      label: item.title,
+      isDisabled: Number(item.type) !== 3,
+      children: [],
+    })
+  })
+
+  const roots = []
+  byId.forEach((node) => {
+    const parent = byId.get(node.parent_id)
+    if (parent && parent !== node) {
+      parent.children.push(node)
+    } else {
+      roots.push(node)
+    }
+  })
+  return roots
+}
+
+const collectErrors = (error) => {
+  const details = error?.response?.data?.error?.details
+  if (details && typeof details === 'object') {
+    Object.entries(details).forEach(([field, messages]) => {
+      const text = Array.isArray(messages) ? messages.join(' ') : String(messages)
+      form.setFieldError(field.replace(/\.\d+$/, ''), text)
+    })
+    return
+  }
+  form.setNonFieldError(error?.response?.data?.error?.message || error?.message || t('groupLearning.saveFailed'))
+}
+
+onMounted(async () => {
+  await Promise.all([
+    store.dispatch('User/fetchGroups'),
+    store.dispatch('User/fetchUsers'),
+    store.dispatch('Course/fetchCategories'),
+    store.dispatch('Course/fetchAircrafts'),
+  ]).catch((error) => console.error(error))
+
+  const fromRoute = Number(props.idEdit)
+  if (Number.isInteger(fromRoute) && fromRoute > 0) {
+    form.setFieldValue('group_id', fromRoute)
+  }
+})
+
+const cancel = () => {
+  router.go(-1)
+}
+
+defineExpose({ form, submitForm: form.submit })
 </script>
 
-<style src="vue3-treeselect/dist/vue3-treeselect.css"></style>
-
-<!--
-  Блок был unscoped и правил классы Vuetify и vue3-treeselect во всём
-  приложении: `.v-card-text { font-size: 1rem }` менял кегль текста ВСЕХ
-  карточек на всех страницах, а правила деревовидного селекта попадали
-  в любой другой экран, где он встретится. Здесь нужен :deep — сами
-  классы лежат внутри дочерних компонентов, — но блок остаётся привязан
-  к этой странице.
--->
 <style scoped>
 :deep(.v-card-text) {
   font-size: 1rem;
@@ -511,10 +483,10 @@ export default {
 
 :deep(.vue-treeselect__control) {
   height: 56px;
-  border-bottom: 1px solid;
+  border-bottom: 1px solid var(--c-border);
   background: var(--c-surface-3);
   margin-bottom: 17px;
-  border-radius: 5px;
+  border-radius: var(--radius-md);
 }
 
 :deep(.vue-treeselect__placeholder),
@@ -532,7 +504,8 @@ export default {
   cursor: pointer;
   color: var(--c-text-secondary);
   background-color: var(--c-surface-2);
-  border-bottom: 3px solid;
+  border-bottom: 3px solid var(--c-primary);
+  border-radius: var(--radius-sm);
 }
 
 :deep(.vue-treeselect--has-value .vue-treeselect__multi-value) {

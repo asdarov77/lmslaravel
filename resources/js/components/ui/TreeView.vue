@@ -17,7 +17,7 @@
 import { computed } from 'vue'
 import TreeViewNode from './TreeViewNode.vue'
 
-defineProps({
+const props = defineProps({
   /** Flat list of nodes with level property (1=theme, 2=section, 3=material) */
   nodes: { type: Array, default: () => [] },
   /** Currently active node ID */

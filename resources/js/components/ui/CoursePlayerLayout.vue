@@ -113,6 +113,10 @@
       <main class="cpl__content">
         <slot name="default" />
 
+        <div v-if="!sections.length" class="cpl__empty">
+          {{ $t('courseManifest.emptyContents') }}
+        </div>
+
         <!-- Переходы между уроками в конце материала -->
         <nav v-if="hasNeighbours" class="cpl__pager" :aria-label="$t('common.navigation')">
           <button type="button" class="cpl__pager-btn" :disabled="!canPrev" @click="$emit('prev')">
@@ -147,7 +151,7 @@ const props = defineProps({
   isFullscreen: { type: Boolean, default: false },
 })
 
-defineEmits(['select-section', 'prev', 'next', 'toggle-sidebar', 'toggle-fullscreen'])
+const emit = defineEmits(['select-section', 'prev', 'next', 'toggle-sidebar', 'toggle-fullscreen'])
 
 /** Символы отметок; состояние приходит снаружи. */
 const MARK = { done: '✓', partial: '◐', todo: '—' }
@@ -194,6 +198,70 @@ const handleToggleSection = (nodeId) => {
     newExpanded.add(nodeId)
   }
   expandedNodes.value = newExpanded
+}
+
+/** Материалы (только узлы уровня 3). */
+const materials = computed(() => props.sections.filter((s) => s.level === 3))
+
+/** Количество материалов. */
+const materialCount = computed(() => materials.value.length)
+
+/** Количество прочитанных материалов (state === 'done'). */
+const doneCount = computed(() => materials.value.filter((m) => m.state === 'done').length)
+
+/**
+ * Соседний МАТЕРИАЛ относительно активного.
+ *
+ * Ориентируемся на список материалов (isMaterial=true).
+ * Раньше переход шёл по всем узлам подряд, и «следующий» после темы
+ * приводил на заголовок без файла.
+ */
+const neighbour = (offset) => {
+  const mats = materials.value
+  if (!mats.length) return null
+
+  const index = mats.findIndex((s) => s.id === props.activeId)
+  if (index === -1) {
+    // Активен заголовок (например, после смены курса): отправляем
+    // к первому материалу в нужную сторону.
+    return offset > 0 ? mats[0] : mats[mats.length - 1]
+  }
+
+  return mats[index + offset] ?? null
+}
+
+const hasNeighbours = computed(() => {
+  const mats = materials.value
+  if (!mats.length) return false
+  const index = mats.findIndex((s) => s.id === props.activeId)
+  if (index === -1) return false
+  return index > 0 || index < mats.length - 1
+})
+
+const canPrev = computed(() => {
+  const mats = materials.value
+  if (!mats.length) return false
+  const index = mats.findIndex((s) => s.id === props.activeId)
+  if (index === -1) return false
+  return index > 0
+})
+
+const canNext = computed(() => {
+  const mats = materials.value
+  if (!mats.length) return false
+  const index = mats.findIndex((s) => s.id === props.activeId)
+  if (index === -1) return false
+  return index < mats.length - 1
+})
+
+const goPrev = () => {
+  const target = neighbour(-1)
+  if (target) emit('prev', target.originalSection)
+}
+
+const goNext = () => {
+  const target = neighbour(1)
+  if (target) emit('next', target.originalSection)
 }
 </script>
 
@@ -357,7 +425,7 @@ const handleToggleSection = (nodeId) => {
 .cpl__sidebar--hidden .cpl__sidebar-title,
 .cpl__sidebar--hidden .cpl__heading,
 /* Слот приходит извне, поэтому только через :deep. */
-.cpl__sidebar--hidden :deep(.cm-tree) {
+.cpl__sidebar--hidden :deep(.u-tree) {
   display: none;
 }
 

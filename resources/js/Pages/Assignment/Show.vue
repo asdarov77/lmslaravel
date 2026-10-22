@@ -45,49 +45,56 @@
       <section v-if="!canReview" class="u-card u-card__body mt-4">
         <h2 class="u-card__title">{{ $t('assignments.submitTitle') }}</h2>
 
-        <!--
-          Повторная сдача доступна: замечания преподавателя почти всегда
-          требуют исправления, а запись на задание одна.
+        <v-alert
+          v-if="assignment.overdue"
+          type="warning"
+          density="compact"
+          class="mb-3"
+        >
+          {{ $t('assignments.overdueHint') }}
+        </v-alert>
 
-          Файл выбирается обычным полем, а не DropzoneUpload: тот
-          рассчитан на файловый менеджер (нужен объект очереди и своя
-          папка), а здесь один файл за раз, и поднимать очередь ради
-          него — лишнее.
-        -->
-        <v-file-input
+        <FormField
           v-if="!assignment.overdue"
-          v-model="file"
           :label="$t('assignments.uploadLabel')"
-          prepend-icon=""
-          show-size
-          density="compact"
-          class="mt-3"
-          data-test="assignment-file"
-        />
+          name="file"
+          :error="form.errors.file"
+        >
+          <v-file-input
+            v-model="file"
+            prepend-icon=""
+            show-size
+            density="compact"
+            data-test="assignment-file"
+            @change="form.setFieldValue('file', $event)"
+          />
+        </FormField>
 
-        <v-textarea
-          v-model="comment"
+        <FormField
+          v-if="!assignment.overdue"
           :label="$t('assignments.commentLabel')"
-          rows="3"
-          density="compact"
-          class="mt-3"
-          data-test="assignment-comment"
-        />
+          name="comment"
+          :error="form.errors.comment"
+        >
+          <v-textarea
+            v-bind="form.bind('comment')"
+            :rows="3"
+            density="compact"
+            data-test="assignment-comment"
+          />
+        </FormField>
 
         <v-btn
+          v-if="!assignment.overdue"
           color="primary"
           class="mt-3"
           :loading="saving"
-          :disabled="!comment.trim() && !file"
+          :disabled="!form.values.comment?.trim() && !form.values.file"
           data-test="assignment-send"
           @click="submit"
         >
           {{ assignment.own_submission ? $t('assignments.resend') : $t('assignments.submit') }}
         </v-btn>
-
-        <v-alert v-if="assignment.overdue" type="warning" density="compact" class="mt-3">
-          {{ $t('assignments.overdueHint') }}
-        </v-alert>
 
         <!-- Результат проверки виден сразу: главный вопрос после сдачи —
              «что не так», а он в комментарии преподавателя. -->
@@ -136,8 +143,6 @@
           </template>
 
           <template #cell-score="{ row }">
-            <!-- Непроверенная работа показывает прочерк, а не 0: ноль
-                 это оценка «ноль», а здесь оценки ещё нет. -->
             <span v-if="row.score === null" class="u-muted">—</span>
             <span v-else>{{ row.score }} / {{ assignment.max_score }}</span>
           </template>
@@ -164,27 +169,40 @@
           <p class="text-body-2 mb-3">{{ review.user }}</p>
           <p v-if="review.comment" class="text-caption mb-3">{{ review.comment }}</p>
 
-          <v-text-field
-            v-model="review.score"
+          <FormField
             :label="$t('assignments.score')"
-            type="number"
-            :min="0"
-            :max="assignment?.max_score ?? 5"
-            data-test="review-score"
-            density="compact"
-          />
+            name="score"
+            :error="reviewErrors.score"
+            :required="true"
+          >
+            <v-text-field
+              v-model="review.score"
+              type="number"
+              :min="0"
+              :max="assignment?.max_score ?? 5"
+              data-test="review-score"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
+          </FormField>
 
-          <v-textarea
-            v-model="review.feedback"
+          <FormField
             :label="$t('assignments.feedback')"
-            rows="4"
-            data-test="review-feedback"
-            density="compact"
-          />
+            name="feedback"
+            :error="reviewErrors.feedback"
+          >
+            <v-textarea
+              v-model="review.feedback"
+              :rows="4"
+              density="compact"
+              data-test="review-feedback"
+            />
+          </FormField>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" @click="review.open = false">{{ $t('cancel') }}</v-btn>
+          <v-btn variant="text" @click="closeReview">{{ $t('cancel') }}</v-btn>
           <v-btn color="primary" :loading="saving" data-test="review-save" @click="saveReview">
             {{ $t('save') }}
           </v-btn>
@@ -200,6 +218,7 @@ import { unwrapResponse } from '../../api/envelope'
 import DataTable from '../../components/ui/DataTable.vue'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import PageHeader from '../../components/ui/PageHeader.vue'
+import FormField from '../../components/ui/FormField.vue'
 
 /**
  * Домашнее задание: описание, сдача и проверка.
@@ -210,7 +229,7 @@ import PageHeader from '../../components/ui/PageHeader.vue'
  */
 export default {
   name: 'AssignmentShow',
-  components: { DataTable, EmptyState, PageHeader },
+  components: { DataTable, EmptyState, PageHeader, FormField },
   props: {
     idEdit: { type: [Number, String], required: true },
   },
@@ -224,6 +243,7 @@ export default {
       saving: false,
       loading: true,
       review: { open: false, id: null, user: null, comment: '', score: 0, feedback: '' },
+      reviewErrors: {},
     }
   },
   computed: {
@@ -262,9 +282,6 @@ export default {
       this.saving = true
 
       try {
-        // Файл уходит как multipart: отдельным запросом «сначала
-        // файл, потом комментарий» работа была бы привязана к половине
-        // сделанного.
         const body = new FormData()
         body.append('comment', this.comment)
 
@@ -294,9 +311,22 @@ export default {
         score: submission.score ?? 0,
         feedback: submission.feedback ?? '',
       }
+      this.reviewErrors = {}
+    },
+
+    closeReview() {
+      this.review.open = false
+      this.reviewErrors = {}
     },
 
     async saveReview() {
+      this.reviewErrors = {}
+
+      if (this.review.score === null || this.review.score === '') {
+        this.reviewErrors.score = this.$t('assignments.errors.scoreRequired')
+        return
+      }
+
       this.saving = true
 
       try {
@@ -306,7 +336,7 @@ export default {
           { optional: true }
         )
 
-        this.review.open = false
+        this.closeReview()
         await this.load()
       } finally {
         this.saving = false
@@ -340,7 +370,7 @@ export default {
 }
 
 .assignment__facts dt {
-  color: var(--text-muted);
+  color: var(--c-text-muted);
   font-size: 0.8125rem;
 }
 

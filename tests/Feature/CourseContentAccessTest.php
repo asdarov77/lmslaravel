@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Aukstructure;
+use Illuminate\Support\Facades\DB;
 use App\Models\Aircraft;
 use App\Models\Category;
 use App\Models\Course;
@@ -201,5 +202,52 @@ class CourseContentAccessTest extends TestCase
         $this->actingAs($user, 'sanctum')
             ->getJson("/api/getlink/{$radioAuk->id}")
             ->assertOk('материал открыт после записи на свою специальность');
+    }
+
+    /**
+     * Единый endpoint открытия курса (P0.1): курс, дерево, избранное и
+     * entry в одном ответе; gated как остальные content-эндпоинты.
+     */
+    public function test_course_player_returns_compact_payload(): void
+    {
+        [$group, $course, $auk] = $this->fixtures();
+        \App\Models\Link::factory()->create([
+            'aukstructure_id' => $auk->id,
+            'link' => 'index.html',
+        ]);
+        DB::table('favorites')->insert([
+            'user_id' => null,
+            'course_id' => $course->id,
+            'title' => 'Тест favourites',
+        ]);
+        $user = $this->trainee($group);
+
+        Group2learning::factory()->create([
+            'group_id' => $group->id,
+            'course_id' => $course->id,
+        ]);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson("/api/course-player/{$course->id}")
+            ->assertOk();
+
+        $data = $response->json('data');
+        $this->assertSame($course->title, $data['course']['title']);
+        $this->assertSame($auk->id, $data['tree'][0]['id']);
+
+        // Entry: подписанный base есть, file равен link первого материала.
+        $this->assertSame('index.html', $data['entry']['file']);
+        $this->assertNotEmpty($data['entry']['signed_base']);
+    }
+
+    /** Без записи — 403, как у остальных content-эндпоинтов. */
+    public function test_course_player_gates_by_enrolment(): void
+    {
+        [$group, $course, $auk] = $this->fixtures();
+        $user = $this->trainee($group);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson("/api/course-player/{$course->id}")
+            ->assertForbidden();
     }
 }

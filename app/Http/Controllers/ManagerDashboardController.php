@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Assignment;
+use App\Models\AssignmentSubmission;
 use App\Models\Category;
 use App\Models\Course;
 use App\Models\Exam;
@@ -182,10 +184,119 @@ class ManagerDashboardController extends Controller
                 'attention' => $this->attention($actor, $isAdmin, $groupScope),
                 'recent' => $this->recent($actor, $groupScope),
                 'trends' => $this->trends($actor, $groupScope),
+                'top_courses' => $this->topCourses($actor, $groupScope),
+                'review_queue' => $this->reviewQueue($actor, $groupScope),
             ],
             'error' => null,
             'meta' => null,
         ]);
+    }
+
+    /**
+     * Топ курсов: число зачислений (group2learnings) и попытки экзаменов
+     * слушателей групп, записанных на курс.
+     */
+    private function topCourses(User $actor, ?array $groupScope): array
+    {
+        if (! ($actor->isSuperAdmin() || $actor->hasPermission('courses.manage') || $actor->hasPermission('courses.view'))) {
+            return [];
+        }
+
+        return Course::query()
+            ->withCount(['group2learnings' => function ($q) use ($groupScope) {
+                $this->applyGroupScope($q, $groupScope);
+            }])
+            ->orderByDesc('group2learnings_count')
+            ->limit(5)
+            ->get(['id', 'title'])
+            ->map(function (Course $course) {
+                return [
+                    'id' => $course->id,
+                    'title' => $course->title,
+                    'students' => (int) $course->group2learnings_count,
+                    'attempts' => ExamAttempt::query()
+                        ->whereIn('user_id', function ($sub) use ($course) {
+                            $sub->select('users.id')
+                                ->from('users')
+                                ->join('group2learnings', 'group2learnings.group_id', '=', 'users.group_id')
+                                ->where('group2learnings.course_id', $course->id);
+                        })
+                        ->count(),
+                ];
+            })
+            ->all();
+    }
+
+    /**
+     * Работы, которые ждут проверки преподавателя: сданы, но ещё без
+     * оценки и комментария. Отдаём пять последних с именами, чтобы
+     * сразу было куда пойти.
+     */
+    /**
+     * GET /api/menu-counters: счётчики для бейджей меню.
+     *
+     * Пока один счётчик — очередь проверки: остальные бейджи (объявления,
+     * форум) завести без своего источника нельзя, а «бейдж ради бейджа»
+     * только шумит. Работает для manager/admin с правом проверки.
+     */
+    public function counters(Request $request)
+    {
+        $actor = $request->user();
+        $canReview = $actor->isSuperAdmin() || $actor->hasPermission('grading.manage') || $actor->hasPermission('courses.manage');
+
+        $reviewQueue = 0;
+
+        if ($canReview) {
+            $reviewQueue = (clone $this->reviewQueueQuery($actor))
+                ->toBase()->count();
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => ['review_queue' => $reviewQueue],
+            'error' => null,
+            'meta' => null,
+        ]);
+    }
+
+    private function reviewQueueQuery(User $actor)
+    {
+        $groupScope = $this->groupScope($actor, $actor->isSuperAdmin() || $actor->hasPermission('courses.manage'));
+
+        return AssignmentSubmission::query()
+            ->whereNull('score')
+            ->whereNull('feedback')
+            ->whereNotNull('submitted_at')
+            ->when($groupScope !== null, fn ($q) => $q->whereIn('user_id',
+                fn ($sub) => $sub->select('id')->from('users')->whereIn('group_id', $groupScope)));
+    }
+
+    private function reviewQueue(User $actor, ?array $groupScope): array
+    {
+        $canReview = $actor->isSuperAdmin() || $actor->hasPermission('grading.manage') || $actor->hasPermission('courses.manage');
+        if (! $canReview) {
+            return [];
+        }
+
+        $reviewModel = AssignmentSubmission::query();
+        $this->applyGroupScope($reviewModel, $groupScope);
+
+        $query = AssignmentSubmission::query()
+            ->whereNull('score')
+            ->whereNull('feedback')
+            ->whereNotNull('submitted_at')
+            ->when($groupScope !== null, fn ($q) => $q->whereIn('user_id',
+                fn ($sub) => $sub->select('id')->from('users')->whereIn('group_id', $groupScope)))
+            ->with(['assignment:id,title', 'user:id,fio'])
+            ->orderByDesc('submitted_at')
+            ->limit(5);
+
+        return $query->get()->map(fn (AssignmentSubmission $sub) => [
+            'id' => $sub->id,
+            'assignment' => $sub->assignment?->title,
+            'student' => $sub->user?->fio,
+            'submitted_at' => $sub->submitted_at,
+        ])->all();
     }
 
     /**

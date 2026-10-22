@@ -1,7 +1,7 @@
 <template>
   <header class="u-page__head">
     <div class="u-page__head-text">
-      <Breadcrumbs v-if="$route.meta.breadcrumbs" />
+      <Breadcrumbs v-if="$route?.meta?.breadcrumbs" />
       <h1 v-if="title" class="u-page__title">{{ title }}</h1>
       <p v-if="subtitle" class="u-page__subtitle">{{ subtitle }}</p>
       <slot name="head" />

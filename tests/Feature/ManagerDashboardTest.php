@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Answer;
+use App\Models\Assignment;
+use App\Models\AssignmentSubmission;
 use App\Models\Category;
 use App\Models\Course;
 use App\Models\Exam;
@@ -295,6 +297,52 @@ class ManagerDashboardTest extends TestCase
         $this->admin();
 
         return $this->getJson('/api/dashboard/summary')->assertOk()->json('data');
+    }
+
+    /** Покрытие агрегатов: топ курсов считается по зачислениям своей области. */
+    public function test_top_courses_counts_group_assignments(): void
+    {
+        $data = $this->getAsAdmin();
+
+        $top = collect($data['top_courses']);
+        $this->assertGreaterThan(0, $top->count());
+        $row = $top->firstWhere('title', 'Курс для сводки');
+        $this->assertNotNull($row);
+        $this->assertSame(1, $row['students']);
+    }
+
+    /** Очередь проверки: сданные без оценки работы с именами. */
+    public function test_review_queue_lists_unchecked_submissions(): void
+    {
+        $admin = User::factory()->create(['role' => 'Администратор']);
+        $this->grant($admin, 'grading.manage');
+        $this->asExistingUser($admin);
+
+        $data = $this->getJson('/api/dashboard/summary')->assertOk()->json('data');
+        // Пока заданий нет — очередь пуста, но поле присутствует.
+        $this->assertIsArray($data['review_queue']);
+        $this->assertSame([], $data['review_queue']);
+
+        $trainee = User::factory()->create(['role' => 'Обучаемый', 'group_id' => $this->own->id]);
+        $course = Course::firstOrFail();
+        $assignment = Assignment::create([
+            'title' => 'Проверяемая работа',
+            'course_id' => $course->id,
+            'group_id' => $this->own->id,
+            'max_score' => 5,
+            'published_at' => now(),
+        ]);
+        AssignmentSubmission::create([
+            'assignment_id' => $assignment->id,
+            'user_id' => $trainee->id,
+            'submitted_at' => now(),
+        ]);
+
+        $data = $this->getJson('/api/dashboard/summary')->assertOk()->json('data');
+
+        $this->assertCount(1, $data['review_queue']);
+        $this->assertSame('Проверяемая работа', $data['review_queue'][0]['assignment']);
+        $this->assertSame($trainee->fio, $data['review_queue'][0]['student']);
     }
 
     /** Фабрики для экзаменов в проекте нет, а политике важны только поля. */

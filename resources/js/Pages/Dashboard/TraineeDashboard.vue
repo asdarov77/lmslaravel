@@ -121,6 +121,29 @@
         </v-btn>
       </section>
 
+      <!-- Рекомендованные: недоделанные курсы плана -->
+      <section v-if="recommended.length" class="u-card dash__panel u-card--glass u-hover-lift" data-test="dash-recommended">
+        <h2 class="u-card__title">{{ $t("dashboard.recommendedTitle") }}</h2>
+        <p class="u-page__subtitle">{{ $t("dashboard.recommendedHint") }}</p>
+
+        <ul class="dash__list">
+          <li v-for="(row, index) in recommended" :key="row.id" class="dash__list-row" data-stagger :data-stagger-index="index">
+            <div>
+              <span class="dash__list-title">{{ row.title }}</span>
+              <span class="dash__list-sub">{{ $t("dashboard.recommendedPercent", { n: row.percent }) }}</span>
+            </div>
+            <v-btn
+              size="x-small"
+              variant="text"
+              color="primary"
+              :to="{ name: 'courses.itemmani', query: { idEdit: row.id } }"
+            >
+              {{ $t("dashboard.continueAction") }}
+            </v-btn>
+          </li>
+        </ul>
+      </section>
+
       <!-- Прогресс обучения -->
       <section class="u-card dash__panel u-card--glass u-hover-lift">
         <h2 class="u-card__title">{{ $t("dashboard.progress") }}</h2>
@@ -298,6 +321,7 @@ export default {
       // Держим отдельно от summary: это необязательный блок, его
       // отсутствие не должно ломать остальной дашборд.
       gamification: {},
+      recommended: [],
       // Пока идут два параллельных запроса, показываем скелетоны той же
       // формы. Раньше состояния загрузки не было вовсе: карточки появлялись
       // разом и без предупреждения, а на медленной сети страница выглядела
@@ -510,6 +534,14 @@ export default {
         this.gamification = response?.data?.data ?? {};
       } catch {
         this.gamification = {};
+      }
+
+      // Рекомендации — тоже отдельный необязательный запрос.
+      try {
+        const response = await $api.get("/api/my/recommended");
+        this.recommended = Array.isArray(response?.data?.data) ? response.data.data : [];
+      } catch {
+        this.recommended = [];
       }
     },
 

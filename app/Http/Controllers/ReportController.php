@@ -72,9 +72,9 @@ class ReportController extends Controller
     }
 
     /**
-     * Выгрузка отчёта в CSV.
+     * Выгрузка отчёта: CSV (по умолчанию), XLSX или PDF.
      *
-     * GET /api/reports/export?report=enrollment|exams|progress|activity
+     * GET /api/reports/export?report=enrollment|exams|progress|activity&format=csv|xlsx|pdf
      */
     public function export(Request $request)
     {
@@ -93,7 +93,122 @@ class ReportController extends Controller
             default => abort(422, 'Неизвестный отчёт: ' . $report),
         };
 
-        return $this->csv($report, $data);
+        return match ($request->query('format', 'csv')) {
+            'xlsx' => $this->xlsx($report, $data),
+            'pdf' => $this->pdf($report, $data),
+            default => $this->csv($report, $data),
+        };
+    }
+
+    /**
+     * XLSX отчёта: те же строки, что и в CSV, но по-настоящему
+     * формат Excel (PhpSpreadsheet), а не «CSV, переименованный в .xls».
+     */
+    private function xlsx(string $report, array $data): \Illuminate\Http\Response
+    {
+        $rows = $this->reportRows($report, $data);
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        foreach ($rows as $rIdx => $row) {
+            foreach (array_values($row) as $cIdx => $value) {
+                $sheet->setCellValue([$cIdx + 1, $rIdx + 1], $value);
+            }
+        }
+
+        // Шапка жирным: одиночный визуальный акцент, не оформление ради оформления.
+        if (count($rows) > 0) {
+            $sheet->getStyle([1, 1, count($rows[0]), 1])->getFont()->setBold(true);
+        }
+
+        $n = max(1, count($rows[0] ?? []));
+        for ($i = 1; $i <= $n; $i++) {
+            $sheet->getColumnDimension(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($i))->setAutoSize(true);
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'xls');
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($tmp);
+        $content = (string) file_get_contents($tmp);
+        unlink($tmp);
+        $spreadsheet->disconnectWorksheets();
+
+        return response($content, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="report-' . $report . '.xlsx"',
+        ]);
+    }
+
+    /**
+     * PDF отчёта: простая таблица через dompdf, который уже в проекте.
+     */
+    private function pdf(string $report, array $data): \Illuminate\Http\Response
+    {
+        $rows = $this->reportRows($report, $data);
+
+        $cells = '';
+        foreach ($rows as $i => $row) {
+            $tag = $i === 0 ? 'th' : 'td';
+            $cells .= '<tr>' . implode('', array_map(
+                fn ($v) => '<' . $tag . '>' . htmlspecialchars((string) $v, ENT_QUOTES) . '</' . $tag . '>',
+                array_values($row),
+            )) . '</tr>';
+        }
+
+        $html = '<html><head><meta charset="utf-8"><style>table{border-collapse:collapse}td,th{border:1px solid #999;padding:4px 8px;font-size:11px}</style></head><body><table>' . $cells . '</table></body></html>';
+
+        return app('dompdf.wrapper')->loadHtml($html)
+            ->download("report-{$report}.pdf");
+    }
+
+    /**
+     * Строки отчёта для csv/xlsx/pdf: общий источник, чтобы форматы
+     * не разъезжались при правке колонок.
+     *
+     * @param  array<string, mixed>  $data
+     * @return list<list<mixed>>
+     */
+    private function reportRows(string $report, array $data): array
+    {
+        $rows = [];
+
+        switch ($report) {
+            case 'enrollment':
+                $rows[] = ['Группа', 'Курс', 'Начало', 'Окончание', 'Дедлайн'];
+
+                foreach ($data['rows'] as $row) {
+                    $rows[] = [
+                        $row['group'], $row['course'],
+                        $row['study_from'], $row['study_to'], $row['deadline'],
+                    ];
+                }
+                break;
+
+            case 'exams':
+                $rows[] = ['Попытки', 'Сдано', 'Успеваемость, %', 'Средний балл'];
+                $rows[] = [
+                    $data['attempts'],
+                    $data['passed'],
+                    $data['percent'] ?? '',
+                    $data['average'] === null ? '' : round($data['average'] * 100),
+                ];
+                break;
+
+            case 'progress':
+                $rows[] = ['Уроков пройдено', 'Уроков начато', 'Средний процент, %', 'Курсов'];
+                $rows[] = [
+                    $data['lessons_done'], $data['lessons_started'],
+                    $data['percent'] ?? '', $data['courses'],
+                ];
+                break;
+
+            case 'activity':
+                $rows[] = ['Новых пользователей', 'Тем форума', 'Объявлений'];
+                $rows[] = [$data['new_users'], $data['topics'], $data['announcements']];
+                break;
+        }
+
+        return $rows;
     }
 
     /**
@@ -306,43 +421,7 @@ class ReportController extends Controller
      */
     private function csv(string $report, array $data): \Illuminate\Http\Response
     {
-        $rows = [];
-
-        switch ($report) {
-            case 'enrollment':
-                $rows[] = ['Группа', 'Курс', 'Начало', 'Окончание', 'Дедлайн'];
-
-                foreach ($data['rows'] as $row) {
-                    $rows[] = [
-                        $row['group'], $row['course'],
-                        $row['study_from'], $row['study_to'], $row['deadline'],
-                    ];
-                }
-                break;
-
-            case 'exams':
-                $rows[] = ['Попытки', 'Сдано', 'Успеваемость, %', 'Средний балл'];
-                $rows[] = [
-                    $data['attempts'],
-                    $data['passed'],
-                    $data['percent'] ?? '',
-                    $data['average'] === null ? '' : round($data['average'] * 100),
-                ];
-                break;
-
-            case 'progress':
-                $rows[] = ['Уроков пройдено', 'Уроков начато', 'Средний процент, %', 'Курсов'];
-                $rows[] = [
-                    $data['lessons_done'], $data['lessons_started'],
-                    $data['percent'] ?? '', $data['courses'],
-                ];
-                break;
-
-            case 'activity':
-                $rows[] = ['Новых пользователей', 'Тем форума', 'Объявлений'];
-                $rows[] = [$data['new_users'], $data['topics'], $data['announcements']];
-                break;
-        }
+        $rows = $this->reportRows($report, $data);
 
         $csv = "\xEF\xBB\xBF";
 

@@ -10,6 +10,8 @@ use Illuminate\Support\Str;
 
 use App\Models\Link;
 use App\Models\Aukstructure;
+use App\Models\Course;
+use Illuminate\Support\Facades\DB;
 
 use DOMDocument;
 use DOMText;
@@ -466,28 +468,27 @@ class SearchController extends Controller
 
 
     /**
-     * Поиск по содержимому приватных файлов курса.
+     * Поиск по содержимому материалов курса (P1.1, lesson_search_index).
      *
-     * Маршрут висел только на auth:sanctum, а сам поиск берёт aircraft и
-     * path прямо из тела запроса и читает `private/{aircraft}/{path}`.
-     * То есть любой вошедший, зная (или перебрав) идентификатор
-     * самолёта, получал фрагменты учебного материала ЧУЖОГО курса —
-     * включая те, которые его группе не назначены.
+     * Обход файловой системы заменён tsquery по индексу:/files решает БД,
+     * PHP читает и подсвечивает только найденные файлы. Права — как у
+     * открытия курса (CourseAccess::authorizeOpen): записанный обучаемый
+     * ищет в своём курсе, не записанный получает 403. Старое ограничение
+     * «только content.manage» снимается — индекс выдаёт фрагменты только
+     * материалов курса, к которому уже есть доступ.
      *
-     * Теперь требуется право на управление контентом (content.manage)
-     * либо courses.manage: это методическая операция, а не чтение
-     * материала обучаемым. Для обучаемого поиск по материалам идёт
-     * через /api/search, который ограничен его курсами.
+     * Индекс пуст (первый запуск после деплоя) — курс доиндексируется
+     * синхронно: файлы только этого курса, терпимая цена за самоохрану
+     * фичи без ручного прогона команды.
      */
     public function search(Request $request)
     {
         $actor = $request->user();
+        $searchTerm = trim((string) $request->input('query', ''));
 
-        if (! $actor || ! ($actor->hasPermission('content.manage') || $actor->hasPermission('courses.manage'))) {
-            abort(403, 'Поиск по содержимому курсов доступен только тем, кто управляет контентом');
+        if ($searchTerm === '') {
+            return response()->json(['success' => true, 'data' => [], 'error' => null, 'meta' => null]);
         }
-
-        $searchTerm = strtolower($request->input('query'));
 
         $aircraft = Aircraft::find($request->input('aircraft'));
 
@@ -498,51 +499,63 @@ class SearchController extends Controller
             abort(422, 'Не указан существующий самолёт');
         }
 
-        $aircraftPath = $aircraft->path;
-        $directory = "private/{$aircraftPath}/{$request->input('path')}/";
-        $matches = [];
+        $course = Course::where('aircraft_id', $aircraft->id)
+            ->where('path', (string) $request->input('path', ''))
+            ->first();
 
-        //$files = Storage::disk('public')->files($directory);
+        if (! $course) {
+            abort(422, 'Курс по указанному пути не найден');
+        }
+
+        \App\Support\CourseAccess::authorizeOpen($actor, $course);
+
+        if (! DB::table('lesson_search_index')->where('course_id', $course->id)->exists()) {
+            \App\Support\LessonSearchIndexer::indexCourse($course);
+        }
+
+        /*
+         * websearch_to_tsquery('russian', ...): пользовательский синтаксис
+         * поисковой строки (кавычки, ИЛИ), морфология волнений не вызывает
+         * для русских материалов. limit сдерживает payload: подсветка
+         * дорога, а 25 файлов — уже больше одной страницы листания.
+         */
+        $rows = collect(DB::select(
+            "SELECT file, aukstructure_id
+             FROM lesson_search_index
+             WHERE course_id = :course
+               AND searchable @@ websearch_to_tsquery('russian', :query)
+             ORDER BY ts_rank(searchable, websearch_to_tsquery('russian', :query2)) DESC
+             LIMIT 25",
+            ['course' => $course->id, 'query' => $searchTerm, 'query2' => $searchTerm]
+        ));
 
         $disk = Storage::disk('public');
-        $files = $disk->files($directory);
+        $prefix = 'private/' . trim($aircraft->path) . '/' . trim($course->path) . '/';
 
-        //var_dump($files);
-        //   var_dump($directory);
+        // Сопоставление материал ↔ файл: индекс строился по Link, поэтому
+        // обратный lookup дёшев и точен.
+        $fileToAuk = Aukstructure::whereIn('id', $rows->pluck('aukstructure_id'))
+            ->get()
+            ->keyBy('id');
 
-        foreach ($files as $file) {
-            if (Str::endsWith($file, '.html') && !Str::endsWith($file, 'index.html')) {
-                $contents = $disk->get($file);
-                //$contents = Storage::get($file);
-                if (Str::contains(strtolower($contents), $searchTerm)) {
-                    $filename = basename($file);
-                    $filename = trim($filename);
-                    $link = Link::where('link', $filename)->first();
-                    // Раньше переменная объявлялась только внутри
-                    // `if ($link)`, а использовалась в ответе всегда:
-                    // для файла без записи в links шла PHP-Notice и
-                    // itemId отсутствовал вовсе.
-                    $aukstructureId = $link?->aukstructure_id;
-                    $aukstructure = $link ? $link->aukstructure : Aukstructure::whereHas('links', function ($query) use ($filename) {
-                        $query->where('link', $filename);
-                    })->first();
-                    $title = $aukstructure ? $aukstructure->title : null;
-                    $highlightedHtml = $this->highlightWords($contents, $searchTerm);
-                    //$highlightedHtmlStrings = $this->convertNodesToHtml($highlightedHtml['highlightedNodes']);
-                    //$originalHtmlStrings = $this->convertNodesToHtml($highlightedHtml['originalNodes']);
-                    //var_dump($aukstructureId);
-                    //dd($highlightedHtml['highlightedNodes']);
-                    //dd($highlightedHtml['originalNodes']);
+        $matches = [];
 
-                    $matches[] = [
-                        'file' => $file,
-                        'title' => $title,
-                        'itemId'  => $aukstructureId,
-                        'highlightedNodes' => $highlightedHtml,
-                    ];
-                }
+        foreach ($rows as $row) {
+            $path = $prefix . $row->file;
+            if (! $disk->exists($path)) {
+                continue;
             }
+            $contents = $disk->get($path);
+            $auk = $fileToAuk->get($row->aukstructure_id);
+
+            $matches[] = [
+                'file' => $path,
+                'title' => $auk?->title ?? $row->file,
+                'itemId' => $row->aukstructure_id,
+                'highlightedNodes' => $this->highlightWords($contents, $searchTerm),
+            ];
         }
+
         // Конверт обязателен: весь api проходит через
         // ApiResponseEnvelope, а фронт разбирает ответ через
         // unwrapResponse.
@@ -553,6 +566,7 @@ class SearchController extends Controller
             'meta' => null,
         ]);
     }
+
 
 
 

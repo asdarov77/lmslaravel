@@ -2,7 +2,7 @@
   <div class="u-tree__node">
     <div
       class="u-tree__item"
-      :class="{ 'u-tree__item--active': isActive }"
+      :class="{ 'u-tree__item--active': isActive, 'u-tree__item--material': node.isMaterial }"
       @click="handleSelect"
     >
       <button
@@ -24,6 +24,10 @@
         <v-icon size="16">mdi-circle-small</v-icon>
       </span>
 
+      <span v-if="node.isMaterial" class="u-tree__mark" :class="markClass" :aria-label="markAriaLabel">
+        {{ markSymbol }}
+      </span>
+
       <span class="u-tree__label">{{ node.title }}</span>
     </div>
 
@@ -41,6 +45,7 @@
           :node="child"
           :active-id="activeId"
           :expanded-nodes="expandedNodes"
+          :all-nodes="allNodes"
           @select="$emit('select', $event)"
           @toggle="$emit('toggle', $event)"
         />
@@ -51,26 +56,40 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
-defineProps({
+const { t } = useI18n()
+
+const props = defineProps({
   node: { type: Object, required: true },
   activeId: { type: [String, Number], default: null },
   expandedNodes: { type: Set, default: () => new Set() },
   allNodes: { type: Array, default: () => [] },
 })
 
-defineEmits(['select', 'toggle'])
+const emit = defineEmits(['select', 'toggle'])
+
+const MARK = { done: '✓', partial: '◐', todo: '—' }
+const MARK_LABEL = {
+  done: 'courseManifest.markDone',
+  partial: 'courseManifest.markPartial',
+  todo: 'courseManifest.markTodo',
+}
+
+const markSymbol = computed(() => MARK[props.node.state] || MARK.todo)
+const markClass = computed(() => `u-tree__mark--${props.node.state || 'todo'}`)
+const markAriaLabel = computed(() => t(MARK_LABEL[props.node.state] || MARK_LABEL.todo))
 
 const children = computed(() => {
   // Find children of this node (nodes with level = parent level + 1 that appear after this node)
-  const nodeLevel = node.level || 1
-  const nodeIndex = allNodes.value.findIndex(n => n.id === node.id)
+  const nodeLevel = props.node.level || 1
+  const nodeIndex = props.allNodes.findIndex(n => n.id === props.node.id)
   if (nodeIndex === -1) return []
 
   const children = []
-  for (let i = nodeIndex + 1; i < allNodes.value.length; i++) {
-    const item = allNodes.value[i]
-    if (item.level <= node.level) break // Stop at same or higher level
+  for (let i = nodeIndex + 1; i < props.allNodes.length; i++) {
+    const item = props.allNodes[i]
+    if (item.level <= nodeLevel) break // Stop at same or higher level
     if (item.level === nodeLevel + 1) {
       children.push(item)
     }
@@ -159,6 +178,34 @@ const handleSelect = () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.u-tree__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  margin-right: var(--sp-1);
+}
+
+.u-tree__mark--done {
+  background: var(--c-success-soft);
+  color: var(--c-success);
+}
+
+.u-tree__mark--partial {
+  background: var(--c-warning-soft);
+  color: var(--c-warning);
+}
+
+.u-tree__mark--todo {
+  background: var(--c-surface-3);
+  color: var(--c-text-muted);
 }
 
 .u-tree__children {

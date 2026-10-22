@@ -210,14 +210,11 @@ describe('LeftSideMenu: меню не сворачивается', () => {
     localStorage.clear()
   })
 
-  it('пункты видны подписями, без тултипов и без флага свёртки', async () => {
+  it('пункты видны подписями, секции сворачиваются по клику и помнят состояние', async () => {
     const LeftSideMenu = (await import('../../resources/js/Pages/Navigation/LeftSideMenu.vue')).default
     const wrapper = mountPage(LeftSideMenu)
 
-    // Пункты отрисовывает сама LeftSideMenu. Раньше их рендерила
-    // отдельная компонента, где пункт в свёрнутом виде превращался в
-    // безымянную иконку и подсказку показывал только тултип; теперь меню
-    // всегда развёрнуто, подпись есть у каждого пункта.
+    // По умолчанию меню развёрнуто, у каждого пункта есть подпись.
     const items = wrapper.findAll('[data-test="nav-item"]')
     expect(items.length).toBeGreaterThan(0)
 
@@ -225,22 +222,42 @@ describe('LeftSideMenu: меню не сворачивается', () => {
       expect(item.text().trim()).not.toEqual('')
     }
 
-    expect(wrapper.findAllComponents({ name: 'v-tooltip' })).toHaveLength(0)
-    expect(wrapper.vm.collapsed).toBeUndefined()
+    // Сворачивание секции: клик по заголовку прячет её пункты
+    // и сохраняет состояние в localStorage.
+    const sections = wrapper.findAll('.u-nav__section--toggle')
+    expect(sections.length).toBeGreaterThan(0)
+
+    const before = wrapper.findAll('[data-test="nav-item"]').length
+    await sections[0].trigger('click')
+    expect(wrapper.vm.collapsed[Object.keys(wrapper.vm.collapsed)[0]]).toBe(true)
+    expect(localStorage.getItem('ui-nav-collapsed')).toContain('true')
+    expect(wrapper.findAll('[data-test="nav-item"]').length).toBeLessThan(before)
 
     wrapper.unmount()
   })
 
-  it('в компоненте нет ни флагов свёртки, ни сворачиваемых групп', async () => {
+  it('rail-переключатель сворачивает меню до иконок', async () => {
+    const LeftSideMenu = (await import('../../resources/js/Pages/Navigation/LeftSideMenu.vue')).default
+    const wrapper = mountPage(LeftSideMenu)
+
+    expect(wrapper.vm.rail).toBe(false)
+    await wrapper.find('.u-nav__rail-toggle').trigger('click')
+    expect(wrapper.vm.rail).toBe(true)
+    expect(localStorage.getItem('ui-nav-rail')).toBe('1')
+    expect(wrapper.find('nav').classes()).toContain('u-nav--rail')
+
+    wrapper.unmount()
+  })
+
+  it('в компоненте нет сворачиваемых групп и вынесенных рендереров', async () => {
     const source = readFileSync(
       'resources/js/Pages/Navigation/LeftSideMenu.vue',
       'utf8'
     )
 
-    // Регресс: два механизма сворачивания (localStorage-флаги разделов и
-    // collapsed) заставляли меню закрываться само, а scoped-стили
-    // родителя не применялись к вынесенным пунктам — это и были артефакты.
-    expect(source).not.toContain('nav-collapsed')
+    // Регресс: два механизма сворачивания (v-list-group и вынесенный
+    // RenderNavItem) не применяли scoped-стили родителя к пунктам — это
+    // были артефакты. Сворачивание секций теперь своё, на кнопках.
     expect(source).not.toContain('nav-expanded-sections')
     expect(source).not.toContain('<v-list-group')
     // Компонент удалён, меню не должно его импортировать. Именно импорт,

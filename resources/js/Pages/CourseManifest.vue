@@ -239,7 +239,11 @@
                  прямо в DOM, а :style="{ height: '' }" при каждом
                  ре-рендере её затирал — материал схлопывался до 172px
                  после первого же изменения состояния и оставался таким. -->
+            <!-- sandbox: без allow-scripts — сохранённый в материале
+                 HTML не должен исполнять свои скрипты (WYSIWYG-безопасность),
+                 без allow-same-origin — нет доступа к родительскому DOM. -->
             <iframe class="hello px-5" :srcdoc="contentHtml" ref="myIframe" name="iframe_a"
+              sandbox="allow-forms allow-popups"
               @load="onFrameLoad" :style="{ height: frameHeight }"
               width="100%" scrolling="auto" :title="$t('courseManifest.material')">
             </iframe>
@@ -265,6 +269,8 @@ import $api from "../api/httpClient";
 import { unwrapResponse, unwrapArray, unwrapField, numericQuery } from "../api/envelope";
 import { mapState, mapGetters } from "vuex";
 import { toast } from "../composables/useToast";
+import { sanitizeMaterialHtml } from "../utils/sanitizeHtml";
+import { createDocCache } from "../utils/docCache";
 
 export default {
   components: {
@@ -383,59 +389,13 @@ export default {
     this.restoreVisited();
     this.$nextTick(this.bindScroll);
 
-    //this.$store.dispatch("Course/fetchCourse",  { courseId: this.idEdit, categoryId: this.category_id });    
+    // Единый endpoint открытия курса (P0.1): один запрос вместо шести.
+    // Подробности — docs/course-player-performance.md, раздел 2.
+    this.loadPlayerData();
+
     if (!this.aircrafts) {
       this.$store.dispatch("Course/fetchAircrafts");
     }
-    this.$store.dispatch("Course/fetchCourse", { course_id: this.idEdit, category_id: this.idCategory });
-    this.$store.dispatch("Course/fetchCategory", this.idCategory);
-    this.$store.dispatch("Course/fetchCategories");
-    this.$store.dispatch("Course/fetchAircrafts");
-    this.$store.dispatch("Course/fetchAircraft", this.aircraft);
-
-    // --------------------------------загрузка левого меню-------------------------------
-
-    //this.$store.dispatch("Course/fetchCourse", { course_id: this.idEdit, category_id: this.idCategory })
-    $api
-      .get(apiUrl + "/api/course", { params: numericQuery({ course_id: this.idEdit, category_id: this.idCategory }) })
-      .then((response) => {
-        const course = unwrapArray(response)[0] || {};
-        // Раньше здесь был course.title без fallback: при пустом ответе
-        // titleauk становился undefined, и шаблон падал на
-        // titleauk.toUpperCase() с «Cannot read properties of undefined».
-        this.titleauk = course.title || "";
-        this.aukstructures = course.aukstructures || []; // получаем с backEnd все aukstruct для построения меню левого       
-
-        // фильтруем по категориям
-        // Регресс: categoryCode равен null, пока категория не загружена
-        // (в списке курсов idCategory не передаётся вовсе), а вызов
-        // .toString() на нём бросал TypeError. Из-за этого .then()
-        // прерывался до присваивания path/aircraft, и в консоль падала
-        // ошибка при каждом открытии курса.
-        const code = this.categoryCode ? String(this.categoryCode).trim() : '';
-
-        this.filterByCategoryAukstructures = code
-          ? this.aukstructures.filter((aukstructure) => {
-              return aukstructure.categories ? aukstructure.categories.includes(code) : true;
-            }).sort((a, b) => a.id - b.id)
-          : this.aukstructures;
-
-        //this.getfirstauk(this.idEdit);
-        //удалить возможно
-        this.path = course.path; // папка с АУК        
-        this.aircraft = course.aircraft_id;
-
-        // Автооткрытие первого модуля (см. docs/course-player-performance.md §1.2):
-        // без этого страница открывалась пустым кадром до первого клика — часть
-        // воспринимаемой «задержки открытия курса» была именно отсутствием
-        // entry-материала. Открываем, только если пользователь ещё ничего не выбрал.
-        if (!this.activeId && this.getFirstAukId) {
-          this.getlink(this.getFirstAukId);
-        }
-      })
-      .catch((err) => {
-        console.error(err);
-      });
   },
 
   beforeUnmount() {
@@ -450,6 +410,13 @@ export default {
 
   beforeDestroy() {
     document.removeEventListener("keydown", this.onKeydown);
+  },
+
+  created() {
+    // Не реактивен намеренно (см. docCache.js): кэш влияет только на
+    // скорость повторного клика, html в reactive-состоянии тормозил бы
+    // отрисовку списка.
+    this._docCache = createDocCache();
   },
 
   watch: {
@@ -526,19 +493,70 @@ export default {
   // ----------------------------------------- методы --------------------------------------------------
 
   methods: {
+
+    /**
+   * Данные плеера одним запросом (P0.1). Три setState по ответу
+   * соответствуют тому же набору переменных, что заполнял старый
+   * цепочный код: заголовок, дерево, путь, aircraft. При наличии entry
+   * первый материал открывается сразу, без getlink.
+   */
+  async loadPlayerData() {
+    try {
+      const params = this.idCategory ? { category_id: this.idCategory } : {};
+      const response = await $api.get(apiUrl + "/api/course-player/" + this.idEdit, {
+        params: numericQuery(params),
+        stayOnPage: true,
+      });
+      const data = unwrapResponse(response) || {};
+      const course = data.course || {};
+      const tree = data.tree || [];
+
+      // Раньше здесь был course.title без fallback: при пустом ответе
+      // titleauk становился undefined, и шаблон падал на
+      // titleauk.toUpperCase() с «Cannot read properties of undefined».
+      this.titleauk = course.title || "";
+      this.aukstructures = tree;
+      this.filterByCategoryAukstructures = tree;
+      this.path = course.path || "";
+      this.aircraft = course.aircraft_id;
+
+      // Автооткрытие первого модуля: материал отдаёт сам endpoint
+      // (entry), поэтому getlink не вызывается — одна подпись и один
+      // запрос документа на старте.
+      if (!this.activeId && data.entry && data.entry.file) {
+        const target = data.entry;
+        const base = target.signed_base || "";
+        this.activeFile = target.file || "";
+        this.aircraft = course.aircraft_id;
+
+        if (base) {
+          const contentResponse = await $api.get(
+            base + encodeURIComponent(target.file).replace(/%2F/g, "/"),
+            { optional: true }
+          );
+          const html = typeof contentResponse.data === "string" ? contentResponse.data : "";
+          const clean = html ? sanitizeMaterialHtml(html) : "";
+          this.contentHtml = clean ? '<base href="' + base + '" />' + clean : "";
+          this.link = this.contentHtml;
+          this._docCache?.put(this.idEdit, target.aukstructure_id, this.contentHtml);
+          this.markVisited(target.aukstructure_id);
+          this.saveProgress(target.aukstructure_id, 0);
+        }
+      } else if (!this.activeId && this.getFirstAukId) {
+        this.getlink(this.getFirstAukId);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  },
+
+
     /**
      * Стиль узла дерева. Отступ и кегль зависят от уровня (type),
      * остальное — на CSS. Раньше кегль, курсор, цвет и opacity были
      * инлайновыми для каждого из 182 узлов, из-за чего любое изменение
      * состояния перерисовывало дерево целиком.
      */
-    nodeStyle(item) {
-      return {
-        paddingLeft: `${Math.max(0, (item.type - 1) * 12 + 8)}px`,
-        fontSize: `${30 - item.type * 4}px`,
-      };
-    },
-
     isVisited(id) {
       return this.visitedIds.includes(id);
     },
@@ -834,6 +852,16 @@ export default {
       // долгая загрузка не должна оставлять пункт «непосещённым».
       this.markVisited(item_id);
       this.saveProgress(item_id, 0);
+      // P0.3: повторный клик по уже показанному материалу — мгновенный
+      // srcdoc без сети (getlink → signed-url → файл — три RTT).
+      const cached = this._docCache?.get(this.idEdit, item_id);
+      if (cached != null) {
+        this.contentHtml = cached;
+        this.link = cached;
+        this.isLoading = false;
+        this.saveProgress(item_id, this.lessonPercent(item_id));
+        return;
+      }
       try {
         // Контент курсов отдаётся по подписи, а не по auth:sanctum:
         // вложенные ресурсы (CSS/JS/картинки) браузер запрашивает напрямую,
@@ -887,8 +915,13 @@ export default {
           { optional: true }
         );
         const html = typeof contentResponse.data === "string" ? contentResponse.data : "";
-        this.contentHtml = html ? '<base href="' + base + '" />' + html : "";
+        // Двойной барьер поверх sandbox-атрибута iframe: из документа
+        // убираются <script>, инлайновые обработчики on* и javascript:-
+        // ссылки, чтобы сохранённый материал не имел пути к исполнению.
+        const clean = html ? sanitizeMaterialHtml(html) : "";
+        this.contentHtml = clean ? '<base href="' + base + '" />' + clean : "";
         this.link = this.contentHtml;
+        this._docCache?.put(this.idEdit, item_id, this.contentHtml);
         // Урок открыт и прочитан хотя бы частично: серверный прогресс
         // нужен, чтобы «продолжить обучение» работало на другом
         // устройстве, а не только в этом браузере.
@@ -1192,14 +1225,25 @@ export default {
       }
 
       this.isSearching = true;
+      // Отмена прошлого запроса: медленный ответ по «ко» не должен
+      // перебивать быстрые результаты по «кок».
+      this._searchAbort?.abort();
+      this._searchAbort = new AbortController();
       const formData = {
         query: term, path: this.path, aircraft: this.aircraft
       }
 
       try {
-        const response = await $api.post(apiUrl + `/api/search-files/`, formData);
+        const response = await $api.post(apiUrl + `/api/search-files/`, formData, {
+          signal: this._searchAbort?.signal,
+        });
         this.matchingFiles = unwrapArray(response) || [];
       } catch (error) {
+        // Отменённый запрос — не ошибка поиска: прошлый запрос
+        // перебивается новым, пользователю показывать ничего не надо.
+        if (error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError') {
+          return;
+        }
         this.matchingFiles = [];
         toast.error(this.$t("courseManifest.searchError"));
       } finally {

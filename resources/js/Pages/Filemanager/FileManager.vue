@@ -394,14 +394,19 @@
         </v-card-title>
 
         <v-card-text>
-          <v-text-field
-            v-model="nameValue"
+          <FormField
             :label="$t('files.field.name')"
-            :error-messages="nameError"
-            data-test="fm-name-input"
-            :autofocus="true"
-            @keyup.enter="submitName"
-          ></v-text-field>
+            :error="nameError"
+            :required="true"
+          >
+            <v-text-field
+              v-model="nameValue"
+              :placeholder="$t('files.field.name')"
+              data-test="fm-name-input"
+              :autofocus="true"
+              @keyup.enter="submitName"
+            />
+          </FormField>
         </v-card-text>
 
         <v-card-actions class="fm-dialog__actions">
@@ -427,16 +432,20 @@
         <v-card-title class="fm-dialog__title">{{ $t("files.move.title") }}</v-card-title>
 
         <v-card-text>
-          <v-select
-            v-model="moveTarget"
-            :items="moveTargets"
-            item-title="label"
-            item-value="value"
+          <FormField
             :label="$t('files.move.target')"
-            data-test="fm-move-select"
-          ></v-select>
-
-          <p v-if="moveError" class="fm-dialog__error">{{ moveError }}</p>
+            :error="moveError"
+            :required="true"
+          >
+            <v-select
+              v-model="moveTarget"
+              :items="moveTargets"
+              item-title="label"
+              item-value="value"
+              :placeholder="$t('files.move.selectTarget')"
+              data-test="fm-move-select"
+            />
+          </FormField>
         </v-card-text>
 
         <v-card-actions class="fm-dialog__actions">
@@ -577,6 +586,7 @@ import PageHeader from "../../components/ui/PageHeader.vue";
 import DataTable from "../../components/ui/DataTable.vue";
 import EmptyState from "../../components/ui/EmptyState.vue";
 import ConfirmDialog from "../../components/ui/ConfirmDialog.vue";
+import FormField from "../../components/ui/FormField.vue";
 import { toast } from "../../composables/useToast";
 import { extractFieldErrors } from "../../api/envelope";
 import { createUploadQueue, STATUS } from "../../services/chunkUpload";

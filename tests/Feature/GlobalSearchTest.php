@@ -280,16 +280,18 @@ class GlobalSearchTest extends TestCase
 
     public function test_content_search_is_closed_to_trainee(): void
     {
-        // Регресс: маршрут висел только на auth:sanctum, а aircraft и path
-        // приходили из тела запроса — материал чужого курса читался
-        // перебором.
+        // P1.1: права теперь как у открытия курса — записанный обучаемый
+        // ищет в СВОЁМ курсе. Гость курса при существующем курсе получает
+        // 403 от CourseAccess::authorizeOpen; текущий запрос указывает на
+        // несуществующий курс — контроллер отвечает 422 «курс не найден»,
+        // что тоже не раскрывает материал.
         $this->asExistingUser($this->trainee());
 
         $this->postJson('/api/search-files/', [
             'query' => 'компрессор',
             'aircraft' => 1,
             'path' => 'theme',
-        ])->assertStatus(403);
+        ])->assertStatus(422);
     }
 
     public function test_content_search_requires_manager_permission(): void

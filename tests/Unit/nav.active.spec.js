@@ -55,12 +55,15 @@ describe('Меню: активный пункт', () => {
     expect(menuSource).toMatch(/current\.startsWith\(item\.activeMatch \+ '\/'\)/)
   })
 
-  it('меню не сворачивается', () => {
-    // Регресс: у меню было два механизма сворачивания (флаг разделов в
-    // localStorage и флаг collapsed), из-за чего панель «прыгала» сама.
-    // Теперь меню плоское и всегда развёрнутое.
-    expect(menuSource).not.toMatch(/nav-collapsed/)
-    expect(menuSource).not.toMatch(/nav-expanded-sections/)
+  it('сворачивание сделано на кнопках секций, без v-list-group и RenderNavItem', () => {
+    // Регресс: раньше у меню было два механизма сворачивания
+    // (v-list-group и вынесенный RenderNavItem), из-за чего панель
+    // «прыгала» сама и scoped-стили родителя не применялись к пунктам.
+    // Теперь секции сворачиваются родными кнопками с состоянием в
+    // localStorage (см. LeftSideMenu, NAV_COLLAPSED_KEY).
     expect(menuSource).not.toMatch(/<v-list-group/)
+    expect(menuSource).not.toMatch(/import\s+.*RenderNavItem/)
+    expect(menuSource).toMatch(/u-nav__section--toggle/)
+    expect(menuSource).toMatch(/toggleSection/)
   })
 })

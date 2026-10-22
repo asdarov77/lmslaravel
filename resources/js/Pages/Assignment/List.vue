@@ -44,8 +44,6 @@
           <span v-if="item.due_at">· {{ $t('assignments.due') }} {{ formatDate(item.due_at) }}</span>
         </p>
 
-        <!-- Своя работа видна сразу: «сдано или нет» — это и есть
-             главный вопрос обучаемого, а не «есть ли где-то файл». -->
         <p v-if="item.own_submission" class="as-item__status">
           <v-icon icon="mdi-check-circle-outline" size="16" aria-hidden="true" />
           {{ $t('assignments.submitted') }}
@@ -64,77 +62,21 @@
       </article>
     </div>
 
-    <!-- Создание задания -->
-    <v-dialog v-model="editor.open" max-width="620">
+    <!-- Создание/редактирование задания -->
+    <v-dialog v-model="editor.open" max-width="680">
       <v-card>
-        <v-card-title>{{ $t('assignments.createTitle') }}</v-card-title>
+        <v-card-title>{{ isEditing ? $t('assignments.editTitle') : $t('assignments.createTitle') }}</v-card-title>
         <v-card-text>
-          <v-text-field
-            v-model="editor.title"
-            :label="$t('assignments.fieldTitle')"
-            data-test="assignment-title"
-            density="compact"
-          />
-
-          <v-textarea
-            v-model="editor.description"
-            :label="$t('assignments.fieldDescription')"
-            rows="4"
-            data-test="assignment-description"
-            density="compact"
-          />
-
-          <v-select
-            v-model="editor.course_id"
-            :items="courses"
-            item-title="name"
-            item-value="id"
-            :label="$t('assignments.fieldCourse')"
-            data-test="assignment-course"
-            density="compact"
-          />
-
-          <v-select
-            v-model="editor.group_id"
-            :items="groups"
-            item-title="name"
-            item-value="id"
-            :label="$t('assignments.fieldGroup')"
-            data-test="assignment-group"
-            density="compact"
-          />
-
-          <div class="d-flex ga-4">
-            <v-text-field
-              v-model="editor.due_at"
-              :label="$t('assignments.fieldDue')"
-              type="datetime-local"
-              density="compact"
-            />
-            <v-text-field
-              v-model="editor.max_score"
-              :label="$t('assignments.fieldMaxScore')"
-              type="number"
-              min="1"
-              density="compact"
-            />
-          </div>
-
-          <v-switch
-            v-model="editor.publish"
-            :label="$t('assignments.fieldPublish')"
-            color="primary"
-            density="compact"
-            data-test="assignment-publish"
+          <AssignmentForm
+            v-model:editor="editor"
+            :initial-data="editingAssignment"
+            :courses="courses"
+            :groups="groups"
+            :mode="isEditing ? 'edit' : 'create'"
+            @submit="saveAssignment"
+            @cancel="closeEditor"
           />
         </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="editor.open = false">{{ $t('cancel') }}</v-btn>
-          <v-btn color="primary" :loading="saving" data-test="assignment-save" @click="save">
-            {{ $t('save') }}
-          </v-btn>
-        </v-card-actions>
       </v-card>
     </v-dialog>
   </div>
@@ -142,15 +84,11 @@
 
 <script>
 import $api from '../../api/httpClient'
-import { unwrapResponse } from '../../api/envelope'
+import { unwrapResponse, unwrapArray } from '../../api/envelope'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import PageHeader from '../../components/ui/PageHeader.vue'
+import AssignmentForm from '../../components/ui/AssignmentForm.vue'
 
-/**
- * Строки из ответа любой формы: голый массив, конверт { data }, либо
- * пагинатор { data: [...] }. Раньше каждая страница разбирала это по-своему,
- * и половина списков была пустой без видимой причины.
- */
 function rowsOf(payload) {
   if (Array.isArray(payload)) return payload
   if (Array.isArray(payload?.data)) return payload.data
@@ -168,35 +106,24 @@ function rowsOf(payload) {
  */
 export default {
   name: 'AssignmentList',
-  components: { EmptyState, PageHeader },
+  components: { EmptyState, PageHeader, AssignmentForm },
   data() {
     return {
       items: [],
       courses: [],
       groups: [],
       loading: true,
-      saving: false,
-      editor: { open: false, title: '', description: '', course_id: null, group_id: null, due_at: '', max_score: 5, publish: true },
+      editor: { open: false },
+      editingAssignment: null,
     }
   },
   computed: {
-    /**
-     * Может ли пользователь создавать и проверять задания.
-     *
-     * Раньше здесь стояло `Auth/groups.includes('manage')` — геттера с
-     * таким именем не существует, условие всегда было ложным, и кнопка
-     * «Создать задание» не появлялась ни у кого. Теперь используются
-     * штатные геттеры: право ИЛИ роль, как в меню и на дашборде.
-     */
     canManage() {
       const can = this.$store?.getters?.['Auth/can']
       const isSuperAdmin = this.$store?.getters?.['Auth/isSuperAdmin']
 
       if (isSuperAdmin) return true
 
-      // can() уже умеет «любое из прав», но осторожность не лишняя:
-      // если его нет (например, в тесте без полного модуля), остаётся
-      // проверка по правам из state.
       if (typeof can === 'function') {
         return can('grading.manage', 'groups.manage', 'courses.manage')
       }
@@ -204,6 +131,10 @@ export default {
       const perms = this.$store?.state?.Auth?.permissionSlugs || []
 
       return perms.some((slug) => ['grading.manage', 'groups.manage', 'courses.manage'].includes(slug))
+    },
+
+    isEditing() {
+      return !!this.editingAssignment
     },
   },
   async mounted() {
@@ -219,7 +150,7 @@ export default {
 
       try {
         const response = await $api.get('/api/assignments')
-        this.items = unwrapResponse(response) || []
+        this.items = rowsOf(unwrapResponse(response)) || []
       } catch (error) {
         this.items = []
       } finally {
@@ -227,14 +158,6 @@ export default {
       }
     },
 
-    /**
-     * Справочники для формы: курсы и группы.
-     *
-     * Разбор ответа терпимый к обоим видам конверта: unwrapResponse уже
-     * снимает оболочку, поэтому ответ может быть как массивом, так и
-     * пагинатором с data/meta. Раньше бралось `payload.data` от
-     * unwrapped-объекта, и список курсов был пуст всегда.
-     */
     async loadOptions() {
       const [coursesRes, groupsRes] = await Promise.allSettled([
         $api.get('/api/courses', { params: { per_page: 100 } }),
@@ -254,37 +177,29 @@ export default {
     },
 
     openCreate() {
-      this.editor = {
-        open: true,
-        title: '',
-        description: '',
-        course_id: this.courses[0]?.id ?? null,
-        group_id: this.groups[0]?.id ?? null,
-        due_at: '',
-        max_score: 5,
-        publish: true,
-      }
+      this.editingAssignment = null
+      this.editor.open = true
     },
 
-    async save() {
-      this.saving = true
-
-      try {
-        await $api.post('/api/assignments', {
-          title: this.editor.title,
-          description: this.editor.description || null,
-          course_id: this.editor.course_id,
-          group_id: this.editor.group_id,
-          due_at: this.editor.due_at || null,
-          max_score: this.editor.max_score,
-          published_at: this.editor.publish ? new Date().toISOString() : null,
-        })
-
-        this.editor.open = false
-        await this.load()
-      } finally {
-        this.saving = false
+    async saveAssignment(payload) {
+      if (this.isEditing) {
+        await $api.put(`/api/assignments/${this.editingAssignment.id}`, payload)
+      } else {
+        await $api.post('/api/assignments', payload)
       }
+
+      this.closeEditor()
+      await this.load()
+    },
+
+    closeEditor() {
+      this.editor.open = false
+      this.editingAssignment = null
+    },
+
+    async editAssignment(item) {
+      this.editingAssignment = item
+      this.editor.open = true
     },
 
     statusLabel(item) {
@@ -343,7 +258,7 @@ export default {
 }
 
 .as-item__meta {
-  color: var(--text-muted);
+  color: var(--c-text-muted);
   display: flex;
   flex-wrap: wrap;
   font-size: 0.8125rem;

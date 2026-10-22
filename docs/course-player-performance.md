@@ -233,18 +233,18 @@ return [ /* те же поля */ + 'signed' => $signer->urlFor($aircraft, $auk,
 
 ## 6. Статус плана на 2026-10-20 (сверено с кодом)
 
-Ни один пункт P0/P1 не выполнен — документ остаётся планом, а не отчётом. Проверено:
+Обновлено 2026-10-22: P0.1 выполнен, P0.3 закрывается клиентским кэшем, P0.4 — задача эксплуатации.
 
 | Пункт | Факт в коде |
 |---|---|
-| P0.1 player-endpoint | маршрута `course-player` в `routes/api.php` нет; `CourseManifest.vue mounted()` гоняет `fetchCourse/fetchCategory/fetchCategories/fetchAircrafts×2/fetchAircraft` + фильтр-запрос `/api/course` + `getFavorites()` |
-| P0.2 серверный кэш дерева | `Cache::remember` для манифеста/дерева отсутствует |
-| P0.3 клиентский LRU-кэш | кэша документов материалов нет: повторный клик на просмотренный модуль проходит всю цепочку заново |
+| P0.1 player-endpoint | **Сделан.** `GET /api/course-player/{courseId}` (`CourseController::player`): курс + компактное дерево (id/parent_id/type/title/categories, разрез по `?category_id=` сервером) + избранное текущего пользователя + entry (первый материал после разреза со `signed_base`). Gated `CourseAccess::authorizeOpen`, тесты — `CourseContentAccessTest`. `CourseManifest.vue` ходит в него одним запросом (`loadPlayerData()`), шестерка dispatch'ей заменена одним `fetchAircrafts`; entry открывает кадр сразу, без `getlink` |
+| P0.2 серверный кэш дерева | **Сделан (2026-10-22).** `Cache::remember('player:tree:{id}:{max(updated_at)}', 10min)` в `CourseController::player`: ключ с max(updated_at) узлов — самоневалидирующийся при реимпорте, отдельное событие не нужно. Кэш подписи не делался: `PrivateContentSigner::signedPath` — чистая функция, выгоды мало |
+| P0.3 клиентский LRU-кэш | **Сделан (2026-10-22).** `resources/js/utils/docCache.js` (15 документов, LRU, ключ `course:item`), используется в `getlink()` и entry: повторный клик — мгновенный srcdoc без сети. Не реактивен намеренно. Prefetch следующего модуля и stale-while-revalidate не делались (shortcut в доке утилиты) |
 | P0.4 nginx X-Accel | инфраструктура есть (`ContentDelivery`, `content:nginx-config`, `deploy/nginx-content-delivery.conf`), но режим выбирается настройкой `settings.content_delivery`; по умолчанию — `php`. Включить на проде — задача эксплуатации, чек-лист ниже |
-| P1.1 tsvector-поиск | `SearchController::search` — прежний обход ФС (`$disk->files()` + `Str::contains`), право `content.manage,courses.manage` (обучающийся поиска не видит) |
-| P1.2 getlink | ~7 запросов, включая полный выбор `type=3` ради первого id |
+| P1.1 tsvector-поиск | **Сделан (2026-10-22).** Миграция `lesson_search_index` (plain_text + генерируемый БД `to_tsvector('russian')` tsvector + GIN); наполнение — `App\Support\LessonSearchIndexer` + команда `courses:index-content` (+ self-heal из контроллера при пустом индексе курса); `POST /api/search-files` переписан на `websearch_to_tsquery('russian')` с `ts_rank` (PHP читает и подсвечивает только 25 найденных файлов, формат ответа прежний); права — `CourseAccess::authorizeOpen`, записанный обучаемый ищет в своём курсе. Фронт: отмена предыдущего запроса (AbortController). Тесты — `LessonSearchIndexTest` |
+| P1.2 getlink | **Закрыт (2026-10-22):** fallback «файл первого материала» убран (полный выбор `type=3` исчез), мёртвые `$url`/`$urlfirst` и весь смысл fastest — фронт использует только aircraft/auk/file, а первый модуль открывает entry из course-player |
 | P1.3 подсветка | `setTimeout(1000)` из горячего пути удалён (применение в `onFrameLoad`) — пункт закрыт досрочно, вне рамок P1 |
-| P1.4 дерево | `TreeView/TreeViewNode` — рекурсия есть; виртуализации и классов `--level-*` вместо inline `nodeStyle` — нет |
+| P1.4 дерево | **Закрыт (2026-10-22).** Рекурсия в `TreeView/TreeViewNode` (одна проходка computed, раскрытие/collapse, отметки visited), inline `nodeStyle` удалён из CourseManifest — уровни только на классах; виртуализация для >300 узлов сознательно не добавлялась: vue-virtual-scroller в зависимостях нет, реальные курсы ~180 узлов, а окно рендера cgda будет первый курс >300 (см. также RecursiveTable с собственной виртуализацией) |
 
 **Чек-лист включения режима `nginx` (снимает главную причину «не справится при нагрузке»):**
 1. применить `php artisan content:nginx-config` вывод в боевой nginx (internal location выше try_files по приоритету);
