@@ -106,6 +106,8 @@ class TutorClient
             'options' => [
                 'temperature' => (float) config('tutor.temperature', 0.4),
                 'num_predict' => $maxTokens,
+                'num_ctx' => (int) config('tutor.num_ctx', 8192),
+                'repeat_penalty' => (float) config('tutor.repeat_penalty', 1.05),
             ],
         ];
 

@@ -15,7 +15,6 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { createRouter, createWebHistory } from 'vue-router'
 
 const http = vi.hoisted(() => ({
   get: vi.fn(),
@@ -38,15 +37,6 @@ import en from '../../resources/js/locales/en.json'
 import AddClass, { toClassPath, extractApiError } from '../../resources/js/Pages/Course/AddClass.vue'
 
 const vuetify = createVuetify({ components: vuetifyComponents, directives: vuetifyDirectives })
-
-// Create a minimal router for tests that use useRoute()
-const router = createRouter({
-  history: createWebHistory(),
-  routes: [
-    { path: '/', name: 'home' },
-    { path: '/classes', name: 'air.store', meta: { breadcrumbs: [] } },
-  ],
-})
 // Страница переведена на $t, поэтому i18n нужен как плагин:
 // опция верхнего уровня из VTU v1 молча игнорируется.
 const i18n = createI18n({
@@ -85,9 +75,10 @@ const mountPage = () =>
     store,
     vuetify,
     global: {
-      plugins: [i18n, router],
+      plugins: [i18n],
       mocks: {
         $store: store,
+        $route: { params: {}, query: {} },
         $router: { go: back, back, push: vi.fn() },
       },
       stubs: {

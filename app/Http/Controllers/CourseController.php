@@ -270,10 +270,29 @@ class CourseController extends Controller
             ->orderByRaw('coalesce(position, id)');
 
         /*
-         * P0.2: дерево в кэше, ключ с max(updated_at) узлов курса —
-         * самоневалидирующийся: любой реимпорт структуры меняет updated_at
-         * и превращает старый ключ в мусор, отдельное событие не нужно.
+         * P0.1: серверный прогресс — единственный источник истины.
+         * Читаем прогресс пользователя по курсу из lesson_progress.
+         * visited — множество просмотренных lesson_id,
+         * percents — карта percent по lesson_id,
+         * last_lesson_id / last_file — точка отклика чтения.
          */
+        $userId = $request->user()?->id;
+        $progress = [];
+        if ($userId) {
+            $progressRows = DB::table('lesson_progress')
+                ->where('user_id', $userId)
+                ->where('course_id', $course->id)
+                ->get(['lesson_id', 'percent', 'last_file', 'last_anchor'])
+                ->keyBy('lesson_id');
+            foreach ($progressRows as $row) {
+                $progress[(int) $row->lesson_id] = [
+                    'percent' => (int) $row->percent,
+                    'last_file' => $row->last_file,
+                    'last_anchor' => $row->last_anchor,
+                ];
+            }
+        }
+
         $stamp = DB::table('aukstructures')
             ->where('course_id', $course->id)
             ->max('updated_at');
@@ -311,6 +330,21 @@ class CourseController extends Controller
             ->where('user_id', $request->user()?->id)
             ->get(['id', 'course_id', 'title']);
 
+        // Собираем прогресс по видимым узлам дерева
+        $progressByNode = [];
+        foreach ($visible as $node) {
+            $nodeId = (int) $node->id;
+            if (isset($progress[$nodeId])) {
+                $progressByNode[$nodeId] = $progress[$nodeId];
+            } else {
+                $progressByNode[$nodeId] = [
+                    'percent' => 0,
+                    'last_file' => null,
+                    'last_anchor' => null,
+                ];
+            }
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -328,6 +362,12 @@ class CourseController extends Controller
                     'title' => $auk->title,
                     'categories' => $auk->categories,
                     'position' => $auk->position,
+                    // Поля прогресса — новые, читаются с сервера
+                    'progress' => $progressByNode[$auk->id] ?? [
+                        'percent' => 0,
+                        'last_file' => null,
+                        'last_anchor' => null,
+                    ],
                 ]),
                 'favorites' => $favorites,
                 'entry' => $entry,

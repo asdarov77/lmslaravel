@@ -396,29 +396,29 @@
         <v-card-text>
           <FormField
             :label="$t('files.field.name')"
-            :error="nameError"
+            :error="nameForm.errors.name"
             :required="true"
           >
             <v-text-field
-              v-model="nameValue"
+              v-model="nameForm.values.name"
               :placeholder="$t('files.field.name')"
               data-test="fm-name-input"
               :autofocus="true"
-              @keyup.enter="submitName"
+              @keyup.enter="handleNameSubmit"
             />
           </FormField>
         </v-card-text>
 
         <v-card-actions class="fm-dialog__actions">
-          <v-btn variant="text" :disabled="saving" @click="nameDialog = false">
+          <v-btn variant="text" :disabled="nameForm.submitting" @click="nameDialog = false">
             {{ $t("common.cancel") }}
           </v-btn>
           <v-btn
             color="primary"
             variant="flat"
-            :loading="saving"
+            :loading="nameForm.submitting"
             data-test="fm-name-submit"
-            @click="submitName"
+            @click="handleNameSubmit"
           >
             {{ $t("common.save") }}
           </v-btn>
@@ -427,18 +427,18 @@
     </v-dialog>
 
     <!-- Перемещение: файлы выделенные, иначе — те, что нажали в строке -->
-    <v-dialog v-model="moveDialog" max-width="480" role="dialog">
+    <v-dialog v-model="moveDialog.value" max-width="480" role="dialog">
       <v-card>
         <v-card-title class="fm-dialog__title">{{ $t("files.move.title") }}</v-card-title>
 
         <v-card-text>
           <FormField
             :label="$t('files.move.target')"
-            :error="moveError"
+            :error="moveError.value"
             :required="true"
           >
             <v-select
-              v-model="moveTarget"
+              v-model="moveForm.values.target"
               :items="moveTargets"
               item-title="label"
               item-value="value"
@@ -449,15 +449,15 @@
         </v-card-text>
 
         <v-card-actions class="fm-dialog__actions">
-          <v-btn variant="text" :disabled="saving" @click="moveDialog = false">
+          <v-btn variant="text" :disabled="moveForm.submitting" @click="moveDialog.value = false">
             {{ $t("common.cancel") }}
           </v-btn>
           <v-btn
             color="primary"
             variant="flat"
-            :loading="saving"
+            :loading="moveForm.submitting"
             data-test="fm-move-submit"
-            @click="submitMove"
+            @click="handleMoveSubmit"
           >
             {{ $t("files.move.submit") }}
           </v-btn>
@@ -582,6 +582,7 @@
 </template>
 
 <script>
+import { ref } from 'vue';
 import PageHeader from "../../components/ui/PageHeader.vue";
 import DataTable from "../../components/ui/DataTable.vue";
 import EmptyState from "../../components/ui/EmptyState.vue";
@@ -589,6 +590,7 @@ import ConfirmDialog from "../../components/ui/ConfirmDialog.vue";
 import FormField from "../../components/ui/FormField.vue";
 import { toast } from "../../composables/useToast";
 import { extractFieldErrors } from "../../api/envelope";
+import useForm from "../../composables/useForm";
 import { createUploadQueue, STATUS } from "../../services/chunkUpload";
 import {
   fetchFolderContents,
@@ -654,12 +656,6 @@ export default {
       /** Ключи выделенных строк: 'f:12' (папка) и 'd:34' (файл). */
       selected: [],
 
-      nameDialog: false,
-      nameDialogMode: "create",
-      nameValue: "",
-      nameError: null,
-      nameTarget: null,
-
       moveDialog: false,
       moveTarget: 0,
       moveTargets: [],
@@ -692,6 +688,58 @@ export default {
       /** Очередь — обычное свойство компонента, в data() ему не место. */
       queue: null,
     };
+  },
+
+  setup() {
+    const nameDialogMode = ref("create");
+    const nameTarget = ref(null);
+    const nameForm = useForm({
+      fields: ["name"],
+      initialValues: { name: "" },
+      draftKey: "filemanager-name-dialog",
+      draftDelay: 500,
+      validate: (values) => {
+        if (!values.name?.trim()) {
+          return { name: "Имя не может быть пустым" };
+        }
+        return true;
+      },
+      onSubmit: async ({ values }) => {
+        return values.name.trim();
+      },
+    });
+
+    const nameDialog = ref(false);
+    const nameError = ref(null);
+    const moveDialog = ref(false);
+    const moveError = ref(null);
+    const moveForm = useForm({
+      fields: ["target"],
+      initialValues: { target: 0 },
+      validate: (values) => {
+        return true; // target=0 (root) is valid, no required validation needed
+      },
+    });
+
+    const openCreateFolder = () => {
+      nameForm.setValues({ name: "" });
+      nameForm.clearErrors();
+      nameDialog.value = true;
+      nameError.value = null;
+      nameDialogMode.value = "create";
+      nameTarget.value = null;
+    };
+
+    const openRename = (row) => {
+      nameForm.setValues({ name: row.name });
+      nameForm.clearErrors();
+      nameDialog.value = true;
+      nameError.value = null;
+      nameDialogMode.value = "rename";
+      nameTarget.value = row;
+    };
+
+    return { nameForm, nameDialog, nameError, nameDialogMode, nameTarget, openCreateFolder, openRename, moveForm, moveDialog, moveError };
   },
 
   computed: {
@@ -985,57 +1033,30 @@ export default {
     // Папки и переименование
     // -----------------------------------------------------------------
 
-    openCreateFolder() {
-      this.nameDialogMode = "create";
-      this.nameTarget = null;
-      this.nameValue = "";
-      this.nameError = null;
-      this.nameDialog = true;
-    },
-
-    openRename(row) {
-      this.nameDialogMode = "rename";
-      this.nameTarget = row;
-
-      // Расширение у файла — часть имени, но редактировать его в том же
-      // поле неудобно: пользователь чаще меняет основную часть. Показываем
-      // полное имя — иначе «переименовать в» и «переименовать файл» будут
-      // означать разное.
-      this.nameValue = row.name;
-      this.nameError = null;
-      this.nameDialog = true;
-    },
-
-    async submitName() {
-      const name = this.nameValue.trim();
-
-      if (name === "") {
-        this.nameError = this.$t("files.errors.emptyName");
-        return;
-      }
+    async handleNameSubmit() {
+      const name = await nameForm.submit();
+      if (!name) return;
 
       this.saving = true;
-      this.nameError = null;
+      nameError.value = null;
 
       try {
         if (this.nameDialogMode === "create") {
           await createFolder(name, this.folderId);
           this.notify(this.$t("files.folder.created", { name }), "success");
-        } else if (this.nameTarget.kind === "folder") {
+        } else if (this.nameTarget?.kind === "folder") {
           await renameFolder(this.nameTarget.id, name);
           this.notify(this.$t("files.renamed", { name }), "success");
-        } else {
+        } else if (this.nameTarget) {
           await renameFile(this.nameTarget.id, name);
           this.notify(this.$t("files.renamed", { name }), "success");
         }
 
-        this.nameDialog = false;
+        nameDialog.value = false;
         await this.load();
       } catch (error) {
-        // Текст ошибки с поля «name» показывается у поля, а не в общем
-        // сообщении: пользователь смотрит на диалог, а не на тост.
         const { fields, general } = extractFieldErrors(error, this.$t("files.errors.save"));
-        this.nameError = fields.name ?? general;
+        nameError.value = fields.name ?? general;
       } finally {
         this.saving = false;
       }
@@ -1057,8 +1078,8 @@ export default {
       if (!rows.length) return;
 
       this.moveRows = rows;
-      this.moveTarget = 0;
-      this.moveError = null;
+      moveForm.setValues({ target: 0 });
+      moveError.value = null;
 
       try {
         const response = await fetchFolderTree();
@@ -1077,23 +1098,22 @@ export default {
             })),
         ];
 
-        this.moveDialog = true;
+        moveDialog.value = true;
       } catch (error) {
         const { general } = extractFieldErrors(error, this.$t("files.errors.move"));
         this.notify(general, "error");
       }
     },
 
-    async submitMove() {
+    async handleMoveSubmit() {
       if (!this.moveRows.length) return;
 
       // 0 — корень. Числом, а не null, потому что v-select пустым
       // значением считал бы «ничего не выбрано» и не дал отправить
       // запрос в корень.
-      const target = Number(this.moveTarget) === 0 ? null : Number(this.moveTarget);
+      const target = Number(moveForm.values.target) === 0 ? null : Number(moveForm.values.target);
 
-      this.saving = true;
-      this.moveError = null;
+      moveError.value = null;
 
       try {
         const folders = this.moveRows.filter((row) => row.kind === "folder");
@@ -1107,14 +1127,12 @@ export default {
           await moveFiles(files.map((row) => row.id), target);
         }
 
-        this.moveDialog = false;
+        moveDialog.value = false;
         await this.load();
         this.notify(this.$t("files.moved"), "success");
       } catch (error) {
         const { fields, general } = extractFieldErrors(error, this.$t("files.errors.move"));
-        this.moveError = fields.folder_id ?? general;
-      } finally {
-        this.saving = false;
+        moveError.value = fields.folder_id ?? general;
       }
     },
 
