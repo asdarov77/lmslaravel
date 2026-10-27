@@ -9,6 +9,13 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\Favorite;
 use App\Models\Aukstructure;
 
+/**
+ * Избранное текущего пользователя (таблица favorites).
+ *
+ * fav_add и remove фильтруют по Auth::id(). index отдаёт Favorite::all()
+ * БЕЗ фильтра по пользователю — это известная дыра: список избранного
+ * показывает чужие записи. Лечится только явным where('user_id', ...).
+ */
 class FavoriteController extends Controller
 {   
 

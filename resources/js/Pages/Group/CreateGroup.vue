@@ -1,126 +1,143 @@
 <template>
-  <v-flex xs12 sm8 md4>
-    <v-card class="elevation-12 mx-auto">
-      <v-toolbar color="primary">        
-        <v-toolbar-title>Добавить группу </v-toolbar-title>        
-      </v-toolbar>
-      <v-card-text>
-        <v-form v-on:@submit.prevent="submitForm">
-          <v-text-field
-            label="наименование группы"
-            type="text"
-            v-model="groupname"
-          ></v-text-field>
-          <v-text-field
-            label="описание группы"
-            type="text"
-            v-model="groupdescription"
-          ></v-text-field>
+  <div class="u-page">
+    <FormCard
+      :heading-level="1"
+      :title="t('groups.create.title')"
+      :subtitle="t('groups.create.subtitle')"
+      :busy="form.submitting.value"
+      :submit-text="t('common.create')"
+      @submit="submitForm"
+      @cancel="cancel"
+    >
+      <!--
+        Общая ошибка сервера (не 422): показываем здесь, а не над каждым
+        полем. Ошибки конкретных полей useForm раскладывает по form.errors
+        и подсвечивает поле само.
+      -->
+      <v-alert
+        v-if="form.serverError.value"
+        type="error"
+        variant="tonal"
+        class="mb-4"
+        :text="form.serverError.value"
+      />
 
-          <v-container class="notification is-danger" v-if="errors.length">
-            <!--class="has-text-centered"> -->
-            <p v-for="error in errors" v-bind:key="error">
-              {{ error }}
-            </p>
-          </v-container>
-        </v-form>
-      </v-card-text>
-      <v-card-actions>
-        <v-spacer></v-spacer>
-        <v-btn v-on:click="submitForm" color="primary">Сохранить</v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-flex>
+      <FormField
+        :label="t('groups.create.name')"
+        :error="form.errors.groupname"
+        :required="form.isRequired('groupname')"
+        name="groupname"
+      >
+        <v-text-field
+          v-bind="form.bind('groupname')"
+          :placeholder="t('groups.create.namePlaceholder')"
+          autofocus
+        />
+      </FormField>
+
+      <FormField
+        :label="t('groups.create.description')"
+        :error="form.errors.groupdescription"
+        name="groupdescription"
+      >
+        <AutosizeTextarea
+            :label-id="`field-groupdescription-label`"
+          v-model="form.values.groupdescription"
+          :maxlength="255"
+          :rows="3"
+          :placeholder="t('groups.create.descriptionPlaceholder')"
+          @blur="form.validateField('groupdescription')"
+        />
+      </FormField>
+
+      <p v-if="form.draftSavedAt.value" class="u-draft-hint">
+        <v-icon icon="mdi-content-save-check-outline" size="16" aria-hidden="true" />
+        {{ t('common.draftSaved') }}
+      </p>
+    </FormCard>
+  </div>
 </template>
 
-<script>
-import { mapState, mapGetters } from 'vuex'
+<script setup>
+import { useI18n } from 'vue-i18n'
+import { useStore } from 'vuex'
+import { useRouter } from 'vue-router'
+import FormCard from '../../components/ui/FormCard.vue'
+import FormField from '../../components/ui/FormField.vue'
+import AutosizeTextarea from '../../components/ui/fields/AutosizeTextarea.vue'
+import useForm from '../../composables/useForm'
+import useLeaveGuard from '../../composables/useLeaveGuard'
+import { required, maxLength, unique } from '../../composables/validation/rules'
+import { asArray } from '../../api/envelope'
+import { toast } from '../../composables/useToast'
 
-export default {
-  //props: ["idEdit"],
-  // props: 
-  // {
-  //   idEdit: {
-  //     type: Number,
-  //     required: true
-  //   },
-  // }, 
-  data() {
-    return {
-      groupname: '',
-      groupdescription: '',
-      //group: [], // группа с указанным ID из базы данных
-      errors: [],
-    }
-  },
-  computed: {
-    ...mapState('User', ['allGroups','users']),    
-    ...mapGetters('User', ['users','groups']),
-  },
+/**
+ * Создание группы.
+ *
+ * Переведена на useForm (Фаза 2): вместо ручного `fieldErrors` —
+ * объект-схема; вместо `if (!this.errors.length)` (где массив ошибок
+ * нигде не наполнялся) — проверка правил до запроса; серверный 422
+ * раскладывается по полям, а не висит одним блоком; уход с формы
+ * требует подтверждения; длинное описание автосохраняется как черновик.
+ */
+const { t } = useI18n()
+const store = useStore()
+const router = useRouter()
 
-  created() {   
-    
-    //if(this.idEdit){
-      //console.log(this.idEdit, 'id')
-      //this.$store.dispatch('User/fetchGroup', this.idEdit)      
-     
-    //}   
-  },
-
-  methods: {
-    submitForm: function () {      
-      if (!this.errors.length) {
-        const formData = {
-          groupname: this.groupname,
-          groupdescription: this.groupdescription,
-          
-        };          
-        this.$store                
-        .dispatch('User/createGroup', {...formData})
-        .then(() => { 
-        })
-        .catch(error => {
-          console.error(error)
-        })        
-        .finally(() => this.$router.back())            
-        }
-
-
-        // if(this.idEdit){        
-        // //axios
-        // $api        
-        //   .put("/api/groups/" + this.idEdit, formData)
-        //   .then((response) => {
-        //     console.log(response);
-        //      this.$router.push("/groups/list");
-        //   })
-        // }
-        // else
-        // $api
-        // //axios 
-        // .post("/api/groups/", formData)
-        //   .then((response) => {
-        //     console.log(response);
-        //      this.$router.push("/groups/list");
-        //   })
-        //   .catch((error) => {
-        //     if (error.response) {
-        //       for (const property in error.response.data) {
-        //         this.errors.push(
-        //           `${property}: ${error.response.data[property]}`
-        //         );
-        //       }
-
-        //       console.log(JSON.stringify(error.response.data));
-        //     } else if (error.message) {
-        //       this.errors.push("Something went wrong. Please try again");
-        //       console.log(JSON.stringify(error));
-        //     }
-        //   });
-      }
+const form = useForm({
+  schema: {
+    groupname: {
+      initial: '',
+      rules: [
+        required(t('groups.create.errors.nameRequired')),
+        maxLength(255, t('groups.create.errors.nameTooLong')),
+        // Уникальность проверяем по уже загруженному списку групп.
+        unique(() => asArray(store.state.User.allGroups), {
+          by: 'groupname',
+          message: t('groups.create.errors.nameTaken'),
+        }),
+      ],
     },
-  //},
-};
+    groupdescription: {
+      initial: '',
+      rules: [maxLength(255, t('groups.create.errors.descriptionTooLong'))],
+    },
+  },
+
+  draftKey: 'groups.create',
+
+  onSubmit: async ({ values }) => {
+    await store.dispatch('User/createGroup', {
+      groupname: values.groupname.trim(),
+      groupdescription: values.groupdescription.trim(),
+    })
+
+    toast.success(t('groups.create.done'))
+    await router.push('/groups/list')
+  },
+})
+
+const { confirmLeave } = useLeaveGuard(() => form.dirty.value, { message: t('common.leaveConfirm') })
+
+const submitForm = () => {
+  form.submit()
+}
+
+const cancel = async () => {
+  // Подтверждаем ДО router.back(): браузер сдвигает историю мгновенно,
+  // и отменённый guard оставлял бы в адресной строке чужой маршрут,
+  // пока на экране ещё форма.
+  if (await confirmLeave()) router.back()
+}
 </script>
 
-<style></style>
+<style scoped>
+.u-draft-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+</style>

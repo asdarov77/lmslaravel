@@ -4,6 +4,9 @@ namespace App\Http\Requests\Aukstructure;
 
 use Illuminate\Foundation\Http\FormRequest;
 
+/**
+ * Валидация фильтров структуры АУК: course_id, parent_id, type как int.
+ */
 class FilterRequest extends FormRequest
 {
     /**

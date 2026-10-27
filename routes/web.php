@@ -61,8 +61,60 @@ Route::post( 'secret', function(){
 });
 
 
-// Route::fallback(function() {
-//     return redirect('api/') ;
-// });
+// Fallback для SPA: все не-API маршруты отдают index.html,
+// чтобы роутер на фронтенде мог обработать их сам.
+// Без этого прямые переходы и обновление страниц на вложенных
+// маршрутах (/course/16, /courses/list и т.п.) давали 404.
+/*
+ * Fallback не тянет сессионное middleware.
+ *
+ * Маршрут объявлен в группе web, а через него проходят и запросы к
+ * /api/*, для которых маршрут не нашёлся. StartSession и
+ * AuthenticateSession на таких запросах обращаются к сессионному
+ * guard'у, а у него нет метода viaRemember: неизвестный путь /api/*
+ * падал с 500 вместо честного 404. Сама проверка кода и разбора
+ * методов сессии не нужна, поэтому middleware снимаются точечно, а
+ * вся группа web — нет.
+ */
+Route::fallback(function () {
+    if (request()->is('api/*')) {
+        // Fallback регистрируется как обычный маршрут и срабатывает на
+        // ЛЮБОЙ метод, поэтому он «съедал» 405: GET /api/city (а маршрут
+        // объявлен только POST) возвращал 404 вместо 405 и клиент не мог
+        // отличить неверный путь от неверного метода.
+        $uri = trim(request()->path(), '/');
+        $methods = collect(Route::getRoutes()->getRoutes())
+            ->filter(fn ($route) => $route->uri() === $uri)
+            ->flatMap(fn ($route) => $route->methods())
+            ->reject(fn ($method) => in_array($method, ['HEAD', 'OPTIONS'], true))
+            ->unique()
+            ->values();
+
+        if ($methods->isNotEmpty()) {
+            return response()->json([
+                'success' => false,
+                'data'    => null,
+                'error'   => 'Метод не поддерживается',
+                'meta'    => ['allowed' => $methods->all()],
+            ], 405);
+        }
+
+        return response()->json([
+            'success' => false,
+            'data'    => null,
+            'error'   => 'Маршрут не найден',
+            'meta'    => null,
+        ], 404);
+    }
+
+    return app(SinglePageController::class)->index();
+})->withoutMiddleware([
+    // Сессия и её проверка на /api/* не нужны и вредны: guard по
+    // умолчанию здесь sanctum, у него нет viaRemember, и любой
+    // несуществующий путь /api/* отвечал 500 вместо 404.
+    \Illuminate\Session\Middleware\StartSession::class,
+    \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+    \Illuminate\Session\Middleware\AuthenticateSession::class,
+]);
 
 

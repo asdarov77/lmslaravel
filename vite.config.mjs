@@ -39,6 +39,7 @@ export default defineConfig({
     },
 
     server: {
+        host: '127.0.0.1',
         watch: {
             // не следить за PHP-зависимостями (экономит лимит inotify-наблюдателей)
             ignored: ['**/vendor/**', '**/storage/**', '**/node_modules/**'],
@@ -50,6 +51,15 @@ export default defineConfig({
         environment: 'jsdom',
         include: ['tests/Unit/**/*.spec.js', 'resources/js/**/*.spec.js'],
         exclude: ['tests/E2E/**', 'node_modules/**', 'vendor/**'],
+        setupFiles: ['tests/Unit/setup.js'],
+        server: {
+            deps: {
+                // Vuetify тянет .css, которые Node-раннер не умеет импортировать.
+                // В тестах CSS не нужен — отдаём пустой модуль.
+                inline: [/vuetify/],
+            },
+        },
+        css: false,
     },
 
 

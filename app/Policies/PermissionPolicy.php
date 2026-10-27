@@ -6,6 +6,13 @@ use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
+/**
+ * Устаревшая заглушка.
+ *
+ * Доступ к сущности Permission проверяется строковым правом manage-users,
+ * view/create/restore/forceDelete возвращают null. Реальные правила управления
+ * правами живут в PermissionScope и PermissionCatalog.
+ */
 class PermissionPolicy
 {
     use HandlesAuthorization;

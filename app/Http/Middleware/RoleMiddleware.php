@@ -5,6 +5,14 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 
+/**
+ * Алиас `role` зарегистрирован в Kernel, но handle() целиком
+ * закомментирован: класс нерабочий и ничего не проверяет.
+ *
+ * Оставлен, потому что на маршрутах роль проверяют политики (Gate) и
+ * HasRolesAndPermissions, а не этот middleware. Удалять нужно вместе с
+ * упоминанием в Kernel.
+ */
 class RoleMiddleware
 {
     /**

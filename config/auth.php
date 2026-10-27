@@ -37,10 +37,21 @@ return [
     */
 
     'guards' => [
+        /*
+         * Веб-гард — сессионный.
+         *
+         * Раньше здесь стоял закомментированный 'driver' => 'sanctum',
+         * и это выглядело как «sanctum выключен». На самом деле
+         * auth:sanctum работает через СВОЙ гард, который Sanctum
+         * регистрирует сам, и он не зависит от настройки web-гарда.
+         *
+         * Важно: Auth::user() в middleware API вернёт null, потому что
+         * гард по умолчанию — web (сессионный), а у API-запросов нет
+         * сессии. Поэтому в CheckUserPermission используется
+         * $request->user(), а не Auth::user().
+         */
         'web' => [
-            'driver' => 'session',  //orig
-//            'driver' => 'sanctum',
-//          'driver' => 'token',
+            'driver' => 'session',
             'provider' => 'users',
         ],
 

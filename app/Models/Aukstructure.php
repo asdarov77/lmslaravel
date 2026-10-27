@@ -7,11 +7,17 @@ use Illuminate\Database\Eloquent\Model;
 
 
 
+/**
+ * Модуль курса (aukstructures) с самоссылкой parent/children.
+ *
+ * Иерархия используется в LessonsController для построения дерева тем и в
+ * Exam как пара отбора вопросов вместе со специальностью.
+ */
 class Aukstructure extends Model
 {
     use HasFactory;
     use Filterable;
-    protected $fillable = ['title','course_id','parent_id','type','description','categories','identifier'];
+    protected $fillable = ['title','course_id','parent_id','type','position','description','categories','identifier'];
 
     public function categories()
     {

@@ -6,10 +6,18 @@ use App\Http\Filters\Group2learningFilter;
 use App\Http\Requests\Group2learning\FilterRequest;
 use Illuminate\Http\Request;
 use App\Models\Group2learning;
+use App\Policies\Group2learningPolicy;
 
 
 
 
+/**
+ * CRUD учебных записей «группа записана на курс в рамках специальности».
+ *
+ * store делегирует AuthController::group2learning: валидация и транзакция
+ * должны быть в одном месте, иначе массовая запись и одиночная разойдутся.
+ * Область видимости — Group2learningPolicy::scopeQuery.
+ */
 class Group2learningController extends Controller
 {
     /**
@@ -17,13 +25,31 @@ class Group2learningController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
+    /**
+     * Список записей на курсы.
+     *
+     * Раньше возвращались ВСЕ строки таблицы любому авторизованному:
+     * маршрут висел только на auth:sanctum. То есть обучаемый мог
+     * перечислить учебные планы чужих групп — кто на какой курс записан
+     * и когда. Это учебные данные другого человека.
+     *
+     * Теперь выдача ограничена областью видимости, а не только фактом
+     * входа: обучаемый видит свою группу, тот, у кого есть users.courses
+     * (методист), — все группы. Так же, как с каталогом курсов.
+     */
     public function index(FilterRequest $request)
+    {
+        $data = $request->validated();
+        $filter = app()->make(Group2learningFilter::class, ['queryParams' => array_filter($data)]);
+        $query = Group2learning::filter($filter);
 
-    {    
-            $data = $request->validated();
-            $filter = app()->make(Group2learningFilter::class, ['queryParams' => array_filter($data)]);
-            $learnings = Group2learning::filter($filter)->get();
-            return $learnings;         
+        // Область видимости описана в Group2learningPolicy: администратор
+        // и методист (users.courses) видят все группы, остальные — свою.
+        // Правило было продублировано прямо здесь, из-за чего show($id)
+        // остался без него и отдавал чужие записи по перебору id.
+        $query = Group2learningPolicy::scopeQuery(auth('sanctum')->user(), $query);
+
+        return $query->get();
     }
 
 
@@ -40,25 +66,24 @@ class Group2learningController extends Controller
 
 
     /**
-     * Show the form for creating a new resource.
+     * Создание записи через RESTful-маршрут POST /api/learning.
      *
-     * @return \Illuminate\Http\Response
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
+     * Метод был пустой заглушкой и возвращал 200, НИЧЕГО не записывая.
+     * Это худший вид поломки: клиент (в том числе автотесты) получал
+     * «успех», а учебный план оставался пустым — запись группы молча
+     * терялась.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
+     * Валидацию и саму запись переиспользуем у AuthController@group2learning:
+     * там она уже исправлялась (пустые course_id, нечисловые id, NOT NULL,
+     * транзакция против частичной записи, контракт ответа), и дублировать
+     * её во второй раз — значит завести два разных поведения на одну
+     * операцию.
      */
     public function store(Request $request)
     {
-        //
+        return app(AuthController::class)->group2learning($request);
     }
+
 
     /**
      * Display the specified resource.
@@ -68,7 +93,17 @@ class Group2learningController extends Controller
      */
     public function show($id)
     {
-        $learnings = Group2learning::find($id);
+        // Раньше здесь был `Group2learning::find($id);` без return —
+        // метод всегда отдавал null, то есть 200 с пустым телом вместо
+        // самой записи.
+        $learning = Group2learning::findOrFail($id);
+
+        // Маршрут висел только на auth:sanctum, поэтому любой вошедший
+        // читал чужую учебную запись по идентификатору, даже когда
+        // index был уже ограничен своей группой.
+        $this->authorize('view', $learning);
+
+        return $learning;
     }
 
     /**
@@ -93,15 +128,21 @@ class Group2learningController extends Controller
     {
     $group2learn = Group2learning::findOrFail($id);
 
-    // Обновляем поля экземпляра модели данными из запроса
-    $group2learn->course_id = $request->input('course_id');
-    $group2learn->group_id = $request->input('group_id');
-    $group2learn->category_id = $request->input('category_id');
-    $group2learn->parent_id = $request->input('parent_id');
-    $group2learn->teacher = $request->input('teacher');
-    $group2learn->typeOfLesson = $request->input('typeOfLesson');
-    $group2learn->study_from = $request->input('study_from');
-    $group2learn->study_to = $request->input('study_to');
+    // Право записи групп на курсы продублировано политикой: раньше
+    // оно было только в middleware маршрута, и любая другая точка входа
+    // (например, внутренний вызов) осталась бы без проверки.
+    $this->authorize('update', $group2learn);
+
+    // Находка: teacher/course_id/group_id/category_id — NOT NULL в БД.
+    // Если их не передать, input() вернёт null и save() упадёт в 500,
+    // затирая существующие значения. Поэтому обновляем только переданные поля.
+    $fields = $request->only([
+        'course_id', 'group_id', 'category_id',
+        'parent_id', 'teacher', 'typeOfLesson', 'study_from', 'study_to', 'deadline',
+    ]);
+    foreach ($fields as $key => $value) {
+        $group2learn->{$key} = $value;
+    }
 
     // Сохраняем изменения в базу данных
     $group2learn->save();
@@ -124,6 +165,8 @@ class Group2learningController extends Controller
         
             // Находим экземпляр модели по его id
     $group2learn = Group2learning::findOrFail($id);
+
+    $this->authorize('delete', $group2learn);
 
     // Удаляем найденный экземпляр из базы данных
     $group2learn->delete();

@@ -3,14 +3,17 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run check:sfc && vite build",
+    "build:e2e": "VITE_APP_URL=http://127.0.0.1:8080 npm run check:sfc && vite build",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "verify:nginx": "tools/verify-nginx-delivery.sh",
+    "test:e2e:nginx": "playwright test tests/E2E/nginx-course-delivery.spec.js",
+    "migrate:content": "tools/migrate-content-storage.sh",
+    "check:sfc": "node scripts/check-sfc.mjs"
   },
   "dependencies": {
-    "@fortawesome/fontawesome-svg-core": "^7.1.0",
-    "@fortawesome/free-solid-svg-icons": "^7.1.0",
-    "@fortawesome/vue-fontawesome": "^3.1.2",
     "@fullcalendar/core": "^6.1.15",
     "@fullcalendar/daygrid": "^6.1.15",
     "@fullcalendar/interaction": "^6.1.15",
@@ -24,7 +27,9 @@
     "fuse.js": "^7.1.0",
     "jszip": "^3.10.1",
     "laravel-mix-merge-manifest": "^2.1.0",
+    "nprogress": "^0.2.0",
     "roboto-fontface": "*",
+    "tinyrainbow": "^1.2.0",
     "vite-plugin-vuetify": "^2.1.2",
     "vue": "^3.5.22",
     "vue-i18n": "^11.1.12",

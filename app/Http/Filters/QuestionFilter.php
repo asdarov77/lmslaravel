@@ -7,6 +7,9 @@ use App\Models\Aukstructure;
 use App\Models\Question;
 use App\Models\Category;
 
+/**
+ * Фильтры выборки Question по category_id, aukstructure_id и questions.id.
+ */
 class QuestionFilter extends AbstractFilter
 {
     public const CATEGORY_ID = 'category_id';        

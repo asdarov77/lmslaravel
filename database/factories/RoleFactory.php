@@ -14,9 +14,8 @@ class RoleFactory extends Factory
     public function definition()
     {
         return [
-           'rolename' => 'Администратор',
-//           'id' => $this->faker->numberBetween(1,10),
-          'user_id' => $this->faker->numberBetween(1,20),
+            'rolename'    => $this->faker->unique()->word(),
+            'slug'        => $this->faker->unique()->slug(2),
 
         ];
     }

@@ -4,6 +4,11 @@ namespace App\Http\Middleware;
 
 use Illuminate\Http\Middleware\TrustHosts as Middleware;
 
+/**
+ * Доверяет всем поддоменам APP_URL.
+ *
+ * В глобальном стеке Kernel закомментирован и не используется.
+ */
 class TrustHosts extends Middleware
 {
     /**

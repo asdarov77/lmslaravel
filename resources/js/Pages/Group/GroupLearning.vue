@@ -1,523 +1,514 @@
 <template>
-  <v-card class="elevation-12 mx-auto" style="width: 600px; overflow: visible">
-    <v-toolbar color="primary">
-      <v-toolbar-title>Запись групп пользователей на курсы</v-toolbar-title>
-    </v-toolbar>
-    <!-- {{ group.courses }} -->
-    <!-- {{ options }} -->
-    <!-- {{ courseFilter }} -->
-    <!-- {{ selectedOptions }} -->
-    <!-- {{ courseFilter }} -->
-    <v-card-text>
+  <div class="u-page">
+    <PageHeader :title="$t('groupLearning.title')" />
 
-      <v-form v-on:@submit.prevent="submitForm">
-        <!-- ***************удалить*************** -->
-        <!-- <treeselect placeholder="тест" 
-        v-model="group.courses" 
-        :multiple="true" 
-        :options="options"                  
-         /> -->
-        <!-- ***************удалить*************** -->
-        <v-select label="Класс" type="text" :items="aircrafts" v-model="group.aircrafts" item-value="id" item-title="path"
-          empty-option clearable:true @update:modelValue="changeAir(group.aircrafts)">
-        </v-select>
-        <v-select label="Категории" type="text" :items="catFilter" v-model="group.categories" item-value="id"
-          item-title="title" empty-option @update:modelValue="changeCat(group.categories)" ref="selectedElcat">
-        </v-select>
-        <v-divider></v-divider>
-        <!-- <v-select
-          label="Курсы"
-          type="text"
-          :items="courseFilter"
-          v-model="group.courses"
-          multiple
+    <FormCard
+      :busy="form.submitting.value"
+      @submit="submitForm"
+      @cancel="cancel"
+    >
+      <v-alert
+        v-if="form.serverError.value"
+        type="error"
+        variant="tonal"
+        class="mb-4"
+        :text="form.serverError.value"
+      />
+
+      <!-- Выбор группы -->
+      <FormField
+        :label="$t('groupLearning.group')"
+        name="group_id"
+        :error="form.errors.group_id"
+        :required="form.isRequired('group_id')"
+      >
+        <v-select
+          v-bind="form.bind('group_id')"
+          :items="allGroups"
+          item-title="groupname"
           item-value="id"
-          item-title="title"
-          empty-option          
-          ref="selectedElcourse"            
-        @onClick:modelValue="onClick" // вернуть в treeselect
-        @update:modelValue="changeCourseTree(group.courses)"  
-        >        
-      </v-select> -->
-        <treeselect placeholder="Курсы" :default-expand-level="1" v-model="group.courses" :multiple="true"
-          :options="options" @update:modelValue="test(group.courses)" ref="treeSelectInput" />
+          :placeholder="$t('groupLearning.selectGroup')"
+          :disabled="form.submitting.value"
+          variant="outlined"
+          density="compact"
+          hide-details
+        />
+      </FormField>
 
-        <!-- <v-progress-linear ></v-progress-linear> -->
+      <!-- Выбор класса (ВС) с каскадом к категориям -->
+      <FormField
+        :label="$t('groupLearning.class')"
+        name="aircraft_id"
+        :error="form.errors.aircraft_id"
+        :required="form.isRequired('aircraft_id')"
+        :hint="$t('groupLearning.classHint')"
+      >
+        <CascadeSelect
+          v-model="form.values.aircraft_id"
+          :options="aircraftOptions"
+          :placeholder="$t('groupLearning.selectAircraft')"
+          :disabled="form.submitting.value"
+          :clearable="true"
+          @update:model-value="onAircraftChange"
+        />
+      </FormField>
 
+      <!-- Выбор категории (зависит от выбранного класса) -->
+      <FormField
+        :label="$t('groupLearning.categories')"
+        name="category_id"
+        :error="form.errors.category_id"
+        :required="form.isRequired('category_id')"
+        :disabled="!form.values.aircraft_id"
+      >
+        <RemoteAutocomplete
+          v-model="form.values.category_id"
+          :options="categoryOptions"
+          :placeholder="$t('groupLearning.selectCategory')"
+          :disabled="form.submitting.value || !form.values.aircraft_id"
+          :clearable="true"
+          :search-debounce="0"
+        />
+      </FormField>
 
-        <v-select label="Инструктор" type="text" :items="filteredUserRole" v-model="group.teacher"
-          item-title="fio"></v-select>
-        <v-select label="Вид занятия" type="text"
-          :items="['Лекция', 'Практическое занятие', 'Самостоятельная подготовка']" v-model="group.typeOfLesson"
-          item-value="id"></v-select>
+      <v-divider class="my-4" />
 
-        <v-divider></v-divider>
-        <v-container>
-          <v-row>
-            <v-col>
-              <v-text-field type="date" v-model="group.study_from" label="начало" variant="outlined">
-              </v-text-field>
-            </v-col>
+      <!-- Дерево курсов/модулей -->
+      <FormField
+        v-if="form.values.aircraft_id && form.values.category_id"
+        :label="$t('groupLearning.courses')"
+        name="course_ids"
+        :error="form.errors.course_ids"
+        :required="form.isRequired('course_ids')"
+        :hint="$t('groupLearning.materialsOnlyHint')"
+      >
+        <treeselect
+          :key="treeselectKey"
+          :placeholder="$t('groupLearning.coursesPlaceholder')"
+          :default-expand-level="1"
+          v-model="form.values.course_ids"
+          :options="courseOptions"
+          :multiple="true"
+          :clearable="false"
+          :disabled="form.submitting.value"
+        />
+      </FormField>
 
-            <v-col>
-              <v-text-field type="date" v-model="group.study_to" label="конец" variant="outlined">
-              </v-text-field>
-            </v-col>
-          </v-row>
-        </v-container>
+      <v-alert
+        v-else-if="form.values.aircraft_id && !form.values.category_id"
+        type="info"
+        variant="tonal"
+        density="compact"
+        class="mb-3"
+        :text="$t('groupLearning.selectCategoryFirst')"
+      />
 
-        <v-container class="notification is-danger" v-if="errors.length">
+      <v-alert
+        v-else-if="!form.values.aircraft_id"
+        type="info"
+        variant="tonal"
+        density="compact"
+        class="mb-3"
+        :text="$t('groupLearning.selectAircraftFirst')"
+      />
 
-          <p v-for="error in errors" v-bind:key="error" class="has-text-centered">
-            <!-- {{ error }} -->
-          </p>
-        </v-container>
-        <popup :alert="alert" :alertType="alertType" :snackbarText="snackbarText" :overlay="alert"
-          :alertFalse="alertFalse"></popup>
-      </v-form>
-    </v-card-text>
-    <v-card-actions>
-      <v-spacer></v-spacer>
-      <!-- <v-btn v-on:click="login" color="primary" to="/MyAccount">Login</v-btn> -->
-      <!-- <v-btn v-on:click="submitForm" color="primary">Сохранить</v-btn> -->
-      <ButtonGroup @submitForm="submitForm" @cancelBtn="cancelBtnHead"></ButtonGroup>
-    </v-card-actions>
-  </v-card>
+      <v-alert
+        v-if="form.values.course_ids.length"
+        type="success"
+        variant="tonal"
+        density="compact"
+        class="mt-3"
+        :text="$t('groupLearning.selectedCount', { count: form.values.course_ids.length })"
+      />
+
+      <v-divider class="my-4" />
+
+      <!-- Преподаватель -->
+      <FormField
+        :label="$t('groupLearning.instructor')"
+        name="teacher"
+        :error="form.errors.teacher"
+      >
+        <RemoteAutocomplete
+          v-model="form.values.teacher"
+          :options="instructorOptions"
+          :placeholder="$t('groupLearning.selectInstructor')"
+          :clearable="true"
+          :search-debounce="150"
+        />
+      </FormField>
+
+      <!-- Тип занятия -->
+      <FormField
+        :label="$t('groupLearning.lessonType')"
+        name="typeOfLesson"
+        :error="form.errors.typeOfLesson"
+      >
+        <v-select
+          v-bind="form.bind('typeOfLesson')"
+          :items="lessonTypes"
+          :placeholder="$t('groupLearning.selectLessonType')"
+          :disabled="form.submitting.value"
+          variant="outlined"
+          density="compact"
+          hide-details
+        />
+      </FormField>
+
+      <v-divider class="my-4" />
+
+      <!-- Период обучения (DateRangeField) -->
+      <FormField
+        :label="$t('groupLearning.period')"
+        name="period"
+        :error="form.errors.period"
+        :required="form.isRequired('period')"
+        :hint="$t('groupLearning.periodHint')"
+      >
+        <DateRangeField
+          v-model="periodRange"
+          :start-label="$t('groupLearning.studyFrom')"
+          :end-label="$t('groupLearning.studyTo')"
+          :required="true"
+          :min-date="today"
+          @update:model-value="onPeriodChange"
+        />
+      </FormField>
+
+      <!-- Дедлайн -->
+      <FormField
+        :label="$t('plan.deadline')"
+        name="deadline"
+        :error="form.errors.deadline"
+        :hint="$t('groupLearning.deadlineHint')"
+      >
+        <MaskedField
+          v-model="form.values.deadline"
+          preset="date"
+          :placeholder="$t('groupLearning.selectDeadline')"
+          :clearable="true"
+          :disabled="form.submitting.value"
+        />
+      </FormField>
+
+      <!-- Ошибки валидации на уровне формы (не полей) -->
+      <v-alert
+        v-for="(error, index) in form.nonFieldErrors"
+        :key="index"
+        type="error"
+        variant="tonal"
+        class="mb-2"
+        :text="error"
+      />
+    </FormCard>
+  </div>
 </template>
 
-<script>
-//  <!-- @update:modelValue="changeCourse(group.courses)" -->
-import PermissionWrapper from "../PermissionWrapper.vue";
-import popup from "../Popup.vue";
-import { mapState, mapGetters } from "vuex";
-import $api from "../../api/httpClient";
-import ButtonGroup from "../../components/ButtonGroup.vue";
-import Treeselect from 'vue3-treeselect';
-import 'vue3-treeselect/dist/vue3-treeselect.css';
+<script setup>
+import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useStore } from 'vuex'
+import { useRoute, useRouter } from 'vue-router'
+import $api from '../../api/httpClient'
+import { unwrapArray, numericQuery, asArray } from '../../api/envelope'
+import { canonicalRoleSlug } from '../../utils/roles'
+import { toast } from '../../composables/useToast'
+import useForm from '../../composables/useForm'
+import useLeaveGuard from '../../composables/useLeaveGuard'
+import PageHeader from '../../components/ui/PageHeader.vue'
+import FormCard from '../../components/ui/FormCard.vue'
+import FormField from '../../components/ui/FormField.vue'
+import DateRangeField from '../../components/ui/fields/DateRangeField.vue'
+import MaskedField from '../../components/ui/fields/MaskedField.vue'
+import CascadeSelect from '../../components/ui/fields/CascadeSelect.vue'
+import RemoteAutocomplete from '../../components/ui/fields/RemoteAutocomplete.vue'
+import Treeselect from 'vue3-treeselect'
+import 'vue3-treeselect/dist/vue3-treeselect.css'
 
-export default {
-  components: { PermissionWrapper, popup, ButtonGroup, Treeselect },
-  props: ["idEdit"],
-  data() {
-    return {
-      errors: [],
-      isLoading: false,
-      alert: false,
-      alertType: "",
-      overlay: false,
-      snackbarText: "",
-      //----------- отфильтрованные массивы для item в v-select--------------
-      airFilter: [],
-      catFilter: [],
-      courseFilter: [],
-      userFilter: [],
+const { t } = useI18n()
+const store = useStore()
+const route = useRoute()
+const router = useRouter()
 
+const props = defineProps({
+  idEdit: { type: Number, default: null },
+})
 
-      // -------------------------конец отфильтрованные массивы --------------
-      //------------------------------options for treeview----------------------------
-      options: [],
-      selectedOptions: [] //здесь выбранные пункты куска дерева
+const today = new Date().toISOString().slice(0, 10)
 
-      // ***************удалить*************** -->
-      // options: [ {
-      //     id: 'a',
-      //     label: 'a',
-      //     children: [ {
-      //       id: 'aa',
-      //       label: 'aa',
-      //       children: [ {
-      //       id: 'aaa',
-      //       label: 'aaa',
-      //     }, {
-      //       id: 'abb',
-      //       label: 'abb',
-      //     } ],
-      //     }, {
-      //       id: 'ab',
-      //       label: 'ab',
-      //     } ],
-      //   }, {
-      //     id: 'b',
-      //     label: 'b',
-      //   }, {
-      //     id: 'c',
-      //     label: 'c',
-      //   } ]
-      // ***************удалить*************** -->
-
-      //---------------------------------удалить потом----------------------------
-      // dateFrom: group.dateFrom,
-      // dateTo: group.dateTo,
-    };
-  },
-  created() {
-    // set default value for study_from to today's date
-    let today = new Date()
-    this.group.study_from = today.toISOString().substr(0, 10)
-    // this.$store
-    //   .dispatch("User/fetchUsers")
-    //   .catch((error) => console.error(error))
-    //   .finally(() => (this.isLoading = false));
-
-    this.$store.dispatch("User/fetchUsers");
-
-    this.$store.dispatch("Course/fetchCategories");
-    this.$store.dispatch("Course/fetchCourses");
-    this.$store.dispatch("Course/fetchAircrafts");
-    //this.$store.dispatch("Course/fetchCoursesFilter", );
-    this.$store.dispatch("User/fetchGroup", this.idEdit);
-  },
-  computed: {
-    ...mapState("User", ["group", "users"]),
-    ...mapState("Course", ["courses", "categories", "aircrafts"]),
-
-    ...mapGetters("Course", ["courses"]),
-    // ...mapGetters("Auth", ["hasPermission"]),
-
-    hasEditPermission() {
-      return this.hasPermission(["manage-users"], "Manage users");
+const form = useForm({
+  schema: {
+    group_id: {
+      initial: null,
+      rules: [],
     },
-
-    filteredUserRole() {
-      return this.users.filter(item => item.role === 'Инструктор')
+    aircraft_id: {
+      initial: null,
+      rules: [],
     },
-  },
-  watch: {
-    dateFrom(value, oldValue) {
-      //console.log(oldValue,"old Value");
-      //console.log(value,"new Value");
+    category_id: {
+      initial: null,
+      rules: [],
     },
-    dateTo(value, oldValue) {
-      // console.log(oldValue,"old Value");
-      // console.log(value,"new Value");
+    course_ids: {
+      initial: [],
+      rules: [],
+    },
+    teacher: {
+      initial: null,
+      rules: [],
+    },
+    typeOfLesson: {
+      initial: 'Лекция',
+      rules: [],
+    },
+    study_from: {
+      initial: today,
+      rules: [],
+    },
+    study_to: {
+      initial: null,
+      rules: [],
+    },
+    deadline: {
+      initial: null,
+      rules: [],
     },
   },
 
-  methods: {
-    alertFalse() {
-      this.alert = false;
-    },
-    cancelBtn() {
-      this.$emit("cancelBtn");
-    },
-    alertFalse() {
-      this.alert = false;
-    },
-    changeAir(id_air) {
-      // this.$refs["selectedElcourse"].reset();
-      //console.log(this.$refs["treeSelectInput"], "treeselect");
-      this.$refs["treeSelectInput"].clear();
-      this.$refs["selectedElcat"].reset();
-      this.courseFilter = [];
-      this.catFilter = [];
-      this.catFilter = this.categories.filter(function (e) {
-        return e.aircraft_id === id_air;
-      });
-    },
-    changeCat(id_cat) {
-      this.$refs["treeSelectInput"].clear();
-      this.courseFilter = [];
-      if (id_cat) {
-        let urlToGet =
-          "/api/course/?" +
-          "aircraft_id=" +
-          this.group.aircrafts +
-          "&category_id=" +
-          this.group.categories;
-        $api.get(urlToGet).then((response) => {
-          this.courseFilter = response.data;
+  draftKey: 'groupLearning',
 
-          //console.log(urlToGet);
-          //console.log(this.courseFilter[0].aukstructures);
-          // замена aukstructure плоского на иерархическую
-          var index;
-          for (index = 0; index < this.courseFilter.length; ++index) {
-            // console.log(this.courseFilter[0].aukstructures, '\n\n\n\n\n\n\n'); 
-            // console.log(this.courseFilter[index].aukstructures, '\n\n\n\n\n\n\n'); 
-            this.courseFilter[index].aukstructures = this.flatToHierarchy(this.courseFilter[index].aukstructures);
-          }
-          //console.log(this.courseFilter[0].aukstructures, "this.courseFilter")     
-          // копия массива courseFilter c переименованными полями для работы с treeview
-          //console.log(this.courseFilter[0].aukstructures)
-          //           this.options = this.courseFilter.aukstructures.map(function(aukstructure) {
-          //   return aukstructure;
-          // });
-          //console.log(this.options)
-          //for (ii = 0; index < this.courseFilter.length; ++ii) {
+  async onSubmit({ values }) {
+    // Валидация перед отправкой
+    const errors = []
+    const fieldErrors = {}
 
-          // this.options = this.courseFilter.map(item => ({
-          //           id: item.id,
-          //           label: item.title,
-
-          //           // parent_id: item.parent_id,
-          //           // children: item.aukstructures.map(a => ({
-          //           //    id: a.id,            
-          //           //    label: a.title,            
-          //           //   //  parent_id: a.parent_id,
-
-          //           //    children: a.children.map(aa => ({
-          //           //    id: aa.id,            
-          //           //    label: aa.title,            
-          //           //   //  parent_id: aa.parent_id,
-
-          //           //   children: aa.children.map(aaa => ({
-          //           //    id: aaa.id,            
-          //           //    label: aaa.title,                         
-          //           //   //  parent_id: aaa.parent_id,
-          //           //  }))   
-          //           //  }))                 
-          //          //}))     
-          //         }));
-
-          // исправленный вариант,где не дублируется название курса
-          //console.log(JSON.stringify(this.courseFilter[0]))
-          // this.options = this.courseFilter.map(course =>
-          //   course.aukstructures.map(item => ({
-          //     id: item.id,
-          //     label: item.title,
-          //      children: item.children.map(a => ({
-          //        id: a.id,
-          //        label: a.title,
-          //       children: a.children.map(aa => ({
-          //         id: aa.id,
-          //         label: aa.title,
-          //         children: aa.children.map(aaa => ({
-          //           id: aaa.id,
-          //           label: aaa.title,
-          //         }))
-          //       }))
-          //      }))
-          //   }))
-          // ).flat();
-
-
-
-
-
-
-
-          this.options = this.courseFilter.map(course =>
-            course.aukstructures.map(item =>
-              this.renameFieldsRecursive(item, 'title', 'label')
-            )
-          ).flat();
-
-
-          // console.log(this.options);
-
-          //this.options = this.courseFilter.map(item => ({
-          //           id: item.id,
-          //           label: item.title,
-          // aukstructures: item.map(a => ({
-          //           // parent_id: item.parent_id,
-          //           // children: item.aukstructures.map(a => ({
-          //  id: a.id,            
-          //  label: a.title,            
-          //           //   //  parent_id: a.parent_id,
-
-          //           //    children: a.children.map(aa => ({
-          //           //    id: aa.id,            
-          //           //    label: aa.title,            
-          //           //   //  parent_id: aa.parent_id,
-
-          //           //   children: aa.children.map(aaa => ({
-          //           //    id: aaa.id,            
-          //           //    label: aaa.title,                         
-          //           //   //  parent_id: aaa.parent_id,
-          //           //  }))   
-          //           //  }))                 
-          //   }))     
-          //  }));
-
-
-
-
-
-          //console.log(this.options)      
-        });
-      }
-    },
-
-    // Метод для переименования полей в массиве options
-    // этот массив явлется входными данными в treeselect
-    renameFieldsRecursive(obj, oldName, newName) {
-      if (typeof obj !== 'object' || obj === null) {
-        return obj;
-      }
-
-      const newObj = {};
-      for (const [key, value] of Object.entries(obj)) {
-        if (key === oldName) {
-          newObj[newName] = value;
-        } else if (key === 'children') {
-          newObj.children = value.map(child => this.renameFieldsRecursive(child, oldName, newName));
-        } else {
-          newObj[key] = this.renameFieldsRecursive(value, oldName, newName);
-        }
-      }
-
-      return newObj;
-    },
-
-
-    // метод преобразования структуры плоской в иерархическую
-
-    flatToHierarchy(flat) {
-      const roots = [],
-        map = [],
-        id = [];
-      flat.forEach(item => {
-        map.push(Object.assign({}, item)); // копируем
-        id.push(item.id);
-      });
-      let i;
-      map.forEach(item => {
-        // Не пойму зачем вы вставили сюда null !?
-        if ( /*item.parent_id === null ||*/ !item.parent_id || (i = id.indexOf(item.parent_id)) === -1) {
-          roots.push(item);
-          return;
-        }
-        if (map[i].children) {
-          map[i].children.push(item);
-        }
-        else {
-          map[i].children = [item];
-        }
-      });
-      return roots;
-    },
-    // проверка текущей даты
-    validateDate() {
-      let today = new Date()
-      let studyFrom = new Date(this.group.study_from)
-      if (studyFrom < today) {
-        this.errors.push('Дата начала не может быть меньше текущей даты')
-        return false
-      }
-      return true
-    },
-
-
-
-    submitForm() {
-      this.errors = [];
-      if (this.group.study_from > this.group.study_to) {
-        this.errors.push("дата начала не может быть раньше даты окончания");
-        this.snackbarText = "дата начала не может быть раньше даты окончания";
-        this.alertType = "error";
-        this.alert = true;
-      }
-      if (!this.group.study_from) {
-        this.errors.push("дата начала не задана");
-        this.snackbarText = "дата начала не задана";
-        this.alertType = "error";
-        this.alert = true;
-      }
-      if (!this.group.study_to) {
-        this.errors.push("дата окончания не задана");
-        this.snackbarText = "дата окончания не задана";
-        this.alertType = "error";
-        this.alert = true;
-      }
-      if (!this.validateDate()) {
-        this.errors.push("дата начала не может быть меньше текущей");
-        this.snackbarText = "дата начала меньше текущей";
-        this.alertType = "error";
-        this.alert = true;
-      }
-      console.log("this.validate()")
-      if (!this.errors.length && (this.group.study_from && this.group.study_to && this.group.study_from < this.group.study_to)) {
-        const formData = {
-          course_id: this.group.courses,
-          group_id: this.idEdit,
-          category_id: this.group.categories,
-          // parent_id: this.group.courses,
-          study_from: this.group.study_from,
-          study_to: this.group.study_to,
-          teacher: this.group.teacher,
-          typeOfLesson: this.group.typeOfLesson,
-        };
-        //console.log(formData);
-
-        let urlToUp = "/api/group/learning";
-        this.$store.dispatch("Course/fetchGroup2learnings", formData)
-          .catch((error) => console.error(error))
-          .finally(() => this.$router.push("/groups/list"));
-      }
-    },
-
-    cancelBtnHead() {
-      //console.log('cancel');
-      this.$router.go(-1);
-    },
-
-    //---------------------------------------------
-    test(array) {
-      console.log(array.length);
-      var index;
-      for (index = 0; index < array.length; ++index) {
-
-        this.selectedOptions = _.find(array, function (selectedOptions) {
-          return selectedOptions.id == array[index]
-        })
-      }
+    if (!values.group_id) fieldErrors.group_id = t('groupLearning.groupRequired')
+    if (!values.aircraft_id) fieldErrors.aircraft_id = t('groupLearning.classRequired')
+    if (!values.category_id) fieldErrors.category_id = t('groupLearning.categoryRequired')
+    if (!values.course_ids?.length) errors.push(t('groupLearning.coursesRequired'))
+    if (!values.study_from) fieldErrors.study_from = t('groupLearning.fromRequired')
+    if (!values.study_to) fieldErrors.study_to = t('groupLearning.toRequired')
+    else if (values.study_from && values.study_to < values.study_from) {
+      fieldErrors.study_to = t('groupLearning.toBeforeFrom')
     }
 
-    //---------------------------------------------
+    if (Object.keys(fieldErrors).length > 0) {
+      form.setFieldErrors(fieldErrors)
+    }
+    if (errors.length > 0) {
+      form.setNonFieldErrors(errors)
+    }
 
+    if (Object.keys(fieldErrors).length > 0 || errors.length > 0) {
+      toast.error(t('groupLearning.checkForm'))
+      return false
+    }
+
+    // Подготовка данных для сохранения
+    const entries = Array.from(new Set(values.course_ids)).map((nodeId) => {
+      const asCourse = /^course-(\d+)$/.exec(String(nodeId))
+      return asCourse
+        ? { course_id: Number(asCourse[1]), parent_id: null }
+        : { course_id: nodeCourse.value[nodeId], parent_id: nodeId }
+    }).filter((entry) => entry.course_id)
+
+    try {
+      await store.dispatch('Course/fetchGroup2learnings', {
+        group_id: values.group_id,
+        entries,
+        category_id: values.category_id,
+        teacher: values.teacher,
+        typeOfLesson: values.typeOfLesson,
+        study_from: values.study_from,
+        study_to: values.study_to,
+        deadline: values.deadline || null,
+      })
+
+      toast.success(t('groupLearning.enrolled'))
+      await router.push('/groups/list')
+    } catch (error) {
+      collectErrors(error)
+      toast.error(form.nonFieldErrors[0] || t('groupLearning.saveFailed'))
+      throw error
+    }
   },
-};
+})
+
+const { confirmLeave } = useLeaveGuard(() => form.dirty.value, { message: t('common.leaveConfirm') })
+
+const aircraftOptions = computed(() =>
+  (store.state.Course.aircrafts || []).map((a) => ({
+    value: a.id,
+    label: a.path,
+  }))
+)
+
+const instructorOptions = computed(() => {
+  const users = store.state.User.users || []
+  return users
+    .filter((u) => canonicalRoleSlug(u.role) === 'instructor')
+    .map((u) => ({ value: u.fio, label: u.fio }))
+})
+
+const periodRange = ref({ start: today, end: null })
+
+const onPeriodChange = (range) => {
+  form.setFieldValue('study_from', range.start)
+  form.setFieldValue('study_to', range.end || null)
+  periodRange.value = range
+}
+
+const categoryOptions = ref([])
+
+const onAircraftChange = async (aircraftId) => {
+  form.setFieldValue('category_id', null)
+  form.setFieldValue('course_ids', [])
+  categoryOptions.value = []
+  courseOptions.value = []
+  treeselectKey.value += 1
+
+  if (!aircraftId) return
+
+  // Загружаем категории для выбранного класса
+  const categories = (store.state.Course.categories || []).filter(
+    (c) => Number(c.aircraft_id) === Number(aircraftId)
+  )
+  categoryOptions.value = categories.map((c) => ({
+    value: c.id,
+    label: c.title,
+  }))
+}
+
+const courseOptions = ref([])
+const nodeCourse = ref({})
+const treeselectKey = ref(0)
+
+watch(() => form.values.category_id, async (categoryId) => {
+  if (!categoryId || !form.values.aircraft_id) {
+    courseOptions.value = []
+    nodeCourse.value = {}
+    treeselectKey.value += 1
+    return
+  }
+
+  form.setFieldValue('course_ids', [])
+  treeselectKey.value += 1
+
+  try {
+    const params = numericQuery({
+      aircraft_id: form.values.aircraft_id,
+      category_id: categoryId,
+    })
+    const response = await $api.get('/api/course', { params })
+    const courses = unwrapArray(response)
+
+    const nodeCourseMap = {}
+    courseOptions.value = courses.map((course) => ({
+      id: `course-${course.id}`,
+      label: course.title,
+      children: flatToHierarchy(asArray(course.aukstructures), course.id, nodeCourseMap),
+    }))
+    nodeCourse.value = nodeCourseMap
+  } catch (error) {
+    courseOptions.value = []
+    form.setNonFieldErrors([t('groupLearning.loadCoursesError')])
+    console.error(error)
+  }
+})
+
+const flatToHierarchy = (flat, courseId, nodeCourseMap) => {
+  const byId = new Map()
+
+  flat.forEach((item) => {
+    if (!item) return
+    nodeCourseMap[item.id] = courseId
+    byId.set(item.id, {
+      id: item.id,
+      label: item.title,
+      isDisabled: Number(item.type) !== 3,
+      children: [],
+    })
+  })
+
+  const roots = []
+  byId.forEach((node) => {
+    const parent = byId.get(node.parent_id)
+    if (parent && parent !== node) {
+      parent.children.push(node)
+    } else {
+      roots.push(node)
+    }
+  })
+  return roots
+}
+
+const collectErrors = (error) => {
+  const details = error?.response?.data?.error?.details
+  if (details && typeof details === 'object') {
+    Object.entries(details).forEach(([field, messages]) => {
+      const text = Array.isArray(messages) ? messages.join(' ') : String(messages)
+      form.setFieldError(field.replace(/\.\d+$/, ''), text)
+    })
+    return
+  }
+  form.setNonFieldError(error?.response?.data?.error?.message || error?.message || t('groupLearning.saveFailed'))
+}
+
+onMounted(async () => {
+  await Promise.all([
+    store.dispatch('User/fetchGroups'),
+    store.dispatch('User/fetchUsers'),
+    store.dispatch('Course/fetchCategories'),
+    store.dispatch('Course/fetchAircrafts'),
+  ]).catch((error) => console.error(error))
+
+  const fromRoute = Number(props.idEdit)
+  if (Number.isInteger(fromRoute) && fromRoute > 0) {
+    form.setFieldValue('group_id', fromRoute)
+  }
+})
+
+const cancel = () => {
+  router.go(-1)
+}
+
+defineExpose({ form, submitForm: form.submit })
 </script>
 
-<style src="vue3-treeselect/dist/vue3-treeselect.css"></style>
-
-<style>
-.v-card-text {
-  /* font-size: 1.1rem; */
-  font-size: 16px;
-
+<style scoped>
+:deep(.v-card-text) {
+  font-size: 1rem;
 }
 
-.vue-treeselect__control {
+:deep(.vue-treeselect__control) {
   height: 56px;
-  border-bottom: 1px solid;
-  /* box-shadow: 0 3px 1px -2px var(--v-high-emphasis-opacity, rgba(0, 0, 0, 0.2)), 0 2px 2px 0 var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.14)), 0 1px 5px 0 var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.12)); */
-  /* --v-field-padding-top :10px;
-  --v-field-padding-start:16px; */
-  background: #f4f4f4;
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-surface-3);
   margin-bottom: 17px;
-  border-radius: 5px;
+  border-radius: var(--radius-md);
 }
 
-.vue-treeselect__placeholder,
-.vue-treeselect__single-value {
+:deep(.vue-treeselect__placeholder),
+:deep(.vue-treeselect__single-value) {
   padding-left: 12px;
   line-height: 56px;
-  color: #848484;
-
+  color: var(--c-text-muted);
 }
 
-.vue-treeselect__control-arrow-container {
+:deep(.vue-treeselect__control-arrow-container) {
   width: 38px;
 }
 
-.vue-treeselect:not(.vue-treeselect--disabled) .vue-treeselect__multi-value-item:not(.vue-treeselect__multi-value-item-disabled):hover .vue-treeselect__multi-value-item:not(.vue-treeselect__multi-value-item-new) .vue-treeselect__multi-value-item:not(.vue-treeselect__multi-value-item-new):hover,
-.vue-treeselect__multi-value-item {
+:deep(.vue-treeselect__multi-value-item) {
   cursor: pointer;
-  color: #7a7a7a;
-  background-color: #f2efef;
-  border-bottom: 3px solid;
+  color: var(--c-text-secondary);
+  background-color: var(--c-surface-2);
+  border-bottom: 3px solid var(--c-primary);
+  border-radius: var(--radius-sm);
 }
 
-
-
-.vue-treeselect--has-value .vue-treeselect__multi-value {
+:deep(.vue-treeselect--has-value .vue-treeselect__multi-value) {
   margin-bottom: 15px;
-
-}
-
-/* --focused */
-.vue-treeselect__value-containe:hover {
-  background: red;
 }
 </style>
