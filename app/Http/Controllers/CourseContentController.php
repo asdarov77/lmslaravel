@@ -31,12 +31,44 @@ class CourseContentController extends Controller
     {
         // Контракт как у CoursePlayerController: sanctum-токен либо web-сессия.
         $this->middleware(function ($request, $next) {
-            if (!Auth::guard('sanctum')->check() && !Auth::check()) {
+            if (!$this->authenticated($request)) {
                 abort(401, 'Требуется авторизация');
             }
 
             return $next($request);
         });
+    }
+
+    /**
+     * Авторизация запроса кадра. iframe не может отправить заголовок
+     * Authorization, поэтому допускается токен в query ?t= (sanctum).
+     */
+    private function authenticated(Request $request): bool
+    {
+        if (Auth::guard('sanctum')->check() || Auth::check()) {
+            return true;
+        }
+
+        $token = (string) $request->query('t', '');
+        if ($token === '') {
+            return false;
+        }
+
+        // сверяем хэш предъявленного токена с сохранённым (id|secret формат Sanctum)
+        $tokenId = explode('|', $token)[0] ?? null;
+        if (!$tokenId || !ctype_digit($tokenId)) {
+            return false;
+        }
+
+        $row = \DB::table('personal_access_tokens')->where('id', $tokenId)->first();
+        if (!$row || $row->revoked_at !== null) {
+            return false;
+        }
+        if ($row->expires_at !== null && strtotime($row->expires_at) < time()) {
+            return false;
+        }
+
+        return hash_equals($row->token, hash('sha256', $token));
     }
 
     /**

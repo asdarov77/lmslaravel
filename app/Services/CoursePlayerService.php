@@ -102,11 +102,13 @@ class CoursePlayerService
                 'id' => $course->id,
                 'title' => $course->title,
                 'path' => trim((string) $course->path),
+                'aircraft_id' => $course->aircraft_id ? (int) $course->aircraft_id : null,
                 'aircraft_path' => trim((string) optional($course->aircraft)->path),
             ],
             'nodes' => $nodes,
             'tree' => $this->buildTree($nodes),
-            'entry' => $entry ? ['item_id' => $entry['id'], 'title' => $entry['title']] : null,
+            // Д2: entry несёт content_url сразу — фронту не нужен RTT к getlink
+            'entry' => $entry ? ['item_id' => $entry['id'], 'title' => $entry['title'], 'content_url' => $entry['content_url']] : null,
             'resume' => $resume,
             'stats' => [
                 'materials_total' => $totalMaterials,
