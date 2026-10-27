@@ -8,6 +8,7 @@ use App\Models\CourseMaterialView;
 use App\Models\CourseProgress;
 use App\Services\CoursePlayerService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * API плеера курса (player-endpoint).
@@ -22,6 +23,23 @@ class CoursePlayerController extends Controller
 {
     public function __construct(private CoursePlayerService $players)
     {
+        // Контракт: все методы требуют авторизацию (см. tests/Feature/CoursePlayerEndpointTest.php).
+        // Sanctum-токен из фронтенда; сессионный guard — запасной вариант для web-сессий.
+        $this->middleware(function ($request, $next) {
+            if (!Auth::guard('sanctum')->check() && !Auth::check()) {
+                abort(401, 'Требуется авторизация');
+            }
+
+            return $next($request);
+        });
+    }
+
+    /**
+     * Идентификатор текущего пользователя: sanctum-токен либо web-сессия.
+     */
+    private function userId(Request $request): int
+    {
+        return $request->user()?->id ?? Auth::id();
     }
 
     /**
@@ -32,7 +50,7 @@ class CoursePlayerController extends Controller
     public function show(Request $request, int $courseId)
     {
         $course = Course::findOrFail($courseId);
-        $userId = $request->user()?->id;
+        $userId = $request->user()?->id ?? Auth::id();
 
         return response()->json($this->players->payload($course, $userId));
     }
@@ -62,7 +80,7 @@ class CoursePlayerController extends Controller
         );
 
         $progress = CourseProgress::updateOrCreate(
-            ['user_id' => $request->user()->id, 'course_id' => $course->id],
+            ['user_id' => $this->userId( $request), 'course_id' => $course->id],
             [
                 'last_item_id' => $data['last_item_id'],
                 'last_anchor' => $data['last_anchor'] ?? null,
@@ -100,7 +118,7 @@ class CoursePlayerController extends Controller
         );
 
         $view = CourseMaterialView::firstOrNew([
-            'user_id' => $request->user()->id,
+            'user_id' => $this->userId( $request),
             'aukstructure_id' => $data['aukstructure_id'],
         ]);
 
@@ -116,7 +134,7 @@ class CoursePlayerController extends Controller
         return response()->json([
             'ok' => true,
             'completed' => $view->completed,
-            'stats' => $this->players->payload($course, $request->user()->id)['stats'],
+            'stats' => $this->players->payload($course, $this->userId( $request))['stats'],
         ]);
     }
 }
