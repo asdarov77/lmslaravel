@@ -336,6 +336,7 @@ function openItem(itemId, { anchor = null, highlight = '' } = {}) {
   activeItemId.value = Number(itemId)
   treeTabId.value = Number(itemId)
   highlightTerm.value = highlight
+  resumeAnchor.value = anchor   // прокрутка выполнится в onFrameLoad (Д6)
   frame.navigate(buildFrameSrc(itemId))
   progress.openLesson(Number(itemId), anchor)
   if (!state.error) player.markVisited(Number(itemId))
@@ -389,9 +390,9 @@ function attachScrollTracking() {
 function onFrameLoad() {
   frame.onLoad()
   // resume-point: прокрутка к якорю после отрисовки (Д6)
-  const node = activeNode.value
-  if (node?.pendingAnchor) {
-    frame.scrollToAnchor(node.pendingAnchor)
+  if (resumeAnchor.value) {
+    frame.scrollToAnchor(resumeAnchor.value)
+    resumeAnchor.value = null
   }
   // серверная подсветка уже в DOM кадра — собираем span.cp-hl (Д5)
   if (highlightTerm.value) {

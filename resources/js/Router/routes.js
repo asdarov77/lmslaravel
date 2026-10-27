@@ -205,7 +205,10 @@ const routes = [
         // courses.view и content.view получал 403 на своих же курсах.
         path: '/courses/itemmani',
         meta: { permission: ['content.view', 'content.manage'] },
-        component: () => import('../Pages/CourseManifest.vue'),
+        // Плеер переписан на composables (useCoursePlayer/useContentFrame/
+        // useLessonProgress/useInDocumentSearch) — закрыты дефекты Д1–Д10.
+        // Legacy-версия CourseManifest.vue сохранена как аварийный откат.
+        component: () => import('../Pages/CourseManifestNew.vue'),
         // props: route => ({ idEdit: Number(route.params.idEdit)}),
         props: (route) => ({
             idEdit: toIntOrNull(route.query.idEdit),
