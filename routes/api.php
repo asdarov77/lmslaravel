@@ -11,6 +11,7 @@ use App\Http\Controllers\LessonsController;
 use App\Http\Controllers\AukstructureController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\CourseController;
+use App\Http\Controllers\CoursePlayerController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\GroupController;
@@ -114,6 +115,10 @@ Route::get('/courses/cat/{id}/', [CategoryListController::class, 'getCatCoursesI
 Route::apiResource('course', CourseController::class)->middleware('auth:sanctum');
 Route::get('/coursemanifest/{id}', [CourseController::class, 'showmanifest']);
 Route::get('/getlink/{id}', [CourseController::class, 'getlink']);
+// --- API плеера курса (player-endpoint + событийный прогресс) ---
+Route::get('/course/{courseId}/player', [CoursePlayerController::class, 'show']);
+Route::post('/course/{courseId}/progress', [CoursePlayerController::class, 'progress']);
+Route::post('/course/{courseId}/view', [CoursePlayerController::class, 'view']);
 Route::get('/getfirstauk/{id}', [CourseController::class, 'get_first_auk']);
 //-------------------- классы -----------------
 Route::get('/classes/', [AircraftController::class, 'indexclasses']);
