@@ -173,7 +173,7 @@ const treeNodes = computed(() => {
     id: section.id,
     title: section.title,
     level: section.level || 1,
-    isMaterial: section.level === 3,
+    isMaterial: section.isMaterial === true || section.level === 3,
     state: section.state,
     originalSection: section, // для доступа к state и другим полям
   }))
@@ -201,7 +201,7 @@ const handleToggleSection = (nodeId) => {
 }
 
 /** Материалы (только узлы уровня 3). */
-const materials = computed(() => props.sections.filter((s) => s.level === 3))
+const materials = computed(() => props.sections.filter((s) => s.isMaterial === true || s.level === 3))
 
 /** Количество материалов. */
 const materialCount = computed(() => materials.value.length)

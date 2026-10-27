@@ -402,11 +402,13 @@ export default {
       el?.removeEventListener('scroll', this.scrollHandler);
       this.scrollHandler = null;
     }
+    document.removeEventListener("keydown", this.onKeydown);
+    if (this._frameResizeObserver) {
+      this._frameResizeObserver.disconnect();
+      this._frameResizeObserver = null;
+    }
   },
 
-  beforeDestroy() {
-    document.removeEventListener("keydown", this.onKeydown);
-  },
 
   created() {
     // Не реактивен намеренно (см. docCache.js): кэш влияет только на
@@ -516,10 +518,12 @@ export default {
       this.path = course.path || "";
       this.aircraft = course.aircraft_id;
 
-      // Автооткрытие первого модуля: материал отдаёт сам endpoint
-      // (entry), поэтому getlink не вызывается — одна подпись и один
-      // запрос документа на старте.
-      if (!this.activeId && data.entry && data.entry.file) {
+      // Возобновление чтения: если сервер вернул последний открытый
+      // материал, открываем его, а не первый модуль курса.
+      const resumeEntry = Object.entries(data.progress || {}).find(([, value]) => value?.last_file);
+      if (!this.activeId && resumeEntry) {
+        this.getlink(Number(resumeEntry[0]));
+      } else if (!this.activeId && data.entry && data.entry.file) {
         const target = data.entry;
         const base = target.signed_base || "";
         this.activeFile = target.file || "";
@@ -534,7 +538,7 @@ export default {
           const clean = html ? sanitizeMaterialHtml(html) : "";
           this.contentHtml = clean ? '<base href="' + base + '" />' + clean : "";
           this.link = this.contentHtml;
-          this._docCache?.put(this.idEdit, target.aukstructure_id, this.contentHtml);
+          this._docCache?.put(this.idEdit, target.aukstructure_id, clean);
           this.markVisited(target.aukstructure_id);
           this.saveProgress(target.aukstructure_id, 0);
         }
@@ -755,6 +759,18 @@ export default {
         return;
       }
 
+      // Наблюдаем за изменением высоты документа (картинки догружаются
+      // после load): без повторного пересчёта кадр остаётся обрезанным.
+      if (doc?.body && typeof ResizeObserver !== 'undefined') {
+        if (this._frameResizeObserver) this._frameResizeObserver.disconnect();
+        const observer = new ResizeObserver(() => {
+          const height = doc?.body?.scrollHeight ?? 0;
+          if (height > 0) this.frameHeight = `${height + 20}px`;
+        });
+        observer.observe(doc.body);
+        this._frameResizeObserver = observer;
+      }
+
       // Подсветка — после того, как кадр готов и высота посчитана:
       // переписывание ветки сдвигает высоту, и порядок важен.
       this.applyHighlights(doc);
@@ -852,8 +868,18 @@ export default {
       // srcdoc без сети (getlink → signed-url → файл — три RTT).
       const cached = this._docCache?.get(this.idEdit, item_id);
       if (cached != null) {
-        this.contentHtml = cached;
-        this.link = cached;
+        let base = "";
+        try {
+          const sigResponse = await $api.get(apiUrl + "/api/private/signed-url", {
+            params: { aircraft: (this.aircraft || "").trim(), auk: (this.path || "").trim() },
+          });
+          base = (unwrapResponse(sigResponse) || {}).base || "";
+        } catch (error) {
+          base = "";
+        }
+        const html = base ? '<base href="' + base + '" />' + cached : cached;
+        this.contentHtml = html;
+        this.link = html;
         this.isLoading = false;
         this.saveProgress(item_id, this.lessonPercent(item_id));
         return;
@@ -917,7 +943,7 @@ export default {
         const clean = html ? sanitizeMaterialHtml(html) : "";
         this.contentHtml = clean ? '<base href="' + base + '" />' + clean : "";
         this.link = this.contentHtml;
-        this._docCache?.put(this.idEdit, item_id, this.contentHtml);
+        this._docCache?.put(this.idEdit, item_id, clean);
         // Урок открыт и прочитан хотя бы частично: серверный прогресс
         // нужен, чтобы «продолжить обучение» работало на другом
         // устройстве, а не только в этом браузере.

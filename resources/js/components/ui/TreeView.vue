@@ -28,7 +28,11 @@ const props = defineProps({
 
 defineEmits(['select', 'toggle'])
 
-const rootNodes = computed(() => props.nodes.filter(n => (n.level || 1) === 1))
+const rootNodes = computed(() => {
+  if (!props.nodes.length) return []
+  const minLevel = Math.min(...props.nodes.map((n) => n.level || 1))
+  return props.nodes.filter((n) => (n.level || 1) === minLevel)
+})
 </script>
 
 <style scoped>

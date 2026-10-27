@@ -2,8 +2,13 @@
   <div class="u-tree__node">
     <div
       class="u-tree__item"
+      role="treeitem"
+      tabindex="0"
+      :aria-selected="isActive"
       :class="{ 'u-tree__item--active': isActive, 'u-tree__item--material': node.isMaterial }"
       @click="handleSelect"
+      @keydown.enter.prevent="handleSelect"
+      @keydown.space.prevent="handleSelect"
     >
       <button
         v-if="hasChildren"
