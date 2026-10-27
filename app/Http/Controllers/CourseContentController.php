@@ -91,6 +91,20 @@ class CourseContentController extends Controller
         }
 
         $course = Course::with('aircraft')->findOrFail($courseId);
+
+        // Д12: авторизация доступа к СОДЕРЖИМОМУ. Раньше endpoint проверял
+        // только факт входа, а CourseAccess (запись на курс / специальность /
+        // отмеченные модули) жил лишь в CourseController::getlink. Любой
+        // вошедший, знающий id, читал чужой курс — ровно тот обход, который
+        // закрыли при появлении витрины. Теперь правило одно для всех точек.
+        $user = $request->user() ?? Auth::user();
+        \App\Support\CourseAccess::authorizeOpenModule($user, $course, $item->id);
+
+        // Д11 (главная причина «плеер работает некорректно»): контент АУК лежит
+        // на диске 'private' (root = storage/app/courses, см. config/filesystems.php).
+        // Disk 'public' указывает в storage/app/public — там этих файлов никогда
+        // не было, и любой материал отдавал 404 («битый кадр»). Все чтения контента
+        // идут только через диск 'private'.
         $relative = sprintf(
             'private/%s/%s/%s',
             trim((string) optional($course->aircraft)->path),
@@ -98,7 +112,7 @@ class CourseContentController extends Controller
             $link
         );
 
-        $disk = Storage::disk('public');
+        $disk = Storage::disk('private');
         if (!$disk->exists($relative)) {
             abort(404, 'Файл материала отсутствует');
         }
