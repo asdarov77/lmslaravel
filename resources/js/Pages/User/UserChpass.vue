@@ -1,110 +1,134 @@
 <template>
-  <v-flex xs12 sm8 md4>
-    <v-card class="elevation-12 mx-auto" style="width: 600px">
-      <v-toolbar color="primary">
-        <v-toolbar-title>Сменить пароль {{ usernameEdit }}</v-toolbar-title>
-      </v-toolbar>
-      <v-card-text>
-        <v-form v-on:@submit.prevent="submitForm">
-          <v-text-field
-            id="password"
-            prepend-icon="lock"
-            name="password"
-            label="Пароль"
-            v-model="password"
-            type="password"
-          ></v-text-field>
-          <v-text-field
-            id="password_confirmation"
-            prepend-icon="lock"
-            name="password_confirmation"
-            label="Повторите пароль"
-            v-model="password_confirmation"
-            type="password"
-          ></v-text-field>
-          <popup
-            :alert="alert"
-            :alertType="alertType"
-            :snackbarText="snackbarText"
-            :overlay="alert"
-            :alertFalse="alertFalse"
-          ></popup>
-          <v-container class="notification is-danger" v-if="errors.length">
-            <p v-for="error in errors" v-bind:key="error">
-              {{ error }}
-            </p>
-          </v-container>
-        </v-form>
-      </v-card-text>
-      <v-card-actions>
-        <v-spacer></v-spacer>
-        <v-btn v-on:click="submitForm" color="primary">Сохранить</v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-flex>
+  <v-col cols="12" sm="8" md="4">
+    <FormCard
+      :heading-level="1"
+      :title="`${t('user.changePassword')} ${usernameEdit}`"
+      :busy="form.submitting.value"
+      @submit="submitForm"
+      @cancel="cancel"
+    >
+      <FormField
+        :label="t('user.labelParol')"
+        name="password"
+        :error="form.errors.password"
+        :required="form.isRequired('password')"
+        :hint="passwordHint"
+      >
+        <v-text-field
+          id="password"
+          v-bind="form.bind('password')"
+          name="password"
+          type="password"
+          :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+          autocomplete="new-password"
+          @click:append-inner="showPassword = !showPassword"
+        />
+      </FormField>
+
+      <FormField
+        :label="t('user.labelPovtorite-parol')"
+        name="password_confirmation"
+        :error="form.errors.password_confirmation"
+        :required="form.isRequired('password_confirmation')"
+      >
+        <v-text-field
+          id="password_confirmation"
+          v-bind="form.bind('password_confirmation')"
+          name="password_confirmation"
+          type="password"
+          autocomplete="new-password"
+        />
+      </FormField>
+
+      <!--
+        Показывать/скрывать пароль: раньше поле всегда было type="password",
+        и при опечатке в длинном пароле приходилось набирать заново вслепую.
+      -->
+      <v-switch
+        v-model="showPassword"
+        :label="t('user.showPassword')"
+        density="compact"
+        color="primary"
+        hide-details
+      />
+    </FormCard>
+  </v-col>
 </template>
 
-<script>
-import popup from "../Popup.vue";
-import { mapState, mapGetters } from "vuex";
-export default {
-  components: {
-    popup,
-  },
-  props: ["idEdit"],
-  data() {
-    return {
-      password: "", // пользователь с указанным ID из базы данных
-      password_confirmation: "",
-      errors: [],
+<script setup>
+import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useStore } from 'vuex'
+import { useRouter } from 'vue-router'
+import FormCard from '../../components/ui/FormCard.vue'
+import FormField from '../../components/ui/FormField.vue'
+import useForm from '../../composables/useForm'
+import { required, minLength, sameAs } from '../../composables/validation/rules'
+import { toast } from '../../composables/useToast'
 
-      alert: false,
-      alertType: "",
-      overlay: false,
-      snackbarText: "",
-    };
-  },
-  mounted() {
-    //console.log(this.idEdit, "idEdit")
-  },
-  computed: {
-    ...mapState("User", ["user"]),
-    //...mapGetters('User', ['users','groups']),
-  },
-  methods: {
-    alertFalse() {
-      this.alert = false;
+/**
+ * Смена пароля пользователем.
+ *
+ * Переведена на useForm (Фаза 2). Раньше проверка выглядела так:
+ * `if (this.password !== this.password_confirmation) errors.push('пароли
+ * не совпадают')`, а дальше `if (!this.errors.length)` — массив ошибок
+ * копился, но в него попадали строки вперемешку с переводами, а кнопка
+ * сохранения не блокировалась: пользователь мог отправить несовпадающие
+ * пароли и получить 422. Теперь правила в схеме, submit блокируется,
+ * а несовпадение подсвечивает конкретное поле.
+ */
+const { t } = useI18n()
+const store = useStore()
+const router = useRouter()
+
+const props = defineProps({
+  idEdit: { type: [Number, String], required: true },
+})
+
+const showPassword = ref(false)
+
+const usernameEdit = computed(() => store.state.User.user?.fio ?? '')
+
+const form = useForm({
+  schema: {
+    password: {
+      initial: '',
+      rules: [
+        required(t('login.passwordRequired')),
+        minLength(6, t('user.chpass.tooShort')),
+      ],
     },
-    submitForm: function () {
-      if (this.password !== this.password_confirmation) {
-        this.errors.push("пароли не совпадают");
-        this.alert = true;
-        this.snackbarText = "пароли не совпадают";
-        this.alertType = "error";
-        setTimeout(() => this.$router.back(), 3000);
-      }
-      if (!this.errors.length) {
-        const formData = {
-          password: this.password,
-        };
-
-        this.$store
-          .dispatch("User/chpassUser", { id: this.idEdit, data: formData })
-          .then(() => {
-            this.snackbarText = "пароль успешно изменен";
-            this.alertType = "success";
-          })
-          .catch((error) => {
-            console.error(error);
-            this.snackbarText = "ошибка смены пароля";
-            this.alertType = "error";
-          })
-          .finally(() => {
-            this.alert = true;
-            setTimeout(() => this.$router.back(), 3000);
-          });
-      }
+    password_confirmation: {
+      initial: '',
+      rules: [
+        required(t('login.passwordRequired')),
+        sameAs('password', t('user.chpass.mismatch')),
+      ],
     },
   },
-};
+
+  onSubmit: async ({ values }) => {
+    await store.dispatch('User/chpassUser', {
+      id: props.idEdit,
+      data: { password: values.password },
+    })
+
+    toast.success(t('user.chpass.success'))
+    /*
+     * Возврат на страницу сделан сразу: раньше здесь стоял таймер,
+     * чтобы тост успел отрисоваться на этой странице. Тост живёт в
+     * общем стеке и переживает навигацию — ждать нечего, иначе
+     * пользователь секунду смотрит на пустую страницу.
+     */
+    await router.back()
+  },
+})
+
+const submitForm = () => {
+  form.submit()
+}
+
+const cancel = () => {
+  router.back()
+}
 </script>

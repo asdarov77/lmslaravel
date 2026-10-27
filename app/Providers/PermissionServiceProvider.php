@@ -7,6 +7,14 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use App\Policies\GroupPolicy;
 
+/**
+ * Регистрация прав как «abilities» Gate.
+ *
+ * Тело boot() закомментировано: проверки прав идут через middleware
+ * `permission`/`permission.all` и HasRolesAndPermissions, а не через
+ * $user->can('slug'). Не раскомментировать без необходимости — появятся
+ * две разные проверки с разными правилами.
+ */
 class PermissionServiceProvider extends ServiceProvider
 {
     /**

@@ -1,4 +1,5 @@
 import { LanguageService } from '../../services/language.service'
+import density from '../../utils/density'
 
 const UiModule = {
     namespaced: true,
@@ -6,6 +7,10 @@ const UiModule = {
 
         menudrawler: false,
         language: LanguageService.getLanguage(),
+        // Плотность интерфейса: default или compact. Начальное значение
+        // берётся из сохранённого выбора — иначе после перезагрузки
+        // переключатель показывал бы «обычную», хотя страница компактная.
+        density: density.read(),
         // errors: {}
     }),
     mutations: {
@@ -13,7 +18,6 @@ const UiModule = {
         LOGIN_SUCCESS(state) {
 
             state.menudrawler = true
-            //console.log('action login mutation',state)
         },
         //   LOGIN_ERROR(state, errors) {
         //     state.errors = errors
@@ -25,7 +29,6 @@ const UiModule = {
             //   state[key] = newState[key]
             // })
             state.menudrawler = false
-            //console.log('action logiout mutation',state)
 
         },
         //   SET_USER(state, user) {
@@ -34,6 +37,9 @@ const UiModule = {
         SET_LANGUAGE(state, lang) {
             state.language = lang
         },
+        SET_DENSITY(state, density) {
+            state.density = density
+        },
         //   // eslint-disable-next-line no-unused-vars
         //  RESET(state) {}
 
@@ -41,12 +47,10 @@ const UiModule = {
     actions: {
 
         login({ commit }) {
-            //  console.log('action login')
             commit('LOGIN_SUCCESS')
         },
 
         logout({ commit }) {
-            //console.log('action logout', state)
             commit('LOGOUT_SUCCESS')
         }
 

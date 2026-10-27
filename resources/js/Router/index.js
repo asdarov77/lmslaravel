@@ -1,33 +1,115 @@
 //import { createRouter,createWebHistory } from 'vue-router';
-import { createRouter,createWebHashHistory } from 'vue-router';
+import { createRouter,createWebHistory } from 'vue-router';
 import routes from './routes';
+import { TokenService } from '../services/storage.service';
+import store from '../Store';
+import { onUnauthorizedHandler } from '../api/httpClient';
+import NProgress from 'nprogress';
+import 'nprogress/nprogress.css';
+
+/*
+ * Полоса перехода между страницами.
+ *
+ * Раньше при переходе между маршрутами не было никакой индикации:
+ * пользователь кликал по пункту меню и ждал, пока страница
+ * перерисуется. Теперь сверху идёт тонкая полоса.
+ */
+NProgress.configure({
+  showSpinner: false,
+  trickleSpeed: 200,
+  minimum: 0.08,
+  easing: 'ease',
+});
+
+// Слой API не импортирует роутер (иначе возникает цикл
+// httpClient -> Router -> Store -> модули -> api -> httpClient).
+// Направление зависимости обратное: UI сообщает инфраструктуре,
+// куда уходить при 401/403/404/500.
+onUnauthorizedHandler(name => router.push({ name }).catch(err => err));
 
 const router = createRouter({
-//    history: createWebHistory(),
-    history: createWebHashHistory(),
+    history: createWebHistory(),
     routes
 })
 
-// защита от неавторизованных
+// Защита маршрутов: авторизация + права (meta.permission).
+// Фронтенд-проверки — только UX-фильтр; реальную безопасность
+// обеспечивает бэкенд (middleware `permission:` / Gate).
 
-router.beforeEach((to , from, next) => {
-        // const token = localStorage.getItem("token", token)   
-        const token = localStorage.getItem("token");   
-        //console.log(to.name , 'куда');
-        //console.log(from.name, 'откуда');
-        //console.log(token);
-        if(!token) {                                    
-            if(to.name === 'login' || to.name === 'regist') // если не авторизован,то открываем доступ для регистрации и авторизации
-            {            
+// Флаг «права уже синхронизированы с сервером» для текущей жизни
+// приложения (перезагрузка страницы сбрасывает его намеренно).
+/*
+ * Токен, для которого права уже синхронизированы.
+ *
+ * Раньше здесь был булев флаг на всё время жизни страницы, и это была
+ * утечка прав: при смене пользователя без перезагрузки (logout → вход
+ * другим человеком) новый сеанс продолжал работать с правами
+ * предыдущего. Гвард видел у старого пользователя users.permissions и
+ * пускал нового в раздел прав, которого у него нет.
+ *
+ * Теперь сравнивается именно токен: сменилась сессия — права
+ * перезапрашиваются.
+ */
+let syncedToken = null
+
+router.beforeEach(async (to , from, next) => {
+  NProgress.start();
+        // Раньше здесь стояло localStorage.getItem("token") напрямую:
+        // при недоступном хранилище (about:blank, sandbox, приватный
+        // режим) исключение всплывало как pageerror. TokenService
+        // возвращает null вместо throw.
+        const token = TokenService.getToken();
+        if(!token) {
+            // Публичные страницы: вход, регистрация и восстановление
+            // пароля. Последние нужны именно НЕавторизованному — на них
+            // пользователь попадает по прямой ссылке из письма, где он
+            // ещё не входил. Раньше список состоял только из login/regist,
+            // и ссылка из письма уводила на форму входа (бесконечное
+            // «забыл пароль → снова вход»), а сброс пароля был недостижим.
+            const PUBLIC_WITHOUT_TOKEN = ['login', 'regist', 'password.forgot', 'password.reset']
+
+            if (PUBLIC_WITHOUT_TOKEN.includes(to.name)) {
                 return next()
             }
-            else 
-            {             
-                return next({ name : 'login' })                
-            }        
-        }
-         next()
-})
 
+            return next({ name : 'login' })
+        }
+
+        // Публичные страницы ошибок доступны всем авторизованным
+        if (to.name === '403' || to.name === '404' || to.name === '500') {
+            return next()
+        }
+
+        // Требование прав объявлено в meta защищённых маршрутов
+        // (стиль Laravel Gate): достаточно ЛЮБОГО из списка (OR),
+        // как в middleware `permission:a,b` на бэкенде.
+        const required = to.meta?.permission
+
+        // RBAC-синхронизация: при первом переходе после перезагрузки
+        // страницы права во фронт-сторе приходят из LocalStorage — это
+        // снимок момента логина. Если администратору/инструктору выдали
+        // новые права, а сессия (токен) живёт дольше, чем перелогин,
+        // меню остаётся «укороченным», пока не дернем GET /api/v1/me.
+        // Флаг синхронизации — на сессию жизни приложения (не в LS).
+        if (token && syncedToken !== token) {
+            syncedToken = token
+            await store.dispatch('Auth/fetchCurrentUser').catch(() => null)
+        }
+
+        if (Array.isArray(required) && required.length > 0) {
+            // Права уже синхронизированы с сервером выше (или будут
+            // синхронизированы при первом же переходе после перезагрузки).
+            // Второй вызов /api/v1/me на каждый защищённый маршрут убирался
+            // намеренно: он не добавляет актуальности, но удваивает задержку.
+
+            const can = store.getters['Auth/hasPermission']
+            if (!can(required)) {
+                return next({ name: '403' })
+            }
+        }
+
+        next()
+  NProgress.done()
+})
 
 export default router

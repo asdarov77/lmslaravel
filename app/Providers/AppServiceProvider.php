@@ -7,6 +7,10 @@ use Illuminate\Support\Facades\Storage; //added
 use Illuminate\Support\Facades\URL; //added
 use App\Http\Controllers\GiftController;
 
+/**
+ * Общие регистрации сервисов приложения. Содержимое минимально: основные
+ * правила живут в AuthServiceProvider и PermissionServiceProvider.
+ */
 class AppServiceProvider extends ServiceProvider
 {
     /**

@@ -4,6 +4,11 @@ namespace App\Lyx;
 use App\Lyx\LyxSubsection;
 use App\Lyx\LyxToHtml;
 
+/**
+ * Раздел LyX — третий уровень вложенности.
+ *
+ * Часть мёртвого конвертера app/Lyx (см. LyxParser).
+ */
 class LyxSection
 {
     public $title = '';

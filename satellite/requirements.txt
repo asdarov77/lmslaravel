@@ -1,0 +1,17 @@
+# Python-сателлит тренажёра (Вариант A: ChromaDB + векторный поиск).
+#
+# Ставится на машине, где запущена LMS:
+#     python3 -m venv .venv-satellite
+#     .venv-satellite/bin/pip install -r satellite/requirements.txt
+#     .venv-satellite/bin/python -m uvicorn satellite.app:app --port 8100
+#
+# Версии зафиксированы по нижней границе: без них меняется поведение
+# эмбеддингов, а индекс становится несопоставимым с уже сохранённым.
+# Смена версии = переиндексация материалов.
+
+fastapi>=0.110,<1.0
+uvicorn[standard]>=0.27
+chromadb>=0.5,<1.0
+sentence-transformers>=3.0,<4.0
+# multilingual-e5-small требует numpy; без него импорт падает.
+numpy>=1.26,<3.0

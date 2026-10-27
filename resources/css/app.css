@@ -1,34 +1,1110 @@
+/**
+ * Базовые классы приложения.
+ *
+ * Не переопределяет Vuetify: опирается на токены (resources/css/tokens.css)
+ * и добавляет то, чего в библиотеке нет — таблицы данных, карточки
+ * форм, состояния строк, пустые состояния, фокус.
+ *
+ * Правило: никаких селекторов к «голым» элементам (button, td, table).
+ * Раньше именно они и текали наружу — RecursiveTable.vue задавал
+ * `td { border: 1px solid #ccc }` на все таблицы приложения,
+ * а QuestionItem.vue — `button { background: #4CAF50 }` на все кнопки.
+ */
+
+.u-page {
+  width: 100%;
+  max-width: var(--w-content-max);
+  margin: 0 auto;
+  padding: var(--sp-6) var(--sp-4) var(--sp-10);
+}
+
+/*
+ * Базовый кегль и шрифт.
+ *
+ * --font-family и --fs-base объявлены в tokens.css, но до этого нигде
+ * не применялись: Vuetify задаёт Roboto/16px в .v-application, и Inter
+ * с базовыми 15px до интерфейса не доходили (getComputedStyle показывал
+ * Roboto, 16px). Ставим оба здесь и перебиваем .v-application: у
+ * Vuetify селектор специфичнее одного селектора класса.
+ */
+html {
+  font-size: var(--fs-base);
+}
+
+body {
+  font-family: var(--font-family);
+}
+
+.v-application {
+  font-family: var(--font-family) !important;
+}
+
+/*
+ * Компенсация закреплённого футера.
+ *
+ * Футер в App.vue — <v-footer app bottom fixed>, то есть position: fixed
+ * и вне потока. Контейнер v-main сам места под него не резервирует,
+ * поэтому последние --app-footer-h пикселей страницы уезжали под футер:
+ * нижний ряд кнопок в списках нельзя было нажать, а текст — прочитать.
+ *
+ * Правило лежит на контейнере, а не на .u-page, потому что футер
+ * перекрывает и старые страницы без дизайн-системы (Home, Календарь).
+ * Когда футер скрыт (режим просмотра курса, v-show), остаётся
+ * безвредный лишний отступ.
+ */
+.v-main > .v-container {
+  padding-bottom: calc(var(--app-footer-h) + var(--sp-4));
+}
+
+@media (max-width: 960px) {
+  .u-page {
+    padding: var(--sp-4) var(--sp-3) var(--sp-8);
+  }
+}
+
+/* ------------------------------- заголовок ------------------------------- */
+.u-page__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-5);
+}
+
+.u-page__title {
+  margin: 0;
+  font-size: var(--fs-2xl);
+  line-height: var(--lh-tight);
+  font-weight: var(--fw-semibold);
+  color: var(--c-text);
+  letter-spacing: -0.01em;
+}
+
+.u-page__subtitle {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+  color: var(--c-text-secondary);
+  max-width: 68ch;
+}
+
+.u-page__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+/*
+ * Кнопки.
+ *
+ * Раньше здесь была вторая система кнопок — .u-btn с ролями
+ * primary/secondary/ghost/danger. Она не используется НИГДЕ: в
+ * разметке ни одного класса u-btn не осталось, все кнопки — это v-btn
+ * с темой Vuetify, читающей те же токены.
+ *
+ * Две параллельные системы кнопок — прямой путь к тому, что одна
+ * кнопка выглядит иначе в зависимости от того, кто её написал.
+ * Поэтому параллельная система удалена, а роли задаются через
+ * variant/color у v-btn: primary — color="primary", вторичное
+ * действие — variant="text" или "outlined", опасное — color="error".
+ */
+
+/*
+ * Значок языка.
+ *
+ * Общий для футера и страницы входа: раньше язык в футере был парой
+ * текстовых кнопок «eng/rus», а на странице входа — отдельным
+ * компонентом, и два переключателя выглядели по-разному.
+ *
+ * Состояние «включено» задаётся фоном из токенов, а не только
+ * насыщенностью текста: иначе активный язык не читается.
+ */
+.lang-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  background: transparent;
+  color: var(--c-text-secondary);
+}
+
+.lang-badge--on {
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  border-color: var(--c-primary-soft);
+}
+
+.lang-badge:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+}
+
+/*
+ * Скелетон загрузки.
+ *
+ * Раньше пока грузились данные, страница оставалась пустой — это
+ * выглядело как «приложение зависло». Теперь вместо пустоты рисуется
+ * скелетон с пульсацией.
+ */
+.app__skeleton {
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.app__skeleton-bar {
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--c-skeleton);
+  animation: app-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.app__skeleton-line {
+  height: 14px;
+  border-radius: 4px;
+  background: var(--c-skeleton);
+  animation: app-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.app__skeleton-line--w80 { width: 80%; }
+.app__skeleton-line--w60 { width: 60%; }
+
+@keyframes app-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/*
+ * Учебный режим (страница курса).
+ *
+ * На странице курса шапка и футер не нужны: это полноэкранный просмотр
+ * материала. Раньше они скрывались через v-show по флагу, и при переходе
+ * на страницу курса мигали. Теперь это вариант раскладки: класс
+ * app--course на v-app скрывает их через CSS.
+ */
+.app--course .v-app-bar,
+.app--course .app__footer {
+  display: none;
+}
+
+/*
+ * Плотность интерфейса.
+ *
+ * Раньше плотность была зашита в токенах, и пользователь не мог её
+ * изменить. Теперь есть переключатель в шапке, и плотность задаётся
+ * через data-атрибут на <html>.
+ */
+:root[data-density='compact'] {
+  --sp-1: 2px;
+  --sp-2: 4px;
+  --sp-3: 8px;
+  --sp-4: 12px;
+  --sp-5: 16px;
+  --sp-6: 24px;
+}
+
+/* -------------------------------- карточки ------------------------------- */
+.u-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+}
+
+.u-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.u-card__title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  color: var(--c-text);
+}
+
+.u-card__body {
+  padding: var(--sp-5);
+}
+
+.u-card__body--flush {
+  padding: 0;
+}
+
+.u-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-5);
+  border-top: 1px solid var(--c-border);
+  background: var(--c-surface-2);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+/* --- Стеклянные карточки (glassmorphism) ------------------------------- */
+
+/* Полупрозрачная карточка с размытием заднего фона и тонкой обводкой.
+   Смотсится лёгко и современно, не перегружает страницу. */
+.u-card--glass {
+  background: var(--c-glass-bg);
+  border: 1px solid var(--c-glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--c-glass-shadow);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  transition:
+    border-color var(--dur-base) var(--ease),
+    box-shadow var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease);
+}
+
+.u-card--glass:hover {
+  border-color: rgb(255 255 255 / 0.55);
+  box-shadow: var(--shadow-3);
+}
+
+/* Карточка с глубокой тенью и подъёмом при наведении — для главных
+   блоков дашборда, где нужно выделить акцент. */
+.u-card--elevated {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-2);
+  transition:
+    box-shadow var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease-spring);
+}
+
+.u-card--elevated:hover {
+  box-shadow: var(--shadow-4);
+  transform: translateY(-4px);
+}
+
+/* Карточка-лента (активный/выбранный элемент) — тонкая цветная обводка
+   и мягкий фон вместо тяжёлой заливки. */
+.u-card--ring {
+  position: relative;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-1);
+}
+
+.u-card--ring::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-xl);
+  padding: 1px;
+  background: linear-gradient(135deg, var(--c-primary), var(--c-accent));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: destination-out;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease);
+}
+
+.u-card--ring:hover::before,
+.u-card--ring.is-active::before {
+  opacity: 1;
+}
+
+/* --- Микро-взаимодействия --------------------------------------------- */
+
+/* Подъём элемента при наведении — для карточек каталога, курсов, списков. */
+.u-hover-lift {
+  transition:
+    transform var(--dur-base) var(--ease-spring),
+    box-shadow var(--dur-base) var(--ease),
+    border-color var(--dur-base) var(--ease);
+}
+
+.u-hover-lift:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-3);
+}
+
+.u-hover-lift:active {
+  transform: translateY(-2px);
+}
+
+/* Градиентный текст — для больших заголовков, цифр KPI, акцентов. */
+.u-text-gradient {
+  background: linear-gradient(135deg, var(--c-gradient-hero-1), var(--c-gradient-hero-2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Кнопка-стекло: полупрозрачная, с ореолом при наведении. */
+.u-btn-glass {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  height: 40px;
+  padding: 0 var(--sp-5);
+  background: var(--c-glass-bg);
+  border: 1px solid var(--c-glass-border);
+  border-radius: var(--radius-pill);
+  color: var(--c-text);
+  font: inherit;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+
+.u-btn-glass:hover {
+  background: var(--c-surface);
+  border-color: var(--c-border-strong);
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-1px);
+}
+
+.u-btn-glass:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+/* --- Анимации списков (stagger) --------------------------------------- */
+
+/* Детейл-вход элементов списка по очереди — используется через
+   директиву v-stagger или вручную с data-stagger-index. */
+[data-stagger] {
+  opacity: 0;
+  transform: translateY(12px);
+  animation:
+    stagger-enter var(--dur-slow) var(--ease-out) forwards;
+}
+
+[data-stagger-index] {
+  animation-delay: calc(var(--stagger-delay) * var(--stagger-index));
+}
+
+@keyframes stagger-enter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Пульсирующая точка (живой индикатор) — для статусов, онлайна, новых
+   уведомлений без раздражающего мигания. */
+.u-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-success);
+  box-shadow: var(--c-glow-accent);
+  animation: u-pulse 2s ease-in-out infinite;
+}
+
+@keyframes u-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.7;
+  }
+}
+
+/* --- Усиленные переходы страниц --------------------------------------- */
+
+/* Scale + fade (более выраженный эффект, чем базовый slide). */
+.page-scale-enter-active,
+.page-scale-leave-active {
+  transition:
+    opacity var(--page-transition-dur) var(--page-transition-ease),
+    transform var(--page-transition-dur) var(--ease-spring);
+}
+
+.page-scale-enter-from {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.page-scale-leave-to {
+  opacity: 0;
+  transform: scale(1.03);
+}
+
+/* Reduced motion — отключаем все анимации выше. */
+@media (prefers-reduced-motion: reduce) {
+  [data-stagger],
+  [data-stagger-index] {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+  .u-pulse {
+    animation: none !important;
+    opacity: 1;
+  }
+  .page-scale-enter-active,
+  .page-scale-leave-active {
+    transition: none !important;
+  }
+  .page-scale-enter-from,
+  .page-scale-leave-to {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* --------------------------------- переходы ------------------------------- */
+.page-enter-active,
+.page-leave-active {
+  transition: opacity var(--dur-base, 200ms) var(--ease-out, ease), transform var(--dur-base, 200ms) var(--ease-out, ease);
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* Уважаем prefers-reduced-motion. */
+@media (prefers-reduced-motion: reduce) {
+  .page-enter-active,
+  .page-leave-active {
+    transition: none;
+  }
+}
+
+/* --------------------------------- таблица ------------------------------- */
+/* Одна разметка для всех списков: шапка, строки, зебра, hover, выделение.
+   Раньше у каждой страницы своя: v-table/v-data-table/сырой table,
+   без зебры и hover, с курсором-указателем на всей таблице. */
+.u-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--fs-base);
+  color: var(--c-text);
+}
+
+.u-table th {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  padding: var(--sp-3) var(--sp-4);
+  text-align: left;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+  background: var(--c-surface-2);
+  border-bottom: 1px solid var(--c-border);
+  white-space: nowrap;
+}
+
+.u-table td {
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--c-border);
+  vertical-align: middle;
+}
+
+.u-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.u-table tbody tr:hover {
+  background: var(--c-surface-2);
+}
+
+/* Выделенная строка (текущий элемент, найденная запись). */
+.u-table tbody tr.is-selected,
+.u-table tbody tr.is-selected:hover {
+  background: var(--c-primary-soft);
+}
+
+/* Строка с действиями: курсор только там, где он осмыслен. */
+.u-table td.u-table__actions {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.u-table__num {
+  color: var(--c-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Узкая числовая колонка (число ответов, счётчик).
+ *
+ * tabular-nums обязателен: без него цифры в колонке «прыгают» при
+ * переходе между 9 и 10, и таблица визуально «дёргается».
+ */
+.u-table th.u-table__answers,
+.u-table td.u-table__answers {
+  width: 1%;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.u-table-wrap {
+  overflow-x: auto;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+/* --------------------------------- формы --------------------------------- */
+.u-field {
+  display: block;
+  margin-bottom: var(--sp-4);
+}
+
+.u-field__label {
+  display: block;
+  margin-bottom: var(--sp-1);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--c-text);
+}
+
+/* Обязательное поле помечаем и цветом, и символом — не только цветом. */
+.u-field__label--required::after {
+  content: ' *';
+  color: var(--c-danger);
+  font-weight: var(--fw-bold);
+}
+
+.u-field__hint {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+  line-height: var(--lh-normal);
+}
+
+.u-field__error {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--c-danger);
+  line-height: var(--lh-normal);
+}
+
+.u-field__error::before {
+  content: '⚠ ';
+}
+
+/* Сетка полей: две колонки на широких экранах, одна на узких. */
+.u-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--sp-4);
+}
+
+.u-grid--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.u-grid__full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 720px) {
+  .u-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ------------------------------ служебное -------------------------------- */
+.u-muted {
+  color: var(--c-text-muted);
+}
+
+.u-secondary {
+  color: var(--c-text-secondary);
+}
+
+.u-nowrap {
+  white-space: nowrap;
+}
+
+.u-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+  Моноширинный текст с разрядкой: секреты двухфакторной аутентификации и
+  подобные значения, где важно отличать похожие символы (0/O, 1/l).
+  Раньше это стояло инлайном в MyAccount.vue.
+*/
+.u-mono {
+  font-family: var(--font-mono);
+  letter-spacing: 0.1em;
+}
+
+/*
+  Название группы в списке пользователей.
+
+  `.u-truncate` сам по себе не ограничивает ширину: в ячейке таблицы
+  `span` остаётся строчным, и текст либо размазывает колонку, либо
+  обрезается не там. Ограничение в ch, а не в px: колонка тянется за
+  содержимым, и 24ch — это примерно длина реального названия группы.
+*/
+.u-clamp-group {
+  display: block;
+  max-width: 24ch;
+}
+
+.u-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Пустое состояние: раньше списки просто были пустыми, и было
+   непонятно — данных нет, фильтр ничего не нашёл или ошибка. */
+.u-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-12) var(--sp-4);
+  text-align: center;
+  color: var(--c-text-secondary);
+}
+
+.u-empty__icon {
+  color: var(--c-text-muted);
+  opacity: 0.7;
+}
+
+.u-empty__title {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  color: var(--c-text);
+}
+
+.u-empty__text {
+  font-size: var(--fs-sm);
+  max-width: 46ch;
+  margin: 0;
+}
+
+/* Бейджи статусов. */
+.u-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 22px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--radius-full);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: var(--c-surface-3);
+  color: var(--c-text-secondary);
+}
+
+.u-badge--primary { background: var(--c-primary-soft); color: var(--c-primary); }
+.u-badge--success { background: var(--c-success-soft); color: var(--c-success); }
+.u-badge--warning { background: var(--c-warning-soft); color: var(--c-warning); }
+.u-badge--danger  { background: var(--c-danger-soft);  color: var(--c-danger); }
+/* Приглушённый бейдж: второстепенные метки (специальности, статус
+   «запланирован»), которые не должны спорить с основным заголовком. */
+.u-badge--muted   { background: var(--c-surface-3);      color: var(--c-text-secondary); }
+
+/* ------------------------- переключающие чипы ------------------------- */
+/* Фильтр-чип: «Все», «КЛЕН», «БПЛА» и подобные. Общий компонент,
+   потому что фильтр нужен и в категориях, и в курсах. */
+.cats-chip {
+  height: 28px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--c-surface);
+  color: var(--c-text-secondary);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.cats-chip:hover {
+  border-color: var(--c-primary);
+  color: var(--c-primary);
+}
+
+.cats-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.cats-chip--on {
+  background: var(--c-primary);
+  border-color: var(--c-primary);
+  color: var(--c-on-primary);
+}
+
+.cats-chip--on:hover {
+  color: var(--c-on-primary);
+}
+
+/* Пониженная прозрачность на время загрузки/сохранения. */
+.u-is-busy {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.65;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ==================================================================
+   СОВМЕСТИМОСТЬ — временный блок.
+
+   Эти классы пришли из старой версии app.css и до сих пор
+   используются в 4 шаблонах (UserCourse.vue, UserPage.vue,
+   GradeSettings1.vue). Файл app.css не был подключён к сборке
+   (в vite.config.mjs строка с ним закомментирована), а шаблоны
+   подключали его через @import внутри <style> — то есть стили
+   приезжали в одну страницу и не в другие.
+
+   Теперь app.css подключён глобально (см. resources/js/app.js),
+   поэтому классы надо сохранить, иначе эти страницы потеряют вид.
+   Когда шаблоны переедут на ui-классы, блок можно удалить целиком.
+   ================================================================== */
+
 .course-table {
-    width: 80%;
-    margin: 0 auto;
-    border: 1px solid #DCDCDC;
+  width: 100%;
+  margin: 0 auto;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
+
 .h1-title {
-    font-weight: normal;
-    text-align: center;
-    margin-bottom: 20px;
+  font-weight: var(--fw-semibold);
+  text-align: center;
+  margin-bottom: var(--sp-4);
+  font-size: var(--fs-2xl);
+  line-height: var(--lh-tight);
+  color: var(--c-text);
 }
+
 .next-lesson {
-    background-color: #B0E0E6;
-    width: max-content;
-    padding: 5px 10px;
-    border-radius: 10px;
-    margin: 20px auto;
+  background-color: var(--c-primary-soft);
+  color: var(--c-primary);
+  width: max-content;
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--radius-full);
+  margin: var(--sp-4) auto;
+  font-size: var(--fs-sm);
 }
+
 .th-table {
-    background-color: #DCDCDC;
-    border: 1px solid #DCDCDC;
-    font-size: 25px !important;
-    font-weight: 400 !important;
-    color: rgba(112, 107, 107, 0.75);
+  background-color: var(--c-surface-2);
+  border: 1px solid var(--c-border);
+  font-size: var(--fs-base) !important;
+  font-weight: var(--fw-semibold) !important;
+  color: var(--c-text-secondary);
 }
+
 .topic-name {
-    background-color: #f5f5f5;
-    font-size: 18px !important;
-    font-weight: 400 !important;
-    color: rgb(112, 107, 107);
-    text-align: center;
+  background-color: var(--c-surface-3);
+  font-size: var(--fs-md) !important;
+  font-weight: var(--fw-medium) !important;
+  color: var(--c-text-secondary);
+  text-align: center;
+  padding: var(--sp-2);
 }
-td, tr {
-    border: 1px solid #DCDCDC;
+
+/* ============================================================
+   Каркас приложения (App.vue)
+
+   Раньше каркас опирался на классы, которых в проекте нет:
+   в шапке — инлайновый style, в футере — `container mx-auto flex
+   justify-between items-center` (Tailwind и Bulma одновременно).
+   Из-за этого футер не раскладывался: копирайт и переключатель
+   языка стояли друг под другом, а `--app-footer-h` в CSS считался
+   по высоте, которой на самом деле не было.
+   ============================================================ */
+
+.app__brand {
+  /*
+    Цвет берётся из --c-text, а НЕ из --c-on-primary.
+
+    Шапка перестала быть залитой primary: теперь это «стеклянная» панель,
+    которая в светлой теме белая, а в тёмной тёмная. Старое
+    `color: var(--c-on-primary)` считало, что под текстом насыщенный
+    синий, и давало белый по белому в светлой теме (контраст 1.0) и
+    тёмный по тёмному в тёмной (1.04) — логотип с названием был
+    фактически не виден ни в одной теме. --c-text переключается вместе
+    с темой, поэтому читается на обеих.
+  */
+  color: var(--c-text);
+  text-decoration: none;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app__brand:hover,
+.app__brand:focus-visible {
+  text-decoration: underline;
+}
+
+/* Стеклянная шапка: полупрозрачный фон, размытие, тонкая обводка.
+   Primary больше не закрашивает панель целиком — это выглядело тяжело
+   и «ведомственно». Теперь шапка légère и не конкурирует с контентом. */
+/*
+ * Skip-ссылка «к содержимому».
+ *
+ * В покое спрятана, но не display:none и не visibility:hidden — иначе
+ * она выпала бы из порядка обхода и не получила фокус с клавиатуры.
+ */
+.app__skip-link {
+  position: absolute;
+  top: var(--sp-2);
+  left: var(--sp-2);
+  z-index: 2000;
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-md);
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.app__skip-link:focus-visible {
+  transform: translateY(0);
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+.app__bar {
+  background: var(--c-glass-bg);
+  border-bottom: 1px solid var(--c-glass-border);
+  box-shadow: none;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* Ширина рабочей области ограничена токеном: на широком мониторе
+   таблицы и карточки растягивались на всю страницу и становились
+   нечитаемыми. */
+/*
+   Селектор с .v-container обязателен: у Vuetify правило
+   `.v-container.v-container--fluid { max-width: 100% }` — два класса,
+   и оно побеждает одиночный `.app__content`. Из-за этого рабочая
+   область оставалась во всю ширину окна, а таблицы на широком
+   мониторе растягивались и становились нечитаемыми.
+*/
+.v-container.app__content {
+  max-width: var(--w-content-max);
+  margin: 0 auto;
+  padding: var(--sp-4) var(--sp-4) 0;
+}
+
+.app__footer {
+  border-top: 1px solid var(--c-border, var(--c-surface-3));
+  background: var(--c-surface);
+}
+
+.app__footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: var(--w-content-max);
+  margin: 0 auto;
+  padding: var(--sp-2) var(--sp-4);
+}
+
+.app__copyright {
+  margin: 0;
+  color: var(--c-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.app__langs {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+@media (max-width: 640px) {
+  .app__footer-inner {
+    justify-content: center;
+  }
+}
+
+/* Глобальный поиск в шапке. На узких экранах подсказка сжимается,
+   поэтому нижняя граница кнопки остаётся на всю доступную ширину. */
+.app__search {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin-left: auto;
+}
+
+/*
+ * Кнопка палитры команд.
+ *
+ * margin-left: 0, а не auto: auto-отступ двигает блок к правому краю,
+ * и после него кнопка прилипала бы к теме, теряясь среди прочих
+ * иконок. Здесь нужен только отступ от поиска.
+ */
+.app__cmdk {
+  flex: none;
+  margin-left: var(--sp-1);
+  opacity: 0.75;
+}
+
+.app__cmdk:hover,
+.app__cmdk:focus-visible {
+  opacity: 1;
+}
+
+@media (max-width: 960px) {
+  .app__search .u-search__hint,
+  .app__search .u-search__kbd {
+    display: none;
+  }
+}
+
+/* ==================================================================
+   ФОКУС — единый для всех интерактивных элементов.
+   Раньше фокус с клавиатуры был почти нигде не виден: браузерный
+   outline выглядел по-разному на кнопках, полях и чипах.
+   ================================================================== */
+:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/*
+  Vuetify снимает outline у своих полей классом `.v-field__input:focus`
+  — он специфичнее голого `:focus-visible`, и кольцо фокуса не
+  появлялось НИ НА ОДНОМ поле формы: ни «Класс», ни «Группа», ни
+  категория. С клавиатуры по форме было не пройти.
+  Возвращаем кольцо с достаточной специфичностью; рамку поля
+  рисует сам Vuetify, поэтому дублирования контура нет.
+  WCAG 2.2 SC 2.4.7 (Focus Visible), 2.4.11 (Focus Not Obscured).
+*/
+/* Специфичность 0-3-0 против 0-2-0 у Vuetify: порядок подключения
+   таблиц стилей не должен решать, виден фокус или нет. */
+.v-field .v-field__input:focus-visible,
+.v-field .v-select__selection-text:focus-visible,
+textarea.v-field__input:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 1px;
+}
+
+/* ==================================================================
+   ПЛОТНОСТЬ — компактный режим влияет на таблицы и формы глобально.
+   Переключатель в шапке (App.vue) ставит data-density="compact" на
+   <html> через utils/density.js: раньше флаг менялся только в Vuex,
+   и переключатель не производил никакого эффекта.
+   ================================================================== */
+:root[data-density='compact'] .v-table {
+  --v-table-row-height: 36px;
+}
+
+:root[data-density='compact'] .u-field {
+  margin-bottom: var(--sp-3);
+}
+
+/* Кнопки в компактном режиме ниже обычных (40 -> 34): в плотных
+   таблицах и тулбарах строки действий иначе распирают высоту строки. */
+:root[data-density='compact'] .v-btn:not(.v-btn--icon) {
+  height: 34px;
+}
+
+/* ==================================================================
+   СКРОЛЛБАРЫ — тонкие, в цветах токенов. Раньше были системными
+   и выглядели чужеродно в тёмной теме.
+   ================================================================== */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--c-border-strong);
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--c-text-muted);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* ==================================================================
+   REDUCED MOTION — отключаем анимации для пользователей,
+   которые просили меньше движения в системе.
+   ================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -3,6 +3,10 @@
 namespace App\Http\Filters;
 use Illuminate\Database\Eloquent\Builder;
 
+/**
+ * Фильтры выборки Group2learning по course_id, category_id, group_id и
+ * course_title (LIKE по courses.title с подгрузкой связи).
+ */
 class Group2learningFilter extends AbstractFilter
 {
     public const COURSE_ID = 'course_id';

@@ -4,6 +4,10 @@ namespace App\Http\Requests\Question;
 
 use Illuminate\Foundation\Http\FormRequest;
 
+/**
+ * Валидация фильтров банка вопросов. Все параметры nullable|int, чтобы пустые
+ * фильтры фронта давали пустой список, а не 422.
+ */
 class FilterRequest extends FormRequest
 {
     /**
@@ -23,10 +27,13 @@ class FilterRequest extends FormRequest
      */
     public function rules()
     {
+        // nullable: фронт шлёт пустые фильтры (category_id=), а QuestionsController::index
+        // сам вызывает array_filter($data) и рассчитан на их отбрасывание.
+        // Без nullable пустой фильтр падал в 422 и ломал страницу вопросов.
         return [
-            'aukstructure_id' => 'int',
-            'category_id' => 'int',
-            'id' => 'int',
+            'aukstructure_id' => 'nullable|int',
+            'category_id' => 'nullable|int',
+            'id' => 'nullable|int',
         ];
     }
 }

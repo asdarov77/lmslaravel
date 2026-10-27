@@ -4,6 +4,10 @@ namespace App\Http\Requests\Group2learning;
 
 use Illuminate\Foundation\Http\FormRequest;
 
+/**
+ * Валидация фильтров учебных записей: group_id, course_id, category_id (int)
+ * и course (string).
+ */
 class FilterRequest extends FormRequest
 {
     /**

@@ -1,0 +1,67 @@
+<template>
+  <div class="styleguide">
+    <PageHeader
+      :title="$t('styleguide.title')"
+      :subtitle="$t('styleguide.subtitle')"
+      icon="mdi-palette-swatch"
+    />
+
+    <!--
+      TabsForm вместо v-tabs + v-tabs-items: это компоненты Vuetify 2,
+      которых в Vuetify 3 нет. В prod-сборке неизвестный тег молча
+      превращался в пустой элемент — вкладки переключались, а под ними
+      ничего не было. Заодно полоса вкладок стала той же, что на
+      остальных страницах.
+    -->
+    <TabsForm :tabs="tabs">
+      <template v-for="tab in tabs" #[tab.key]>
+        <component :is="tab.component" />
+      </template>
+    </TabsForm>
+  </div>
+</template>
+
+<script>
+import PageHeader from '../../components/ui/PageHeader.vue'
+import TabsForm from '../../components/ui/TabsForm.vue'
+import StyleguideColors from './StyleguideColors.vue'
+import StyleguideTypography from './StyleguideTypography.vue'
+import StyleguideSpacing from './StyleguideSpacing.vue'
+import StyleguideComponents from './StyleguideComponents.vue'
+import StyleguideMotion from './StyleguideMotion.vue'
+import StyleguideDarkMode from './StyleguideDarkMode.vue'
+
+export default {
+  name: 'Styleguide',
+
+  components: {
+    PageHeader,
+    TabsForm,
+    StyleguideColors,
+    StyleguideTypography,
+    StyleguideSpacing,
+    StyleguideComponents,
+    StyleguideMotion,
+    StyleguideDarkMode,
+  },
+
+  setup() {
+    const tabs = [
+      { key: 'colors', title: 'Цвета', component: 'StyleguideColors' },
+      { key: 'typography', title: 'Типографика', component: 'StyleguideTypography' },
+      { key: 'spacing', title: 'Отступы', component: 'StyleguideSpacing' },
+      { key: 'components', title: 'Компоненты', component: 'StyleguideComponents' },
+      { key: 'motion', title: 'Motion', component: 'StyleguideMotion' },
+      { key: 'dark', title: 'Тёмная тема', component: 'StyleguideDarkMode' },
+    ]
+
+    return { tabs }
+  },
+}
+</script>
+
+<style scoped>
+.styleguide__tabs {
+  margin-top: var(--sp-4);
+}
+</style>

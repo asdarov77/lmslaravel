@@ -1,322 +1,564 @@
 <template>
-  <link
-    rel="stylesheet"
-    href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css"
-  />
-  <div class="courses">
-    <div class="hero is-info">
-      <div class="hero-body has-text-centered">
-        <h1 class="title">Автоматизированные учебные курсы</h1>
-      </div>
+  <div class="u-page">
+    <PageHeader
+      :title="$t('courses.list.title')"
+      :subtitle="$t('courses.list.subtitle')"
+    >
+      <template #actions>
+        <v-btn color="primary" variant="flat" :to="{ name: 'course.store' }">
+          <v-icon start icon="mdi-plus" size="18" aria-hidden="true"></v-icon>
+          {{ $t("courses.list.create") }}
+        </v-btn>
+      </template>
+    </PageHeader>
+
+    <div class="courses">
+      <!-- ============================ фильтры ============================ -->
+      <aside class="courses__filters">
+        <section class="u-card courses__filter-block">
+          <h2 class="courses__filter-title">{{ $t("courses.list.filterAircraft") }}</h2>
+          <div class="courses__chips">
+            <button
+              v-for="tag in tags"
+              :key="tag.id"
+              type="button"
+              class="cats-chip"
+              :class="{ 'cats-chip--on': Number(selectedAircraft) === Number(tag.id) }"
+              :aria-pressed="Number(selectedAircraft) === Number(tag.id)"
+              @click="clickair(tag.id)"
+            >
+              {{ tag.path }}
+            </button>
+          </div>
+        </section>
+
+        <section class="u-card courses__filter-block">
+          <h2 class="courses__filter-title">{{ $t("courses.list.filterCategory") }}</h2>
+          <nav class="courses__nav" :aria-label="$t('courses.list.filterCategory')">
+            <button
+              type="button"
+              class="courses__nav-item"
+              :class="{ 'courses__nav-item--on': !activeCategory }"
+              :aria-current="!activeCategory ? 'true' : null"
+              @click="setActiveCategory({ id: 0 })"
+            >
+              {{ $t("courses.list.allCategories") }}
+            </button>
+            <button
+              v-for="_category in categories"
+              :key="_category.id"
+              type="button"
+              class="courses__nav-item"
+              :class="{ 'courses__nav-item--on': activeCategory && activeCategory.id === _category.id }"
+              :aria-current="activeCategory && activeCategory.id === _category.id ? 'true' : null"
+              @click="setActiveCategory(_category)"
+            >
+              {{ _category.title }}
+            </button>
+          </nav>
+        </section>
+
+        <!--
+          Переключатель видимости. Раньше подпись формировалась как
+          «Показать: true» — булево значение пользователю ничего
+          не объясняло. Теперь это переключатель с понятными словами.
+        -->
+        <section class="u-card courses__filter-block">
+          <v-switch
+            v-model="show"
+            color="primary"
+            hide-details
+            :label="show ? $t('courses.list.onlyVisible') : $t('courses.list.onlyHidden')"
+            @update:model-value="getCourses"
+          ></v-switch>
+        </section>
+      </aside>
+
+      <!-- ============================= сетка ============================= -->
+      <section class="courses__grid">
+        <EmptyState
+          v-if="!visibleCourses.length"
+          :icon="'mdi-book-open-page-variant-outline'"
+          :title="hasFilters ? $t('courses.list.emptyFiltered') : $t('courses.list.emptyTitle')"
+          :text="hasFilters ? $t('courses.list.emptyFilteredText') : $t('courses.list.emptyText')"
+        ></EmptyState>
+
+        <article
+          v-for="course in visibleCourses"
+          :key="course.id"
+          class="courses__card"
+          :data-course-id="course.id"
+        >
+          <h3 class="courses__card-title">{{ course.title }}</h3>
+
+          <p class="courses__card-text">
+            {{ course.short_description || $t('courses.list.noDescription') }}
+          </p>
+
+          <div class="courses__card-meta">
+            <span class="u-badge">{{ course.path }}</span>
+            <span v-if="course.category" class="u-badge">{{ course.category.title }}</span>
+            <span v-if="!course.visible" class="u-badge u-badge--warning">
+              {{ $t("courses.list.hidden") }}
+            </span>
+            <span v-if="course.status" class="u-badge" :class="statusBadgeClass(course.status)">
+              {{ statusLabel(course.status) }}
+            </span>
+          </div>
+
+          <div class="courses__card-instructors" v-if="course.instructors && course.instructors.length">
+            <router-link
+              v-for="instructor in course.instructors"
+              :key="instructor.id"
+              :to="{ name: 'instructor.profile', params: { id: instructor.id } }"
+              :aria-label="`${$t('profile.title')}: ${instructor.fio}`"
+              :title="instructor.fio"
+              class="mr-1"
+            >
+              <v-avatar size="28" color="primary">
+                <span class="text-white text-caption">
+                  {{ instructor.fio.charAt(0).toUpperCase() }}
+                </span>
+              </v-avatar>
+            </router-link>
+          </div>
+
+          <!--
+            Действия: просмотр, редактирование, удаление, открыть.
+            Раньше «Открыть» и «Удалить» были одного цвета error, поэтому
+            необратимое действие не выделялось. Теперь удаление — единственная
+            красная кнопка, а «Открыть» ведёт в отдельную вкладку, о чём
+            сказано в подсказке.
+          -->
+          <div class="courses__actions">
+            <v-btn
+              size="small"
+              variant="tonal"
+              color="primary"
+              :to="{ name: 'courses.desc', params: { idEdit: course.id } }"
+            >
+              {{ $t("courses.list.more") }}
+            </v-btn>
+
+            <v-btn
+              size="small"
+              variant="text"
+              :to="{ name: 'course.update', params: { idEdit: course.id } }"
+              :aria-label="`${$t('courses.list.edit')}: ${course.title}`"
+              :title="$t('courses.list.edit')"
+            >
+              <v-icon icon="mdi-pencil-outline" size="18" aria-hidden="true"></v-icon>
+            </v-btn>
+
+            <v-btn
+              size="small"
+              variant="text"
+              color="primary"
+              :to="{ name: 'courses.itemmani', query: { idEdit: course.id } }"
+              target="_blank"
+              :aria-label="`${$t('courses.list.openManifest')}: ${course.title}`"
+              :title="$t('courses.list.openManifestHint')"
+            >
+              <v-icon icon="mdi-open-in-new" size="18" aria-hidden="true"></v-icon>
+            </v-btn>
+
+            <v-btn
+              size="small"
+              variant="text"
+              :color="isPinned(course.id) ? 'warning' : undefined"
+              :aria-label="`${$t('courses.list.pin')}: ${course.title}`"
+              :title="$t('courses.list.pin')"
+              @click="togglePin(course)"
+            >
+              <v-icon
+                :icon="isPinned(course.id) ? 'mdi-pin' : 'mdi-pin-outline'"
+                size="18"
+                aria-hidden="true"
+              ></v-icon>
+            </v-btn>
+
+            <v-btn
+              size="small"
+              variant="text"
+              color="error"
+              :aria-label="`${$t('courses.list.delete')}: ${course.title}`"
+              :title="$t('courses.list.delete')"
+              @click="askDelete(course)"
+            >
+              <v-icon icon="mdi-trash-can-outline" size="18" aria-hidden="true"></v-icon>
+            </v-btn>
+          </div>
+        </article>
+      </section>
     </div>
-    <section class="section">
-      <div class="container">
-        <div class="columns">
-          <div class="column is-2">
-            <aside class="menu">
-              <p class="menu-label">Классы</p>
-              <v-chip
-                @click="clickair(tag.id)"
-                v-for="tag in tags"
-                :key="tag.id"
-                
-                class="xxx ml-1 mr-1"
-                :selected="selected"               
-              >
-                {{ tag.path }}
-              </v-chip>
-            </aside>
-            <v-divider></v-divider>
-            <aside class="menu">
-              <p class="menu-label">Категории курсов</p>
-              <ul class="menu-list">
-                <li >
-                  <a 
-                    v-bind:class="{ 'is-active': !activeCategory }"
-                    @click="setActiveCategory({ id: 0 })"
-                    >{{ activeCategory.id }}/{{ aircraft_id }}
-                    Все категории
-                  </a>
-                </li>
-                <li
-                  v-for="_category in categories"
-                  v-bind:key="_category.id"
-                  @click="setActiveCategory(_category)"
-                >
-                  <a> {{ _category.title }} </a>
-                </li>
-              </ul>
-              <v-switch
-                v-model="show"
-                hide-details
-                :label="`Показать: ${show.toString()}`"
-                @change="getCourses(this.show)"
-              ></v-switch>
-            </aside>
-          </div>
-          <div class="column is-10">
-            <div class="columns is-multiline">
-              <div
-                class="column is-4"
-                v-for="course in courses.filter(
-                  (course) => course.visible === this.show
-                )"
-                v-bind:key="course.id"
-              >
-                <div class="card">
-                  <div class="card-image">
-                    <figure class="image is-4by3">
-                      <img
-                        src="http://bulma.io/images/placeholders/640x480.png"
-                        alt="Placeholder image"
-                      />
-                    </figure>
-                  </div>
-                  <div class="card-content">
-                    <div class="media">
-                      <div class="media-content">
-                        <p class="is-size-5">{{ course.title }}</p>
-                      </div>
-                    </div>
-                    <div class="content">
-                      <p>{{ course.short_description }}</p>
-                      <v-row align="center" justify="space-around">
-                        <v-btn size="small"
-                          color="primary"
-                          flat
-                          :to="{
-                            name: 'courses.desc',
-                            params: { idEdit: course.id },
-                          }"
-                        >
-                          Больше
-                        </v-btn>
-                        <v-btn size="small"
-                          color="blue-grey"
-                          flat
-                          :to="{
-                            name: 'course.update',
-                            params: {
-                              idEdit: course.id,
-                            },
-                          }"
-                          >Редактировать</v-btn
-                        >
-                        <v-btn size="small"
-                          color="error"
-                          flat
-                          @click="deleteCourse(course.id)"
-                          >Удалить</v-btn
-                        >
-                        <v-btn size="small"
-                          color="error"
-                          flat
-                          :to="{
-                            name: 'courses.itemmani',
-                            params: { idEdit: course.id },
-                          }"  target="_blank"
-                          >Открыть</v-btn
-                        >
-                        <!-- <v-btn
-                          color="error"
-                          flat
-                          :to="{
-                            name: 'courses.item',
-                            params: { idEdit: course.id },
-                          }"  target="_blank"
-                          >MF</v-btn
-                        > -->                        
-                      </v-row>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="column is-12">
-                <nav class="pagination">
-                  <a class="pagination-previous">Предыдущий</a>
-                  <a class="pagination-next">Следующий</a>
-                  <v-btn
-                    color="secondary"
-                    class="pagination-link is centred"
-                    :to="{ name: 'course.store' }"
-                    >Добавить курс</v-btn
-                  >
-                  <ul class="pagination-list">
-                    <li>
-                      <a class="pagination-link is-current">1</a>
-                    </li>
-                    <li>
-                      <a class="pagination-link">2</a>
-                    </li>
-                    <li>
-                      <a class="pagination-link">3</a>
-                    </li>
-                  </ul>
-                </nav>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
+
+    <ConfirmDialog
+      v-model="deleteDialog"
+      :title="$t('courses.delete.title')"
+      :confirm-text="$t('courses.delete.confirm')"
+      :cancel-text="$t('common.cancel')"
+      :busy="deleting"
+      @cancel="deleteDialog = false"
+      @confirm="confirmDelete"
+    >
+      {{ $t("courses.delete.text", { name: pendingCourse?.title ?? '' }) }}
+    </ConfirmDialog>
+
   </div>
 </template>
+
 <script>
-//@click="openUrl(course.id)"
-import $api from "../api/httpClient";
-const apiUrl = import.meta.env.VITE_APP_URL;
-import { mapState, mapGetters } from "vuex";
+import { mapState } from "vuex";
+import PageHeader from "../components/ui/PageHeader.vue";
+import EmptyState from "../components/ui/EmptyState.vue";
+import ConfirmDialog from "../components/ui/ConfirmDialog.vue";
+import { pinnedCourses } from "../utils/pinnedCourses";
+import { toast } from "../composables/useToast";
+
 export default {
+  name: "Courses",
+  components: { PageHeader, EmptyState, ConfirmDialog },
+
   data() {
     return {
-      //courseId: null,
-      activeCategory: {
-        id: 0,
-      },
       show: true,
-      url: "", // ??
-      aircraft_id: 0,
-      tags: [],
-
-      selected:false,
+      activeCategory: null,
+      // id выбранного класса (самолёта). null — все.
+      selectedAircraft: 0,
+      isLoading: true,
+      deleting: false,
+      deleteDialog: false,
+      pendingId: null,
     };
   },
-  async mounted() {
-    //console.log('mounted')
-    this.$store.dispatch("Course/fetchCourses");
-    this.$store.dispatch("Course/fetchCategories");
-    this.getCourses(this.show); // временный вариант для скрытия курсов
-    // --------------загрузка классов----------------
-    $api.get(apiUrl+"/api/classes").then((response) => {
-      //console.log(response.data, "v-chip");
-      this.tags = response.data;
-    });
-    // --------------загрузка классов----------------
+
+  async created() {
+    await Promise.all([
+      this.$store.dispatch("Course/fetchAircrafts").catch(() => {}),
+      this.$store.dispatch("Course/fetchCategories").catch(() => {}),
+      this.$store.dispatch("Course/fetchCourses").catch(() => {}),
+    ]).catch(() => {});
+
+    this.isLoading = false;
   },
+
   computed: {
-    ...mapState("Course", ["course", "category", "totalCourses"]),
-    ...mapGetters("Course", ["categories", "courses"]),
-  },
-  methods: {
-    setActiveCategory(_category) {
-      //console.log(_category.id, "активная категория");
-      this.activeCategory = _category;
-      //console.log(this.activeCategory)
-      this.getCourses(this.show);
+    ...mapState("Course", ["courses", "categories", "aircrafts", "totalCourses"]),
+
+    /** Классы (самолёты) — источник чипов фильтра. */
+    tags() {
+      return Array.isArray(this.aircrafts) ? this.aircrafts : [];
     },
-    //getCourses(isVis) {
-    //-----------------------------------------
-    // getCourses() {
-    //   if (this.activeCategory) {
-    //     this.$store.dispatch("Course/fetchCoursecat", this.activeCategory.id);
-    //   } else this.$store.dispatch("Course/fetchCourses");
-    // },
-    //-----------------------------------------
+
+    allCourses() {
+      return Array.isArray(this.courses) ? this.courses : [];
+    },
+
+    allCategories() {
+      return Array.isArray(this.categories) ? this.categories : [];
+    },
+
+    /**
+     * Фильтр по видимости. Раньше список дополнительно фильтровался
+     * прямо в шаблоне (courses.filter(...)), из-за чего вычисляемое
+     * свойство нельзя было переиспользовать и его нельзя было
+     * посчитать заранее для счётчика.
+     */
+    visibleCourses() {
+      return this.allCourses.filter((course) => course.visible === this.show);
+    },
+
+    /**
+     * Применён ли фильтр.
+     *
+     * Нужен, чтобы пустое состояние не врало. После выбора категории
+     * стор содержит уже отфильтрованный список, поэтому «курсов нет»
+     * и «под фильтр ничего не подошло» по данным не различить —
+     * но для пользователя это разные вещи: в первом случае надо
+     * создать курс, во втором — снять фильтр.
+     */
+    hasFilters() {
+      return Boolean(this.activeCategory) || Boolean(this.selectedAircraft);
+    },
+  },
+
+  methods: {
+    /**
+     * Класс бейджа состояния курса.
+     *
+     * Метод, а не массив в шаблоне: у курса состояние приходит строкой
+     * из API, и набор классов должен быть собран в одном месте — иначе
+     * цвет статуса и его подпись разъезжаются между карточкой и
+     * списком.
+     */
+    statusBadgeClass(status) {
+      const classes = {
+        draft: 'u-badge--warning',
+        pending: 'u-badge--warning',
+        published: 'u-badge--success',
+        active: 'u-badge--success',
+        archived: 'u-badge--grey',
+        inactive: 'u-badge--grey',
+      }
+      return classes[status] ?? ''
+    },
+
+    statusLabel(status) {
+      const labels = {
+        draft: 'Черновик',
+        pending: 'На проверке',
+        published: 'Опубликован',
+        active: 'Активен',
+        archived: 'В архиве',
+        inactive: 'Неактивен',
+      }
+      return labels[status] ?? status
+    },
+
+    isPinned(id) {
+      return pinnedCourses.isPinned(id);
+    },
+
+    /**
+     * Закрепление курса из каталога.
+     *
+     * Ссылку берём на содержание курса: это основная страница, куда
+     * возвращаются после входа. Закрепление не должно зависеть от того,
+     * какая вкладка курса открыта в момент нажатия.
+     */
+    togglePin(course) {
+      pinnedCourses.toggle({
+        id: course.id,
+        title: course.title,
+        link: { name: 'courses.itemmani', query: { idEdit: course.id } },
+      });
+      this.$forceUpdate();
+      window.dispatchEvent(new CustomEvent('pinned-courses-changed'));
+    },
+
+    setActiveCategory(category) {
+      // «Все категории» приходит как { id: 0 }: сбрасываем выбор.
+      this.activeCategory = category && category.id ? category : null;
+      this.getCourses();
+    },
+
+    clickair(itemId) {
+      this.selectedAircraft = Number(itemId) === Number(this.selectedAircraft) ? 0 : itemId;
+      this.getCourses();
+    },
 
     getCourses() {
-      if (this.activeCategory) {
-        //console.log(this.activeCategory, "this.activeCategory");
-        this.$store.dispatch("Course/fetchCoursesFilter", {
-          params: {
-            category_id: this.activeCategory.id,
-            aircraft_id: this.item,
-          },
-        });
-      } else this.$store.dispatch("Course/fetchCourses");
-    },
-    async deleteCourse(course_id) {
-      //console.log(course_id, 'текущий курс');
-      this.$store
-        .dispatch("Course/deleteCourse", course_id)
-        .catch((error) => console.error(error));
-      this.$store
-        .dispatch("Course/fetchCourses")
+      const params = {};
+
+      if (this.activeCategory) params.category_id = this.activeCategory.id;
+      if (this.selectedAircraft) params.aircraft_id = this.selectedAircraft;
+
+      this.isLoading = true;
+
+      const action = Object.keys(params).length
+        ? this.$store.dispatch("Course/fetchCoursesFilter", params)
+        : this.$store.dispatch("Course/fetchCourses");
+
+      Promise.resolve(action)
         .catch((error) => console.error(error))
-        .finally(() => console.log("удален курс  ", course_id));
+        .finally(() => (this.isLoading = false));
     },
-    clickair(item_id) {
-      this.selected = !this.selected
-      //console.log(item_id)
-      if (item_id == this.aircraft_id) {
-        this.aircraft_id = 0;
-      } else {
-        this.aircraft_id = item_id;
+
+    askDelete(course) {
+      this.pendingId = course.id;
+      this.deleteDialog = true;
+    },
+
+    async confirmDelete() {
+      if (!this.pendingId) return;
+
+      this.deleting = true;
+
+      try {
+        await this.$store.dispatch("Course/deleteCourse", this.pendingId);
+        await this.$store.dispatch("Course/fetchCourses");
+        this.notify(this.$t("courses.delete.done"), "success");
+      } catch (error) {
+        this.notify(this.$t("courses.delete.error"), "error");
+      } finally {
+        this.deleting = false;
+        this.deleteDialog = false;
+        this.pendingId = null;
       }
-      //console.log(this.aircraft_id, "this.aircraft_id")
-      this.$store
-        .dispatch("Course/fetchCoursesFilter", {
-          params: {
-            category_id: this.activeCategory.id,
-            aircraft_id: this.aircraft_id,
-          },
-        })
-        .catch((error) => console.error(error));
     },
-          
-      //window.open("api/private/Ми-38/АУК-01/index.html", '_blank');
-      
-      // var params =
-      //  {
-      //    'Authorization': 'Bearer ' + '32|OtMVKbMv1vDMS3r7X4aXcXxLWtEzwzFxSJlwM9et',
-      //    'Content-type': 'application/x-www-form-urlencoded',
-      //  };
 
-      // $api.get("api/private/Ми-38/АУК-01/index.html")
-      // .then((response) => {
-      //   this.content = response.data;
-      //   window.open("","_blank");
-      // });
-
-      //window.open($api.get("api/private/Ми-38/АУК-01/index.html")), '_blank');
-      //$api.get("api/private/Ми-38/АУК-01/index.html")
-      //url = "api/private/Ми-38/АУК-01/index.html";
-      // const viewFile = async (url) => {
-      //  window.open(url, '_blank');
-      // // Change this to use your HTTP client
-      //     fetch(url, {'Authorization': 'Bearer ' + '32|OtMVKbMv1vDMS3r7X4aXcXxLWtEzwzFxSJlwM9et'} ) // FETCH BLOB FROM IT
-      //       .then((response) => response.blob())
-      //       .then((blob) => { // RETRIEVE THE BLOB AND CREATE LOCAL URL
-      //         var _url = window.URL.createObjectURL(blob);
-      //         window.open(_url, "_blank").focus(); // window.open + focus
-      //     }).catch((err) => {
-      //       console.log(err);
-      //     });
-      // };
-    
+    notify(text, type) {
+      toast.byType(type, text);
+    },
   },
 };
 </script>
 
-<style>
-/* .xxx {
-  background: none;
-} */
-
-.xxx:hover  {
-  background: lightgreen;
-  font-weight: bold;
-}
-.xxx:focus {
-  /* background: red; */
-  background-color: lightgrey;
-  font-weight: bold;
+<style scoped>
+/*
+  Сетка «фильтры + карточки» вместо колонок Bulma.
+  Bulma подключалась с CDN только ради этой страницы; из-за этого она
+  выглядела иначе всех остальных и ломалась при любом изменении.
+*/
+.courses {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: start;
 }
 
-/* .xxx .v-chip__content {
-  color: white;
-  font-weight: bold;
-} */
-
-.menu-list a:hover  {
-  background-color: lightgreen !important;
-  font-weight: bold;
-}
-.menu-list a:focus {
-  /* background: red; */
-
-  background-color: blue !important;
-  font-weight: bold;
+@media (max-width: 1100px) {
+  .courses {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
+.courses__filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
 
+.courses__filter-block {
+  padding: var(--sp-4);
+}
+
+.courses__filter-title {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+}
+
+.courses__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.courses__nav {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 0 calc(-1 * var(--sp-2));
+}
+
+/*
+  Пункты навигации по разделам. Раньше это были <a> без единого
+  стиля и с .menu-list a:focus { background-color: blue !important } —
+  насыщенный синий фокус плюс !important поверх всего.
+*/
+.courses__nav-item {
+  display: block;
+  width: 100%;
+  padding: var(--sp-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--c-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.courses__nav-item:hover {
+  background: var(--c-surface-3);
+}
+
+.courses__nav-item:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.courses__nav-item--on {
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  font-weight: var(--fw-medium);
+}
+
+.courses__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+.courses__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+  transition: box-shadow var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+
+.courses__card:hover {
+  box-shadow: var(--shadow-2);
+  border-color: var(--c-border-strong);
+}
+
+.courses__card-title {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  color: var(--c-text);
+}
+
+.courses__card-text {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+  color: var(--c-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.courses__card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  margin-top: auto;
+}
+
+.courses__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--c-border);
+
+  /*
+   * Ряд действий переполнял карточку.
+   *
+   * Здесь пять элементов, и v-btn по умолчанию не сжимается
+   * (min-width 48px + внутренние отступы). В колонке сетки шириной
+   * около 300px они в сумме не помещались, ряд выходил за правый
+   * край карточки (проверено: кнопка «Удалить» заканчивалась на
+   * 42px правее границы), а карточка имеет overflow: visible — то
+   * есть кнопка физически уезжала на соседнюю колонку и висела
+   * поверх неё.
+   *
+   * flex-wrap: кнопки переносятся на вторую строку, а
+   * min-width: 0 позволяет им ужиматься до соседних.
+   */
+  flex-wrap: wrap;
+}
+
+.courses__actions > * {
+  min-width: 0;
+  flex: 0 0 auto;
+}
 </style>

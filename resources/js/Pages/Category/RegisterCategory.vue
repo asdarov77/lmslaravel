@@ -1,84 +1,83 @@
 <template>
-  <v-flex xs12 sm8 md4>
-    <v-card class="elevation-12 mx-auto">
-      <v-toolbar color="primary">
-        <v-toolbar-title>Добавить категорию </v-toolbar-title>
-      </v-toolbar>
-      <v-card-text>
-        <v-form v-on:@submit.prevent="submitForm">
-          <v-text-field
-            label="Название категории"
-            type="text"
-            v-model="title"
-          ></v-text-field>
-          <v-text-field
-            label="Описание категории"
-            type="text"
-            v-model="description"
-          ></v-text-field>
-          <v-container class="notification is-danger" v-if="errors.length">
-            <!--class="has-text-centered"> -->
-            <p v-for="error in errors" v-bind:key="error">
-              {{ error }}
-            </p>
-          </v-container>
-        </v-form>
-      </v-card-text>
-      <v-card-actions>
-        <v-spacer></v-spacer>
-        <!-- <v-btn v-on:click="submitForm" color="primary">Сохранить</v-btn> -->
-        <ButtonGroup @submitForm="submitForm" @cancelBtn="cancelBtnHead"></ButtonGroup>
-      </v-card-actions>
-    </v-card>
-  </v-flex>
+  <div class="u-page">
+    <FormCard
+      :heading-level="1"
+      :title="$t('categories.create.title')"
+      :subtitle="$t('categories.create.subtitle')"
+      :busy="form.submitting.value"
+      :submit-text="$t('common.create')"
+      @submit="submitForm"
+      @cancel="cancelBtnHead"
+    >
+      <FormField
+        :label="$t('categories.create.name')"
+        name="title"
+        :error="form.errors.title"
+        :required="form.isRequired('title')"
+      >
+        <v-text-field
+          v-bind="form.bind('title')"
+          :placeholder="$t('categories.create.namePlaceholder')"
+          autofocus
+        />
+      </FormField>
+
+      <FormField
+        :label="$t('categories.create.description')"
+        name="description"
+        :error="form.errors.description"
+      >
+        <v-textarea
+          v-bind="form.bind('description')"
+          :placeholder="$t('categories.create.descriptionPlaceholder')"
+          rows="3"
+          auto-grow
+        />
+      </FormField>
+
+    </FormCard>
+  </div>
 </template>
 
-<script>
-import { mapState, mapGetters } from 'vuex'
-import ButtonGroup from "../../components/ButtonGroup.vue";
+<script setup>
+import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
+import { useStore } from 'vuex'
+import FormCard from '@/components/ui/FormCard.vue'
+import FormField from '@/components/ui/FormField.vue'
+import { unwrapResponse } from '@/api/envelope'
+import useForm from '@/composables/useForm'
+import { required, maxLength } from '@/composables/validation/rules'
+import { toast } from '@/composables/useToast'
 
-export default {
-  components: {ButtonGroup},
+const { t } = useI18n()
+const router = useRouter()
+const store = useStore()
 
-  data() {
-    return {
-      title: "",
-      description: "",
-      errors: [],
-    };
+const form = useForm({
+  schema: {
+    title: { initial: '', rules: [required(t('categories.create.errors.nameRequired')), maxLength(255, t('categories.create.errors.nameTooLong'))] },
+    description: { initial: '', rules: [maxLength(255, t('categories.create.errors.descriptionTooLong'))] },
   },
 
-  async mounted() {
-    //console.log("mounted register category");    
-  },
-  computed: {
-      ...mapState('Course', ['totalCategories','categories']),
-      ...mapGetters('Course', ['categories','courses']),
+  onSubmit: async ({ values }) => {
+    try {
+      const response = await store.dispatch('Course/createCategory', {
+        title: values.title.trim(),
+        description: values.description.trim(),
+      })
+
+      toast.success(t('categories.create.done'))
+      router.push('/categories')
+    } catch (error) {
+      // Error handled by useForm interceptors and toast
+      console.error('Create category failed:', error)
+    }
   },
 
-  methods: {
-    submitForm: function () {
-      if (!this.errors.length) {
-        const formData = {
-          title: this.title,
-          description: this.description,
-        };
-        this.$store
-          .dispatch("Course/createCategory", { ...formData })
-          .then(() => {})
-          .catch((error) => {
-            console.error(error);
-          })
-          .finally(() => this.$router.back());
-      }
-    },
-    cancelBtnHead()
-    {
-      //console.log('cancel');
-      this.$router.go(-1);
-    },
+  cancelBtnHead() {
+    router.back()
   },
-};
+})
 </script>
-
-<style></style>

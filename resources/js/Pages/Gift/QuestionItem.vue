@@ -13,13 +13,14 @@
         </label>
       </li>
     </ul>
-    <button @click="nextQuestion">Следующий вопрос</button>
+    <button @click="nextQuestion">{{ $t('gift.nextQuestion') }}</button>
   </div>
 </template>
 
   
 <script>
 import axios from 'axios';
+import { unwrapResponse } from "../../api/envelope";
 
 export default {
   //props: ["idEdit"],
@@ -34,7 +35,7 @@ export default {
     // получение списка вопросов с сервера
     axios.get(`/api/questions/${this.idEdit}`)
       .then(response => {
-        this.question = response.data;
+        this.question = unwrapResponse(response);
       })
       .catch(error => {
         console.log(error);
@@ -47,7 +48,7 @@ export default {
       this.$router.push({ name: 'question.item', params: { idEdit: nextId } });
       axios.get(`/api/questions/${nextId}`)
         .then(response => {
-          this.question = response.data;
+          this.question = unwrapResponse(response);
         })
         .catch(error => {
           console.log(error);
@@ -86,21 +87,28 @@ export default {
 };
 </script>
 
-<style>
+<!--
+  Блок был unscoped, и это било по всему приложению: селектор `button`
+  красил ВСЕ кнопки без класса Vuetify в зелёный с белым текстом и
+  отступами 10px, а `.card` — все элементы с таким классом в других
+  страницах. Здесь и карточка, и кнопка — свои элементы этого шаблона,
+  поэтому достаточно scoped.
+-->
+<style scoped>
 .card {
-  background-color: #F0F8FF;
-  padding: 20px;
-  margin: 20px;
-  border-radius: 10px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+  background-color: var(--c-info-soft);
+  padding: var(--sp-5);
+  margin: var(--sp-5);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
 }
 
 button {
-  background-color: #4CAF50;
-  color: white;
+  background-color: var(--c-success);
+  color: var(--c-on-primary);
   border: none;
-  padding: 10px;
-  border-radius: 5px;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 </style>

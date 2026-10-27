@@ -7,6 +7,12 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
+/**
+ * Алиас `guest`: уводит уже авторизованного на HOME.
+ *
+ * Внимание: HOME указывает на '/home' (см. RouteServiceProvider), а основной
+ * экран приложения — '/'. При смене маршрута по умолчанию поправить и здесь.
+ */
 class RedirectIfAuthenticated
 {
     /**

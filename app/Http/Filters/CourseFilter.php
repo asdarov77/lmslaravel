@@ -7,6 +7,19 @@ use App\Models\Aukstructure;
 use App\Models\Course;
 use App\Models\Category;
 
+/**
+ * Фильтры выборки Course по title, path, aircraft_id, category_id, parent_id,
+ * type_id, course_id.
+ *
+ * Два параметра требуют пояснения:
+ *  - categoryId фильтрует по КОДУ категории через связи aukstructures/categories,
+ *    а не по id;
+ *  - courseId умеет разрешаться и в Course, и в Aukstructure — исторически
+ *    фронт присылал оба.
+ *
+ * Фильтр ничего не проверяет по правам: область видимости добавляется отдельно
+ * вызовом CourseVisibility в контроллере.
+ */
 class CourseFilter extends AbstractFilter
 {
     public const TITLE = 'title';

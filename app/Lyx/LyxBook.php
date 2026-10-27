@@ -5,6 +5,12 @@ namespace App\Lyx;
 use App\Lyx\LyxChapter;
 use App\Lyx\LyxToHtml;
 
+/**
+ * Книга LyX: корневой документ, содержит главы и разделы.
+ *
+ * Часть мёртвого конвертера app/Lyx (см. LyxParser). Используется только
+ * им.
+ */
 class LyxBook
 {
     public $title = '';
