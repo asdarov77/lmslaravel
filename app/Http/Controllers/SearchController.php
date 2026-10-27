@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Aircraft;
+use App\Models\Course;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
@@ -431,15 +432,17 @@ class SearchController extends Controller
                 $originalText = ltrim($originalText, " \t\r\0\x0B\n."); // удаляем спецсимволы 
                 //$originalText = trim($originalText);
                 //$originalText = preg_replace('/<[^>]*>/', '', $text);
+                // ВАЖНО (Д5): originalXpath вычисляется ДО мутации дерева —
+                // это путь к текстовому узлу исходного документа. Фронт обязан
+                // искать его через XPathResult.ORDERED_NODE_ITERATOR_TYPE с
+                // фильтром по.nodeType === TEXT_NODE, т.к. loadHTML() добавляет
+                // implicit <html>/<body> и нумерация sibling-элементов смещается.
                 $originalXpath = $node->getNodePath();
-                //$highlightedText = $before . "<mark class='highlighted' data-id='" . substr(md5($searchTerm), 0, 10) . "'>" . $highlighted . "</mark>" . $after;
                 $highlightedText = "{$before}<mark class='highlighted' data-id='{$highlightedNode->getAttribute('data-id')}'>{$highlighted}</mark>{$after}";
-                $highlightedXpath = $highlightedNode->getNodePath();
                 $highlightedNodes[] = [
                     'originalText' => $originalText,
                     'originalXpath' => $originalXpath,
                     'highlightedText' => $highlightedText,
-                    //'highlightedXpath' => $highlightedXpath,
                 ];
             }
         }
@@ -530,6 +533,41 @@ class SearchController extends Controller
         ));
 
         $disk = Storage::disk('public');
+        $files = $disk->files($directory);
+
+        //var_dump($files);
+        //   var_dump($directory);
+
+        foreach ($files as $file) {
+            if (Str::endsWith($file, '.html') && !Str::endsWith($file, 'index.html')) {
+                $contents = $disk->get($file);
+                //$contents = Storage::get($file);
+                if (Str::contains(strtolower($contents), $searchTerm)) {
+                    $filename = basename($file);
+                    $filename = trim($filename);
+                    // Д5: один файл может быть прикреплён к НЕСКОЛЬКИМ узлам —
+                    // берём все aukstructure_id, а не «первый попавшийся».
+                    $aukstructureIds = Link::where('link', $filename)->pluck('aukstructure_id')->all();
+                    $firstLink = Link::where('link', $filename)->first();
+                    $aukstructure = $firstLink ? $firstLink->aukstructure : Aukstructure::whereHas('links', function ($query) use ($filename) {
+                        $query->where('link', $filename);
+                    })->first();
+                    $title = $aukstructure ? $aukstructure->title : null;
+                    $highlightedHtml = $this->highlightWords($contents, $searchTerm);
+
+                    $snippet = $this->buildSnippet($aukstructure ? $aukstructure->course_id : null, $filename);
+
+                    $matches[] = [
+                        'file' => $file,
+                        'title' => $title,
+                        'itemId'  => $aukstructure ? $aukstructure->id : ($aukstructureIds[0] ?? null),
+                        'itemIds' => $aukstructureIds ?: array_filter([$aukstructure ? $aukstructure->id : null]),
+                        'snippet' => $snippet,
+                        'occurrences' => count($highlightedHtml),
+
+                        'highlightedNodes' => $highlightedHtml,
+                    ];
+                }
         $prefix = 'private/' . trim($aircraft->path) . '/' . trim($course->path) . '/';
 
         // Сопоставление материал ↔ файл: индекс строился по Link, поэтому
@@ -565,6 +603,37 @@ class SearchController extends Controller
             'error' => null,
             'meta' => null,
         ]);
+    }
+
+
+    /**
+     * Серверный snippet (ts_headline-подобный): ~120 символов вокруг первого
+     * совпадения. Фронт показывает его в выдаче и больше не зависит от точности
+     * XPath-подсветки (Д5) — подсветка в кадре становится best-effort украшением.
+     */
+    private function buildSnippet(?int $courseId, string $filename): string
+    {
+        if (!$courseId) {
+            return '';
+        }
+        $course = Course::find($courseId);
+        if (!$course) {
+            return '';
+        }
+        $aircraftPath = optional($course->aircraft)->path;
+        $path = "private/{$aircraftPath}/{$course->path}/{$filename}";
+        if (!Storage::disk('public')->exists($path)) {
+            return '';
+        }
+        $html = Storage::disk('public')->get($path);
+        $text = trim(preg_replace('/\s+/u', ' ', strip_tags($html)));
+        $pos = mb_stripos($text, request()->input('query', ''));
+        if ($pos === false) {
+            return mb_substr($text, 0, 120);
+        }
+        $start = max(0, $pos - 50);
+        $snippet = mb_substr($text, $start, 170);
+        return ($start > 0 ? '…' : '') . $snippet . ($start + 170 < mb_strlen($text) ? '…' : '');
     }
 
 

@@ -13,6 +13,7 @@ use App\Http\Controllers\QuestionImportController;
 use App\Http\Controllers\AukstructureController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\CourseController;
+use App\Http\Controllers\CoursePlayerController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\PermissionController;
@@ -410,6 +411,14 @@ Route::get('/courses/cat/', [CategoryListController::class, 'getCatCourses']);
 Route::get('/courses/cat/{id}/', [CategoryListController::class, 'getCatCoursesId'])->whereNumber('id');  // вывод курсов для конкретной категории, с флагом видимости
 // блок курсов и категорий новый
 //
+Route::apiResource('course', CourseController::class)->middleware('auth:sanctum');
+Route::get('/coursemanifest/{id}', [CourseController::class, 'showmanifest']);
+Route::get('/getlink/{id}', [CourseController::class, 'getlink']);
+// --- API плеера курса (player-endpoint + событийный прогресс) ---
+Route::get('/course/{courseId}/player', [CoursePlayerController::class, 'show']);
+Route::post('/course/{courseId}/progress', [CoursePlayerController::class, 'progress']);
+Route::post('/course/{courseId}/view', [CoursePlayerController::class, 'view']);
+Route::get('/getfirstauk/{id}', [CourseController::class, 'get_first_auk']);
 Route::apiResource('course', CourseController::class)
     ->only(['index', 'show'])
     ->middleware('auth:sanctum')
