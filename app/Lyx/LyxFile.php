@@ -4,6 +4,11 @@ use Illuminate\Support\Facades\Config;
 
 // use Illuminate\Support\Facades\Config;
 
+/**
+ * Файл-представление элемента LyX: парсер одного файла .lyx в дерево.
+ *
+ * Часть мёртвого конвертера app/Lyx (см. LyxParser).
+ */
 class LyxFile
 {
     public $file_path = '';

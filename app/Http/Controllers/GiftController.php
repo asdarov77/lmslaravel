@@ -10,6 +10,17 @@ use Illuminate\Support\Facades\DB;
 
 require_once __DIR__ . '/../Helpers/ParseHtmlHelper.php';
 
+/**
+ * Разбор GIFT-файлов.
+ *
+ * store($file) разбирает файл в HTML через App\GiftParser\GiftParser и
+ * ВОЗВРАЩАЕТ результат — в questions/answers не пишет ничего. Счётчик
+ * gift_files_parsed в ответе создаёт иллюзию, что вопросы загрузились;
+ * фактически их заводят через /api/questions.
+ *
+ * truncate по DELETE /api/gift-clear чистит questions и answers (тот же путь
+ * дублируется в ClearDBController).
+ */
 class GiftController extends Controller
 {
     /**

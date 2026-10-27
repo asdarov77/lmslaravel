@@ -1,5 +1,5 @@
 // @ts-check
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
 
 test.describe('LMS Frontend E2E Tests', () => {
   test('should load the main page and redirect to login', async ({ page }) => {
@@ -70,7 +70,7 @@ test.describe('LMS Frontend E2E Tests', () => {
       localStorage.setItem('user', JSON.stringify({ fio: 'Администратор', role: 'Администратор' }));
     }, token);
     
-    await page.goto('/courses');
+    await page.goto('/#/courses/list');
     await page.waitForTimeout(2000);
     
     // Проверяем что страница курсов загрузилась
@@ -152,23 +152,45 @@ test.describe('LMS Frontend E2E Tests', () => {
     });
     
     const createData = await createResponse.json();
-    console.log('Create response:', createData);
-    
-    // Разрешаем разные варианты ответа
-    expect([true, false].includes(createData.success)).toBeTruthy();
-    
-    if (createData.success) {
-      console.log('✓ Категория создана успешно');
-      
-      // Проверка что категория существует
-      const getResponse = await request.get('/api/v1/categories');
-      const getData = await getResponse.json();
-      const found = getData.data.some(cat => cat.name === categoryName);
-      expect(found).toBeTruthy();
-      console.log('✓ Категория найдена в списке');
-    } else {
-      console.log('⚠ Категория не создана (возможно нет прав или валидация):', createData.error?.message);
-    }
+
+    // Раньше проверка была «[true, false].includes(...)» — то есть
+    // проходила и при отказе создать категорию. Теперь результат
+    // однозначен: тест либо проверяет категорию, либо падает.
+    expect(createData.success, 'категория создана').toBeTruthy();
+
+    // Проверка что категория существует (индекс пагинирован, читаем по id)
+    const categoryId = createData.data.id;
+    const getResponse = await request.get(`/api/v1/categories/${categoryId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
+      }
+    });
+    expect(getResponse.ok()).toBeTruthy();
+    const getData = await getResponse.json();
+    expect(getData.data.name ?? getData.data.title).toBe(categoryName);
+
+    // Уборка за собой: тест писал в боевую базу категорию «Тестовая
+    // категория …» и никогда её не удалял, поэтому после прогона в
+    // справочнике оставались пустые мусорные строки.
+    const deleteResponse = await request.delete(`/api/v1/categories/${categoryId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
+      }
+    });
+    expect(
+      [200, 204].includes(deleteResponse.status()),
+      'тестовая категория удалена'
+    ).toBeTruthy();
+
+    const afterDelete = await request.get(`/api/v1/categories/${categoryId}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
+      }
+    });
+    expect(afterDelete.status(), 'категории больше нет').toBe(404);
   });
 
   test('should handle authentication errors', async ({ request }) => {

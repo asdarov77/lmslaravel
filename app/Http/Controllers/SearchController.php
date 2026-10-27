@@ -11,6 +11,8 @@ use Illuminate\Support\Str;
 
 use App\Models\Link;
 use App\Models\Aukstructure;
+use App\Models\Course;
+use Illuminate\Support\Facades\DB;
 
 use DOMDocument;
 use DOMText;
@@ -27,6 +29,12 @@ use Symfony\Component\DomCrawler\Crawler;
 
 
 
+/**
+ * Методический поиск по HTML-файлам каталога курса с подсветкой найденного.
+ *
+ * Требует content.manage или courses.manage — проверка продублирована и в коде,
+ * и на маршруте. Ищет по диску public, то есть по РАСПАКОВАННЫМ материалам.
+ */
 class SearchController extends Controller
 {
     // public function search(Request $request)
@@ -462,14 +470,67 @@ class SearchController extends Controller
     }
 
 
+    /**
+     * Поиск по содержимому материалов курса (P1.1, lesson_search_index).
+     *
+     * Обход файловой системы заменён tsquery по индексу:/files решает БД,
+     * PHP читает и подсвечивает только найденные файлы. Права — как у
+     * открытия курса (CourseAccess::authorizeOpen): записанный обучаемый
+     * ищет в своём курсе, не записанный получает 403. Старое ограничение
+     * «только content.manage» снимается — индекс выдаёт фрагменты только
+     * материалов курса, к которому уже есть доступ.
+     *
+     * Индекс пуст (первый запуск после деплоя) — курс доиндексируется
+     * синхронно: файлы только этого курса, терпимая цена за самоохрану
+     * фичи без ручного прогона команды.
+     */
     public function search(Request $request)
     {
-        $searchTerm = strtolower($request->input('query'));
-        $aircraftPath = Aircraft::find($request->input('aircraft'))->path;
-        $directory = "private/{$aircraftPath}/{$request->input('path')}/";
-        $matches = [];
+        $actor = $request->user();
+        $searchTerm = trim((string) $request->input('query', ''));
 
-        //$files = Storage::disk('public')->files($directory);
+        if ($searchTerm === '') {
+            return response()->json(['success' => true, 'data' => [], 'error' => null, 'meta' => null]);
+        }
+
+        $aircraft = Aircraft::find($request->input('aircraft'));
+
+        // Раньше здесь стояло `Aircraft::find(...)->path` без проверки
+        // результата: несуществующий aircraft давал «Attempt to read
+        // property on null» и 500.
+        if (! $aircraft) {
+            abort(422, 'Не указан существующий самолёт');
+        }
+
+        $course = Course::where('aircraft_id', $aircraft->id)
+            ->where('path', (string) $request->input('path', ''))
+            ->first();
+
+        if (! $course) {
+            abort(422, 'Курс по указанному пути не найден');
+        }
+
+        \App\Support\CourseAccess::authorizeOpen($actor, $course);
+
+        if (! DB::table('lesson_search_index')->where('course_id', $course->id)->exists()) {
+            \App\Support\LessonSearchIndexer::indexCourse($course);
+        }
+
+        /*
+         * websearch_to_tsquery('russian', ...): пользовательский синтаксис
+         * поисковой строки (кавычки, ИЛИ), морфология волнений не вызывает
+         * для русских материалов. limit сдерживает payload: подсветка
+         * дорога, а 25 файлов — уже больше одной страницы листания.
+         */
+        $rows = collect(DB::select(
+            "SELECT file, aukstructure_id
+             FROM lesson_search_index
+             WHERE course_id = :course
+               AND searchable @@ websearch_to_tsquery('russian', :query)
+             ORDER BY ts_rank(searchable, websearch_to_tsquery('russian', :query2)) DESC
+             LIMIT 25",
+            ['course' => $course->id, 'query' => $searchTerm, 'query2' => $searchTerm]
+        ));
 
         $disk = Storage::disk('public');
         $files = $disk->files($directory);
@@ -507,9 +568,41 @@ class SearchController extends Controller
                         'highlightedNodes' => $highlightedHtml,
                     ];
                 }
+        $prefix = 'private/' . trim($aircraft->path) . '/' . trim($course->path) . '/';
+
+        // Сопоставление материал ↔ файл: индекс строился по Link, поэтому
+        // обратный lookup дёшев и точен.
+        $fileToAuk = Aukstructure::whereIn('id', $rows->pluck('aukstructure_id'))
+            ->get()
+            ->keyBy('id');
+
+        $matches = [];
+
+        foreach ($rows as $row) {
+            $path = $prefix . $row->file;
+            if (! $disk->exists($path)) {
+                continue;
             }
+            $contents = $disk->get($path);
+            $auk = $fileToAuk->get($row->aukstructure_id);
+
+            $matches[] = [
+                'file' => $path,
+                'title' => $auk?->title ?? $row->file,
+                'itemId' => $row->aukstructure_id,
+                'highlightedNodes' => $this->highlightWords($contents, $searchTerm),
+            ];
         }
-        return response()->json($matches);
+
+        // Конверт обязателен: весь api проходит через
+        // ApiResponseEnvelope, а фронт разбирает ответ через
+        // unwrapResponse.
+        return response()->json([
+            'success' => true,
+            'data' => $matches,
+            'error' => null,
+            'meta' => null,
+        ]);
     }
 
 
@@ -542,6 +635,7 @@ class SearchController extends Controller
         $snippet = mb_substr($text, $start, 170);
         return ($start > 0 ? '…' : '') . $snippet . ($start + 170 < mb_strlen($text) ? '…' : '');
     }
+
 
 
 

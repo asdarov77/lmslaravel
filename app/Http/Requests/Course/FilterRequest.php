@@ -4,6 +4,12 @@ namespace App\Http\Requests\Course;
 
 use Illuminate\Foundation\Http\FormRequest;
 
+/**
+ * Валидация query-параметров списка курсов.
+ *
+ * authorize() всегда true: права здесь не проверяются — область видимости
+ * добавляется в контроллере вызовом CourseVisibility.
+ */
 class FilterRequest extends FormRequest
 {
     /**

@@ -6,6 +6,13 @@ use App\Models\Category;
 use App\Models\Course;
 use Illuminate\Http\Request;
 
+/**
+ * Старая пара методов для публичных /api/courses/cat/ без auth:sanctum.
+ *
+ * Отдаёт все категории и все курсы категории без учёта прав. Для новой
+ * витрины есть CatalogController — этот класс стоит считать легаси и не
+ * расширять.
+ */
 class CategoryListController extends Controller
 {
     public function getCatCourses(Request $request)

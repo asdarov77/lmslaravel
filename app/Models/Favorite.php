@@ -5,6 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Избранное пользователя (favorites: user_id, course_id, title).
+ *
+ * Все связи с моделями закомментированы, поэтому избранное сейчас читается
+ * только напрямую из таблицы. В index() контроллера фильтра по user_id нет —
+ * это дыра, а не задумка.
+ */
 class Favorite extends Model
 {
     use HasFactory;

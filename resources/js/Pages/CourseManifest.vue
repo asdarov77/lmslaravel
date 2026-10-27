@@ -1,142 +1,251 @@
 <template>
   <v-progress-linear v-if="isLoading" color="primary" indeterminate></v-progress-linear>
-  {{ idEdit }}--{{ idCategory }}
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css" />
 
-  {{ link }}
-  {{ searchTerm }}--
-  {{ isLoading }}
-
-  <v-card color="#f5f5f5">
-    <v-row dense no-gutters>
-      <v-col cols="3">
-        <!-- <v-sheet rounded elevation="4" class="flex-child text-subtitle-1 pa-2 mt-1"> -->
-        <v-sheet class="my-sheet pa-2 mt-1" color="#f5f5f5" :style="{ overflow: 'auto', 'overflow-y': 'auto' }">
-          <!-- кнопки для поиска в тексте,добавления в избранное -->
-          <v-sheet class="mx-auto mt-0 mb-3" elevation=4 rounded=lg>
-            <div class="text-center" :style="{ fontSize: '20px' }">{{ titleauk.toUpperCase() }}</div>
-          </v-sheet>
-          <v-row no-gutters align="center ">
-            <v-col cols="1" class="row-with-line"></v-col>
-            <v-col cols="4" class="d-flex align-center">
-              <v-icon size="x-large" class=" icon-list" :class="{ active: showItems }" @click="toggleList">{{ showItems ?
-                'mdi-view-list' : 'mdi-view-list-outline'
-              }}</v-icon>
-              <v-icon size="x-large" class="icon-favorite" :class="{ active: isFavorite }" @click="toggleFavorite">{{
-                isFavorite ? 'mdi-heart' : 'mdi-heart-outline' }}</v-icon>
-              <v-icon size="x-large" class="icon-search" :class="{ active: showSearch }" @click="toggleSearch">{{
-                showSearch ? 'mdi-magnify-minus-outline' : 'mdi-magnify' }}</v-icon>
-            </v-col>
-            <v-col cols="6" class="row-with-line "></v-col>
-            <v-col cols="1" class="d-flex align-center">
-              <v-icon size="x-large" @click="addToFavorites(activeId)" icon="mdi-playlist-star" class="addToFav"></v-icon>
-            </v-col>
-          </v-row>
-
-          <v-row v-if="isFavorite" class="ml-1 mr-1">
-            <ul>
-              <li v-for="item in favorites" :key="item.id">
-                {{ item.title }}
-                <font-awesome-icon icon="times" @click="removeFavorite(item.course_id)" />
+  <CoursePlayerLayout
+    :course-title="titleauk"
+    :active-title="activeTitle"
+    :sections="sections"
+    :active-id="activeId"
+    :progress="courseProgress"
+    :sidebar-open="showItems"
+    :is-fullscreen="isFullscreen"
+    @select-section="onSelectSection"
+    @prev="goPrev"
+    @next="goNext"
+    @toggle-sidebar="toggleList"
+    @toggle-fullscreen="toggleFullscreen"
+  >
+    <template #sidebar-extra>
+      <div class="cm-tree">
+        <!-- Заметки и избранное живут под деревом, а инструменты — над ним. -->
+          <!-- Избранное. Раньше список был пустым без объяснения, а переключение
+               режима ещё и скрывало дерево, из-за чего казалось, что кнопка
+               «сломалась». Теперь режимы не исключают друг друга. -->
+          <div v-if="isFavorite" class="cm-favorites">
+            <div class="cm-favorites__head">
+              {{ $t('courseManifest.favorites') }}
+              <v-btn size="x-small" variant="text" @click="isFavorite = false">{{ $t('courseManifest.close') }}</v-btn>
+            </div>
+            <ul v-if="favorites.length" class="cm-favorites__list">
+              <li v-for="item in favorites" :key="item.id" class="cm-favorites__item">
+                <span class="cm-favorites__title">{{ item.title }}</span>
+                <v-btn icon="mdi-close" size="x-small" variant="text"
+                  :title="$t('courseManifest.removeFavorite')"
+                  @click="removeFavorite(item.course_id)"></v-btn>
               </li>
             </ul>
-          </v-row>
+            <p v-else class="cm-favorites__empty">{{ $t('courseManifest.favoritesEmpty') }}</p>
+          </div>
 
-          <v-row v-if="showSearch">
-            <v-text-field class="ml-5 mr-5" :loading="loading" density="compact" v-model="searchTerm" variant="outlined"
-              rounded append-inner-icon="mdi-magnify" label="Поиск" @click:append-inner="search" @keyup.enter="search"
-              hint="Введи искомый текст для поиска" clearable single-line>
-            </v-text-field>
+          <!-- Заметки студента к текущему материалу. -->
+          <MaterialNotes
+            v-if="activeId"
+            :material-id="activeId"
+            :course-id="idEdit"
+          />
+      </div>
+    </template>
 
-            <!-- ------------------------------------------------ -->
-            <!-- результаты поиска -->
+    <template #sidebar-top>
+      <div class="cm-tree">
+          <!-- Заголовок курса убран из сайдбара: он теперь один раз
+               в верхней панели CoursePlayerLayout. Раньше надпись
+               дублировалась и занимала три строки над инструментами. -->
 
-            <!--                                            рабочий вариант                           -->
-            <!-- <div>
-              <ul v-if="matchingFiles.length > 0" class=" ml-2 mr-2 search-files__total-results">Всего найдено: {{
-                matchingFiles.length }}
-                <v-btn-group>
-                  <v-btn @click="scrollToPrev"><span>&#9650;</span></v-btn>
-                  <v-btn @click="scrollToNext"><span>&#9660;</span></v-btn>
-                </v-btn-group>
-                <v-divider></v-divider>
-                <li v-for="result in matchingFiles" :key="result.file" style="white-space: nowrap;">
-                  <v-btn @click="loadContent(result.itemId, result.highlightedNodes )" class="text-truncate"
-                    :style="{ 'max-width': '100%', 'overflow': 'hidden', 'text-overflow': 'ellipsis' }">{{ result.title
-                    }}</v-btn>   
-                </li>
-              </ul>
-              <p v-else class="ml-5 mr-5 mt-1 search-files__no-results">Нет результатов</p>
-            </div> -->
-            <!--                                            рабочий вариант                           -->
+          <!-- Вопросы по курсу. Форум живёт внутри курса: отдельный
+               раздел в меню привёл бы в пустоту, потому что вопрос
+               без курса не имеет смысла. -->
+          <v-btn
+            block
+            variant="text"
+            prepend-icon="mdi-forum-outline"
+            :to="{ name: 'forum.list', params: { idEdit: idEdit } }"
+            data-test="course-forum-link"
+          >
+            {{ $t('forum.title') }}
+          </v-btn>
+          <!-- Панель инструментов.
+                     Регресс: здесь стояли фиксированные width:130px на трёх
+                     иконках внутри колонки 4/12 (390px в ~30% ширины) плюс
+                     .row-with-line с margin-bottom:-31px. Из-за отрицательного
+                     отступа блоки наезжали друг на друга, а иконки вылезали
+                     за пределы колонки — шапка «ломалась» на разных ширинах.
+                     Теперь это обычная flex-панель без фиксированных ширин
+                     и отрицательных отступов. -->
+          <div class="cm-toolbar" role="toolbar" :aria-label="$t('common.labelPanel-kursa')">
+            <div class="cm-toolbar__group">
+              <button type="button"
+                class="cm-tool"
+                :class="{ 'cm-tool--on': showItems }"
+                :title="$t('courseManifest.showTree')"
+                :aria-pressed="showItems"
+                @click="toggleList"
+              >
+                <v-icon size="22">{{ showItems ? 'mdi-view-list' : 'mdi-view-list-outline' }}</v-icon>
+                <span class="cm-tool__label">{{ $t('courseManifest.tree') }}</span>
+              </button>
 
-            <!--                                            рабочий эксперимент                           -->
-            <div>
-              <ul v-if="matchingFiles.length > 0" class=" ml-2 mr-2 search-files__total-results">Всего найдено: {{
-                matchingFiles.length }}
-                <v-btn-group>
-                  <v-btn @click="scrollToPrev"><span>&#9650;</span></v-btn>
-                  <v-btn @click="scrollToNext"><span>&#9660;</span></v-btn>
-                </v-btn-group>
-                <v-divider></v-divider>
-                <li v-for="result in matchingFiles" :key="result.file" style="white-space: nowrap;">
-                  <v-btn @click="loadContent(result.itemId, result.highlightedNodes)" class="text-truncate"
-                    :style="{ 'max-width': '100%', 'overflow': 'hidden', 'text-overflow': 'ellipsis' }">{{ result.title
-                    }}</v-btn>
-                </li>
-              </ul>
-              <p v-else class="ml-5 mr-5 mt-1 search-files__no-results">Нет результатов</p>
+              <button type="button"
+                class="cm-tool"
+                :class="{ 'cm-tool--on': isFavorite }"
+                :title="$t('courseManifest.favorites')"
+                :aria-pressed="isFavorite"
+                @click="toggleFavorite"
+              >
+                <v-icon size="22">{{ isFavorite ? 'mdi-heart' : 'mdi-heart-outline' }}</v-icon>
+                <span class="cm-tool__label">{{ $t('courseManifest.favorite') }}</span>
+              </button>
+
+              <button type="button"
+                class="cm-tool"
+                :class="{ 'cm-tool--on': showSearch }"
+                :title="$t('courseManifest.search')"
+                :aria-pressed="showSearch"
+                @click="toggleSearch"
+              >
+                <v-icon size="22">{{ showSearch ? 'mdi-magnify-minus-outline' : 'mdi-magnify' }}</v-icon>
+                <span class="cm-tool__label">{{ $t('courseManifest.search') }}</span>
+              </button>
+
+              <button type="button"
+                class="cm-tool"
+                :disabled="!activeId"
+                :title="$t('courseManifest.addFavorite')"
+                @click="addToFavorites(activeId)"
+              >
+                <v-icon size="22">mdi-bookmark-plus-outline</v-icon>
+                <span class="cm-tool__label">{{ $t("courseManifest.addFavoriteShort") }}</span>
+              </button>
             </div>
-            <!--                                            рабочий эксперимент                           -->
 
-
-
-            <!-- ------------------------------------------------ -->
-            <!-- результаты поиска -->
-
-
-
-          </v-row>
-          <!-- <div v-if="showItems" v-for="(item, index) in filterByCategoryAukstructures" :key="item.parent_id"> -->
-          <div v-if="showItems" v-for="(item, index) in aukstructures" :key="item.parent_id">
-            <div class="mt-1 mx-3" :style="[
-              item.type !== 3
-                ? {
-                  cursor: 'default',
-                  opacity: '.7',
-                  color: 'green',
-                }
-                : {
-                  cursor: 'pointer',
-                  //border: '2px solid firebrick',
-                },
-              {
-                fontSize: `${-5 * item.type + 30}px`,
-                //transform: `translate(${item.type * 20}px)`,
-                paddingLeft: `${(item.type - 1) * 10}px`,
-                display: 'inline-block',
-                wordWrap: 'break-word',
-              },
-            ]">
-              <div @mouseover="item.type === 3 ? showthumb(item.id) : ''" @mouseleave="hidethumb(item.id)" :id="item.id"
-                @click="item.type === 3 ? getlink(item.id) : ''" v-if="index !== 0">
-                {{ item.title }}
-                <!-- {{ item.id }}--{{ item.title }} -->
-              </div>
+            <div class="cm-toolbar__meta">
+              <span v-if="activeTitle" class="cm-toolbar__current" :title="activeTitle">
+                {{ activeTitle }}
+              </span>
+              <v-progress-circular v-if="isLoading" indeterminate size="18" width="2" color="primary" />
             </div>
           </div>
-        </v-sheet>
-      </v-col>
 
-      <!-- ------------------------------------правый iframe ----------------------------------------------------------->
+          <div v-if="showSearch" class="cm-search">
+            <v-text-field
+              v-model="searchTerm"
+              :loading="isSearching"
+              density="compact"
+              variant="outlined"
+              rounded
+              class="cm-search__field"
+              append-inner-icon="mdi-magnify"
+              :label="$t('common.labelPoisk')"
+              :hint="$t('common.hintSearch')"
+              clearable
+              single-line
+              @click:append-inner="search"
+              @keyup.enter="search"
+              @click:clear="clearSearch"
+            />
 
-      <v-col cols="9">
-        <v-sheet rounded elevation="5" class="my-sheet pa-2 mt-2 mr-2"
-          :style="{ 'border-radius': '8px', overflow: 'auto', 'overflow-y': 'auto' }">
-          <div id="iframe-container" :style="{ 'border-radius': '8px' }">
-            <iframe class="hello px-5" :src="link" ref="myIframe" name="iframe_a"
-              onload="this.style.height=(this.contentWindow.document.body.scrollHeight+20)+'px';" :style="contentStyleObj"
-              width="100%" scrolling="auto">
+            <!--
+              Пока идёт запрос — скелетон результатов, а не пустое поле:
+              иначе список выглядел бы как «ничего не найдено» и человек
+              успевал нажать Enter ещё раз, породив второй запрос.
+            -->
+            <div v-if="isSearching" class="cm-search__results">
+              <span
+                v-for="n in 3"
+                :key="`sk${n}`"
+                class="cm-search__skeleton"
+              />
+            </div>
+
+            <template v-else-if="matchingFiles.length">
+              <p class="search-files__total-results">
+                {{ $t('courseManifest.foundTotal') }} {{ matchingFiles.length }}
+              </p>
+
+              <!--
+                Переход по найденным в материале местам. Показывает
+                только когда подсветка реально найдена: иначе кнопки
+                нажимались в пустоту, а счётчик врался.
+              -->
+              <div v-if="highlighted.length" class="cm-search__nav">
+                <v-btn
+                  icon="mdi-chevron-up"
+                  size="x-small"
+                  variant="text"
+                  :title="$t('courseManifest.prevMatch')"
+                  @click="scrollToPrev"
+                />
+                <span class="cm-search__nav-count">
+                  {{ currentHighlight + 1 }} / {{ highlighted.length }}
+                </span>
+                <v-btn
+                  icon="mdi-chevron-down"
+                  size="x-small"
+                  variant="text"
+                  :title="$t('courseManifest.nextMatch')"
+                  @click="scrollToNext"
+                />
+              </div>
+
+              <ul class="cm-search__list">
+                <li v-for="result in matchingFiles" :key="result.file">
+                  <v-btn
+                    class="cm-search__item"
+                    variant="text"
+                    block
+                    @click="loadContent(result.itemId, result.highlightedNodes)"
+                  >
+                    {{ result.title }}
+                  </v-btn>
+                </li>
+              </ul>
+            </template>
+
+            <p v-else class="search-files__no-results">
+              {{ $t('courseManifest.noResults') }}
+            </p>
+          </div>
+
+          <!-- Список разделов/подразделов/модулей.
+                     Подсветка при наведении — на CSS, а не через
+                     @mouseover + document.getElementById: обработчик
+                     на каждом узле заставлял браузер трогать DOM на
+                     каждом движении мыши, из-за чего страница «дёргалась»
+                     и рендерилась медленно (182 узла). -->
+      </div>
+    </template>
+
+    <!-- ------------------------------------правый iframe ----------------------------------------------------------->
+    <template #default>
+        <v-sheet rounded class="my-sheet cm-content pa-2 mt-2 mr-2"
+          ref="contentEl">
+          <!-- Материал открывается длинным документом: без кнопки «вверх»
+               приходилось прокручивать страницу мышью. Показывается только
+               когда прокрутка действительно есть. -->
+          <v-btn
+            v-show="canScrollUp"
+            class="cm-scroll-top"
+            color="primary"
+            size="small"
+            elevation="6"
+            icon="mdi-arrow-up"
+            :title="$t('courseManifest.toTop')"
+            @click="scrollToTop"
+          ></v-btn>
+          <div id="iframe-container" class="cm-frame">
+            <p v-if="error" class="has-text-danger px-3 py-2">{{ error }}</p>
+            <!-- Высота материала держится в состоянии Vue, а не в
+                 инлайновом onload. Регресс: атрибут onload писал высоту
+                 прямо в DOM, а :style="{ height: '' }" при каждом
+                 ре-рендере её затирал — материал схлопывался до 172px
+                 после первого же изменения состояния и оставался таким. -->
+            <!-- sandbox: без allow-scripts — сохранённый в материале
+                 HTML не должен исполнять свои скрипты (WYSIWYG-безопасность),
+                 без allow-same-origin — нет доступа к родительскому DOM. -->
+            <iframe class="hello px-5" :srcdoc="contentHtml" ref="myIframe" name="iframe_a"
+              sandbox="allow-forms allow-popups"
+              @load="onFrameLoad" :style="{ height: frameHeight }"
+              width="100%" scrolling="auto" :title="$t('courseManifest.material')">
             </iframe>
 
             <!-- <iframe class="hello px-5" :src="link" ref="myIframe" name="iframe_a" @load="updateDocHeight"  @load="onIframeLoaded" 
@@ -146,29 +255,27 @@
 
           </div>
         </v-sheet>
-      </v-col>
-    </v-row>
-  </v-card>
-  <popup :alert="alert" :alertType="alertType" :snackbarText="snackbarText" :overlay="alert" :alertFalse="alertFalse">
-  </popup>
+    </template>
+  </CoursePlayerLayout>
 </template>
 
 <!-- <script> -->
-<script export default>
+<script>
 
 const apiUrl = import.meta.env.VITE_APP_URL;
+import CoursePlayerLayout from "../components/ui/CoursePlayerLayout.vue";
+import MaterialNotes from "./Course/MaterialNotes.vue";
 import $api from "../api/httpClient";
-import popup from "./Popup.vue";
+import { unwrapResponse, unwrapArray, unwrapField, numericQuery } from "../api/envelope";
 import { mapState, mapGetters } from "vuex";
-import { library } from '@fortawesome/fontawesome-svg-core';
-import { faTimes } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-library.add(faTimes);
+import { toast } from "../composables/useToast";
+import { sanitizeMaterialHtml } from "../utils/sanitizeHtml";
+import { createDocCache } from "../utils/docCache";
 
 export default {
   components: {
-    popup, FontAwesomeIcon
-
+    MaterialNotes,
+    CoursePlayerLayout,
   },
 
   props: {
@@ -183,25 +290,38 @@ export default {
     treeData: Object,
   },
 
-
   data() {
 
     return {
 
       titleauk: "",
       aukstructures: [],
+      // id уже открытых модулей — для подсветки «посещённого» светло-серым.
+      visitedIds: [],
+      // Заголовок активного модуля для панели инструментов.
+      activeTitle: "",
+      // Имя последнего открытого файла: по нему «продолжить»
+      // возвращает к нужному разделу, а не к началу курса.
+      activeFile: null,
+      // Документ пролистан до конца — урок засчитан как пройденный.
+      isScrolledToEnd: false,
+      canScrollUp: false,
       filterByCategoryAukstructures: [],
       categories: {},
       link: "",
+      // Документ материала для iframe. Раньше iframe грузил файл напрямую
+      // по ссылке, и вложенные ресурсы падали в 403 без подписи.
+      contentHtml: "",
       firstId: '',
-      contentStyleObj: {
-        height: "",
-      },
+      // Высота кадра в состоянии: см. onFrameLoad.
+      frameHeight: '320px',
       activeId: this.firstId,
       curAuk: this.item,
 
       showItems: true,
       showSearch: false,
+      // Полноэкранный режим чтения материала.
+      isFullscreen: false,
       isFavorite: false, // добавить в избранное
       //---------------- блок имитации загрузки--------
       loaded: false,
@@ -210,6 +330,11 @@ export default {
       //------------блок поиска---------------
       searchTerm: '',
       matchingFiles: [],
+      // Поиск идёт по содержимому файлов на сервере, поэтому он
+      // медленный и видимый. Раньше индикатор был привязан к флагу,
+      // который никто не выставлял, — запрос выглядел как «ничего не
+      // происходит».
+      isSearching: false,
       aircraftTitle: '', //передавать в контроллер 
       //------------конец блока поиска---------------
       path: '',
@@ -218,28 +343,27 @@ export default {
       error: '',
       //---- for popup
       isLoading: false,
-      alert: false,
-      alertType: "",
       overlay: false,
-      snackbarText: "",
       //
       // избранное
       favorites: [],
       // загрузка iframe
       highlighted: [],
       currentHighlight: 0,
+      // Что подсветить в следующем открытом материале. Раньше
+      // подсветка применялась по таймеру наугад (см. loadContent).
+      pendingHighlights: [],
       iframe: null,  //удалить для подсветки
       IframeisLoaded: false,
 
     };
   },
 
-
   mounted() {
+    document.addEventListener("keydown", this.onKeydown);
+
     //   const iframe = this.$refs.myIframe;
-    //   const iframeDoc = iframe.contentDocument;
     // iframe.addEventListener('load', () => {
-    //   console.log('слушатель highlightNodes')
     //   this.highlightNodes(iframe);
     // });
     //const iframe = this.$refs.myIframe;
@@ -262,57 +386,42 @@ export default {
     // });
 
     this.getFavorites(); // загружаем избранное
+    this.restoreVisited();
+    this.$nextTick(this.bindScroll);
 
-    //this.$store.dispatch("Course/fetchCourse",  { courseId: this.idEdit, categoryId: this.category_id });    
-    if (!this.aircrafts) {
-      this.$store.dispatch("Course/fetchAircrafts");
+    // Единый endpoint открытия курса (P0.1): один запрос вместо шести.
+    // Подробности — docs/course-player-performance.md, раздел 2.
+    this.loadPlayerData();
+  },
+
+  beforeUnmount() {
+    // Слушатель прокрутки жил на странице вечно и держал компонент,
+    // из-за чего навигация копила их по одной на каждый переход.
+    if (this.scrollHandler) {
+      const el = this.$refs.contentEl?.$el ?? this.$refs.contentEl;
+      el?.removeEventListener('scroll', this.scrollHandler);
+      this.scrollHandler = null;
     }
-    this.$store.dispatch("Course/fetchCourse", this.idEdit);
-    this.$store.dispatch("Course/fetchCategory", this.idCategory);
-    this.$store.dispatch("Course/fetchCategories");
-    this.$store.dispatch("Course/fetchAircrafts");
-    this.$store.dispatch("Course/fetchAircraft", this.aircraft);
-
-    // --------------------------------загрузка левого меню-------------------------------
-
-    //this.$store.dispatch("Course/fetchCourse", { course_id: this.idEdit, category_id: this.idCategory })
-    $api
-      .get(apiUrl + "/api/course?course_id=" + this.idEdit + "&&category_id=" + this.idCategory)
-      .then((response) => {
-        //console.log(response.data[0].aircraft_id, "air");
-        this.titleauk = response.data[0].title;
-        //console.log(response[0].title, "response");
-        this.aukstructures = response.data[0].aukstructures; // получаем с backEnd все aukstruct для построения меню левого       
-
-        // фильтруем по категориям
-
-        this.filterByCategoryAukstructures = this.aukstructures.filter((aukstructure) => {
-          return aukstructure.categories ? aukstructure.categories.includes(this.categoryCode.toString().trim()) : true;
-        }).sort((a, b) => a.id - b.id);
-
-        //this.getfirstauk(this.idEdit);
-        //удалить возможно
-        this.path = response.data[0].path; // папка с АУК        
-        this.aircraft = response.data[0].aircraft_id;
-      })
-      .catch((err) => {
-        console.error(err);
-      });
+    document.removeEventListener("keydown", this.onKeydown);
+    if (this._frameResizeObserver) {
+      this._frameResizeObserver.disconnect();
+      this._frameResizeObserver = null;
+    }
   },
 
 
-  // beforeDestroy() {
-  // this.$refs.myIframe.removeEventListener('load', this.onIframeLoaded);
-  // this.isLoading===false;
-  // },
+  created() {
+    // Не реактивен намеренно (см. docCache.js): кэш влияет только на
+    // скорость повторного клика, html в reactive-состоянии тормозил бы
+    // отрисовку списка.
+    this._docCache = createDocCache();
+  },
 
   watch: {
     link(newLink, oldLink) {
-      // console.log('Link has changed:', oldLink, '->', newLink);
       // Вызов метода loadContent для загрузки нового контента
     },
     activeId(newVal, oldVal) {
-      //console.log("active",this.activeId)
     },
     getFirstAukId: function (newVal, oldVal) {
       // вызываем метод getlink с новым значением
@@ -335,26 +444,368 @@ export default {
     categoryCode() {
       return this.category ? this.category.code : null;
     },
+    /**
+     * Разделы для CoursePlayerLayout: плоский массив aukstructures
+     * превращается в список с уровнем вложенности и отметкой
+     * прочтения (done / partial / todo).
+     *
+     * Раньше «посещённый» раздел красился бледно-серым, а у активного
+     * менялся только цвет текста — в тёмной теме это было почти не
+     * различимо, и прогресс курса нельзя было оценить целиком.
+     */
+    sections() {
+      return this.aukstructures.map((item) => ({
+        id: item.id,
+        title: item.title,
+        level: Math.min(3, Math.max(1, item.type)),
+        /*
+         * Материал ли это (type 3). Тема и раздел — заголовки структуры,
+         * за ними файла нет: открывать их нечего. Признак передаётся
+         * явно, потому что level зажат в 1..3 и сам по себе не отвечает
+         * на вопрос «есть ли за узлом материал».
+         */
+        isMaterial: item.type === 3,
+        state: this.sectionState(item.id),
+      }));
+    },
+
+    /**
+     * Прогресс курса в процентах — по разделам, а не по страницам:
+     * длина материала не пропорциональна трудоёмкости.
+     */
+    courseProgress() {
+      if (!this.sections.length) return 0;
+      const weight = { done: 1, partial: 0.5, todo: 0 };
+      const sum = this.sections.reduce((acc, s) => acc + weight[s.state], 0);
+      return (sum / this.sections.length) * 100;
+    },
+
     getFirstAukId() {
       // Используем метод find() для поиска первого элемента, у которого type равен 3
+      // Побочных эффектов здесь нет намеренно: раньше computed дёргал getlink(),
+      // а на него же подписан watch — материал грузился дважды.
       const firstAuk = this.aukstructures.find((item) => item.type === 3);
-      // Если элемент найден, то возвращаем его id, иначе возвращаем null      
-      if (firstAuk) this.getlink(firstAuk.id);
       return firstAuk ? firstAuk.id : null;
     },
   },
   // ----------------------------------------- методы --------------------------------------------------
 
-
   methods: {
+
+    /**
+   * Данные плеера одним запросом (P0.1). Три setState по ответу
+   * соответствуют тому же набору переменных, что заполнял старый
+   * цепочный код: заголовок, дерево, путь, aircraft. При наличии entry
+   * первый материал открывается сразу, без getlink.
+   */
+  async loadPlayerData() {
+    try {
+      const params = this.idCategory ? { category_id: this.idCategory } : {};
+      const response = await $api.get(apiUrl + "/api/course-player/" + this.idEdit, {
+        params: numericQuery(params),
+        stayOnPage: true,
+      });
+      const data = unwrapResponse(response) || {};
+      const course = data.course || {};
+      const tree = data.tree || [];
+
+      // Раньше здесь был course.title без fallback: при пустом ответе
+      // titleauk становился undefined, и шаблон падал на
+      // titleauk.toUpperCase() с «Cannot read properties of undefined».
+      this.titleauk = course.title || "";
+      this.aukstructures = tree;
+      this.filterByCategoryAukstructures = tree;
+      this.path = course.path || "";
+      this.aircraft = course.aircraft_id;
+
+      // Возобновление чтения: если сервер вернул последний открытый
+      // материал, открываем его, а не первый модуль курса.
+      const resumeEntry = Object.entries(data.progress || {}).find(([, value]) => value?.last_file);
+      if (!this.activeId && resumeEntry) {
+        this.getlink(Number(resumeEntry[0]));
+      } else if (!this.activeId && data.entry && data.entry.file) {
+        const target = data.entry;
+        const base = target.signed_base || "";
+        this.activeFile = target.file || "";
+        this.aircraft = course.aircraft_id;
+
+        if (base) {
+          const contentResponse = await $api.get(
+            base + encodeURIComponent(target.file).replace(/%2F/g, "/"),
+            { optional: true }
+          );
+          const html = typeof contentResponse.data === "string" ? contentResponse.data : "";
+          const clean = html ? sanitizeMaterialHtml(html) : "";
+          this.contentHtml = clean ? '<base href="' + base + '" />' + clean : "";
+          this.link = this.contentHtml;
+          this._docCache?.put(this.idEdit, target.aukstructure_id, clean);
+          this.markVisited(target.aukstructure_id);
+          this.saveProgress(target.aukstructure_id, 0);
+        }
+      } else if (!this.activeId && this.getFirstAukId) {
+        this.getlink(this.getFirstAukId);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  },
+
+
+    /**
+     * Стиль узла дерева. Отступ и кегль зависят от уровня (type),
+     * остальное — на CSS. Раньше кегль, курсор, цвет и opacity были
+     * инлайновыми для каждого из 182 узлов, из-за чего любое изменение
+     * состояния перерисовывало дерево целиком.
+     */
+    isVisited(id) {
+      return this.visitedIds.includes(id);
+    },
+
+    /**
+     * Состояние раздела: прочитан / начат / не начат.
+     * «Начат» — раздел открыт прямо сейчас.
+     */
+    sectionState(id) {
+      if (id === this.activeId) return "partial";
+      return this.isVisited(id) ? "done" : "todo";
+    },
+
+    /**
+     * Клик по узлу содержания.
+     *
+     * Открывается только материал (type 3): за темой и разделом файла
+     * нет, и клик по ним раньше молча менял подсветку, создавая впечатление
+     * перехода. Тема и раздел кликабельны не будут (см. CoursePlayerLayout).
+     */
+    onSelectSection(section) {
+      if (!section?.isMaterial) return;
+
+      const item = this.aukstructures.find((entry) => entry.id === section.id);
+      if (!item) return;
+
+      this.openModule(item);
+    },
+
+    /**
+     * Соседний МАТЕРИАЛ относительно активного.
+     *
+     * Раньше переход шёл по всем узлам подряд, и «следующий» после темы
+     * приводил на заголовок без файла. Ориентируемся на список материалов.
+     */
+    neighbour(offset) {
+      const materials = this.sections.filter((s) => s.isMaterial);
+      if (!materials.length) return null;
+
+      const index = materials.findIndex((s) => s.id === this.activeId);
+      if (index === -1) {
+        // Активен заголовок (например, после смены курса): отправляем
+        // к первому материалу в нужную сторону.
+        return offset > 0 ? materials[0] : materials[materials.length - 1];
+      }
+
+      return materials[index + offset] ?? null;
+    },
+
+    goPrev() {
+      const target = this.neighbour(-1);
+      if (target) this.onSelectSection(target);
+    },
+
+    goNext() {
+      const target = this.neighbour(1);
+      if (target) this.onSelectSection(target);
+    },
+
+    /**
+     * Полный экран. Выход по Escape — ожидаемое поведение, поэтому
+     * вешаем слушатель и снимаем его при уходе со страницы: иначе
+     * после ухода с курса Escape переставал закрывать что-либо и
+     * оставался висеть на document.
+     */
+    toggleFullscreen() {
+      this.isFullscreen = !this.isFullscreen;
+    },
+
+    onKeydown(event) {
+      if (event.key !== "Escape") return;
+      if (this.isFullscreen) this.isFullscreen = false;
+    },
+
+    /** Открытие модуля: контент + отметка «посещён». */
+    openModule(item) {
+      this.getlink(item.id);
+    },
+
+    markVisited(id) {
+      if (!this.visitedIds.includes(id)) {
+        this.visitedIds = [...this.visitedIds, id];
+      }
+      this.persistVisited();
+    },
+
+    /**
+     * Процент урока: 100, если материал пролистали до конца.
+     *
+     * Отдельного «пройти урок» в материалах нет — документ один
+     * большой HTML. Поэтому признак прохождения здесь такой же
+     * практический, как у видеоуроков: доскроллил до конца.
+     * Промежуточные значения не пишем: иначе один скролл создавал бы
+     * запись в базе на каждом кадре.
+     */
+    lessonPercent(itemId) {
+      if (this.isScrolledToEnd) {
+        return 100;
+      }
+
+      return this.visitedIds.includes(itemId) ? 0 : 0;
+    },
+
+    /**
+     * Отправляет серверный прогресс по уроку.
+     *
+     * Ошибка намеренно проглатывается: материал уже открыт, и падение
+     * фоновой записи не должно превращаться в сообщение об ошибке на
+     * странице. В localStorage копия остаётся как запасной вариант.
+     */
+    async saveProgress(itemId, percent) {
+      try {
+        await $api.post(`${apiUrl}/api/my/progress`, {
+          course_id: Number(this.idEdit),
+          lesson_id: Number(itemId),
+          percent,
+          last_file: this.activeFile || null,
+        }, { optional: true });
+      } catch (error) {
+        // Прогресс не критичен для показа материала.
+      }
+    },
+
+    /** Ключ хранилища — по курсу: прогресс разных курсов не смешивается. */
+    visitedKey() {
+      return `course-manifest-visited:${this.idEdit}`;
+    },
+
+    persistVisited() {
+      try {
+        window.localStorage.setItem(this.visitedKey(), JSON.stringify(this.visitedIds));
+      } catch (error) {
+        // localStorage бывает недоступен (приватный режим): прогресс
+        // просто не сохранится, ломать страницу из-за этого не нужно.
+      }
+    },
+
+    restoreVisited() {
+      try {
+        const raw = window.localStorage.getItem(this.visitedKey());
+        const parsed = raw ? JSON.parse(raw) : [];
+        this.visitedIds = Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        this.visitedIds = [];
+      }
+    },
+
+    /**
+     * Слушатель прокрутки.
+     *
+     * Через requestAnimationFrame: событие прокрутки приходит десятками
+     * раз в секунду, а изменение реактивного состояния на каждом из них
+     * перерисовывало дерево из 180+ узлов и пересоздавало iframe — отсюда
+     * «низкая скорость рендеринга» и подвисание материала.
+     *
+     * Кнопка сделана через v-show, а не v-if: v-if уничтожал и создавал
+     * iframe заново на каждом появлении кнопки, и высота материала
+     * схлопывалась до пустой.
+     */
+    bindScroll() {
+      const el = this.$refs.contentEl?.$el ?? this.$refs.contentEl;
+
+      if (!el) return;
+
+      let frame = null;
+
+      this.scrollHandler = () => {
+        if (frame !== null) return;
+
+        frame = window.requestAnimationFrame(() => {
+          frame = null;
+          this.canScrollUp = el.scrollTop > 240;
+          this.checkScrollEnd(el);
+        });
+      };
+
+      el.addEventListener('scroll', this.scrollHandler, { passive: true });
+      this.canScrollUp = el.scrollTop > 240;
+    },
+
+    /**
+     * Подгоняет высоту кастра под содержимое материала.
+     *
+     * Раньше это делал инлайновый onload, писавший высоту прямо в DOM.
+     * Vue на каждом ре-рендере перезаписывал :style пустым значением, и
+     * материал «схлопывался» до размера пустого iframe.
+     */
+    onFrameLoad(event) {
+      let doc = null;
+
+      try {
+        doc = event?.target?.contentDocument;
+        const height = doc?.body?.scrollHeight ?? 0;
+
+        if (height > 0) {
+          this.frameHeight = `${height + 20}px`;
+        }
+      } catch (error) {
+        // srcdoc-документ бывает недоступен (sandbox) — оставляем прошлую высоту.
+        return;
+      }
+
+      // Наблюдаем за изменением высоты документа (картинки догружаются
+      // после load): без повторного пересчёта кадр остаётся обрезанным.
+      if (doc?.body && typeof ResizeObserver !== 'undefined') {
+        if (this._frameResizeObserver) this._frameResizeObserver.disconnect();
+        const observer = new ResizeObserver(() => {
+          const height = doc?.body?.scrollHeight ?? 0;
+          if (height > 0) this.frameHeight = `${height + 20}px`;
+        });
+        observer.observe(doc.body);
+        this._frameResizeObserver = observer;
+      }
+
+      // Подсветка — после того, как кадр готов и высота посчитана:
+      // переписывание ветки сдвигает высоту, и порядок важен.
+      this.applyHighlights(doc);
+    },
+
+    /**
+     * Дошёл ли пользователь до конца материала.
+     *
+     * Кадр подгоняется под высоту документа, поэтому «конец
+     * документа» — это нижняя граница прокрутки страницы. Запас в
+     * 40px нужен из-за дробной высоты и субпиксельной раскладки.
+     * Отметка о выходе на конец отправляется один раз: при каждом
+     * движении колеса запрос не уходит.
+     */
+    checkScrollEnd(el) {
+      if (this.isScrolledToEnd) return;
+
+      const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+
+      if (distance <= 40) {
+        this.isScrolledToEnd = true;
+        this.saveProgress(this.activeId, 100);
+      }
+    },
+
+    scrollToTop() {
+      const el = this.$refs.contentEl?.$el ?? this.$refs.contentEl;
+      el?.scrollTo({ top: 0, behavior: 'smooth' });
+    },
     // onIframeLoad(event) {
     //   const iframe = event.currentTarget;
     //   iframe.style.height = (iframe.contentWindow.document.body.scrollHeight + 20) + 'px';
     // // Добавьте здесь свой код, который нужно выполнить после загрузки iframe
-    // console.log('Iframe загружен!');
     //   if(this.showSearch) {
     //   const iframeDoc = iframe.contentDocument;
-    //   console.log(iframeDoc)
     //   setTimeout(() => {
     //   this.highlightNodes(iframeDoc);    
     // }, 100)
@@ -383,7 +834,6 @@ export default {
 
       // Replace old node with new node
       node.parentNode.replaceChild(newContent, node);
-      // console.log(node.parentNode.replaceChild(newContent, node), 'replace')
     },
 
     // onIframeLoaded() {
@@ -398,24 +848,133 @@ export default {
     // this.$refs.myIframe.height = this.$refs.myIframe.contentWindow.document.body.scrollHeight + 20;
     // },
 
-
     async getlink(item_id) {
       this.isLoading = true;
       this.activeId = item_id;
-      //console.log('getlink')      
+      this.activeTitle = this.aukstructures.find((item) => item.id === item_id)?.title ?? '';
+      // Сбрасываем прошлую высоту: иначе до загрузки нового документа
+      // в кадре пустота, а блок занимает размер предыдущего материала.
+      this.frameHeight = '320px';
+      // Новый материал открыт сверху, значит «вверх» идти некуда.
+      // Без сброса кнопка оставалась видимой: событие scroll не
+      // срабатывает, когда позиция и так уже 0.
+      this.canScrollUp = false;
+      this.isScrolledToEnd = false;
+      // Отмечаем модуль посещённым сразу, а не после загрузки контента:
+      // долгая загрузка не должна оставлять пункт «непосещённым».
+      this.markVisited(item_id);
+      this.saveProgress(item_id, 0);
+      // P0.3: повторный клик по уже показанному материалу — мгновенный
+      // srcdoc без сети (getlink → signed-url → файл — три RTT).
+      const cached = this._docCache?.get(this.idEdit, item_id);
+      if (cached != null) {
+        let base = "";
+        try {
+          const sigResponse = await $api.get(apiUrl + "/api/private/signed-url", {
+            params: { aircraft: (this.aircraft || "").trim(), auk: (this.path || "").trim() },
+          });
+          base = (unwrapResponse(sigResponse) || {}).base || "";
+        } catch (error) {
+          base = "";
+        }
+        const html = base ? '<base href="' + base + '" />' + cached : cached;
+        this.contentHtml = html;
+        this.link = html;
+        this.isLoading = false;
+        this.saveProgress(item_id, this.lessonPercent(item_id));
+        return;
+      }
       try {
-        const response = await $api.get(apiUrl + "/api/getlink/" + item_id);
-        this.link = response.data;
+        // Контент курсов отдаётся по подписи, а не по auth:sanctum:
+        // вложенные ресурсы (CSS/JS/картинки) браузер запрашивает напрямую,
+        // без заголовка Authorization. Раньше здесь подставлялся «голый»
+        // путь api/private/КЛЕН/01/file.html — middleware отвечал 403,
+        // и правая панель оставалась пустой.
+        // Теперь getlink отдаёт составляющие пути, подпись получаем
+        // отдельным запросом, а документ показываем через srcdoc с
+        // <base href>: все относительные ресурсы наследуют токен
+        // из query-строки, поэтому стили и картинки тоже загружаются.
+        const response = await $api.get(apiUrl + "/api/getlink/" + item_id, {
+          /*
+           * stayOnPage: 403 здесь — это «группа не записана на ЭТОТ
+           * материал», а не «нет прав на страницу». Без флага глобальный
+           * перехватчик httpClient уводил со страницы целиком, и человек
+           * терял список материалов из-за одного недоступного — тем
+           * более что при записи на конкретные материалы (parent_id)
+           * закрытых модулей в курсе много, а открыт ровно один.
+           */
+          stayOnPage: true,
+        });
+        const target = unwrapResponse(response) || {};
+        const aircraft = (target.aircraft || "").trim();
+        const auk = (target.auk || "").trim();
+        const file = (target.file || "").trim();
+        this.activeFile = file;
+
+        if (!aircraft || !auk || !file) {
+          this.contentHtml = "";
+          this.error = "Для этого раздела не найден файл материала";
+          return;
+        }
+
+        this.error = "";
+
+        const sigResponse = await $api.get(apiUrl + "/api/private/signed-url", {
+          params: { aircraft, auk },
+        });
+        const signed = unwrapResponse(sigResponse) || {};
+        const base = signed.base || "";
+
+        if (!base) {
+          this.contentHtml = "";
+          this.error = "Не удалось получить доступ к материалу курса";
+          return;
+        }
+
+        // optional: файла может не оказаться на диске — это не ошибка API.
+        const contentResponse = await $api.get(
+          base + encodeURIComponent(file).replace(/%2F/g, "/"),
+          { optional: true }
+        );
+        const html = typeof contentResponse.data === "string" ? contentResponse.data : "";
+        // Двойной барьер поверх sandbox-атрибута iframe: из документа
+        // убираются <script>, инлайновые обработчики on* и javascript:-
+        // ссылки, чтобы сохранённый материал не имел пути к исполнению.
+        const clean = html ? sanitizeMaterialHtml(html) : "";
+        this.contentHtml = clean ? '<base href="' + base + '" />' + clean : "";
+        this.link = this.contentHtml;
+        this._docCache?.put(this.idEdit, item_id, clean);
+        // Урок открыт и прочитан хотя бы частично: серверный прогресс
+        // нужен, чтобы «продолжить обучение» работало на другом
+        // устройстве, а не только в этом браузере.
+        this.saveProgress(item_id, this.lessonPercent(item_id));
       } catch (error) {
-        console.log(error);
+        this.contentHtml = "";
+        /*
+         * Показываем причину от backend, а не общую фразу: при записи на
+         * отдельные материалы отказ означает «этот материал не входит в
+         * запись группы», и человеку нужно именно это знать, а не
+         * «не удалось загрузить».
+         */
+        const status = error?.response?.status;
+        const reason =
+          error?.response?.data?.data?.message ||
+          error?.response?.data?.error?.message ||
+          "";
+
+        if (status === 403 && reason) {
+          this.error = reason;
+        } else if (status === 403) {
+          this.error = "Материал недоступен для вашей группы";
+        } else {
+          this.error = "Не удалось загрузить материал курса";
+        }
       } finally {
         this.isLoading = false; // Установить isLoading в false после завершения загрузки
       }
     },
 
-
     // method(hlHtml) {
-    //   console.log('method')
     //   //console.log(hltml, 'hltml')
     //   setTimeout(() => {
     //     const iframe = this.$refs.myIframe;
@@ -436,7 +995,6 @@ export default {
     //         }
     //       });
     //     } catch (e) {
-    //       console.log(e);
     //     }
     //     // console.log(highlight,'highlight')
     //     iframeDoc.body.innerHTML = dom.documentElement.innerHTML;
@@ -448,50 +1006,69 @@ export default {
 
     loadContent(item, hlHtml) {
       this.isLoading = true;
-      this.getlink(item); // загружаем в iframe содержимое файла статического html
+      // Регресс производительности (см. docs/course-player-performance.md §1.2, P1.3):
+      // раньше подсветка шла через setTimeout(1000) с прямой мутацией
+      // iframeDoc.body.innerHTML — на тяжёлых документах iframe не успевал
+      // прогрузиться (гонка), а перестройка всего <body> вызывала full reflow
+      // и «подвисание» материала. Теперь: контент загружаем через getlink(),
+      // а подсветку применяем в onload-колбазе уже готового srcdoc-кадра,
+      // точечно заменяя только узлы-совпадения (без перезаписи body целиком).
+      this.pendingHighlights = Array.isArray(hlHtml) ? hlHtml : [];
 
-      //await this.onIframeLoaded();
-      //console.log(hlHtml, "подсвеченный");
+      // Подсвечиваем после фактической загрузки кадра, а не по таймеру.
+      this.getlink(item);
+    },
 
-      //this.method(hlHtml)
+    /**
+     * Применяет подсветку к загруженному кадру.
+     *
+     * Использует `pendingHighlights`, заполненный в `loadContent`.
+     * Заменяет только текстовые узлы-совпадения, не пересоздавая DOM целиком.
+     * Вызывается из `onFrameLoad` после загрузки кадра и из тестов напрямую.
+     */
+    applyHighlights(doc) {
+      const marks = this.pendingHighlights;
+      this.pendingHighlights = [];
 
-      setTimeout(() => {
-        const iframe = this.$refs.myIframe;
-        const iframeDoc = iframe.contentDocument;
-        const dom = new DOMParser().parseFromString(iframeDoc.body.innerHTML, 'text/html');
-        //console.log(dom, "dom");        
-        try {
-          hlHtml.forEach((highlighted) => {
-            const nodeToReplace = dom.evaluate(highlighted.originalXpath, dom, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-            //console.log(nodeToReplace, 'node')
-            //     console.log(highlighted.originalXpath, 'оригинальный xpath');
-            if (nodeToReplace) {
-              const parentNode = nodeToReplace.parentNode;
-              //const highlightedTextCon = document.createElement('span');
-              //highlightedTextCon.style.backgroundColor = 'yellow';
-              //console.log(highlighted.highlightedText, 'highlighted.highlightedText')
-              parentNode.innerHTML = highlighted.highlightedText;
-            }
-          });
-        } catch (e) {
-          console.log(e);
-        }
-        // console.log(highlight,'highlight')
-        iframeDoc.body.innerHTML = dom.documentElement.innerHTML;
-        this.highlightNodes(iframeDoc);
+      if (!doc || !marks.length) return;
 
-      }, 1000) // делаем задержку чтобы на тяжелых страницах iframe прогрузился и успели раскраситься слова
-      this.isLoading = false;
+      try {
+        marks.forEach((mark) => {
+          const node = doc.evaluate(
+            mark.originalXpath,
+            doc,
+            null,
+            XPathResult.FIRST_ORDERED_NODE_TYPE,
+            null
+          ).singleNodeValue;
+
+          if (!node || !node.parentNode) return;
+
+          const holder = doc.createElement('div');
+          holder.innerHTML = mark.highlightedText;
+
+          // Заменяем только сам текстовый узел, сохраняя соседние узлы.
+          while (holder.firstChild) {
+            node.parentNode.insertBefore(holder.firstChild, node);
+          }
+          node.parentNode.removeChild(node);
+        });
+      } catch (e) {
+        // XPath из ответа сервера может не совпасть с документом.
+        // Материал должен открыться и без подсветки.
+      }
+
+      this.highlightNodes(doc);
     },
 
     ///-------------------------------------------скроллинг --------------------------------------------------------------
 
     highlightNodes(iframe) {
-      //console.log(iframe.querySelectorAll('.highlighted'),'iframe')
-      this.highlighted = Array.from(iframe.querySelectorAll('.highlighted'));
-      //console.log(this.highlighted, 'highlighted');
-      this.currentHighlight = 0
-      this.scrollToHighlight(this.highlighted[this.currentHighlight]);
+      this.highlighted = iframe
+        ? Array.from(iframe.querySelectorAll('.highlighted'))
+        : [];
+      this.currentHighlight = 0;
+      this.scrollToHighlight(this.highlighted[0]);
     },
 
     // scrollToHighlight(node) {
@@ -509,18 +1086,29 @@ export default {
     //    })       
     // },
     scrollToHighlight(node) {
+      /*
+       * Раньше узла могло не оказаться — подсветка не нашлась — и
+       * `node.getBoundingClientRect()` бросал TypeError прямо из
+       * обработчика загрузки кадра. Материал при этом открывался,
+       * но консоль сыпала ошибками на каждый переход.
+       *
+       * Проверяется и сам кадр: подсветка применяется по событию
+       * `load`, и к этому моменту ссылка на iframe уже может быть
+       * пустой (переход на другой материал, размонтирование).
+       */
       const iframe = this.$refs.myIframe;
-      const iframeDocument = iframe.contentWindow.document;
+      const iframeDocument = iframe?.contentWindow?.document;
+
+      if (!node || !iframeDocument) return;
+
       const iframeRect = iframe.getBoundingClientRect();
       const nodeRect = node.getBoundingClientRect();
       const offsetTop = nodeRect.top - iframeRect.top + iframeDocument.documentElement.scrollTop;
       iframeDocument.documentElement.scrollTop = offsetTop;
     },
 
-
     scrollToNext() {
       if (this.highlighted.length > 0) {
-        //console.log("к следующему")
         this.currentHighlight = (this.currentHighlight + 1) % this.highlighted.length;
         this.scrollToHighlight(this.highlighted[this.currentHighlight]);
       } else {
@@ -529,7 +1117,6 @@ export default {
     },
     scrollToPrev() {
       if (this.highlighted.length > 0) {
-        //console.log("к предыдующему")
         this.currentHighlight = (this.currentHighlight - 1 + this.highlighted.length) % this.highlighted.length;
         this.scrollToHighlight(this.highlighted[this.currentHighlight]);
       } else {
@@ -539,52 +1126,36 @@ export default {
     ///-----------------------------------конец-скроллинг--------------------------------------------------------------
 
 
-    showthumb(item_id) {
-      // console.log(item_id)
-      document.getElementById(item_id).style.border = "2px doted grey ";
-      document.getElementById(item_id).style.borderRadius = "4px";
-      if (item_id !== this.activeId)
-        document.getElementById(item_id).style.background = "#D3D3D3";
-
-      document.getElementById(item_id).style.transform = "scale(1.03)";
-    },
-    hidethumb(item_id) {
-      //console.log(item_id, 'вышел')
-      document.getElementById(item_id).style.border = "none";
-      if (item_id !== this.activeId)
-        document.getElementById(item_id).style.background = "none";
-
-      document.getElementById(item_id).style.transform = "scale(1.0)";
-    },
-
 
     getfirstauk: function (course_id) {
       $api
         .get(apiUrl + "/api/getfirstauk/" + course_id)
         .then((response) => {
-          this.firstId = response.data;
-          //console.log(this.firstId,"this.firstId")
+          this.firstId = unwrapResponse(response);
           this.getlink(this.firstId);
         });
     },
     // добавить в избранное
+    /**
+     * Панели не исключают друг друга.
+     *
+     * Регресс: переключатели гасили другие панели и само дерево
+     * (toggleSearch ставил showItems = false). Из-за этого нажатие на
+     * «лупу» или «сердечко» убирало список материалов, и казалось, что
+     * кнопки сломаны. Теперь каждый управляет только своей панелью,
+     * а дерево скрывает отдельная кнопка «Дерево».
+     */
     toggleFavorite() {
       this.isFavorite = !this.isFavorite;
-      this.showItems = false;
-      this.showSearch = false;
-      if (this.isFavorite == false) this.showItems = true;
+      if (this.isFavorite) this.getFavorites();
     },
+
     toggleList() {
-      //this.clearContent();
       this.showItems = !this.showItems;
-      this.isFavorite = false;
-      this.showSearch = false;
     },
+
     toggleSearch() {
       this.showSearch = !this.showSearch;
-      this.isFavorite = false;
-      this.showItems = false;
-      if (this.showSearch == false) this.showItems = true;
     },
     // onClickSearch() {
     //   this.loading = true
@@ -597,7 +1168,6 @@ export default {
 
     addToFavorites(course_id) {
       const activeTitle = this.aukstructures.find(item => item.id === course_id)?.title;
-      // console.log(activeTitle, "activeTitle")
       $api
         .post(apiUrl + '/api/favorites/add', { course_id: course_id, title: activeTitle })
         .then(response => {
@@ -605,150 +1175,421 @@ export default {
           this.getFavorites(); // загружаем избранное
         })
         .catch(error => {
-          // Обработка ошибки
+          // 400 — материал уже в избранном. Раньше ошибка уходила в
+          // консоль и пользователь видел «ничего не произошло».
+          const message =
+            error?.response?.data?.error?.message || error?.response?.data?.error || "";
+
+          // 400 здесь — «уже в избранном»: это не поломка, а
+          // повторное действие, поэтому сообщение информационное.
+          if (error?.response?.status === 400) {
+            toast.info(
+              typeof message === "string" && message
+                ? message
+                : this.$t("courseManifest.alreadyFavorite"),
+            );
+            return;
+          }
+
+          toast.error(this.$t("courseManifest.favoriteError"));
         });
     },
 
     getFavorites() {
       $api.get(apiUrl + '/api/favorites/').then((response) => {
-        this.favorites = response.data.favorites;
+        this.favorites = unwrapField(response, 'favorites') || [];
       });
     },
+    /*
+     * Удаление из избранного — обратимое, поэтому диалог подтверждения
+     * здесь был бы лишним трением: достаточно одного нажатия, чтобы
+     * вернуть. Вместо него сообщение с действием «Вернуть»: отмена
+     * доступна прямо в тосте.
+     *
+     * Диалог остаётся для необратимых действий (см. AddClass.vue и
+     * списки групп, категорий, курсов, пользователей).
+     */
     removeFavorite(id) {
+      const removed = this.favorites.find((f) => f.id === id)
+
       $api
-        .delete(apiUrl + `/api/favorites/${id}`).then(() => {
+        .delete(apiUrl + `/api/favorites/${id}`)
+        .then(() => {
           this.getFavorites();
+
+          toast.success(this.$t("courseManifest.favoriteRemoved"), {
+            action: {
+              label: this.$t("courseManifest.favoriteRestore"),
+              handler: () => this.restoreFavorite(removed),
+            },
+          });
         });
     },
 
+    /** Возврат удалённого избранного — обработчик кнопки в тосте. */
+    restoreFavorite(removed) {
+      if (!removed) return;
 
-
-    alertFalse() {
-      this.alert = false;
+      $api
+        .post(apiUrl + "/api/favorites/add", {
+          course_id: removed.course_id,
+          title: removed.title,
+        })
+        .then(() => this.getFavorites());
     },
     async search() {
-      const formData = {
-        //  query: this.searchTerm, path: this.path, aircraft: this.aircraft
-        query: this.searchTerm, path: this.path, aircraft: this.aircraft
+      const term = this.searchTerm.trim();
 
-      }
-      if (this.searchTerm.length < 3) {
-        this.snackbarText = "..не меньше трех символов";
-        this.alertType = "error";
-        this.alert = true;
+      if (term.length < 3) {
+        this.matchingFiles = [];
+        toast.warning(this.$t("courseManifest.searchMinChars"));
         return;
       }
 
-      $api.post(apiUrl + `/api/search-files/`, formData)
+      this.isSearching = true;
+      // Отмена прошлого запроса: медленный ответ по «ко» не должен
+      // перебивать быстрые результаты по «кок».
+      this._searchAbort?.abort();
+      this._searchAbort = new AbortController();
+      const formData = {
+        query: term, path: this.path, aircraft: this.aircraft
+      }
 
-        .then(response => {
-          this.matchingFiles = response.data;
-          //         console.log(response, "кол-во")
-        })
-        .catch(error => {
-          console.log(error);
-        }).finally(() => {
-          // this.alert = true;
+      try {
+        const response = await $api.post(apiUrl + `/api/search-files/`, formData, {
+          signal: this._searchAbort?.signal,
         });
+        this.matchingFiles = unwrapArray(response) || [];
+      } catch (error) {
+        // Отменённый запрос — не ошибка поиска: прошлый запрос
+        // перебивается новым, пользователю показывать ничего не надо.
+        if (error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError') {
+          return;
+        }
+        this.matchingFiles = [];
+        toast.error(this.$t("courseManifest.searchError"));
+      } finally {
+        this.isSearching = false;
+      }
+    },
+
+    /**
+     * Очистка поля поиска.
+     *
+     * Кнопка очистки у `v-text-field` с `clearable` сбрасывает только
+     * модель. Старые результаты при этом оставались на экране — человек
+     * видел список файлов, хотя искать уже нечего.
+     */
+    clearSearch() {
+      this.searchTerm = '';
+      this.matchingFiles = [];
+      this.highlighted = [];
+      this.currentHighlight = 0;
     },
 
   },
 };
 </script>
 
-
 <style>
+/*
+  Блок НЕ scoped: класс .highlighted приходит из HTML, который сервер
+  отдаёт для результатов поиска по материалу.
+*/
+
+/*
+  Подсветка найденного. Раньше стоял жёсткий `yellow`: в тёмной теме он
+  резал глаза, а в светлой не совпадал с палитрой. Теперь цвет из
+  токенов, поэтому подсветка следует за темой.
+*/
 .highlighted {
-  background-color: yellow;
+  background-color: var(--c-warning-soft);
+  color: var(--c-warning);
+  border-radius: 2px;
   display: inline-block;
 }
 
+/* --------------------------- панель инструментов --------------------------- */
+/* Регресс: у иконок стоял width:130px (три штуки — 390px) внутри колонки
+   4/12, а у разделителя .row-with-line был margin-bottom:-31px. Иконки
+   вылезали за колонку, а отрицательный отступ наезжал блоками друг на
+   друга — шапка ломалась. Здесь обычный flex без фиксированных ширин. */
+.cm-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: var(--sp-2) var(--sp-2);
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-surface-2);
+  position: sticky;
+  top: 0;
+  z-index: 3;
 
-.v-card {
-  border: 1px solid lightgrey;
+  /*
+    Блок заметок внутри панели не помещался и вылезал за её край:
+    scrollWidth 320 при clientWidth 299.
+
+    Причина — стандартная для flex: у детей по умолчанию
+    min-width: auto, то есть они не сжимаются уже своего содержимого.
+    Блок заметок — это v-textarea, у которой минимальная ширина
+    считается по содержимому, поэтому на узкой боковой колонке панель
+    разъезжалась. min-width: 0 разрешает сжатие до ширины колонки.
+  */
+  min-width: 0;
 }
 
+.cm-toolbar > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.cm-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.cm-toolbar__meta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cm-toolbar__current {
+  font-size: 0.8125rem;
+  color: var(--c-text-muted);
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Кнопка инструмента: обычная кнопка, а не v-icon с рамками.
+   Состояние «включено» — фоном и цветом, а не обводкой. */
+.cm-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--c-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1;
+  transition: background-color .15s ease-in-out, color .15s ease-in-out;
+}
+
+.cm-tool:hover:not(:disabled) {
+  background: var(--c-surface-3);
+  color: var(--c-primary);
+}
+
+/* Клавиатурная доступность: фокус должен быть виден, иначе
+   пользователь не понимает, где он находится. */
+.cm-tool:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 1px;
+}
+
+.cm-tool--on {
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+}
+
+.cm-tool:disabled {
+  opacity: .45;
+  cursor: default;
+}
+
+/* -------------------------------- избранное ------------------------------- */
+.cm-favorites {
+  margin: 8px 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  background: var(--c-surface);
+}
+
+.cm-favorites__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 0.875rem;
+  margin-bottom: 6px;
+}
+
+.cm-favorites__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.cm-favorites__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.cm-favorites__title {
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cm-favorites__empty {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--c-text-muted);
+}
+
+/* ------------------------------ дерево материалов -------------------------- */
 .my-sheet {
-
-  opacity: 1;
-  /* потом удалить opacity,сделал чтобы стили не убирать для v-sheet */
-  /* height: 800px; */
-  /* Установите высоту для v-sheet, чтобы прокрутка сработала */
-}
-
-.icon-list::before {
-  /* border-radius: 10%; */
-  opacity: 0.5;
-  transition: opacity 0.2s ease-in-out;
-}
-
-.icon-list:hover::before {
   opacity: 1;
 }
 
-/* .icon-favorite {
-  position: relative;  
-} */
-
-.icon-favorite::before {
-  /* border-radius: 10%; */
-  opacity: 0.5;
-  transition: opacity 0.2s ease-in-out;
+/*
+  Контейнер кадра с материалом. Скругление раньше стояло инлайном в
+  :style, а материал из iframe подписан по ссылке и не наследует
+  оформление страницы, поэтому скругление нужно здесь.
+*/
+.cm-frame {
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
-.icon-favorite:hover::before {
-  opacity: 1;
+/* Обе колонки прокручиваются независимо, шапка остаётся на месте.
+   Регресс: у блока контента стоял только overflow:auto без высоты,
+   из-за чего он разрастался на всю длину документа (4530px при
+   scrollHeight = clientHeight) и не прокручивался вовсе — скроллилась
+   вся страница, и кнопка «вверх» не могла найти свой контейнер. */
+.cm-tree,
+.cm-content {
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-.icon-search::before {
-  opacity: 0.5;
-  transition: opacity 0.2s ease-in-out;
+/* На невысоких экранах оставляем хоть немного места под контент. */
+@media (max-height: 620px) {
+  .cm-tree,
+  .cm-content {
+    max-height: calc(100vh - 110px);
+  }
 }
 
-.icon-search:hover::before {
-  opacity: 1;
+
+/* ------------------------------ кнопка «вверх» ----------------------------- */
+.cm-content-col {
+  position: relative;
 }
 
-.row-with-line {
-  border-bottom: 2px solid green;
-  margin-bottom: -31px;
-}
-
-.row-with-line .active {
-  border-bottom: none !important;
-}
-
-.icon-list,
-.icon-favorite,
-.icon-search {
-
-  border-bottom: 2px solid green;
-  width: 130px;
-  /* position: relative; */
-
-}
-
-.addToFav {
-  /* width: 70px; */
-  border-bottom: 2px solid green;
-  border-top: 1px solid green;
-  border-left: 1px solid green;
-  border-right: 1px solid green;
-  border-top-left-radius: 50%;
-  border-top-right-radius: 10%;
-}
-
-.active {
-  border-bottom: none;
-  border-top: 2px solid green;
-  border-left: 2px solid green;
-  border-right: 2px solid green;
-  border-top-left-radius: 15%;
-  border-top-right-radius: 15%;
+.cm-scroll-top {
+  position: sticky;
+  top: 12px;
+  margin-left: auto;
+  margin-right: 8px;
+  z-index: 4;
+  display: block;
 }
 
 .search-files__total-results {
-  font-size: 14px;
-  color: #666;
+  font-size: 0.875rem;
+  color: var(--c-text-muted);
 }
+
+.search-files__no-results {
+  margin: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-sm);
+  color: var(--c-text-muted);
+}
+
+/* Поиск по материалам. Блок живёт в панели содержания шириной ~300px,
+   поэтому ширины и переносы заданы явно: v-row без него разъезжался,
+   а инлайновые стили на кнопках результатов обходили токены. */
+.cm-search {
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-surface-1);
+  min-width: 0;
+}
+
+.cm-search__field {
+  min-width: 0;
+}
+
+.cm-search__nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-1);
+}
+
+.cm-search__nav-count {
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cm-search__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.cm-search__item {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  padding: var(--sp-2);
+  text-align: left;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--fs-sm);
+}
+
+/* Скелетон результатов: та же высота, что у кнопки результата,
+   поэтому список не прыгает, когда ответ приходит.
+   Ключ кадров свой, а не общий с AppSkeleton: там он объявлен в
+   scoped-стиле и сюда не попадает. */
+.cm-search__skeleton {
+  display: block;
+  height: 32px;
+  margin-bottom: var(--sp-1);
+  border-radius: var(--radius-sm);
+  background: var(--c-skeleton);
+  animation: cm-search-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes cm-search-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cm-search__skeleton {
+    animation: none;
+  }
+}
+
+
 </style>
