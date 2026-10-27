@@ -12,6 +12,7 @@ use App\Http\Controllers\AukstructureController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\CoursePlayerController;
+use App\Http\Controllers\CourseContentController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\GroupController;
@@ -119,6 +120,10 @@ Route::get('/getlink/{id}', [CourseController::class, 'getlink']);
 Route::get('/course/{courseId}/player', [CoursePlayerController::class, 'show']);
 Route::post('/course/{courseId}/progress', [CoursePlayerController::class, 'progress']);
 Route::post('/course/{courseId}/view', [CoursePlayerController::class, 'view']);
+
+// --- Контент материала для плеера: авторизованная выдача html с base-URL и серверной подсветкой (Д1, Д5) ---
+Route::get('/course/{courseId}/content/{itemId}', [CourseContentController::class, 'show'])->whereNumber('itemId');
+Route::get('/course/{courseId}/raw/{path}', [CourseContentController::class, 'raw'])->where('path', '.*');
 Route::get('/getfirstauk/{id}', [CourseController::class, 'get_first_auk']);
 //-------------------- классы -----------------
 Route::get('/classes/', [AircraftController::class, 'indexclasses']);
@@ -157,6 +162,7 @@ Route::apiResource('groups', GroupController::class)->middleware(['auth:sanctum'
 //
 // блок // //
 //   
+Route::middleware(['auth:sanctum'])->group(function () {
 Route::get('/private/{aircraft}/{auk}/imsmanifest.xml', [PrivateManiController::class, 'xmles00']); //->middleware('auth:sanctum');
 //Route::get('/test', [PrivateManiController::class, 'test']);//->middleware('auth:sanctum');
 
@@ -169,6 +175,7 @@ Route::get('/private/{aircraft}/{auk}/{html}/{html2}/{html3}/{html4}/{html5}', [
 Route::get('/private/{aircraft}/{auk}/{html}/{html2}/{html3}/{html4}/{html5}/{html6}', [PrivateController::class, 'htmles6']); //->middleware('auth');
 Route::get('/private/{aircraft}/{auk}/{html}/{html2}/{html3}/{html4}/{html5}/{html6}/{html7}', [PrivateController::class, 'htmles7']); //->middleware('auth');
 Route::get('/private/{aircraft}/{auk}/{html}/{html2}/{html3}/{html4}/{html5}/{html6}/{html7}/{html8}', [PrivateController::class, 'htmles8']); //->middleware('auth');
+}); // end auth:sanctum — доступ к файлам курсов только для авторизованных
 
 
 Route::get('/userauks', [UsersCoursesController::class, 'index']);
