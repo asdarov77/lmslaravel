@@ -121,6 +121,17 @@
             <dt>{{ $t("catalog.topics") }}</dt>
             <dd>{{ course.topics }}</dd>
           </div>
+          <div v-if="course.instructors && course.instructors.length">
+            <dt>{{ $t("catalog.instructors") }}</dt>
+            <dd>
+              <router-link
+                v-for="instructor in course.instructors"
+                :key="instructor.id"
+                class="catalog__instructor"
+                :to="{ name: 'instructor.profile', params: { id: instructor.id } }"
+              >{{ instructor.fio }}</router-link>
+            </dd>
+          </div>
           <div v-if="course.categories.length">
             <dt>{{ $t("catalog.categories") }}</dt>
             <dd>
@@ -682,6 +693,8 @@ export default {
   color: var(--c-text-secondary);
 }
 
+.catalog__instructor { color: var(--c-primary); display: block; text-decoration: none; }
+.catalog__instructor:hover { text-decoration: underline; }
 .catalog__facts dd {
   margin: 0;
 }

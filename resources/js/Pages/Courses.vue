@@ -107,17 +107,20 @@
           </div>
 
           <div class="courses__card-instructors" v-if="course.instructors && course.instructors.length">
-            <v-avatar
+            <router-link
               v-for="instructor in course.instructors"
               :key="instructor.id"
-              size="28"
-              color="primary"
+              :to="{ name: 'instructor.profile', params: { id: instructor.id } }"
+              :aria-label="`${$t('profile.title')}: ${instructor.fio}`"
+              :title="instructor.fio"
               class="mr-1"
             >
-              <span class="text-white text-caption">
-                {{ instructor.fio.charAt(0).toUpperCase() }}
-              </span>
-            </v-avatar>
+              <v-avatar size="28" color="primary">
+                <span class="text-white text-caption">
+                  {{ instructor.fio.charAt(0).toUpperCase() }}
+                </span>
+              </v-avatar>
+            </router-link>
           </div>
 
           <!--

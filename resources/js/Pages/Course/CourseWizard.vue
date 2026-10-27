@@ -368,21 +368,15 @@
           </v-dialog>
 
           <!-- Подтверждение удаления материала -->
-          <v-dialog v-model="materialDeleteConfirm" max-width="400">
-            <v-card>
-              <v-card-title>{{ t('course.wizard.deleteMaterialConfirm') }}</v-card-title>
-              <v-card-text>{{ t('course.wizard.deleteMaterialConfirmText', { title: materialToDelete?.title || '' }) }}</v-card-text>
-              <v-card-actions>
-                <v-spacer />
-                <v-btn variant="text" @click="materialDeleteConfirm = false">
-                  {{ t('common.cancel') }}
-                </v-btn>
-                <v-btn color="error" variant="flat" @click="deleteMaterial">
-                  {{ t('common.delete') }}
-                </v-btn>
-              </v-card-actions>
-            </v-card>
-          </v-dialog>
+          <ConfirmDialog
+            v-model="materialDeleteConfirm"
+            :title="t('course.wizard.deleteMaterialConfirm')"
+            :text="t('course.wizard.deleteMaterialConfirmText', { title: materialToDelete?.title || '' })"
+            :confirm-text="t('common.delete')"
+            :cancel-text="t('common.cancel')"
+            @cancel="materialDeleteConfirm = false"
+            @confirm="deleteMaterial"
+          />
 
           <SectionCard class="u-wizard__aside" :title="t('course.wizard.materialsPreview')">
             <p class="u-wizard__hint mb-0">{{ t('course.wizard.materialsPreviewText') }}</p>
@@ -473,6 +467,7 @@ import AppSkeleton from '../../components/ui/AppSkeleton.vue'
 import StepperShell from '../../components/ui/StepperShell.vue'
 import CoursePreview from '../../components/ui/CoursePreview.vue'
 import AutosizeTextarea from '../../components/ui/fields/AutosizeTextarea.vue'
+import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
 import useForm from '../../composables/useForm'
 import useLeaveGuard from '../../composables/useLeaveGuard'
 import { required, maxLength, min, numeric } from '../../composables/validation/rules'

@@ -315,20 +315,14 @@
     </v-dialog>
 
     <!-- Подтверждение удаления события. -->
-    <v-dialog v-model="deleteConfirm" max-width="400">
-      <v-card>
-        <v-card-title>{{ $t("calendar.eventDeleteConfirm") }}</v-card-title>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="deleteConfirm = false">
-            {{ $t("calendar.eventCancel") }}
-          </v-btn>
-          <v-btn color="error" variant="flat" @click="deleteEvent">
-            {{ $t("calendar.eventDelete") }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <ConfirmDialog
+      v-model="deleteConfirm"
+      :title="$t('calendar.eventDeleteConfirm')"
+      :confirm-text="$t('calendar.eventDelete')"
+      :cancel-text="$t('calendar.eventCancel')"
+      @cancel="deleteConfirm = false"
+      @confirm="deleteEvent"
+    />
 
   </div>
 </template>
@@ -343,6 +337,7 @@ import ruLocale from "@fullcalendar/core/locales/ru";
 
 import PageHeader from "../components/ui/PageHeader.vue";
 import EmptyState from "../components/ui/EmptyState.vue";
+import ConfirmDialog from "../components/ui/ConfirmDialog.vue";
 import calendarApi from "../api/calendar.api";
 import { toast } from "../composables/useToast";
 
@@ -366,7 +361,7 @@ let uidCounter = 0;
 export default {
   name: "TrainingCalendar",
 
-  components: { PageHeader, EmptyState, FullCalendar },
+  components: { PageHeader, EmptyState, ConfirmDialog, FullCalendar },
 
   data() {
     const uid = `cal-${++uidCounter}`;

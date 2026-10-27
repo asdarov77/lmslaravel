@@ -37,7 +37,7 @@
       <template #cell-value="{ row }">
         <span v-if="row.id === 'current'" data-test="delivery-current">{{ mode || '—' }}</span>
         <span v-else-if="row.id === 'source'" data-test="delivery-source">
-          {{ $t(`settings.delivery.source_${source}`) }}
+          {{ source ? $t(`settings.delivery.source_${source}`) : '—' }}
         </span>
         <code v-else>{{ internal }}</code>
       </template>

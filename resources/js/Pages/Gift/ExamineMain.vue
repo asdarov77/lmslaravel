@@ -226,7 +226,8 @@
       icon="mdi-delete-alert-outline"
       :title="$t('bank.deleteTitle')"
       :text="$t('bank.deleteText')"
-      confirm-text="$t('bank.delete')"
+      :confirm-text="$t('bank.delete')"
+      :cancel-text="$t('common.cancel')"
       :busy="deleting"
       @confirm="doDelete"
     ></ConfirmDialog>

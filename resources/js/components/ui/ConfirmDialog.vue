@@ -9,7 +9,7 @@
   >
     <v-card class="confirm-dialog">
       <v-card-title :id="titleId" class="confirm-dialog__title">
-        <v-icon class="mr-3" :color="iconColor" :icon="icon" size="22" aria-hidden="true"></v-icon>
+        <v-icon class="mr-3" :color="iconColor" :icon="resolvedIcon" size="22" aria-hidden="true"></v-icon>
         {{ title }}
       </v-card-title>
 
@@ -65,6 +65,8 @@ const props = defineProps({
   confirmText: { type: String, default: 'Удалить' },
   cancelText: { type: String, default: 'Отмена' },
   busy: { type: Boolean, default: false },
+  /** Иконка; по умолчанию зависит от tone. */
+  icon: { type: String, default: '' },
   /** danger — необратимое действие, primary — обычное подтверждение. */
   tone: {
     type: String,
@@ -80,8 +82,8 @@ const bodyId = `confirm-body-${Math.random().toString(36).slice(2, 9)}`
 
 const confirmColor = computed(() => (props.tone === 'danger' ? 'error' : 'primary'))
 const iconColor = computed(() => (props.tone === 'danger' ? 'error' : 'primary'))
-const icon = computed(() =>
-  props.tone === 'danger' ? 'mdi-alert-outline' : 'mdi-help-circle-outline'
+const resolvedIcon = computed(() =>
+  props.icon || (props.tone === 'danger' ? 'mdi-alert-outline' : 'mdi-help-circle-outline')
 )
 </script>
 

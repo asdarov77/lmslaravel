@@ -23,12 +23,12 @@ LOCALES = {
     'en': ROOT / 'resources' / 'js' / 'locales' / 'en.json',
 }
 
-# $t('key'), $t("key"), t('key').
+# $t('key'), $tm('key'), t('key').
 #
 # Граница слова обязательна: без неё под шаблон попадают get('...'),
 # emit('...'), closest('div') — они заканчиваются на «t(» и давали
 # ложные «отсутствующие ключи» вида div, run, step.
-KEY_RE = re.compile(r"(?<![A-Za-z0-9_$])(?:\\\\?\$t|\bt)\(\s*[\"\']([a-zA-Z0-9_.\\-]+)[\"\']")
+KEY_RE = re.compile(r"(?<![A-Za-z0-9_$])(?:\$tm?|\bt)\(\s*['\"]([a-zA-Z0-9_.-]+)['\"]")
 
 
 def load(path: Path) -> dict:
@@ -45,7 +45,14 @@ def has_key(data: dict, key: str) -> bool:
 
     # Пустая строка — это тоже отсутствие перевода: пользователь увидит
     # пустое место вместо текста.
-    return not (isinstance(node, str) and node.strip() == '')
+    if isinstance(node, str):
+        return node.strip() != ''
+
+    # Значения-массивы (тура Roboto/onboarding) — тоже перевод.
+    if isinstance(node, list):
+        return len(node) > 0
+
+    return isinstance(node, dict) and bool(node)
 
 
 def collect_used_keys() -> dict:

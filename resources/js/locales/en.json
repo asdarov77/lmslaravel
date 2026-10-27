@@ -199,7 +199,8 @@
     "theme": {
       "toggle": "Toggle theme"
     },
-    "skipToContent": "Skip to content"
+    "skipToContent": "Skip to content",
+    "density": "Density"
   },
   "login": {
     "formTitle": "Login",
@@ -384,7 +385,8 @@
     "notesSave": "Save",
     "prevMatch": "Previous match",
     "nextMatch": "Next match",
-    "searchError": "Search through materials failed"
+    "searchError": "Search through materials failed",
+    "emptyContents": "This course has no materials yet"
   },
   "coursePreview": {
     "label": "Preview",
@@ -489,7 +491,9 @@
     "unknown": "Unknown",
     "back": "Back",
     "reset": "Reset",
-    "toastRepeat": "repeated: {n}"
+    "toastRepeat": "repeated: {n}",
+    "collapse": "Collapse",
+    "expand": "Expand"
   },
   "users": {
     "list": {
@@ -648,7 +652,8 @@
       "title": "Move",
       "target": "Destination folder",
       "root": "Files (root)",
-      "submit": "Move"
+      "submit": "Move",
+      "selectTarget": "Move to"
     },
     "delete": {
       "fileTitle": "Delete file",
@@ -683,7 +688,9 @@
       "folder": "Folder",
       "unsupported": "Preview is not available for this file type"
     },
-    "fileInput": "Choose files to upload"
+    "fileInput": "Choose files to upload",
+    "dropzoneTitle": "Drag files here",
+    "dropzoneHint": "Or click to choose. Large files resume after an interruption."
   },
   "courses": {
     "list": {
@@ -728,7 +735,14 @@
       "notFoundText": "The course was deleted or the id is wrong.",
       "loadFailed": "Could not load the course description",
       "saved": "Course description saved",
-      "saveFailed": "Could not save the description"
+      "saveFailed": "Could not save the description",
+      "fieldTitle": "Title",
+      "fieldTitlePlaceholder": "e.g. Fundamentals of aerodynamics",
+      "fieldShortDescription": "Short description",
+      "fieldShortDescriptionPlaceholder": "One sentence for the catalog",
+      "fieldLongDescription": "Full description",
+      "fieldLongDescriptionPlaceholder": "What the learner will gain, which topics and practice are included",
+      "fieldCategory": "Specialty"
     },
     "opensAt": "Open course from",
     "closesAt": "Open course until"
@@ -757,7 +771,22 @@
     "fromRequired": "Enter a start date",
     "toRequired": "Enter an end date",
     "toBeforeFrom": "End date cannot be before start date",
-    "loadCoursesError": "Failed to load group courses"
+    "loadCoursesError": "Failed to load group courses",
+    "classHint": "Pick a class, then a category — they determine the course list.",
+    "courses": "Courses and modules",
+    "deadlineHint": "Deadline for all selected modules.",
+    "period": "Study period",
+    "periodHint": "Start and end dates of the group study period.",
+    "selectAircraft": "Select a class",
+    "selectAircraftFirst": "Select a class first — categories will appear after that.",
+    "selectCategory": "Select a category",
+    "selectCategoryFirst": "Select a category — the course list will appear after that.",
+    "selectDeadline": "Select a deadline",
+    "selectGroup": "Select a group",
+    "selectInstructor": "Select an instructor",
+    "selectLessonType": "Select a lesson type",
+    "studyFrom": "Study starts",
+    "studyTo": "Study ends"
   },
   "classes": {
     "title": "Add class",
@@ -937,9 +966,10 @@
     "retry": "Retry",
     "start": "Start",
     "state": {
-      "open": "Open",
+      "available": "Available",
+      "planned": "Planned",
       "closed": "Closed",
-      "upcoming": "Upcoming"
+      "exhausted": "Attempts exhausted"
     },
     "statTotal": "Total",
     "statAvailable": "Available",
@@ -1112,7 +1142,15 @@
     "deleteText": "This cannot be undone.",
     "deleted": "Question deleted",
     "deleteError": "Failed to delete the question",
-    "loadError": "Failed to load the question bank"
+    "loadError": "Failed to load the question bank",
+    "import": {
+      "title": "Import questions",
+      "hint": "CSV or Excel: first column is the question, then options; prefix the correct one with '='.",
+      "file": "File",
+      "run": "Import",
+      "done": "Imported: {imported}, skipped: {skipped}",
+      "failed": "Failed to import questions"
+    }
   },
   "search": {
     "open": "Open search",
@@ -1218,7 +1256,8 @@
     "viewGrid": "Grid",
     "viewList": "List",
     "heroTitle": "Open courses",
-    "heroSub": "Pick a course and enroll — materials open right after enrollment."
+    "heroSub": "Pick a course and enroll — materials open right after enrollment.",
+    "instructors": "Instructors"
   },
   "settings": {
     "title": "Settings",
@@ -1429,7 +1468,8 @@
       "codesCopied": "Recovery codes copied",
       "copyAll": "Copy all",
       "recoveryCodesLabel": "Recovery codes (each can be used once):",
-      "recoveryCodeHint": "Keep them safe. Each code can be used only once."
+      "recoveryCodeHint": "Keep them safe. Each code can be used only once.",
+      "qrAlt": "QR code to add to an authenticator app"
     }
   },
   "courseItem": {
@@ -1606,7 +1646,10 @@
     "comment": "Comment",
     "clear": "Remove manual grade",
     "correct": "Correct",
-    "manualLegend": "teacher-entered grade"
+    "manualLegend": "teacher-entered grade",
+    "treeView": "Tree",
+    "matrixView": "Matrix",
+    "treeTitle": "Grades tree"
   },
   "announcements": {
     "title": "Announcements",
@@ -1873,7 +1916,7 @@
     "group": "Group",
     "course": "Course",
     "reset": "Reset",
-    "export": "Export CSV",
+    "export": "Export",
     "enrollments": "Enrollments",
     "passRate": "Pass rate",
     "lessonProgress": "Lesson progress",
@@ -1882,7 +1925,15 @@
     "deadline": "Deadline",
     "noData": "—",
     "emptyTitle": "Nothing in the selected period",
-    "emptyText": "Change the period or reset the filters"
+    "emptyText": "Change the period or reset the filters",
+    "enrollment": "Enrollment",
+    "enrollmentTree": "Group enrollment tree",
+    "item": "Item",
+    "tableView": "Table",
+    "treeView": "Tree",
+    "exportCsv": "CSV (.csv)",
+    "exportXlsx": "Excel (.xlsx)",
+    "exportPdf": "PDF (.pdf)"
   },
   "cmdk": {
     "group": {
@@ -1947,7 +1998,8 @@
       "titleRequired": "Enter a title",
       "courseRequired": "Select a course",
       "groupRequired": "Select a group",
-      "maxScoreInvalid": "Max score must be a positive number"
+      "maxScoreInvalid": "Max score must be a positive number",
+      "scoreRequired": "Enter a score"
     }
   },
   "certSettings": {
@@ -2115,13 +2167,9 @@
     "description": "Description",
     "noCourses": "No courses yet"
   },
-  "bank.import.title": "Import questions",
-  "bank.import.hint": "CSV or Excel: first column is the question, then options; prefix the correct one with '='.",
-  "bank.import.file": "File (CSV / XLSX)",
-  "bank.import.run": "Import",
-  "bank.import.done": "Imported: {imported}, skipped: {skipped}",
-  "bank.import.failed": "Failed to import the file",
-  "course.wizard.moveUp": "Move up",
-  "course.wizard.moveDown": "Move down",
-  "course.wizard.reorderFailed": "Failed to save the new order"
+  "tree": {
+    "childrenOf": "Children of {title}",
+    "collapse": "Collapse",
+    "expand": "Expand"
+  }
 }

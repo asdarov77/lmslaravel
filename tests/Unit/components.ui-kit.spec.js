@@ -16,6 +16,7 @@ import { createVuetify } from 'vuetify'
 import * as vuetifyComponents from 'vuetify/components'
 import * as vuetifyDirectives from 'vuetify/directives'
 import { createI18n } from 'vue-i18n'
+import ru from '../../resources/js/locales/ru.json'
 
 import AppSkeleton from '../../resources/js/components/ui/AppSkeleton.vue'
 import FormField from '../../resources/js/components/ui/FormField.vue'
@@ -64,7 +65,7 @@ const i18n = createI18n({
   legacy: false,
   locale: 'ru',
   fallbackLocale: 'ru',
-  messages: { ru: {} },
+  messages: { ru },
 })
 
 const mountOptions = {

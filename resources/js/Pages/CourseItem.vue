@@ -9,8 +9,8 @@
           v-if="canEdit"
           color="primary"
           variant="flat"
-          :loading="saving"
-          :disabled="saving || !dirty"
+          :loading="form.submitting.value"
+          :disabled="form.submitting.value || !form.dirty.value"
           data-test="course-desc-save"
           @click="save"
         >
@@ -26,90 +26,100 @@
       {{ loadError }}
     </v-alert>
 
-    <v-card v-if="draft" class="u-card">
+    <v-skeleton-loader v-if="loading" type="article, actions" class="u-card u-card__body" />
+
+    <v-card v-else-if="loaded" class="u-card">
       <v-card-text>
-        <v-form ref="form" @submit.prevent="handleSave">
+        <v-form @submit.prevent="save">
           <v-row>
             <v-col cols="12" md="6">
-              <v-form-group
-                :error="form.errors.title"
+              <FormField
                 :label="$t('courses.desc.fieldTitle')"
+                name="title"
+                :error="form.errors.title"
+                :required="form.isRequired('title')"
               >
                 <v-text-field
-                  v-model="form.values.title"
+                  v-bind="form.bind('title')"
                   :placeholder="$t('courses.desc.fieldTitlePlaceholder')"
                   data-test="course-desc-title"
                 />
-              </v-form-group>
+              </FormField>
             </v-col>
             <v-col cols="12" md="6">
-              <v-form-group
-                :error="form.errors.shortDescription"
+              <FormField
                 :label="$t('courses.desc.fieldShortDescription')"
+                name="short_description"
+                :error="form.errors.short_description"
               >
                 <v-text-field
-                  v-model="form.values.shortDescription"
+                  v-bind="form.bind('short_description')"
                   :placeholder="$t('courses.desc.fieldShortDescriptionPlaceholder')"
                   data-test="course-desc-short-description"
                 />
-              </v-form-group>
+              </FormField>
             </v-col>
           </v-row>
           <v-row>
             <v-col cols="12">
-              <v-form-group
-                :error="form.errors.longDescription"
+              <FormField
                 :label="$t('courses.desc.fieldLongDescription')"
+                name="long_description"
+                :error="form.errors.long_description"
               >
                 <v-textarea
-                  v-model="form.values.longDescription"
+                  v-bind="form.bind('long_description')"
                   :placeholder="$t('courses.desc.fieldLongDescriptionPlaceholder')"
                   rows="5"
                   data-test="course-desc-long-description"
                 />
-              </v-form-group>
+              </FormField>
             </v-col>
           </v-row>
           <v-row>
             <v-col cols="12">
-              <v-form-group
-                :error="form.errors.categoryId"
+              <FormField
                 :label="$t('courses.desc.fieldCategory')"
+                name="category_id"
+                :error="form.errors.category_id"
+                :required="form.isRequired('category_id')"
               >
                 <v-select
-                  v-model="form.values.categoryId"
+                  v-bind="form.bind('category_id')"
                   :items="categories"
-                  :label="$t('courses.desc.fieldCategory')"
-                  :rules="[categoryRule]"
-                  item-text="name"
+                  item-title="title"
                   item-value="id"
                   data-test="course-desc-category"
-                >
-                  <v-option
-                    v-for="category in categories"
-                    :key="category.id"
-                    :value="category.id"
-                  >
-                    {{ category.name }}
-                  </v-option>
-                </v-select>
-              </v-form-group>
+                />
+              </FormField>
             </v-col>
           </v-row>
         </v-form>
       </v-card-text>
       <v-card-actions v-if="canEdit">
-        <v-btn color="primary" variant="flat" :loading="saving" :disabled="saving || !dirty" data-test="course-desc-submit">
+        <v-btn
+          color="primary"
+          variant="flat"
+          :loading="form.submitting.value"
+          :disabled="form.submitting.value || !form.dirty.value"
+          data-test="course-desc-submit"
+          @click="save"
+        >
           {{ $t("common.save") }}
         </v-btn>
-        <v-btn variant="text" :disabled="saving || !dirty" data-test="course-desc-reset">
+        <v-btn
+          variant="text"
+          :disabled="form.submitting.value || !form.dirty.value"
+          data-test="course-desc-reset"
+          @click="reset"
+        >
           {{ $t("common.reset") }}
         </v-btn>
       </v-card-actions>
     </v-card>
 
     <EmptyState
-      v-else-if="!loading"
+      v-else
       icon="mdi-book-open-outline"
       :title="$t('courses.desc.notFound')"
       :text="$t('courses.desc.notFoundText')"
@@ -118,103 +128,93 @@
   </div>
 </template>
 
-<script>
-import { mapGetters, mapState, reactive, watch } from "vuex"
-import $api from "../api/httpClient"
-import { unwrapResponse } from "../api/envelope"
-import PageHeader from "../components/ui/PageHeader.vue"
-import EmptyState from "../components/ui/EmptyState.vue"
-import useForm from "../../composables/useForm"
-import { toast } from "../composables/useToast"
-import { required, maxLength } from "../../composables/validation/rules"
+<script setup>
+import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
+import { useStore } from 'vuex'
+import PageHeader from '../components/ui/PageHeader.vue'
+import EmptyState from '../components/ui/EmptyState.vue'
+import FormField from '../components/ui/FormField.vue'
+import { useForm } from '../composables/useForm'
+import { toast } from '../composables/useToast'
+import { required, maxLength } from '../composables/validation/rules'
 
-const emptyDraft = () => ({
-  title: "",
-  short_description: "",
-  long_description: "",
-  category_id: null,
-})
+const route = useRoute()
+const store = useStore()
+const { t } = useI18n()
 
-export default {
-  name: "CourseItem",
+const idEdit = Number(route.params.idEdit)
+const loading = ref(true)
+const loaded = ref(false)
+const loadError = ref('')
+const loadedValues = ref({})
 
-  components: {
-    PageHeader,
-    EmptyState,
+const canEdit = computed(() => store.getters['Auth/can']('courses.manage'))
+const categories = computed(() => store.getters['Course/categories'] || [])
+
+const form = useForm({
+  schema: {
+    title: { initial: '', rules: [required(t('course.errors.titleRequired')), maxLength(255, t('course.errors.titleTooLong'))] },
+    short_description: { initial: '', rules: [maxLength(255, t('course.errors.shortTooLong'))] },
+    long_description: { initial: '', rules: [maxLength(2000, t('course.errors.longTooLong'))] },
+    category_id: { initial: null, rules: [required(t('course.errors.categoriesRequired'))] },
   },
-
-  computed: {
-    ...mapState("Course", ["course"]),
-    ...mapGetters("Course", ["categories"]),
-
-    draft() {
-      return this.course && this.course.id
-        ? this.course.description
-        : emptyDraft()
-    },
-
-    dirty: computed(() => {
-      return this.draft && JSON.stringify(this.draft) !== JSON.stringify(this.form.values)
-    }),
-
-    canEdit: computed(() => this.$auth.user && this.$auth.user.can("courses.manage")),
-
-    loadError: computed(() => this.course && this.course.loadError),
-
-    categoryRule: computed(() => [required("Категория обязательна")]),
-  },
-
-  watch: {
-    "draft"(newValue) {
-      if (newValue) {
-        this.form.setValues(newValue)
-      }
-    },
-  },
-
-  setup() {
-    const form = useForm({
-      fields: ["title", "short_description", "long_description", "category_id"],
-      initialValues: emptyDraft(),
-      validate: (values) => {
-        const errors = {}
-        if (!values.title?.trim()) {
-          errors.title = "Название обязательно"
-        }
-        if (!values.short_description?.trim()) {
-          errors.short_description = "Короткое описание обязательно"
-        }
-        if (!values.long_description?.trim()) {
-          errors.long_description = "Описание обязательно"
-        }
-        if (!values.category_id) {
-          errors.category_id = "Категория обязательна"
-        }
-        return Object.keys(errors).length ? errors : true
-      },
-      onSubmit: async ({ values }) => {
-        try {
-          const response = await $api.put(
-            `/api/courses/${this.course.id}`,
-            values
-          )
-          const data = unwrapResponse(response)
-          toast.success("Курс успешно обновлен")
-          return data
-        } catch (e) {
-          toast.error("Ошибка сохранения курса")
-          throw e
-        }
+  draftKey: Number.isFinite(idEdit) ? `course.desc.${idEdit}` : null,
+  onSubmit: async ({ values }) => {
+    await store.dispatch('Course/updateCourse', {
+      id: idEdit,
+      data: {
+        title: values.title.trim(),
+        short_description: values.short_description.trim(),
+        long_description: values.long_description.trim(),
+        category_id: values.category_id || null,
       },
     })
-
-    return { form }
+    toast.success(t('courses.desc.saved'))
   },
+})
 
-  mounted() {
-    if (this.course && this.course.loadError) {
-      this.loadError = this.course.loadError
-    }
-  },
+function courseValues(course) {
+  return {
+    title: course.title ?? '',
+    short_description: course.short_description ?? '',
+    long_description: course.long_description ?? '',
+    category_id: Number(course.category_id) || course.categories?.[0]?.id || null,
+  }
 }
+
+function reset() {
+  form.reset(loadedValues.value)
+}
+
+async function save() {
+  await form.submit()
+}
+
+onMounted(async () => {
+  if (!Number.isFinite(idEdit)) {
+    loadError.value = t('courses.desc.notFoundText')
+    loading.value = false
+    return
+  }
+
+  store.dispatch('Course/fetchCategories').catch(() => {})
+
+  try {
+    await store.dispatch('Course/fetchCourse', { course_id: idEdit })
+    const course = store.state.Course.course
+    if (!course || course.id === undefined || course.id === null) {
+      loadError.value = t('courses.desc.notFoundText')
+      return
+    }
+    loadedValues.value = courseValues(course)
+    form.reset(loadedValues.value)
+    loaded.value = true
+  } catch (error) {
+    loadError.value = error?.response?.data?.message || t('courses.desc.loadFailed')
+  } finally {
+    loading.value = false
+  }
+})
 </script>

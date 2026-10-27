@@ -377,7 +377,7 @@ export default {
 
     /** Шаги тура приходят из локализации, а не из кода. */
     tourSteps() {
-      return this.$t("onboarding.steps");
+      return this.$tm("onboarding.steps") || [];
     },
 
     /** Кнопка «показать снова» — только после первого показа. */

@@ -2,15 +2,28 @@
   <div>
     <PageHeader :title="$t('reports.title')" :subtitle="$t('reports.hint')">
       <template #actions>
-        <v-btn
-          variant="text"
-          prepend-icon="mdi-download"
-          :href="exportUrl"
-          download
-          data-test="reports-export"
-        >
-          {{ $t('reports.export') }}
-        </v-btn>
+        <v-menu>
+          <template #activator="{ props }">
+            <v-btn
+              v-bind="props"
+              variant="text"
+              prepend-icon="mdi-download"
+              data-test="reports-export"
+            >
+              {{ $t('reports.export') }}
+            </v-btn>
+          </template>
+          <v-list density="compact">
+            <v-list-item
+              v-for="format in exportFormats"
+              :key="format.value"
+              :href="exportUrl(format.value)"
+              :title="format.label"
+              :data-test="`reports-export-${format.value}`"
+              download
+            />
+          </v-list>
+        </v-menu>
         <v-btn
           variant="text"
           :prepend-icon="viewMode === 'table' ? 'mdi-table' : 'mdi-account-tree'"
@@ -307,16 +320,12 @@ export default {
       return row.id
     },
 
-    exportUrl() {
-      const params = new URLSearchParams({ report: 'enrollment' })
-
-      Object.entries(this.filters).forEach(([key, value]) => {
-        if (value !== null && value !== '') {
-          params.set(key, value)
-        }
-      })
-
-      return `${import.meta.env.VITE_APP_URL || ''}/api/reports/export?${params.toString()}`
+    exportFormats() {
+      return [
+        { value: 'csv', label: this.$t('reports.exportCsv') },
+        { value: 'xlsx', label: this.$t('reports.exportXlsx') },
+        { value: 'pdf', label: this.$t('reports.exportPdf') },
+      ]
     },
   },
   async mounted() {
@@ -352,6 +361,18 @@ export default {
       } finally {
         this.loading = false
       }
+    },
+
+    exportUrl(format) {
+      const params = new URLSearchParams({ report: 'enrollment', format })
+
+      Object.entries(this.filters).forEach(([key, value]) => {
+        if (value !== null && value !== '') {
+          params.set(key, value)
+        }
+      })
+
+      return `${import.meta.env.VITE_APP_URL || ''}/api/reports/export?${params.toString()}`
     },
 
     reset() {

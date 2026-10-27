@@ -207,25 +207,21 @@
       </div>
 
       <!-- Диалог подтверждения завершения -->
-      <v-dialog v-model="showConfirmDialog" max-width="400">
-        <v-card>
-          <v-card-title>{{ $t("exams.confirmTitle") }}</v-card-title>
-          <v-card-text>
-            <p>{{ $t("exams.confirmText", { answered: answeredCount, total: questions.length }) }}</p>
-            <p v-if="!allAnswered" class="runner__confirm-warning">
-              {{ $t("exams.confirmWarning") }}
-            </p>
-          </v-card-text>
-          <v-card-actions>
-            <v-btn variant="text" @click="showConfirmDialog = false">
-              {{ $t("common.cancel") }}
-            </v-btn>
-            <v-btn color="success" variant="flat" @click="submit">
-              {{ $t("exams.finish") }}
-            </v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+      <ConfirmDialog
+        v-model="showConfirmDialog"
+        tone="primary"
+        icon="mdi-flag-checkered"
+        :title="$t('exams.confirmTitle')"
+        :confirm-text="$t('exams.finish')"
+        :cancel-text="$t('common.cancel')"
+        @cancel="showConfirmDialog = false"
+        @confirm="submit"
+      >
+        <p>{{ $t("exams.confirmText", { answered: answeredCount, total: questions.length }) }}</p>
+        <p v-if="!allAnswered" class="runner__confirm-warning">
+          {{ $t("exams.confirmWarning") }}
+        </p>
+      </ConfirmDialog>
     </section>
 
   </div>
@@ -235,13 +231,14 @@
 import PageHeader from "../../components/ui/PageHeader.vue";
 import EmptyState from "../../components/ui/EmptyState.vue";
 import ProgressRing from "../../components/ui/ProgressBarRing.vue";
+import ConfirmDialog from "../../components/ui/ConfirmDialog.vue";
 import * as examApi from "../../api/exam.api";
 import { toast } from "../../composables/useToast";
 
 export default {
   name: "ExamRunner",
 
-  components: { PageHeader, EmptyState, ProgressRing },
+  components: { PageHeader, EmptyState, ProgressRing, ConfirmDialog },
 
   props: {
     idEdit: { type: Number, required: true },

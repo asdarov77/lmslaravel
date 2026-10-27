@@ -110,8 +110,8 @@ describe('ManagerDashboard', () => {
   it('после загрузки показывает KPI карточками StatCard', async () => {
     summary.mockResolvedValue(envelope({
       stats: [
-        { key: 'students', value: 42, label_key: 'manager.statStudents', icon: 'mdi-account-group', tone: 'success' },
-        { key: 'avg', value: 74, suffix: '%', label_key: 'manager.statAverage', icon: 'mdi-percent', tone: 'accent' },
+        { key: 'students', value: 42, label_key: 'manager.stats.users', icon: 'mdi-account-group', tone: 'success' },
+        { key: 'avg', value: 74, suffix: '%', label_key: 'manager.stats.passed', icon: 'mdi-percent', tone: 'accent' },
       ],
     }))
 
