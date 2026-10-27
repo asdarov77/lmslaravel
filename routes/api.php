@@ -418,6 +418,10 @@ Route::get('/getlink/{id}', [CourseController::class, 'getlink']);
 Route::get('/course/{courseId}/player', [CoursePlayerController::class, 'show']);
 Route::post('/course/{courseId}/progress', [CoursePlayerController::class, 'progress']);
 Route::post('/course/{courseId}/view', [CoursePlayerController::class, 'view']);
+
+// --- Контент материала для плеера: авторизованная выдача html с base-URL и серверной подсветкой (Д1, Д5) ---
+Route::get('/course/{courseId}/content/{itemId}', [CourseContentController::class, 'show'])->whereNumber('itemId');
+Route::get('/course/{courseId}/raw/{path}', [CourseContentController::class, 'raw'])->where('path', '.*');
 Route::get('/getfirstauk/{id}', [CourseController::class, 'get_first_auk']);
 Route::apiResource('course', CourseController::class)
     ->only(['index', 'show'])

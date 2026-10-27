@@ -43,7 +43,7 @@ class CoursePlayerService
                 ->all();
         }
 
-        $nodes = $items->map(function (Aukstructure $item) use ($viewedIds) {
+        $nodes = $items->map(function (Aukstructure $item) use ($viewedIds, $course) {
             $link = optional($item->links->first())->link;
 
             return [
@@ -53,6 +53,11 @@ class CoursePlayerService
                 'type' => (int) $item->type,
                 'is_material' => (int) $item->type === self::TYPE_MATERIAL && $link !== null,
                 'has_link' => $link !== null,
+                // единый авторизованный endpoint выдачи материала (Д1, Д2):
+                // фронт не собирает пути сам и не зависит от ключей getlink
+                'content_url' => $link !== null
+                    ? "/api/course/{$course->id}/content/{$item->id}"
+                    : null,
                 'visited' => in_array($item->id, $viewedIds, true),
             ];
         })->values()->all();
@@ -60,6 +65,11 @@ class CoursePlayerService
         // entry = первый материал (стабильно, без clamp level)
         $materials = array_values(array_filter($nodes, fn ($n) => $n['is_material']));
         $entry = $materials[0] ?? null;
+        if ($entry) {
+            // мгновенный старт кадра: URL материала уже в payload — фронту
+            // не нужен дополнительный RTT к getlink (Д2, P0.1 «3 RTT»)
+            $entry = ['item_id' => $entry['id'], 'title' => $entry['title'], 'content_url' => $entry['content_url']];
+        }
 
         // prev/next — единый цикл по списку материалов (Д8)
         $matIds = array_column($materials, 'id');
