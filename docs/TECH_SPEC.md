@@ -21,9 +21,12 @@ Vuex Store (см. docs/vuex.md)
 - Целевой контракт: типы уроков contentType (video|article|pdf|file|quiz|html), серверный
   LessonAccessResolver (linear/drip/prereq — решение всегда на бэке), событийный прогресс
   batch-endpoint с idempotency_key, offline-очередь IndexedDB + sendBeacon.
-- Статус: S1-каркас фронтенда реализован (composables/useLessonLoader.js,
-  components/player/LessonWorkspace.vue, Pages/CoursePlayer.vue); старый путь
-  CourseManifestNew.vue живёт до переключения маршрута.
+- Статус (сверено с кодом 2026-10-28): из S1-каркаса в репозитории ТОЛЬКО
+  composables/useLessonLoader.js (race-guard: loadToken + AbortController + docCache +
+  signed-TTL + prefetch; тестов на него нет). Компонентов components/player/LessonWorkspace.vue
+  и Pages/CoursePlayer.vue в коде НЕ существует — blueprint описывает их как целевые,
+  ранее «реализовано» было завышенной отметкой. Штатный рабочий путь —
+  Pages/CourseManifestNew.vue (маршрут /courses/itemmani); переключения маршрута на v2 не было.
 
 API (см. docs/openapi.yaml)
 - Единый конверт ответа: { success, data, error, meta }
