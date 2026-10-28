@@ -16,6 +16,7 @@
 | Единый endpoint старта | `routes/api.php:436` → `CoursePlayerController::show`, `app/Services/CoursePlayerService.php` | ✅ работает: курс + дерево + resume + entry одним запросом (`GET /api/course/{id}/player`), серверный кэш дерева с явной инвалидацией |
 | Клиентский LRU-кэш документов | `resources/js/utils/docCache.js` (15 доков, ключ `course:item`) | ✅ есть, но не реактивен и не знает TTL подписей |
 | Прогресс урока | `composables/useLessonProgress.js` (`lesson_progress`, resume-позиция на сервере) | ✅ debounce-отправка есть; offline-очереди нет |
+| Каркас v2 (S1) | `composables/useLessonLoader.js` — race-guard загрузчика урока | ✅ существует, но не подключён ни к одному компоненту; компонентов v2 (`LessonWorkspace.vue`, `Pages/CoursePlayer.vue`) в репозитории **нет** — см. §4 и таблицу спринтов |
 | Контент-кадр | `composables/useContentFrame.js` + srcdoc-iframe в `Pages/CourseManifestNew.vue` (754 стр.) | ⚠️ только HTML-материалы; iframe-подход наследует проблемы ниже |
 | Дерево курса | `components/ui/CoursePlayerLayout.vue` (748 стр.), TreeView/TreeViewNode | ⚠️ без статусов «заблокировано», без иконок типов контента, без виртуализации >300 узлов |
 
@@ -206,25 +207,35 @@ Schema-driven: бэкенд отдаёт `question.schema.json` (single/multiple
 
 ## 4. Каркас кода (рабочие файлы)
 
-Реализовано (S1-каркас, feature-flag `ui.course_player_v2`, старый маршрут не тронут):
+Состояние на 2026-10-28 (сверено с репозиторием ветки `qwen-code…`/PR #70):
 
-| Файл | Роль |
-|---|---|
-| `resources/js/composables/useLessonLoader.js` | Race-guard загрузки урока: loadToken + AbortController + docCache + TTL подписанного URL + prefetch соседнего урока. Утечки нет: всё живёт в scope компонента и умирает в `onScopeDispose`. |
-| `resources/js/components/player/LessonWorkspace.vue` | Диспетчер контента по `content_type` (video/article/pdf/file/quiz/html-legacy через существующий `useContentFrame`), состояния loading/error/locked/empty, `:key="epoch"` remount. |
-| `resources/js/Pages/CoursePlayer.vue` | Двухпанельный layout: сворачиваемое дерево со статусами/иконками типов + рабочая область; URL (`?item=`) — источник истины выбора; prev/next; прогресс-бар из `stats`. |
+| Файл | Роль | Факт в коде |
+|---|---|---|
+| `resources/js/composables/useLessonLoader.js` | Race-guard загрузки урока: loadToken + AbortController + docCache + TTL подписанного URL + prefetch соседнего урока. Утечек нет: всё живёт в scope компонента и умирает в `onScopeDispose`. | ✅ существует (208 стр.), готов к употреблению; ни одним компонентом пока не используется, тестов нет |
+| `resources/js/components/player/LessonWorkspace.vue` | Диспетчер контента по `content_type` (video/article/pdf/file/quiz/html-legacy через существующий `useContentFrame`), состояния loading/error/locked/empty, `:key="epoch"` remount. | ❌ НЕ создан — ранее отмечался «реализованным» ошибочно |
+| `resources/js/Pages/CoursePlayer.vue` | Двухпанельный layout: сворачиваемое дерево со статусами/иконками типов + рабочая область; URL (`?item=`) — источник истины выбора; prev/next; прогресс-бар из `stats`. | ❌ НЕ создан — то же самое |
 
-Старые `Pages/CourseManifestNew.vue` и `components/ui/CoursePlayerLayout.vue` остаются штатным
-путём до переключения маршрута (аварийный откат — как с legacy CourseManifest).
+Feature-flag `ui.course_player_v2` в конфигах отсутствует (проверено: `config/`,
+`resources/js`, `app/`) — флаг вводится вместе с первыми v2-компонентами.
+
+Штатный рабочий путь — `Pages/CourseManifestNew.vue` (маршрут `/courses/itemmani`,
+`resources/js/Router/routes.js:208–211`); он остаётся нетронутым до появления
+полноценной v2-страницы и переключения маршрута (аварийный откат — как с legacy CourseManifest).
+`createDefaultLessonApi` внутри `useLessonLoader.js` уже подключён к реальным эндпоинтам
+(`contentFrameUrl` из `api/player.api.js`); `fetchSignedDelivery` возвращает 501 —
+это ожидаемо до S2 (типы video/pdf/file ещё не существуют на бэке).
 
 ## 5. Спринт-план и критерии приёмки
 
 | Спринт | Содержание | Acceptance | Статус |
 |---|---|---|---|
-| S1 | Loader race-guard, URL-as-truth, remount-key, тесты Vitest (гонка: 5 кликов подряд → рендер последнего) | TTI ≤1.2с; 0 «залипаний» в e2e Playwright `player-race.spec.js` | **Каркас сделан** (`useLessonLoader.js`, `LessonWorkspace.vue`, `CoursePlayer.vue`); e2e-спека — следующий шаг |
+| S1 | Loader race-guard, URL-as-truth, remount-key, тесты Vitest (гонка: 5 кликов подряд → рендер последнего) | TTI ≤1.2с; 0 «залипаний» в e2e Playwright `player-race.spec.js` | **Частично (2026-10-28):** сделан только `useLessonLoader.js`; `LessonWorkspace.vue`, `CoursePlayer.vue` не созданы, юнит-тестов гонки нет, `player-race.spec.js` нет |
 | S2 | contentType-миграция + VideoLesson (custom controls, resume, speed) + PdfLesson + FileLesson | p95 открытия урока ≤300мс при 50 readers; cache-hit без сети ≤100мс | Не начат |
-| S3 | Rules-движок (linear/drip/prereq) сервер+замок в дереве + InlineQuiz | 403 на bypass-URL чужого урока — тест `LessonRulesAccessTest` | UI-заготовка замка в дереве есть; бэкенд не начат |
+| S3 | Rules-движок (linear/drip/prereq) сервер+замок в дереве + InlineQuiz | 403 на bypass-URL чужого урока — тест `LessonRulesAccessTest` | Не начат (заготовка замка есть лишь как контракт поля `status/lock_reason` в loader'е; UI-дерева v2 нет) |
 | S4 | Offline outbox (IndexedDB) + sendBeacon + coverage-completion; TutorDock SSE | Потеря сети 5 мин → после online 100% событий доставлены, дублей нет | Не начат |
+
+Порядок переработки (по этому документу): S1-остаток — LessonWorkspace + CoursePlayer
+поверх готового loader'а и Vitest-спека гонки; затем S2…S4 по таблице.
 
 Риски: (1) iframe-srcdoc vs нативные рендереры — решаем диспетчером, srcdoc остаётся только
 для legacy-html материалов; (2) ffmpeg-транскодинг на проде — деградация: исходный mp4 без
