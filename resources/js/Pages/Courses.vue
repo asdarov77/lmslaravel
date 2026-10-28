@@ -486,13 +486,15 @@ export default {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--sp-4);
-  align-items: start;
+  /* Растягиваем карточки по высоте строки — сетка без «прыжков». */
+  align-items: stretch;
 }
 
 .courses__card {
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
+  height: 100%;
   padding: var(--sp-4);
   background: var(--c-surface);
   border: 1px solid var(--c-border);
@@ -513,6 +515,12 @@ export default {
   font-weight: var(--fw-semibold);
   line-height: var(--lh-tight);
   color: var(--c-text);
+  /* Фиксируем заголовок ровно в 2 строки: карточки не «прыгают». */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: calc(2 * var(--lh-tight) * 1em);
 }
 
 .courses__card-text {
@@ -524,16 +532,21 @@ export default {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  /* Ровно 3 строки — одинаковая высота описания во всей сетке. */
+  min-height: calc(3 * var(--lh-normal) * 1em);
 }
 
 .courses__card-meta {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-1);
-  margin-top: auto;
+  /* Бейджи не должны съедять высоту — одна строка с обрезкой. */
+  max-height: calc(var(--lh-normal) * 1em + 8px);
+  overflow: hidden;
 }
 
 .courses__actions {
+  margin-top: auto;
   display: flex;
   align-items: center;
   gap: var(--sp-1);

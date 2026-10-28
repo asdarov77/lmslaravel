@@ -187,9 +187,14 @@
               :label="$t('profile.twoFactor.codeLabel')"
               :placeholder="$t('profile.twoFactor.codePlaceholder')"
               maxlength="6"
+              inputmode="numeric"
+              autocomplete="one-time-code"
               density="compact"
               variant="outlined"
               class="mb-3"
+              hide-details="auto"
+              :error-messages="totpError"
+              @update:model-value="onTotpInput"
               @keyup.enter="enable2FA"
             />
 
@@ -300,6 +305,7 @@ export default {
     secret: null,
     qrCodeUrl: null,
     totpCode: '',
+    totpError: null,
     enabling2FA: false,
     recoveryCodes: [],
   }),
@@ -498,10 +504,19 @@ export default {
       }
     },
 
+    // Клиентская валиация кода 2FA: принимаем только цифры,
+    // сразу отсекая буквы/пробелы и показывая понятную ошибку.
+    onTotpInput(value) {
+      const digits = String(value ?? '').replace(/\D/g, '').slice(0, 6);
+
+      this.totpCode = digits;
+      this.totpError = null;
+    },
+
     /** Включает 2FA после проверки TOTP кода. */
     async enable2FA() {
-      if (!this.totpCode || this.totpCode.length !== 6) {
-        this.notify(this.$t('profile.twoFactor.codeInvalid'), 'warning');
+      if (!/^\d{6}$/.test(this.totpCode)) {
+        this.totpError = this.$t('profile.twoFactor.codeInvalid');
         return;
       }
 

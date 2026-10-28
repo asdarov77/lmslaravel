@@ -969,7 +969,8 @@
     "eventDeleteError": "Failed to delete event",
     "clickDateToAdd": "Click a date to add an event",
     "eventTitleRequired": "Enter the event title",
-    "eventDateRequired": "Pick the event date"
+    "eventDateRequired": "Pick the event date",
+    "eventEndBeforeStart": "The end date cannot be earlier than the start date"
   },
   "exams": {
     "title": "Exams",
@@ -1921,7 +1922,9 @@
       "longTooLong": "Description is longer than 2000 characters",
       "categoriesRequired": "Pick at least one category",
       "pathTooLong": "Path is longer than 255 characters",
-      "durationInvalid": "Duration cannot be negative"
+      "pathInvalid": "Path may only contain letters, digits, hyphen and underscore",
+      "durationInvalid": "Duration must be a whole number of hours, at least 1",
+      "closesBeforeOpens": "The end date cannot be earlier than the start date"
     },
     "labelDlitelnost": "Duration, h"
   },
