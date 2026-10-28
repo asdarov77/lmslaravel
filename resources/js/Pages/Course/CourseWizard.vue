@@ -470,7 +470,7 @@ import AutosizeTextarea from '../../components/ui/fields/AutosizeTextarea.vue'
 import ConfirmDialog from '../../components/ui/ConfirmDialog.vue'
 import useForm from '../../composables/useForm'
 import useLeaveGuard from '../../composables/useLeaveGuard'
-import { required, maxLength, min, numeric } from '../../composables/validation/rules'
+import { required, maxLength, min, integer, numeric, pattern, custom } from '../../composables/validation/rules'
 import { toast } from '../../composables/useToast'
 import * as courseApi from '../../api/course.api'
 import { fetchPlayerPayload } from '../../api/player.api'
@@ -592,11 +592,20 @@ const form = useForm({
     // Список категорий при мультивыборе уходил массивом и давал 422
     // «The category id must be an integer».
     category_id: { initial: null, rules: [required(t('course.errors.categoriesRequired'))] },
-    path: { initial: '', rules: [maxLength(255, t('course.errors.pathTooLong'))] },
-    duration: { initial: '', rules: [min(0, t('course.errors.durationInvalid'))] },
+    path: { initial: '', rules: [maxLength(255, t('course.errors.pathTooLong')), pattern(/^[A-Za-z0-9_-]*$/, t('course.errors.pathInvalid'))] },
+    duration: { initial: '', rules: [integer(t('course.errors.durationInvalid')), min(1, t('course.errors.durationInvalid'))] },
     visible: { initial: true, rules: [] },
     opens_at: { initial: '', rules: [] },
-    closes_at: { initial: '', rules: [] },
+    closes_at: {
+      initial: '',
+      rules: [
+        custom(
+          (value, values) =>
+            !value || !values.opens_at || value >= values.opens_at || t('course.errors.closesBeforeOpens'),
+          t('course.errors.closesBeforeOpens'),
+        ),
+      ],
+    },
   },
 
   draftKey: isEdit.value ? `course.edit.${props.idEdit}` : 'course.create',
