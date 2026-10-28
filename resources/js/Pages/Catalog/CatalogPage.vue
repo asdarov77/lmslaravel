@@ -20,9 +20,11 @@
         <v-text-field
           v-model="query"
           :label="$t('catalog.search')"
+          :hint="$t('common.minCharsHint')"
+          persistent-hint
+          minlength="3"
           prepend-inner-icon="mdi-magnify"
           variant="outlined"
-          hide-details
           clearable
           class="catalog__hero-search"
           data-test="catalog-search"
