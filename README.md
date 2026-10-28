@@ -1,4 +1,4 @@
-# LMS (Laravel + Vue 3 + Vuetify 3 + PostgreSQL)
+# LMS (Laravel 11 + Vue 3 + Vuetify 3 + PostgreSQL)
 
 ## Требования
 - PHP 8.1+, Composer
@@ -48,6 +48,7 @@ npm run dev
 | `docs/TESTING-ARCHITECTURE.md` | Как устроены тесты: PHPUnit / Vitest / Playwright |
 | `docs/vuex.md`, `docs/TECH_SPEC.md` | Фактическое состояние Vuex-стора, техническая спецификация |
 | `docs/AGENTS.md` | Правила для автономных агентов: команды проверки, инварианты, чего не трогать |
+| `docs/REWORK.md` | Реестр переработки: незакрытые задачи (R1–R7) и исправления доков, сверено с кодом 2026-10-28 |
 
 ## Файлы
 

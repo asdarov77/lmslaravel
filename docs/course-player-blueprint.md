@@ -87,6 +87,7 @@ revocation-list (Redis SET `revoke:{sign}`) при отчислении из г�
   `CourseController::player` (`/api/course-player/{courseId}`, дерево с самоневалидирующимся
   кэшем `player:tree:{id}:{max(updated_at)}`). В S1 — перенести self-validating-ключ
   в `CoursePlayerService::treeCacheKey`, оставить один маршрут, второй повесить alias на 1 релиз.
+  (Задача R4 в `docs/REWORK.md`.)
 - **Инвалидация**: `CoursePlayerService::invalidateTreeCache()` уже вызывается из
   `CourseController` (update/структура) — при переходе на rules-движок вызывать её же
   из `PUT /aukstructure/{id}/rules` и reorder.
@@ -236,6 +237,8 @@ Feature-flag `ui.course_player_v2` в конфигах отсутствует (�
 
 Порядок переработки (по этому документу): S1-остаток — LessonWorkspace + CoursePlayer
 поверх готового loader'а и Vitest-спека гонки; затем S2…S4 по таблице.
+Нумерованный реестр незакрытых задач с фактами из кода — `docs/REWORK.md`
+(R1–R7; тесты loader'а = R1, компоненты = R2, флаг = R3, слияние endpoint'ов = R4).
 
 Риски: (1) iframe-srcdoc vs нативные рендереры — решаем диспетчером, srcdoc остаётся только
 для legacy-html материалов; (2) ffmpeg-транскодинг на проде — деградация: исходный mp4 без
