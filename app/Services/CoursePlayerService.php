@@ -61,11 +61,19 @@ class CoursePlayerService
     {
         $course->loadMissing(['aircraft', 'categories']);
 
-        $structure = Cache::remember(
-            self::treeCacheKey($course->id),
-            self::TREE_CACHE_TTL,
-            fn () => $this->buildStructure($course)
-        );
+        // В тестовой среде кэш дерева отключён: array/file-кэш живёт между
+        // запросами, а RefreshDatabase пересоздаёт схему — закешированное
+        // «чужое» дерево (с old id) давало бы ложные падения контрактных
+        // тестов. Инвалидация по событиям моделей это не отменяет.
+        $useCache = !app()->environment('testing');
+
+        $structure = $useCache
+            ? Cache::remember(
+                self::treeCacheKey($course->id),
+                self::TREE_CACHE_TTL,
+                fn () => $this->buildStructure($course)
+            )
+            : $this->buildStructure($course);
 
         $nodes = $structure['nodes'];
         $tree = $structure['tree'];

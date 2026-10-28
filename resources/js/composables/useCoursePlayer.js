@@ -30,13 +30,14 @@ export function useCoursePlayer(courseId) {
     state.loading = true
     state.error = null
     try {
-      const { data } = await fetchPlayerPayload(courseId)
-      state.course = data.course
-      state.nodes = data.nodes || []
-      state.tree = data.tree || []
-      state.entry = data.entry || null
-      state.resume = data.resume || null
-      state.stats = data.stats || state.stats
+      // fetchPlayerPayload уже разворачивает конверт ApiResponseEnvelope
+      const payload = await fetchPlayerPayload(courseId)
+      state.course = payload?.course ?? null
+      state.nodes = payload?.nodes || []
+      state.tree = payload?.tree || []
+      state.entry = payload?.entry || null
+      state.resume = payload?.resume || null
+      state.stats = payload?.stats || state.stats
     } catch (e) {
       state.error = e?.response?.status === 401 ? 'Требуется вход в систему' : 'Не удалось загрузить курс'
       throw e

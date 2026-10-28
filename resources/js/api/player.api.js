@@ -7,28 +7,36 @@ import $api from './httpClient'
  * Все пути относительные — baseURL и Bearer-токен добавляет httpClient.
  */
 
-export function fetchPlayerPayload(courseId) {
-  return $api.get(`/api/course/${courseId}/player`)
+/**
+ * Все ответы /api* проходят через middleware ApiResponseEnvelope и приходят
+ * в конверте {success, data, error, meta}. axios отдаёт весь конверт в
+ * response.data, поэтому полезная нагрузка лежит в response.data.data.
+ * Без разворачивания плеер читал data.course === undefined — «пустой кадр».
+ */
+const unwrap = (response) => response?.data?.data ?? null
+
+export async function fetchPlayerPayload(courseId) {
+  return unwrap(await $api.get(`/api/course/${courseId}/player`))
 }
 
-export function saveProgress(courseId, { lastItemId, lastAnchor = null, percent = 0 }) {
-  return $api.post(`/api/course/${courseId}/progress`, {
+export async function saveProgress(courseId, { lastItemId, lastAnchor = null, percent = 0 }) {
+  return unwrap(await $api.post(`/api/course/${courseId}/progress`, {
     last_item_id: lastItemId,
     last_anchor: lastAnchor,
     percent,
-  })
+  }))
 }
 
-export function sendViewEvent(courseId, { aukstructureId, secondsViewed, scrollPercent }) {
-  return $api.post(`/api/course/${courseId}/view`, {
+export async function sendViewEvent(courseId, { aukstructureId, secondsViewed, scrollPercent }) {
+  return unwrap(await $api.post(`/api/course/${courseId}/view`, {
     aukstructure_id: aukstructureId,
     seconds_viewed: secondsViewed,
     scroll_percent: scrollPercent,
-  })
+  }))
 }
 
-export function searchFiles({ query, path, aircraft }) {
-  return $api.post('/api/search-files/', { query, path, aircraft })
+export async function searchFiles({ query, path, aircraft }) {
+  return unwrap(await $api.post('/api/search-files/', { query, path, aircraft }))
 }
 
 /**
