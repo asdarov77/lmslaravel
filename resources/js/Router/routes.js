@@ -489,14 +489,17 @@ const routes = [
         component: () => import('../Pages/Gift/QuestionForm.vue'),
         props: route => ({ idEdit: Number(route.params.idEdit) }),
         name: 'question.edit',
-        meta: { permission: ['questions.manage'] },    },
+        meta: { permission: ['questions.manage'], titleKey: 'questionbank' },    },
     {
-        path: '/questions',
+        // Дублирующий вход в /questions удалён: второй маршрут с тем же
+        // путём был недостижим (vue-router берёт первое совпадение —
+        // экзамен-раннер ExamineItem). Тренажёр одного вопроса доступен
+        // по уникальному пути ниже под тем же именем question.item.
+        path: '/questions-item/:idEdit?',
         meta: { permission: ['questions.view', 'questions.manage'] },
         component: () => import('../Pages/Gift/QuestionItem.vue'),
-        // props: route => ({ idEdit: Number(route.params.idEdit) }),
         props: (route) => ({
-            idEdit: toIntOrNull(route.query.idEdit),
+            idEdit: toIntOrNull(route.query.idEdit ?? route.params.idEdit),
             idCategory: toIntOrNull(route.query.idCategory),
         }),
         name: 'question.item',

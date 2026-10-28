@@ -43,7 +43,8 @@ export function useCoursePlayer(courseId) {
       state.resume = payload?.resume || null
       state.stats = payload?.stats || state.stats
     } catch (e) {
-      state.error = e?.response?.status === 401 ? 'Требуется вход в систему' : 'Не удалось загрузить курс'
+      // Ключи i18n вместо хардкода: страница переводит их через $t().
+      state.error = e?.response?.status === 401 ? 'courseManifest.loginRequired' : 'courseManifest.loadError'
       throw e
     } finally {
       state.loading = false

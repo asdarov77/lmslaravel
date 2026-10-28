@@ -386,7 +386,35 @@
     "prevMatch": "Previous match",
     "nextMatch": "Next match",
     "searchError": "Search through materials failed",
-    "emptyContents": "This course has no materials yet"
+    "emptyContents": "This course has no materials yet",
+    "backToCourses": "Back to courses",
+    "progressAria": "Course progress {percent} percent",
+    "materialsVisited": "{visited}/{total} materials",
+    "retry": "Retry",
+    "sidebarAria": "Sidebar sections",
+    "collapsePanel": "Collapse panel",
+    "tabToc": "Contents",
+    "tabSearch": "Search course",
+    "tabFav": "Favorites",
+    "searchLabel": "Search",
+    "searchFieldAria": "Search field",
+    "openContents": "Open course contents",
+    "removeFavoriteShort": "Remove from favorites",
+    "favStarHint": "Mark materials with the star in the frame header.",
+    "pagerAria": "Material navigation",
+    "prevBtn": "Previous",
+    "nextBtn": "Next",
+    "prevWith": "Previous: {title}",
+    "nextWith": "Next: {title}",
+    "noPrev": "No previous material",
+    "noNext": "This is the last material",
+    "loginRequired": "Sign-in required",
+    "loadError": "Failed to load the course",
+    "heightModeTitle": "Frame height",
+    "heightFit": "Fit content",
+    "heightWindow": "Fit window",
+    "heightFixed": "Fixed",
+    "heightFixedHint": "Frame height, px"
   },
   "coursePreview": {
     "label": "Preview",
@@ -493,7 +521,8 @@
     "reset": "Reset",
     "toastRepeat": "repeated: {n}",
     "collapse": "Collapse",
-    "expand": "Expand"
+    "expand": "Expand",
+    "minCharsHint": "At least 3 characters"
   },
   "users": {
     "list": {

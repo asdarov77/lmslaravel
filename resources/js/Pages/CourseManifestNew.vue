@@ -20,10 +20,14 @@
   Маршрут/пропсы сохранены (/courses/itemmani?idEdit=&idCategory=) — обратная совместимость.
 -->
 <template>
-  <div id="course-player-root" class="cp">
+  <div
+    id="course-player-root"
+    class="cp"
+    :class="{ 'cp--fullscreen': isFullscreen }"
+  >
     <!-- верхняя панель курса -->
-    <v-app-bar flat density="compact" class="cp__bar" color="white">
-      <v-btn icon="mdi-arrow-left" :aria-label="'Назад к курсам'" @click="$router.back()" />
+    <v-app-bar flat density="compact" class="cp__bar">
+      <v-btn icon="mdi-arrow-left" :aria-label="$t('courseManifest.backToCourses')" @click="$router.back()" />
       <v-toolbar-title class="cp__title text-truncate">{{ courseTitle }}</v-toolbar-title>
       <template #append>
         <span class="cp__progress-caption me-3">{{ progressCaption }}</span>
@@ -32,21 +36,21 @@
           size="34"
           width="4"
           color="primary"
-          :aria-label="'Прогресс курса ' + stats.percent + ' процентов'"
+          :aria-label="$t('courseManifest.progressAria', { percent: stats.percent })"
         >{{ stats.percent }}</v-progress-circular>
       </template>
     </v-app-bar>
 
     <v-sheet v-if="state.error" class="cp__error ma-4 pa-4 rounded" color="error-light-1" role="alert">
-      {{ state.error }}
-      <v-btn size="small" variant="text" prepend-icon="mdi-refresh" @click="init">Повторить</v-btn>
+      {{ $t(state.error) }}
+      <v-btn size="small" variant="text" prepend-icon="mdi-refresh" @click="init">{{ $t('courseManifest.retry') }}</v-btn>
     </v-sheet>
 
     <v-row v-else dense no-gutters class="cp__body">
       <!-- левая колонка: оглавление / поиск / избранное -->
       <v-col cols="12" md="4" lg="3" class="cp__side-col">
         <v-sheet class="cp__side rounded-lg" elevation="2">
-          <div class="cp__tabs" role="tablist" aria-label="Разделы боковой панели">
+          <div class="cp__tabs" role="tablist" :aria-label="$t('courseManifest.sidebarAria')">
             <button
               v-for="t in SIDEBAR_TABS"
               :key="t.id"
@@ -60,13 +64,13 @@
               <v-icon size="20">{{ t.icon }}</v-icon>
             </button>
             <v-spacer />
-            <v-btn icon size="x-small" aria-label="Свернуть панель" class="d-md-none" @click="mobilePanelOpen = false">
+            <v-btn icon size="x-small" :aria-label="$t('courseManifest.collapsePanel')" class="d-md-none" @click="mobilePanelOpen = false">
               <v-icon size="18">mdi-close</v-icon>
             </v-btn>
           </div>
 
           <!-- ОГЛАВЛЕНИЕ -->
-          <div v-show="sidebarTab === 'toc'" class="cp__panel" role="tabpanel" aria-label="Оглавление">
+          <div v-show="sidebarTab === 'toc'" class="cp__panel" role="tabpanel" :aria-label="$t('courseManifest.tabToc')">
             <v-skeleton-loader v-if="state.loading" type="list-item@6" />
             <CourseTree
               v-else
@@ -77,31 +81,31 @@
               @set-tab="treeTabId = $event"
             />
             <div v-if="!state.loading && state.nodes.length === 0" class="cp__empty">
-              Курс не содержит материалов.
+              {{ $t('courseManifest.emptyContents') }}
             </div>
           </div>
 
           <!-- ПОИСК -->
-          <div v-show="sidebarTab === 'search'" class="cp__panel" role="tabpanel" aria-label="Поиск по курсу">
+          <div v-show="sidebarTab === 'search'" class="cp__panel" role="tabpanel" :aria-label="$t('courseManifest.tabSearch')">
             <v-text-field
               v-model="search.query.value"
               density="compact"
               variant="outlined"
               rounded
-              label="Поиск"
-              hint="Не менее 3 символов"
+              :label="$t('courseManifest.searchLabel')"
+              :hint="$t('common.minCharsHint')"
               persistent-hint
               clearable
               single-line
               :loading="search.searching.value"
               append-inner-icon="mdi-magnify"
-              aria-label="Строка поиска"
+              :aria-label="$t('courseManifest.searchFieldAria')"
               @update:model-value="search.onQueryInput"
               @click:append-inner="search.runSearch"
               @keyup.enter="search.runSearch"
             />
             <ul v-if="search.results.value.length" class="cp__results">
-              <li class="cp__results-meta">Всего найдено: {{ search.results.value.length }}</li>
+              <li class="cp__results-meta">{{ $t('courseManifest.foundTotal') }} {{ search.results.value.length }}</li>
               <li v-for="(r, i) in search.results.value" :key="(r.itemId || 0) + '-' + r.file + '-' + i">
                 <button class="cp__result-btn" @click="openFromSearch(r)">
                   <span class="cp__result-title">{{ r.title || r.file }}</span>
@@ -109,22 +113,22 @@
                 </button>
               </li>
             </ul>
-            <p v-else-if="search.searchedOnce.value && !search.searching.value" class="cp__empty">Нет результатов</p>
+            <p v-else-if="search.searchedOnce.value && !search.searching.value" class="cp__empty">{{ $t('courseManifest.noResults') }}</p>
           </div>
 
           <!-- ИЗБРАННОЕ -->
-          <div v-show="sidebarTab === 'fav'" class="cp__panel" role="tabpanel" aria-label="Избранное">
+          <div v-show="sidebarTab === 'fav'" class="cp__panel" role="tabpanel" :aria-label="$t('courseManifest.tabFav')">
             <ul v-if="favorites.length" class="cp__results">
               <li v-for="item in favorites" :key="item.id">
                 <button class="cp__result-btn" @click="openFavorite(item)">
                   <span class="cp__result-title">{{ item.title }}</span>
                 </button>
-                <v-btn icon size="x-small" aria-label="Удалить из избранного" @click="removeFavorite(item.course_id)">
+                <v-btn icon size="x-small" :aria-label="$t('courseManifest.removeFavoriteShort')" @click="removeFavorite(item.course_id)">
                   <v-icon size="14">mdi-close</v-icon>
                 </v-btn>
               </li>
             </ul>
-            <p v-else class="cp__empty">Отмечайте материалы звёздочкой в шапке кадра.</p>
+            <p v-else class="cp__empty">{{ $t('courseManifest.favoritesEmpty') }}</p>
           </div>
         </v-sheet>
       </v-col>
@@ -144,11 +148,50 @@
 
           <div class="cp__mat-head">
             <h2 class="cp__mat-title text-truncate-2">{{ activeNode ? activeNode.title : '' }}</h2>
+
+            <!-- Ручной режим высоты кадра (best practice LMS: fit / window / fixed). -->
+            <v-menu offset-y>
+              <template #activator="{ props: menuProps }">
+                <v-btn
+                  icon
+                  size="small"
+                  v-bind="menuProps"
+                  :aria-label="$t('courseManifest.heightModeTitle')"
+                  :title="$t('courseManifest.heightModeTitle')"
+                >
+                  <v-icon size="20">mdi-resize</v-icon>
+                </v-btn>
+              </template>
+              <v-list density="compact" nav>
+                <v-list-item
+                  v-for="m in HEIGHT_MODES"
+                  :key="m.id"
+                  :prepend-icon="frame.heightMode.value === m.id ? 'mdi-check' : undefined"
+                  :title="m.label"
+                  @click="frame.setHeightMode(m.id)"
+                />
+                <v-expand-transition>
+                  <div v-if="frame.heightMode.value === 'fixed'" class="px-4 pb-2">
+                    <v-slider
+                      :model-value="frame.fixedHeight.value"
+                      :label="$t('courseManifest.heightFixedHint')"
+                      min="320"
+                      max="2000"
+                      step="40"
+                      hide-details
+                      dense
+                      @update:model-value="frame.setFixedHeight"
+                    />
+                  </div>
+                </v-expand-transition>
+              </v-list>
+            </v-menu>
+
             <v-btn
               icon
               size="small"
               :color="isFavoriteActive ? 'amber' : undefined"
-              :aria-label="isFavoriteActive ? 'Убрать из избранного' : 'Добавить в избранное'"
+              :aria-label="isFavoriteActive ? $t('courseManifest.removeFavorite') : $t('courseManifest.addFavorite')"
               @click="toggleFavoriteActive"
             >
               <v-icon size="20">{{ isFavoriteActive ? 'mdi-star' : 'mdi-star-outline' }}</v-icon>
@@ -158,8 +201,8 @@
           <iframe
             ref="iframeRef"
             class="cp__iframe"
-            :style="{ height: frame.frameHeight.value + 'px' }"
-            :title="activeNode ? activeNode.title : 'Материал курса'"
+            :style="{ height: currentFrameHeight }"
+            :title="activeNode ? activeNode.title : $t('courseManifest.material')"
             scrolling="auto"
             @load="onFrameLoad"
             @error="frame.failed.value = true"
@@ -167,25 +210,30 @@
 
           <v-progress-linear v-if="frame.loading.value" indeterminate color="primary" />
 
+          <!-- Заметки студента к текущему материалу (перенесены из legacy-плеера). -->
+          <div v-if="activeItemId != null" class="cp__notes px-3 pb-2">
+            <MaterialNotes :material-id="activeItemId" :course-id="idEdit" />
+          </div>
+
           <!-- pager: единый источник prev/next — серверные поля узла (Д8).
                Кнопки показываем всегда, неактивные — disabled: пользователь
                не теряет отметку конца курса на единственном материале. -->
-          <nav class="cp__pager" aria-label="Навигация по материалам">
+          <nav class="cp__pager" :aria-label="$t('courseManifest.pagerAria')">
             <v-btn
               :disabled="!prevNode"
               variant="tonal"
               prepend-icon="mdi-chevron-left"
-              :aria-label="prevNode ? 'Предыдущий: ' + prevNode.title : 'Предыдущий материал отсутствует'"
+              :aria-label="prevNode ? $t('courseManifest.prevWith', { title: prevNode.title }) : $t('courseManifest.noPrev')"
               @click="go(prevNode)"
-            >Назад</v-btn>
+            >{{ $t('courseManifest.prevBtn') }}</v-btn>
             <span class="cp__pager-pos">{{ positionLabel }}</span>
             <v-btn
               :disabled="!nextNode"
               variant="tonal"
               append-icon="mdi-chevron-right"
-              :aria-label="nextNode ? 'Следующий: ' + nextNode.title : 'Это последний материал'"
+              :aria-label="nextNode ? $t('courseManifest.nextWith', { title: nextNode.title }) : $t('courseManifest.noNext')"
               @click="go(nextNode)"
-            >Далее</v-btn>
+            >{{ $t('courseManifest.nextBtn') }}</v-btn>
           </nav>
         </v-sheet>
       </v-col>
@@ -200,7 +248,7 @@
       fab
       fixed
       bottom
-      aria-label="Открыть содержание курса"
+      :aria-label="$t('courseManifest.openContents')"
       @click="mobilePanelOpen = true"
     />
   </div>
@@ -209,6 +257,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useStore } from 'vuex'
+import { useI18n } from 'vue-i18n'
 import $api from '../api/httpClient'
 import { contentFrameUrl } from '../api/player.api'
 import { TokenService } from '../services/storage.service'
@@ -218,17 +267,26 @@ import { useLessonProgress } from '../composables/useLessonProgress'
 import { useInDocumentSearch } from '../composables/useInDocumentSearch'
 import CourseTree from '../components/course/CourseTree.vue'
 import CoursePlayerToolbar from '../components/course/CoursePlayerToolbar.vue'
+import MaterialNotes from './Course/MaterialNotes.vue'
 
 const props = defineProps({
   idEdit: { type: Number, required: true },     // id курса (сохранён старый контракт маршрута)
   idCategory: { type: Number, default: null },
 })
 
-const SIDEBAR_TABS = [
-  { id: 'toc', icon: 'mdi-view-list', label: 'Оглавление' },
-  { id: 'search', icon: 'mdi-magnify', label: 'Поиск по курсу' },
-  { id: 'fav', icon: 'mdi-star-outline', label: 'Избранное' },
-]
+const { t } = useI18n()
+
+const SIDEBAR_TABS = computed(() => [
+  { id: 'toc', icon: 'mdi-view-list', label: t('courseManifest.tabToc') },
+  { id: 'search', icon: 'mdi-magnify', label: t('courseManifest.tabSearch') },
+  { id: 'fav', icon: 'mdi-star-outline', label: t('courseManifest.tabFav') },
+])
+
+const HEIGHT_MODES = computed(() => [
+  { id: 'fit', label: t('courseManifest.heightFit') },
+  { id: 'window', label: t('courseManifest.heightWindow') },
+  { id: 'fixed', label: t('courseManifest.heightFixed') },
+])
 
 /* ------------------------- состояние ------------------------- */
 
@@ -258,6 +316,7 @@ const activeItemId = ref(null)
 const resumeAnchor = ref(null)   // якорь для прокрутки после загрузки кадра (Д6)
 const treeTabId = ref(null)
 const sidebarTab = ref('toc')
+const isFullscreen = ref(false)
 const mobilePanelOpen = ref(true)
 const highlightTerm = ref('') // термин для серверной подсветки текущего кадра
 
@@ -266,8 +325,13 @@ const highlightTerm = ref('') // термин для серверной подс
 const courseTitle = computed(() => state.course?.title || '')
 const stats = computed(() => state.stats)
 const progressCaption = computed(() =>
-  `${stats.value.materials_visited}/${stats.value.materials_total} материалов`
+  t('courseManifest.materialsVisited', { visited: stats.value.materials_visited, total: stats.value.materials_total })
 )
+/** Итоговая высота кадра: зависит от frameHeight, чтобы пересчитываться в режиме fit. */
+const currentFrameHeight = computed(() => {
+  void frame.frameHeight.value
+  return frame.effectiveHeight() + 'px'
+})
 const activeNode = computed(() =>
   activeItemId.value != null ? nodeById.value.get(activeItemId.value) || null : null
 )
@@ -436,6 +500,12 @@ function prefetchNext() {
 
 let scrollKeyHandler = null
 
+// Полноэкранный режим чтения (CoursePlayerToolbar вызывает requestFullscreen
+// на rootEl): синхронизируем класс и следим за выходом через Escape/браузер.
+function onFsChange() {
+  isFullscreen.value = document.fullscreenElement === rootEl.value
+}
+
 async function init() {
   try {
     await player.load()
@@ -466,7 +536,7 @@ onMounted(async () => {
   rootEl.value = document.getElementById('course-player-root')
   getFavorites()
   if (!TokenService.getToken()) {
-    state.error = 'Требуется вход в систему'
+    state.error = 'courseManifest.loginRequired'
     return
   }
   await init()
@@ -486,11 +556,13 @@ onMounted(async () => {
     }
   }
   window.addEventListener('keydown', scrollKeyHandler)
+  document.addEventListener('fullscreenchange', onFsChange)
 })
 
 onBeforeUnmount(() => {
   // Д7: beforeUnmount вместо beforeDestroy — слушатель гарантированно снимается
   if (scrollKeyHandler) window.removeEventListener('keydown', scrollKeyHandler)
+  document.removeEventListener('fullscreenchange', onFsChange)
   progress.unbindUnloadGuards()
 })
 
@@ -503,19 +575,21 @@ watch(
 <style scoped>
 .cp {
   min-height: calc(100vh - 64px);
-  background: #f5f6f8;
+  background: var(--c-bg);
 }
 .cp__bar {
   position: sticky;
   top: 0;
   z-index: 5;
+  background: var(--c-surface);
+  color: var(--c-text);
 }
 .cp__title {
   font-size: 16px;
 }
 .cp__progress-caption {
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--c-text-muted);
 }
 .cp__error {
   display: flex;
@@ -530,14 +604,14 @@ watch(
   flex-direction: column;
   max-height: calc(100vh - 120px);
   overflow: hidden;
-  background: white;
+  background: var(--c-surface);
 }
 .cp__tabs {
   display: flex;
   align-items: center;
   gap: 2px;
   padding: 6px 8px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid var(--c-border);
 }
 .cp__tab {
   border: none;
@@ -545,11 +619,11 @@ watch(
   border-radius: 6px;
   padding: 6px 10px;
   cursor: pointer;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--c-text-secondary);
 }
 .cp__tab--active {
-  background: rgba(25, 118, 210, 0.12);
-  color: #1976d2;
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
 }
 .cp__panel {
   overflow-y: auto;
@@ -557,7 +631,7 @@ watch(
   flex: 1;
 }
 .cp__empty {
-  color: rgba(0, 0, 0, 0.5);
+  color: var(--c-text-muted);
   font-size: 13px;
   padding: 12px 4px;
 }
@@ -573,7 +647,7 @@ watch(
 }
 .cp__results-meta {
   font-size: 13px;
-  color: #666;
+  color: var(--c-text-muted);
   padding: 4px 0;
 }
 .cp__result-btn {
@@ -588,9 +662,10 @@ watch(
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  color: var(--c-text);
 }
 .cp__result-btn:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--c-surface-3);
 }
 .cp__result-title {
   font-size: 13px;
@@ -600,7 +675,7 @@ watch(
 }
 .cp__result-snippet {
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.55);
+  color: var(--c-text-muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -610,7 +685,7 @@ watch(
   padding: 8px;
 }
 .cp__frame-wrap {
-  background: white;
+  background: var(--c-surface);
   overflow: visible;
 }
 .cp__mat-head {
@@ -624,6 +699,7 @@ watch(
   font-weight: 600;
   margin: 0;
   flex: 1;
+  color: var(--c-text);
 }
 .text-truncate-2 {
   display: -webkit-box;
@@ -633,9 +709,12 @@ watch(
 }
 .cp__iframe {
   width: 100%;
+  min-height: 320px;
   border: none;
   display: block;
-  background: white;
+  background: var(--c-surface);
+  /* длинные сканы: кадр вне вьюпорта не layout'ится до появления */
+  content-visibility: auto;
 }
 .cp__pager {
   display: flex;
@@ -646,11 +725,22 @@ watch(
 }
 .cp__pager-pos {
   font-size: 13px;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--c-text-muted);
   font-variant-numeric: tabular-nums;
 }
 .cp__fab {
   z-index: 10;
+}
+/* Полноэкранный режим чтения: скрываем шапку приложения, кадр занимает экран. */
+.cp--fullscreen .cp__bar {
+  display: none;
+}
+.cp--fullscreen {
+  min-height: 100vh;
+  background: var(--c-bg);
+}
+.cp--fullscreen .cp__side {
+  max-height: calc(100vh - 60px);
 }
 @media (max-width: 959px) {
   .cp__side-col {
