@@ -68,14 +68,39 @@
       <aside class="cpl__sidebar" :class="{ 'cpl__sidebar--hidden': !sidebarOpen }">
         <div class="cpl__sidebar-head">
           <span class="cpl__sidebar-title">{{ $t('courseManifest.contents') }}</span>
-          <button
-            type="button"
-            class="cpl__icon-btn cpl__icon-btn--sm"
-            :title="sidebarOpen ? $t('common.hide') : $t('common.show')"
-            @click="$emit('toggle-sidebar')"
-          >
-            <v-icon size="18">{{ sidebarOpen ? 'mdi-chevron-left' : 'mdi-chevron-right' }}</v-icon>
-          </button>
+
+          <!--
+            Управление деревом. Без «развернуть/свернуть всё» в курсе из
+            77 разделов человек кликал по темам вручную, чтобы добраться
+            до материалов; активный материал после перехода «следующий
+            урок» оказывался свёрнутым и терялся в списке.
+          -->
+          <div class="cpl__sidebar-actions">
+            <button
+              type="button"
+              class="cpl__icon-btn cpl__icon-btn--sm"
+              :title="$t('courseManifest.expandAll')"
+              @click="expandAll"
+            >
+              <v-icon size="18">mdi-unfold-more-horizontal</v-icon>
+            </button>
+            <button
+              type="button"
+              class="cpl__icon-btn cpl__icon-btn--sm"
+              :title="$t('courseManifest.collapseAll')"
+              @click="collapseAll"
+            >
+              <v-icon size="18">mdi-unfold-less-horizontal</v-icon>
+            </button>
+            <button
+              type="button"
+              class="cpl__icon-btn cpl__icon-btn--sm"
+              :title="sidebarOpen ? $t('common.hide') : $t('common.show')"
+              @click="$emit('toggle-sidebar')"
+            >
+              <v-icon size="18">{{ sidebarOpen ? 'mdi-chevron-left' : 'mdi-chevron-right' }}</v-icon>
+            </button>
+          </div>
         </div>
 
         <!--
@@ -134,7 +159,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import TreeView from './TreeView.vue'
 
