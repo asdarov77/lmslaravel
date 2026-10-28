@@ -321,6 +321,9 @@ class MyLearningController extends Controller
                             'due_at' => $due['due']->toDateString(),
                             'source' => $this->date($row->deadline) !== null ? 'deadline' : 'study_to',
                             'days_left' => (int) $today->diffInDays($due['due'], false),
+                            // Процент курса рядом со сроком: в личном кабинете
+                            // строка дедлайна отвечает и на вопрос «успеть куда».
+                            'percent' => (int) ($lessonProgress[$row->course_id] ?? 0),
                         ];
                     })
                     ->filter()
@@ -358,6 +361,30 @@ class MyLearningController extends Controller
                  * по плану (progress.percent).
                  */
                 'continue' => $this->continueLearning($plan, $visits, $today, $resumePoints, $lessonProgress),
+                /*
+                 * Активные курсы с прогрессом — для блока «Моё обучение»
+                 * в личном кабинете. Один элемент на курс (дедупликация
+                 * по course_id, как и в upcoming): строки плана с разным
+                 * parent_id — это один курс для человека.
+                 */
+                'inProgress' => $planByCourse
+                    ->map(function ($rows, $courseId) use ($lessonProgress) {
+                        $first = $rows->first();
+
+                        return [
+                            'course_id' => (int) $courseId,
+                            'title' => $first->course->title ?? null,
+                            // Средний процент по урокам курса (LessonProgress),
+                            // уже посчитан выше — второй запрос был бы дублированием.
+                            'percent' => (int) ($lessonProgress[(int) $courseId] ?? 0),
+                            'due_at' => (($this->date($first->deadline) ?? $this->date($first->study_to)))?->toDateString(),
+                        ];
+                    })
+                    ->filter(fn ($r) => $r['title'] !== null && $r['percent'] < 100)
+                    ->sortByDesc('percent')
+                    ->take(4)
+                    ->values()
+                    ->all(),
                 'progress' => [
                     /*
                      * Процент по плану считается по урокам, а не по

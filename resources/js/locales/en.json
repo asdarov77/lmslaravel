@@ -1500,6 +1500,18 @@
       "recoveryCodesLabel": "Recovery codes (each can be used once):",
       "recoveryCodeHint": "Keep them safe. Each code can be used only once.",
       "qrAlt": "QR code to add to an authenticator app"
+    },
+    "learning": {
+      "title": "My learning",
+      "hint": "Courses currently in progress",
+      "empty": "No active courses — check the catalog.",
+      "dueLabel": "Due",
+      "open": "Open"
+    },
+    "deadlines": {
+      "title": "Upcoming deadlines",
+      "hint": "What to finish this week",
+      "empty": "No deadlines in the coming week."
     }
   },
   "courseItem": {
