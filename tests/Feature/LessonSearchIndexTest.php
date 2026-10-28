@@ -12,6 +12,7 @@ use App\Models\Aukstructure;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -32,9 +33,22 @@ class LessonSearchIndexTest extends TestCase
 
     private Aukstructure $auk;
 
+    /** Временный корень диска 'private' — тот же приём, что в ContentDeliveryTest. */
+    private string $tmpRoot;
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->tmpRoot = storage_path('framework/testing/search-'.bin2hex(random_bytes(6)));
+        File::ensureDirectoryExists($this->tmpRoot.'/private/TESTAIR/TESTCOURSE');
+
+        // Контент АУК живёт на диске 'private' (root = родитель courses_path),
+        // а не на 'public': конфиг подменяем точечно, реальный каталог не трогаем.
+        config([
+            'app.courses_path' => $this->tmpRoot.'/private/',
+            'filesystems.disks.private.root' => $this->tmpRoot,
+        ]);
 
         $this->fileHtml = '<html><body><p>Прибор показывает скорость полёта</p></body></html>';
         $aircraft = Aircraft::factory()->create(['path' => 'TESTAIR']);
@@ -52,7 +66,14 @@ class LessonSearchIndexTest extends TestCase
             'link' => 'speed.html',
         ]);
 
-        Storage::disk('public')->put('private/TESTAIR/TESTCOURSE/speed.html', $this->fileHtml);
+        Storage::disk('private')->put('private/TESTAIR/TESTCOURSE/speed.html', $this->fileHtml);
+    }
+
+    protected function tearDown(): void
+    {
+        File::deleteDirectory($this->tmpRoot);
+
+        parent::tearDown();
     }
 
     private function trainee(): User

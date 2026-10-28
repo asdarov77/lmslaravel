@@ -11,7 +11,6 @@ use Illuminate\Support\Str;
 
 use App\Models\Link;
 use App\Models\Aukstructure;
-use App\Models\Course;
 use Illuminate\Support\Facades\DB;
 
 use DOMDocument;

@@ -196,7 +196,7 @@ class CourseContentController extends Controller
      */
     private function baseHref(int $courseId, string $link): string
     {
-        $dir = trim(str_replace('\', '/', dirname($link)), '/.');
+        $dir = trim(str_replace('\\', '/', dirname($link)), '/.');
         $suffix = ($dir !== '' && $dir !== '.') ? $dir . '/' : '';
 
         return url("api/course/{$courseId}/raw/") . '/' . $suffix;
