@@ -142,13 +142,20 @@
           {{ $t('courseManifest.emptyContents') }}
         </div>
 
-        <!-- Переходы между уроками в конце материала -->
+        <!-- Переходы между уроками в конце материала.
+
+             События уходят с целевым материалом: раньше «следующий/
+             предыдущий» эмитились без аргумента, и страница сама искала
+             соседа по своему списку — две копии одной логики (здесь и в
+             CourseManifest) могли разъехаться по порядку узлов. Здесь
+             порядок один: плоский список sections, материалы — level 3.
+        -->
         <nav v-if="hasNeighbours" class="cpl__pager" :aria-label="$t('common.navigation')">
-          <button type="button" class="cpl__pager-btn" :disabled="!canPrev" @click="$emit('prev')">
+          <button type="button" class="cpl__pager-btn" :disabled="!prevTarget" @click="goPrev">
             <v-icon size="18">mdi-chevron-left</v-icon>
             <span class="cpl__pager-label">{{ $t('courseManifest.prevLesson') }}</span>
           </button>
-          <button type="button" class="cpl__pager-btn cpl__pager-btn--next" :disabled="!canNext" @click="$emit('next')">
+          <button type="button" class="cpl__pager-btn cpl__pager-btn--next" :disabled="!nextTarget" @click="goNext">
             <span class="cpl__pager-label">{{ $t('courseManifest.nextLesson') }}</span>
             <v-icon size="18">mdi-chevron-right</v-icon>
           </button>
@@ -207,6 +214,59 @@ const treeNodes = computed(() => {
 /** Множество раскрытых узлов. */
 const expandedNodes = ref(new Set())
 
+/** Индекс «id → узел» и «id → родитель»: O(1) вместо поиска по списку. */
+const nodeIndex = computed(() => {
+  const byId = new Map()
+  const parentById = new Map()
+
+  // Плоский список дерева: родитель — ближайший предыдущий узел
+  // с уровнем на единицу меньше (уровни идут подряд, без пропусков).
+  const stack = []
+  for (const node of treeNodes.value) {
+    byId.set(node.id, node)
+    while (stack.length && stack[stack.length - 1].level >= node.level) stack.pop()
+    parentById.set(node.id, stack.length ? stack[stack.length - 1] : null)
+    stack.push(node)
+  }
+
+  return { byId, parentById }
+})
+
+/** Раскрыть цепочку родителей активного материала и довести его до видуимости. */
+const revealActive = () => {
+  const id = props.activeId
+  if (id == null) return
+
+  const { byId, parentById } = nodeIndex.value
+  const active = byId.get(id)
+  if (!active) return
+
+  const next = new Set(expandedNodes.value)
+  let parent = parentById.get(id)
+  while (parent) {
+    next.add(parent.id)
+    parent = parentById.get(parent.id)
+  }
+  expandedNodes.value = next
+
+  // Прокрутка внутри панели содержания: после «следующий урок» активный
+  // пункт мог оставаться за краем экрана — человек терял его из вида.
+  requestAnimationFrame(() => {
+    const panel = document.querySelector('.cpl__sidebar .u-tree')?.closest('.cpl__sidebar')
+    const el = panel?.querySelector(`[data-node-id="${CSS.escape(String(id))}"]`)
+    el?.scrollIntoView({ block: 'nearest' })
+  })
+}
+
+// Автораскрытие при смене материала (первый кадр, resume, prev/next).
+watch(() => props.activeId, revealActive, { immediate: true })
+
+// Когда дерево только что приехало с сервера, activeId мог прийти раньше
+// nodes — повторить раскрытие, как появятся узлы.
+watch(treeNodes, () => {
+  if (props.activeId != null) revealActive()
+})
+
 /** Обработка выбора узла (только материалы). */
 const handleSelectSection = (node) => {
   if (node.isMaterial) {
@@ -223,6 +283,19 @@ const handleToggleSection = (nodeId) => {
     newExpanded.add(nodeId)
   }
   expandedNodes.value = newExpanded
+}
+
+/** Развернуть / свернуть всё дерево (узлы-контейнеры). */
+const expandAll = () => {
+  const all = new Set(expandedNodes.value)
+  for (const node of treeNodes.value) {
+    if (!node.isMaterial) all.add(node.id)
+  }
+  expandedNodes.value = all
+}
+
+const collapseAll = () => {
+  expandedNodes.value = new Set()
 }
 
 /** Материалы (только узлы уровня 3). */
