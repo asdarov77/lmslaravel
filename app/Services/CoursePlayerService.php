@@ -6,6 +6,7 @@ use App\Models\Aukstructure;
 use App\Models\Course;
 use App\Models\CourseMaterialView;
 use App\Models\CourseProgress;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 
 /**
@@ -22,19 +23,52 @@ class CoursePlayerService
     /** Тип структуры АУК, являющийся материалом (открываемым файлом). */
     public const TYPE_MATERIAL = 3;
 
+    /** TTL кэша дерева курса (сек). Дерево меняется редко — прогресс нет. */
+    private const TREE_CACHE_TTL = 3600;
+
+    /**
+     * Ключ кэша дерева курса. Инвалидируется при любом изменении АУК/ссылок
+     * (см. invalidateTreeCache) и дополнительно ограничен TTL.
+     */
+    public static function treeCacheKey(int $courseId): string
+    {
+        return "course-player-tree-{$courseId}";
+    }
+
+    /**
+     * Явная инвалидация кэша дерева — вызывать из мест изменения структуры
+     * курса (AukstructureController, импорт материалов, изменение links).
+     */
+    public static function invalidateTreeCache(int $courseId): void
+    {
+        Cache::forget(self::treeCacheKey($courseId));
+    }
+
     /**
      * Плоский список узлов курса + готовое дерево + прогресс пользователя.
+     *
+     * Производительность (P1): структура курса (узлы, дерево, entry, prev/next,
+     * ссылки на контент) одинакова для всех учащихся и меняется редко, поэтому
+     * кэшируется целиком (Cache::remember). Индивидуальная часть — viewed /
+     * resume / stats — вычисляется поверх кэша дешёвым pluck'ом, поэтому кэш
+     * никогда не «протухает» относительно прогресса конкретного пользователя.
      */
     public function payload(Course $course, ?int $userId = null): array
     {
         $course->loadMissing(['aircraft', 'categories']);
 
-        $items = Aukstructure::where('course_id', $course->id)
-            ->with('links')
-            ->orderBy('id')
-            ->get();
+        $structure = Cache::remember(
+            self::treeCacheKey($course->id),
+            self::TREE_CACHE_TTL,
+            fn () => $this->buildStructure($course)
+        );
 
-        // прогресс просмотра материалов текущим пользователем
+        $nodes = $structure['nodes'];
+        $tree = $structure['tree'];
+        $entry = $structure['entry'];
+        $totalMaterials = $structure['total_materials'];
+
+        // прогресс просмотра материалов текущим пользователем — вне кэша
         $viewedIds = [];
         if ($userId) {
             $viewedIds = CourseMaterialView::where('user_id', $userId)
@@ -43,7 +77,63 @@ class CoursePlayerService
                 ->all();
         }
 
-        $nodes = $items->map(function (Aukstructure $item) use ($viewedIds, $course) {
+        $viewedFlip = array_flip($viewedIds);
+        foreach ($nodes as &$node) {
+            $node['visited'] = isset($viewedFlip[$node['id']]);
+        }
+        unset($node);
+
+        $resume = null;
+        if ($userId) {
+            $p = CourseProgress::where('user_id', $userId)
+                ->where('course_id', $course->id)
+                ->first();
+            if ($p) {
+                $resume = [
+                    'last_item_id' => $p->last_item_id,
+                    'last_anchor' => $p->last_anchor,
+                    'percent' => $p->percent,
+                ];
+            }
+        }
+
+        $visitedCount = count($viewedIds);
+
+        return [
+            'course' => [
+                'id' => $course->id,
+                'title' => $course->title,
+                'path' => trim((string) $course->path),
+                'aircraft_id' => $course->aircraft_id ? (int) $course->aircraft_id : null,
+                'aircraft_path' => trim((string) optional($course->aircraft)->path),
+            ],
+            'nodes' => $nodes,
+            'tree' => $tree,
+            // Д2: entry несёт content_url сразу — фронту не нужен RTT к getlink
+            'entry' => $entry,
+            'resume' => $resume,
+            'stats' => [
+                'materials_total' => $totalMaterials,
+                'materials_visited' => min($visitedCount, $totalMaterials),
+                'percent' => $totalMaterials > 0
+                    ? (int) round(min($visitedCount, $totalMaterials) / $totalMaterials * 100)
+                    : 0,
+            ],
+        ];
+    }
+
+    /**
+     * Кэшируемая часть payload: узлы + дерево + entry + prev/next.
+     * Не содержит ничего пользовательского (visited проставляется поверх).
+     */
+    private function buildStructure(Course $course): array
+    {
+        $items = Aukstructure::where('course_id', $course->id)
+            ->with('links')
+            ->orderBy('id')
+            ->get();
+
+        $nodes = $items->map(function (Aukstructure $item) use ($course) {
             $link = optional($item->links->first())->link;
 
             return [
@@ -58,7 +148,7 @@ class CoursePlayerService
                 'content_url' => $link !== null
                     ? "/api/course/{$course->id}/content/{$item->id}"
                     : null,
-                'visited' => in_array($item->id, $viewedIds, true),
+                'visited' => false,
             ];
         })->values()->all();
 
@@ -80,43 +170,11 @@ class CoursePlayerService
             $nodes[$pos]['next_id'] = $matIds[$i + 1] ?? null;
         }
 
-        $resume = null;
-        if ($userId) {
-            $p = CourseProgress::where('user_id', $userId)
-                ->where('course_id', $course->id)
-                ->first();
-            if ($p) {
-                $resume = [
-                    'last_item_id' => $p->last_item_id,
-                    'last_anchor' => $p->last_anchor,
-                    'percent' => $p->percent,
-                ];
-            }
-        }
-
-        $visitedCount = count($viewedIds);
-        $totalMaterials = count($materials);
-
         return [
-            'course' => [
-                'id' => $course->id,
-                'title' => $course->title,
-                'path' => trim((string) $course->path),
-                'aircraft_id' => $course->aircraft_id ? (int) $course->aircraft_id : null,
-                'aircraft_path' => trim((string) optional($course->aircraft)->path),
-            ],
             'nodes' => $nodes,
             'tree' => $this->buildTree($nodes),
-            // Д2: entry несёт content_url сразу — фронту не нужен RTT к getlink
-            'entry' => $entry ? ['item_id' => $entry['id'], 'title' => $entry['title'], 'content_url' => $entry['content_url']] : null,
-            'resume' => $resume,
-            'stats' => [
-                'materials_total' => $totalMaterials,
-                'materials_visited' => min($visitedCount, $totalMaterials),
-                'percent' => $totalMaterials > 0
-                    ? (int) round(min($visitedCount, $totalMaterials) / $totalMaterials * 100)
-                    : 0,
-            ],
+            'entry' => $entry,
+            'total_materials' => count($materials),
         ];
     }
 
