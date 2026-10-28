@@ -25,7 +25,9 @@ class LessonSearchIndexer
             return 0;
         }
 
-        $disk = Storage::disk('public');
+        // Контент АУК живёт на диске 'private' (root = courses_path).
+        // Ошибка 'public' делала индекс пустым: файлов там нет.
+        $disk = Storage::disk('private');
         $prefix = 'private/' . trim($course->aircraft->path) . '/' . trim($course->path) . '/';
         $indexed = 0;
 
