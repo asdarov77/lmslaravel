@@ -3,7 +3,7 @@
 Версия: 0.1.0
 
 Общее
-- Backend: Laravel 9+, Sanctum, PostgreSQL
+- Backend: Laravel 11 (`composer.json: laravel/framework ^11.0`), Sanctum, PostgreSQL
 - Frontend: Vue 3 + Vuetify 3, Vite
 - Архитектура API: REST, JSON, v1 префикс
 
