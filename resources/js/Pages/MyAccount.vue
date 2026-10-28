@@ -755,4 +755,79 @@ export default {
   padding: 0;
   margin: 0;
 }
+
+/* Моё обучение / ближайшие сроки (u-grid--2 растягивает карточки по высоте). */
+.profile__learning {
+  align-items: stretch;
+}
+
+.profile__courses {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile__course,
+.profile__deadline {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--c-radius, 12px);
+  background: var(--c-surface);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.profile__course:hover,
+.profile__deadline:hover {
+  border-color: var(--c-primary, #1976d2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.profile__course-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.profile__course-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile__course-due {
+  font-size: 0.82rem;
+}
+
+.profile__course-arrow {
+  color: var(--c-text-muted);
+  flex-shrink: 0;
+}
+
+.profile__deadlines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.profile__deadlines li {
+  display: flex;
+}
+
+.profile__deadline {
+  flex: 1;
+  justify-content: space-between;
+}
 </style>
