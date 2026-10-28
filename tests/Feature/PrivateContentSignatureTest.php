@@ -25,6 +25,49 @@ class PrivateContentSignatureTest extends TestCase
     private string $aircraft = 'КЛЕН';
     private string $auk = '01';
 
+    /** Временный корень контента (см. setUp) — тесты не зависят от выкладки РЭТ. */
+    private ?string $contentRoot = null;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Регресс CI: раньше тесты читали index.html/CSS с реального диска
+        // private, которого на чистом стенде нет → 404 вместо проверяемой
+        // логики подписи. Разворачиваем минимальный набор файлов во временном
+        // каталоге и переподключаем диск — подпись/403/404 тестируются так же,
+        // но без зависимости от COURSES_PATH.
+        $this->contentRoot = storage_path('framework/testing/signature-'.uniqid());
+
+        \Illuminate\Support\Facades\File::ensureDirectoryExists($this->contentRoot.'/private/'.$this->aircraft.'/'.$this->auk);
+        \Illuminate\Support\Facades\File::put(
+            $this->contentRoot.'/private/'.$this->aircraft.'/'.$this->auk.'/index.html',
+            '<html><body>контент КЛЕН/01</body></html>'
+        );
+        \Illuminate\Support\Facades\File::ensureDirectoryExists($this->contentRoot.'/private/'.$this->aircraft.'/'.$this->auk.'/app/dinamika');
+        \Illuminate\Support\Facades\File::put(
+            $this->contentRoot.'/private/'.$this->aircraft.'/'.$this->auk.'/app/dinamika/dinamika.css',
+            'body{margin:0}'
+        );
+        \Illuminate\Support\Facades\File::ensureDirectoryExists($this->contentRoot.'/private/'.$this->aircraft.'/'.$this->auk.'/app/bower_components/normalize.css');
+        \Illuminate\Support\Facades\File::put(
+            $this->contentRoot.'/private/'.$this->aircraft.'/'.$this->auk.'/app/bower_components/normalize.css/jquery-ui.min.css',
+            '.ui-widget{font:inherit}'
+        );
+
+        config(['filesystems.disks.private.root' => $this->contentRoot]);
+        \Illuminate\Support\Facades\Storage::forgetDisk('private');
+    }
+
+    protected function tearDown(): void
+    {
+        if ($this->contentRoot !== null && is_dir($this->contentRoot)) {
+            \Illuminate\Support\Facades\File::deleteDirectory($this->contentRoot);
+        }
+
+        parent::tearDown();
+    }
+
     private function signedPath(): string
     {
         return PrivateContentSigner::signedPath($this->aircraft, $this->auk);
