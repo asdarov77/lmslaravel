@@ -532,49 +532,26 @@ class SearchController extends Controller
             ['course' => $course->id, 'query' => $searchTerm, 'query2' => $searchTerm]
         ));
 
-        $disk = Storage::disk('public');
-        $files = $disk->files($directory);
-
-        //var_dump($files);
-        //   var_dump($directory);
-
-        foreach ($files as $file) {
-            if (Str::endsWith($file, '.html') && !Str::endsWith($file, 'index.html')) {
-                $contents = $disk->get($file);
-                //$contents = Storage::get($file);
-                if (Str::contains(strtolower($contents), $searchTerm)) {
-                    $filename = basename($file);
-                    $filename = trim($filename);
-                    // Д5: один файл может быть прикреплён к НЕСКОЛЬКИМ узлам —
-                    // берём все aukstructure_id, а не «первый попавшийся».
-                    $aukstructureIds = Link::where('link', $filename)->pluck('aukstructure_id')->all();
-                    $firstLink = Link::where('link', $filename)->first();
-                    $aukstructure = $firstLink ? $firstLink->aukstructure : Aukstructure::whereHas('links', function ($query) use ($filename) {
-                        $query->where('link', $filename);
-                    })->first();
-                    $title = $aukstructure ? $aukstructure->title : null;
-                    $highlightedHtml = $this->highlightWords($contents, $searchTerm);
-
-                    $snippet = $this->buildSnippet($aukstructure ? $aukstructure->course_id : null, $filename);
-
-                    $matches[] = [
-                        'file' => $file,
-                        'title' => $title,
-                        'itemId'  => $aukstructure ? $aukstructure->id : ($aukstructureIds[0] ?? null),
-                        'itemIds' => $aukstructureIds ?: array_filter([$aukstructure ? $aukstructure->id : null]),
-                        'snippet' => $snippet,
-                        'occurrences' => count($highlightedHtml),
-
-                        'highlightedNodes' => $highlightedHtml,
-                    ];
-                }
-        $prefix = 'private/' . trim($aircraft->path) . '/' . trim($course->path) . '/';
+        /*
+         * Legacy-обход файловой системы удалён: он ссылался на несуществующую
+         * $directory, имел разбалансированные скобки и перечитывал все файлы
+         * курса на каждый запрос. Единственный источник — lesson_search_index
+         * (tsvector + GIN), наполняемый LessonSearchIndexer.
+         */
+        $disk = Storage::disk('private');
+        $prefix = 'private/' . trim((string) $aircraft->path) . '/' . trim((string) $course->path) . '/';
 
         // Сопоставление материал ↔ файл: индекс строился по Link, поэтому
         // обратный lookup дёшев и точен.
-        $fileToAuk = Aukstructure::whereIn('id', $rows->pluck('aukstructure_id'))
+        $auksById = Aukstructure::whereIn('id', $rows->pluck('aukstructure_id'))
             ->get()
             ->keyBy('id');
+
+        // Д5: один файл может быть прикреплён к НЕСКОЛЬКИМ узлам —
+        // собираем все aukstructure_id по ссылке файла, а не «первый попавшийся».
+        $linksByFile = Link::whereIn('link', $rows->pluck('file')->all())
+            ->get(['link', 'aukstructure_id'])
+            ->groupBy('link');
 
         $matches = [];
 
@@ -584,13 +561,20 @@ class SearchController extends Controller
                 continue;
             }
             $contents = $disk->get($path);
-            $auk = $fileToAuk->get($row->aukstructure_id);
+            $highlightedNodes = $this->highlightWords($contents, $searchTerm);
+            $itemIds = $linksByFile->get($row->file, collect())
+                ->pluck('aukstructure_id')
+                ->values()
+                ->all();
 
             $matches[] = [
                 'file' => $path,
-                'title' => $auk?->title ?? $row->file,
+                'title' => $auksById->get($row->aukstructure_id)?->title ?? $row->file,
                 'itemId' => $row->aukstructure_id,
-                'highlightedNodes' => $this->highlightWords($contents, $searchTerm),
+                'itemIds' => $itemIds ?: [$row->aukstructure_id],
+                'snippet' => $this->buildSnippet($course, $row->file, $searchTerm),
+                'occurrences' => is_array($highlightedNodes) ? count($highlightedNodes) : 0,
+                'highlightedNodes' => $highlightedNodes,
             ];
         }
 
@@ -611,23 +595,18 @@ class SearchController extends Controller
      * совпадения. Фронт показывает его в выдаче и больше не зависит от точности
      * XPath-подсветки (Д5) — подсветка в кадре становится best-effort украшением.
      */
-    private function buildSnippet(?int $courseId, string $filename): string
+    private function buildSnippet(Course $course, string $filename, string $searchTerm): string
     {
-        if (!$courseId) {
-            return '';
-        }
-        $course = Course::find($courseId);
-        if (!$course) {
-            return '';
-        }
         $aircraftPath = optional($course->aircraft)->path;
         $path = "private/{$aircraftPath}/{$course->path}/{$filename}";
-        if (!Storage::disk('public')->exists($path)) {
+        // Диск контента — 'private' (root = courses_path), НЕ 'public':
+        // иначе snippet всегда пустой, потому что файлов на public нет.
+        if (!Storage::disk('private')->exists($path)) {
             return '';
         }
-        $html = Storage::disk('public')->get($path);
+        $html = Storage::disk('private')->get($path);
         $text = trim(preg_replace('/\s+/u', ' ', strip_tags($html)));
-        $pos = mb_stripos($text, request()->input('query', ''));
+        $pos = mb_stripos($text, $searchTerm);
         if ($pos === false) {
             return mb_substr($text, 0, 120);
         }
