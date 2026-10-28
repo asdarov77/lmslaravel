@@ -123,7 +123,6 @@ class CourseContentController extends Controller
         }
 
         $contents = $disk->get($relative);
-
         // sanitizация: приватный контент РЭТ не должен тянуть за собой JS
         $contents = preg_replace('/\son\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $contents);
         $contents = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $contents);
@@ -162,7 +161,7 @@ class CourseContentController extends Controller
             'Content-Type' => $mime,
             'Cache-Control' => 'no-store',
         ]);
-    }
+    } // end show()
 
     /**
      * GET /api/course/{courseId}/raw/{path} — раздача вложенных ресурсов
@@ -184,7 +183,9 @@ class CourseContentController extends Controller
             ltrim($path, '/')
         );
 
-        $disk = Storage::disk('public');
+        // Контент АУК лежит на диске 'private' (root = courses_path).
+        // 'public' здесь давал 404 на всех вложенных ресурсах (css/картинки сканов).
+        $disk = Storage::disk('private');
         abort_unless($disk->exists($relative) && $disk->isFile($relative), 404);
 
         return $disk->response($relative, basename($relative));
