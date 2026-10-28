@@ -69,6 +69,9 @@ class AukstructureController extends Controller
             'description' => \App\Support\HtmlSanitizer::clean($validated['description'] ?? null),
         ]);
 
+        // структура курса изменилась — сбрасываем кэш дерева плеера
+        \App\Services\CoursePlayerService::invalidateTreeCache((int) $item->course_id);
+
         return response()->json([
             'data' => $item,
         ], 201);
@@ -108,6 +111,8 @@ class AukstructureController extends Controller
             'description' => \App\Support\HtmlSanitizer::clean($validated['description'] ?? null),
         ]));
 
+        \App\Services\CoursePlayerService::invalidateTreeCache((int) $item->course_id);
+
         return response()->json([
             'data' => $item->fresh(),
         ]);
@@ -121,7 +126,10 @@ class AukstructureController extends Controller
     public function destroy($id)
     {
         $item = Aukstructure::findOrFail($id);
+        $courseId = (int) $item->course_id;
         $item->delete();
+
+        \App\Services\CoursePlayerService::invalidateTreeCache($courseId);
 
         return response()->json(null, 204);
     }
@@ -188,6 +196,8 @@ class AukstructureController extends Controller
              WHERE course_id = ? AND id IN (" . implode(',', array_fill(0, count($ids), '?')) . ')',
             $bindings
         );
+
+        \App\Services\CoursePlayerService::invalidateTreeCache((int) $validated['course_id']);
 
         return response()->json([
             'success' => true,

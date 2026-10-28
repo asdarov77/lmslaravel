@@ -401,6 +401,35 @@ function onFrameLoad() {
     search.resetMarks()
   }
   attachScrollTracking()
+  prefetchNext()
+}
+
+/* ------------------------- prefetch следующего материала ------------------------- */
+
+// Warm-keepalive: сразу после отрисовки текущего кадра тихо прогреваем HTTP-кэш
+// браузера следующим материалом по цепочке prev/next (Д8). Следующий клик по
+// «Далее» выбирает документ из кэша без задержки на выборку/обработку сервером.
+// no-store у HTML-ответа не мешает: fetch с тем же URL повторит только дешёвый
+// RTT, а сам файл (и его ресурсы через raw/) останутся в памяти процесса.
+let prefetchedId = null
+let prefetchController = null
+
+function prefetchNext() {
+  const next = nextNode.value
+  if (!next || next.id === activeItemId.value || next.id === prefetchedId) return
+  prefetchedId = next.id
+
+  prefetchController?.abort()
+  prefetchController = new AbortController()
+  const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 1500))
+  idle(() => {
+    if (prefetchedId !== next.id) return // пользователь уже ушёл дальше
+    fetch(buildFrameSrc(next.id), {
+      credentials: 'same-origin',
+      signal: prefetchController.signal,
+      priority: 'low',
+    }).catch(() => { /* warm-up, ошибка не критична */ })
+  })
 }
 
 /* ------------------------- инициализация ------------------------- */

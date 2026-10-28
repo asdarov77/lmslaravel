@@ -371,6 +371,9 @@ class AircraftController extends Controller
     $parent_id = 0;
     $course_id = $curAuk->id;
     $this->RecurseXML($startnode, $auktype, $parent_id, $course_id, $resources, $categories, $aircraft_id);
+
+    // импорт перестроил дерево и ссылки — кэш дерева плеера неактуален
+    \App\Services\CoursePlayerService::invalidateTreeCache((int) $course_id);
   }
 
   public function RecurseXML($xml, $auktype, $parent_id, $course_id, $resources, $categories, $aircraft_id, $attrs_ident = '', $attrs_cat = '')
