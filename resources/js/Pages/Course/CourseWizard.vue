@@ -730,6 +730,15 @@ const loadManifest = async () => {
     const response = await fetchPlayerPayload(props.idEdit)
     const payload = unwrapResponse(response) || {}
 
+    // Player-endpoint отдаёт и дерево, и плоский список узлов. Берём
+    // nodes напрямую: обход дерева давал 0 уроков, когда формат детей
+    // разъезжался с ожидаемым (regression: чек-лист «структура» никогда
+    // не становился готовым на странице правки).
+    if (Array.isArray(payload.nodes) && payload.nodes.length) {
+      lessons.value = payload.nodes.map((n) => ({ id: n.id, title: n.title }))
+      return
+    }
+
     const flat = []
     const walk = (nodes) => {
       for (const n of nodes || []) {
