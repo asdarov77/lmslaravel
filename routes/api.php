@@ -404,37 +404,53 @@ Route::middleware(['auth:sanctum', 'permission:files.upload,content.manage,cours
     });
 
 //
-// блок курсов старый
+// блок курсов и категорий
 //
+// ВАЖНО: дубли маршрутов без middleware удалены. В Laravel при совпадении
+// URI+METHOD побеждает последнее зарегистрированное определение, поэтому
+// ранее защищённые копии (строки ниже) выигрывали у открытых — но этот
+// порядок был хрустален: любая перестановка возвращала дыру (любой вошедший
+// читал манифест/ссылки любого курса). Теперь каждый маршрут объявлен ровно
+// один раз и сразу с auth:sanctum.
 Route::get('/courses/', [CoursesListController::class, 'getCourses'])->middleware('auth:sanctum');    // вывод всех курсов
 Route::get('/courses/cat/', [CategoryListController::class, 'getCatCourses']);
 Route::get('/courses/cat/{id}/', [CategoryListController::class, 'getCatCoursesId'])->whereNumber('id');  // вывод курсов для конкретной категории, с флагом видимости
-// блок курсов и категорий новый
-//
-Route::apiResource('course', CourseController::class)->middleware('auth:sanctum');
-Route::get('/coursemanifest/{id}', [CourseController::class, 'showmanifest']);
-Route::get('/getlink/{id}', [CourseController::class, 'getlink']);
-// --- API плеера курса (player-endpoint + событийный прогресс) ---
-Route::get('/course/{courseId}/player', [CoursePlayerController::class, 'show']);
-Route::post('/course/{courseId}/progress', [CoursePlayerController::class, 'progress']);
-Route::post('/course/{courseId}/view', [CoursePlayerController::class, 'view']);
 
-// --- Контент материала для плеера: авторизованная выдача html с base-URL и серверной подсветкой (Д1, Д5) ---
-Route::get('/course/{courseId}/content/{itemId}', [CourseContentController::class, 'show'])->whereNumber('itemId');
-Route::get('/course/{courseId}/raw/{path}', [CourseContentController::class, 'raw'])->where('path', '.*');
-Route::get('/getfirstauk/{id}', [CourseController::class, 'get_first_auk']);
+// Чтение курсов открыто авторизованным; создание/изменение — только по
+// courses.manage или content.manage (раньше любой авторизованный мог
+// создавать/удалять курсы через apiResource целиком).
 Route::apiResource('course', CourseController::class)
     ->only(['index', 'show'])
     ->middleware('auth:sanctum')
     ->whereNumber('course');
-// Ранее любой авторизованный мог создавать/удалять курсы: чтение открыто,
-// изменение — только по courses.manage или content.manage.
 Route::middleware(['auth:sanctum', 'permission:courses.manage,content.manage'])->group(function () {
     Route::post('/course', [CourseController::class, 'store']);
     Route::put('/course/{course}', [CourseController::class, 'update'])->whereNumber('course');
     Route::patch('/course/{course}', [CourseController::class, 'update'])->whereNumber('course');
     Route::delete('/course/{course}', [CourseController::class, 'destroy'])->whereNumber('course');
 });
+
+// --- API плеера курса (player-endpoint + событийный прогресс) ---
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/course/{courseId}/player', [CoursePlayerController::class, 'show'])->whereNumber('courseId');
+    Route::post('/course/{courseId}/progress', [CoursePlayerController::class, 'progress'])->whereNumber('courseId');
+    Route::post('/course/{courseId}/view', [CoursePlayerController::class, 'view'])->whereNumber('courseId');
+});
+
+// --- Контент материала для плеера: авторизованная выдача html с base-URL и серверной подсветкой (Д1, Д5) ---
+// Авторизация внутри CourseContentController (sanctum-токен в ?t= либо web-сессия) —
+// iframe не умеет заголовок Authorization, поэтому middleware здесь бы не сработал.
+Route::get('/course/{courseId}/content/{itemId}', [CourseContentController::class, 'show'])->whereNumber('itemId');
+Route::get('/course/{courseId}/raw/{path}', [CourseContentController::class, 'raw'])->where('path', '.*');
+
+// Материал курса. Раньше эти три маршрута висели без middleware, и
+// любой вошедший читал манифест и ссылки любого курса по идентификатору.
+// С появлением витрины тот же обход позволял открыть незаписанный курс.
+Route::get('/coursemanifest/{id}', [CourseController::class, 'showmanifest'])->middleware('auth:sanctum')->whereNumber('id');
+Route::get('/getlink/{id}', [CourseController::class, 'getlink'])
+    ->middleware('auth:sanctum')->whereNumber('id');
+Route::get('/getfirstauk/{id}', [CourseController::class, 'get_first_auk'])
+    ->middleware('auth:sanctum')->whereNumber('id');
 // Витрина курсов и самостоятельная запись. Отдельна от /api/courses:
 // там учебный план (только записанное), здесь каталог с отметкой
 // «записан/не записан».
@@ -444,14 +460,6 @@ Route::post('/catalog/{course}/enroll', [CatalogController::class, 'enroll'])
 Route::delete('/catalog/{course}/enroll', [CatalogController::class, 'unenroll'])
     ->middleware('auth:sanctum')->whereNumber('course');
 
-// Материал курса. Раньше эти три маршрута висели без middleware, и
-// любой вошедший читал манифест и ссылки любого курса по идентификатору.
-// С появлением витрины тот же обход позволял открыть незаписанный курс.
-Route::get('/coursemanifest/{id}', [CourseController::class, 'showmanifest'])    ->middleware('auth:sanctum')->whereNumber('id');
-Route::get('/getlink/{id}', [CourseController::class, 'getlink'])
-    ->middleware('auth:sanctum')->whereNumber('id');
-Route::get('/getfirstauk/{id}', [CourseController::class, 'get_first_auk'])
-    ->middleware('auth:sanctum')->whereNumber('id');
 // Единый endpoint открытия курса: курс + дерево + избранное + entry.
 Route::get('/course-player/{courseId}', [CourseController::class, 'player'])
     ->middleware('auth:sanctum')->whereNumber('courseId');

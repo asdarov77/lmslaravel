@@ -128,6 +128,7 @@
 <script>
 import $api from '../../api/httpClient'
 import { unwrapResponse } from '../../api/envelope'
+import { fetchPlayerPayload } from '../../api/player.api'
 import EmptyState from '../../components/ui/EmptyState.vue'
 import PageHeader from '../../components/ui/PageHeader.vue'
 
@@ -198,16 +199,25 @@ export default {
 
     async loadLessons() {
       // Уроки нужны только для выбора «вопрос по этому уроку».
+      // Единый player-endpoint: legacy /api/coursemanifest/{id} выведен из
+      // маршрутов (дубли без middleware позволяли читать чужие курсы).
       try {
-        const response = await $api.get(`/api/coursemanifest/${this.idEdit}`)
-        const manifest = unwrapResponse(response) || {}
+        const response = await fetchPlayerPayload(this.idEdit)
+        const payload = unwrapResponse(response) || {}
 
-        // Манифест отдаёт сам курс, а не конверт с полем course.
-        this.course = { title: manifest.title ?? '' }
-        this.lessons = (manifest.aukstructures || []).map((item) => ({
-          id: item.id,
-          title: item.title,
-        }))
+        this.course = { title: payload?.course?.title ?? '' }
+
+        const flat = []
+        const walk = (nodes) => {
+          for (const n of nodes || []) {
+            flat.push({ id: n.id, title: n.title })
+            if (n.children && n.children.length) walk(n.children)
+          }
+        }
+        walk(payload.tree)
+        // В форуме вопрос привязывается к материалу (узлу с файлом),
+        // разделы-контейнеры в списке не нужны.
+        this.lessons = flat.filter((item) => item.id)
       } catch (error) {
         this.course = { title: '' }
         this.lessons = []

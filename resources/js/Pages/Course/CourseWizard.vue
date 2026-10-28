@@ -473,6 +473,7 @@ import useLeaveGuard from '../../composables/useLeaveGuard'
 import { required, maxLength, min, numeric } from '../../composables/validation/rules'
 import { toast } from '../../composables/useToast'
 import * as courseApi from '../../api/course.api'
+import { fetchPlayerPayload } from '../../api/player.api'
 
 /**
  * Конструктор курса: один мастер вместо трёх разрозненных форм.
@@ -714,10 +715,22 @@ const loadManifest = async () => {
 
   manifestLoading.value = true
   try {
-    const response = await $api.get(`/api/coursemanifest/${props.idEdit}`)
-    const manifest = unwrapResponse(response) || {}
+    // Единый player-endpoint (дерево + прогресс в одном ответе, серверный
+    // кэш дерева). Legacy /api/coursemanifest/{id} выведен из маршрутов —
+    // дубли без middleware были дырой обхода CourseAccess (см. routes/api.php).
+    const response = await fetchPlayerPayload(props.idEdit)
+    const payload = unwrapResponse(response) || {}
 
-    lessons.value = (manifest.aukstructures || []).map((item) => ({ id: item.id, title: item.title }))
+    const flat = []
+    const walk = (nodes) => {
+      for (const n of nodes || []) {
+        flat.push({ id: n.id, title: n.title })
+        if (n.children?.length) walk(n.children)
+      }
+    }
+    walk(payload.tree)
+
+    lessons.value = flat
   } catch (error) {
     lessons.value = []
   } finally {

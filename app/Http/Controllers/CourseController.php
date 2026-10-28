@@ -595,6 +595,11 @@ class CourseController extends Controller
             );
         }
 
+        // Дерево плеера кэшируется по course_id; path/aircraft_id участвуют в
+        // построении content_url и entry — без сброса плеер до TTL отдавал бы
+        // ссылки на старый путь (404 «битый кадр» после переноса курса).
+        \App\Services\CoursePlayerService::invalidateTreeCache((int) $courses->id);
+
         return response()->json($courses->fresh(), 200);
     }
 
@@ -690,6 +695,11 @@ class CourseController extends Controller
         }
 
         $course->delete();
+
+        // Курс удалён — кэш его дерева больше никому не нужен; без forget'а
+        // он висел бы в хранилище до TTL (для file-драйвера — на диске).
+        \App\Services\CoursePlayerService::invalidateTreeCache((int) $id);
+
         return response()->json(null, 200);
     }
     //----------------------------------------------------------

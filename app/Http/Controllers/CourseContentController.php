@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Aukstructure;
 use App\Models\Course;
+use App\Support\CourseAccess;
+use App\Support\PrivateContent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -60,7 +63,7 @@ class CourseContentController extends Controller
             return false;
         }
 
-        $row = \DB::table('personal_access_tokens')->where('id', $tokenId)->first();
+        $row = DB::table('personal_access_tokens')->where('id', $tokenId)->first();
         if (!$row || $row->revoked_at !== null) {
             return false;
         }
@@ -97,29 +100,31 @@ class CourseContentController extends Controller
         // отмеченные модули) жил лишь в CourseController::getlink. Любой
         // вошедший, знающий id, читал чужой курс — ровно тот обход, который
         // закрыли при появлении витрины. Теперь правило одно для всех точек.
+        // Порядок важен: сначала доступ (403 для незаписанных — контракт
+        // CourseContentAccessTest), затем существование файла (404).
         $user = $request->user() ?? Auth::user();
-        \App\Support\CourseAccess::authorizeOpenModule($user, $course, $item->id);
+        CourseAccess::authorizeOpenModule($user, $course, $item->id);
 
         // Д11 (главная причина «плеер работает некорректно»): контент АУК лежит
-        // на диске 'private' (root = storage/app/courses, см. config/filesystems.php).
+        // на диске 'private' (root = courses_path, см. config/filesystems.php).
         // Disk 'public' указывает в storage/app/public — там этих файлов никогда
         // не было, и любой материал отдавал 404 («битый кадр»). Все чтения контента
-        // идут только через диск 'private'.
-        $relative = sprintf(
-            'private/%s/%s/%s',
-            trim((string) optional($course->aircraft)->path),
-            trim((string) $course->path),
+        // идут только через диск 'private'. Путь строится через PrivateContent:
+        // единый источник формата private/<самолёт>/<курс>/<файл> с валидацией
+        // сегментов (traversal/NUL отсекаются внутри buildPath → null).
+        $relative = PrivateContent::relativePath(
+            optional($course->aircraft)->path,
+            $course->path,
             $link
         );
 
-        $disk = Storage::disk('private');
-        if (!$disk->exists($relative)) {
-            abort(404, 'Файл материала отсутствует');
+        if ($relative === null) {
+            abort(403, 'Некорректная ссылка материала');
         }
 
-        // защита от path traversal на уровне ссылки манифеста
-        if (str_contains($link, '..')) {
-            abort(403);
+        $disk = Storage::disk('private');
+        if (!$disk->exists($relative) || !$disk->isFile($relative)) {
+            abort(404, 'Файл материала отсутствует');
         }
 
         $contents = $disk->get($relative);
@@ -176,39 +181,19 @@ class CourseContentController extends Controller
         // проверял вход, и любой пользователь, угадавший путь, читал css/сканы
         // чужого курса (обход CourseAccess через <base href>).
         $user = $request->user() ?? Auth::user();
-        \App\Support\CourseAccess::authorizeOpen($user, $course);
+        CourseAccess::authorizeOpen($user, $course);
 
-        // Нормализация пути: «..» отсекаем на уровне сегментов, а не подстрок
-        // (старый str_contains блокировал легальные имена вида a..b.css и
-        // пропускал URL-кодированные %2e%2e до раскодирования роутером).
-        $segments = [];
-        foreach (explode('/', str_replace('\\', '/', $path)) as $segment) {
-            if ($segment === '' || $segment === '.') {
-                continue;
-            }
-            if ($segment === '..') {
-                array_pop($segments);
-                continue;
-            }
-            $segments[] = $segment;
-        }
-
-        $normalized = implode('/', $segments);
-        if ($normalized === '' || !empty($segments)) {
-            // повторная проверка: нормализованный путь не должен выходить за пределы
-            foreach ($segments as $s) {
-                if ($s === '..' || str_contains($s, "\0")) {
-                    abort(403);
-                }
-            }
-        }
-
-        $relative = sprintf(
-            'private/%s/%s/%s',
-            trim((string) optional($course->aircraft)->path),
-            trim((string) $course->path),
-            $normalized
+        // Путь собираем через PrivateContent — тот же формат и та же валидация
+        // сегментов, что у /api/private (traversal/NUL/незваные символы → null).
+        $relative = PrivateContent::relativePath(
+            optional($course->aircraft)->path,
+            $course->path,
+            ...explode('/', str_replace('\\', '/', $path))
         );
+
+        if ($relative === null) {
+            abort(403, 'Некорректный путь ресурса');
+        }
 
         // Контент АУК лежит на диске 'private' (root = courses_path).
         // 'public' здесь давал 404 на всех вложенных ресурсах (css/картинки сканов).
