@@ -14,7 +14,10 @@ import { ref, nextTick } from 'vue'
 
 /* ---------------------- mock httpClient (общий для api) ---------------------- */
 
-const api = { get: vi.fn(), post: vi.fn(), delete: vi.fn() }
+/* vi.mock hoisted наверх файла — переменная внутри фабрики недоступна
+   ("Cannot access 'api' before initialization"). Единственный способ
+   получить общий мок — vi.hoisted. */
+const { api } = vi.hoisted(() => ({ api: { get: vi.fn(), post: vi.fn(), delete: vi.fn() } }))
 vi.mock('../../resources/js/api/httpClient', () => ({ default: api }))
 
 import { fetchPlayerPayload, contentFrameUrl } from '../../resources/js/api/player.api'

@@ -107,7 +107,11 @@ export function useInDocumentSearch({ courseIdRef, aircraftRef, pathRef, iframeR
     const node = marks.value[markIndex.value]
     if (!node) return
     node.classList.add('cp-hl--active')
-    node.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    // jsdom не реализует scrollIntoView — в реальном браузере метод есть,
+    // поэтому вызов защищён feature-check вместо падения юнит-теста.
+    if (typeof node.scrollIntoView === 'function') {
+      node.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
   }
 
   function nextMark() {
