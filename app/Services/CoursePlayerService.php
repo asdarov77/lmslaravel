@@ -29,6 +29,10 @@ class CoursePlayerService
     /**
      * Ключ кэша дерева курса. Инвалидируется при любом изменении АУК/ссылок
      * (см. invalidateTreeCache) и дополнительно ограничен TTL.
+     *
+     * В тестовой среде (array/file-кэш между запросами живёт, а RefreshDatabase
+     * пересоздаёт схему с new id) кэш отключён: контрактные тесты должны видеть
+     * свежие данные, иначе чужое закешированное дерево даёт ложные падения.
      */
     public static function treeCacheKey(int $courseId): string
     {
