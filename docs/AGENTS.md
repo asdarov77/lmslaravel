@@ -1,4 +1,4 @@
-# Правила для автономных агентов (LMS: Laravel 9 + Vue 3 + Vuetify 3 + PostgreSQL)
+# Правила для автономных агентов (LMS: Laravel 11 + Vue 3 + Vuetify 3 + PostgreSQL)
 
 Документ отвечает на вопрос «как безопасно менять этот репозиторий».
 Карта проекта — `docs/architecture.md`; статусы планов — в соответствующих доках (см. §6).
@@ -73,7 +73,7 @@
 
 | План | Документ-источник истины |
 |---|---|
-| Плеер v2 (S1–S4) | `docs/course-player-blueprint.md` (контракт + таблица спринтов) |
+| Плеер v2 (S1–S4) | `docs/course-player-blueprint.md` (контракт + таблица спринтов); реестр незакрытых расхождений кода и доков — `docs/REWORK.md` |
 | Производительность (P0/P1) | `docs/course-player-performance.md`, раздел «Статус плана» |
 | UI-редизайн (фазы) | `docs/design-redesign-plan.md` |
 | Удаления файлов | `docs/cleanup-manifest.md` |
