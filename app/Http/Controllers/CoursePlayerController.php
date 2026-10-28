@@ -36,10 +36,17 @@ class CoursePlayerController extends Controller
 
     /**
      * Идентификатор текущего пользователя: sanctum-токен либо web-сессия.
+     * Пустое значение — 401, а не TypeError из-за null при return type int.
      */
     private function userId(Request $request): int
     {
-        return $request->user()?->id ?? Auth::id();
+        $id = $request->user()?->id ?? Auth::id();
+
+        if ($id === null) {
+            abort(401, 'Требуется авторизация');
+        }
+
+        return (int) $id;
     }
 
     /**
