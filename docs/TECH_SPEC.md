@@ -17,6 +17,14 @@ UI Макеты (подробные таблицы и формы см. в docs/u
 Vuex Store (см. docs/vuex.md)
 - Модули по доменам, кэширование списков, нормализация, оптимистичные апдейты
 
+Плеер курсов (v2, см. docs/course-player-blueprint.md)
+- Целевой контракт: типы уроков contentType (video|article|pdf|file|quiz|html), серверный
+  LessonAccessResolver (linear/drip/prereq — решение всегда на бэке), событийный прогресс
+  batch-endpoint с idempotency_key, offline-очередь IndexedDB + sendBeacon.
+- Статус: S1-каркас фронтенда реализован (composables/useLessonLoader.js,
+  components/player/LessonWorkspace.vue, Pages/CoursePlayer.vue); старый путь
+  CourseManifestNew.vue живёт до переключения маршрута.
+
 API (см. docs/openapi.yaml)
 - Единый конверт ответа: { success, data, error, meta }
 - Пагинация: meta.pagination { page, perPage, total, totalPages }

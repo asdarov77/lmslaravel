@@ -209,6 +209,13 @@ middleware, а дополняет его, потому что `$this->authorize(
 
 ## Чего правила ещё не покрывают
 
+* **Право × подписанный URL (для плеера v2, `docs/course-player-blueprint.md` §1.2).**
+  Подписанный/`?t=` URL — bearer-credential: кто получил ссылку, тот имеет доступ до истечения
+  TTL. Требования при включении rules-движка (linear/drip/prereq): TTL ≤ 15 мин; binding
+  `user_id + path + exp` в сигнатуре (есть в `PrivateContentSigner`); повторная проверка
+  `CourseAccess::authorizeOpen` + `LessonAccessResolver` на самой выдаче контента
+  (`CourseContentController::show/raw`), а не только на дереве — иначе подстановка чужого
+  `item_id` обходит правила; revocation при отчислении из группы (Redis-список ключей подписи).
 * **Playwright ходит в боевую базу.** `phpunit.xml` направляет PHPUnit в
   `lmslaravel_test`, но E2E поднимает `php artisan serve`, который читает
   `.env`, то есть `lmslaravel`. E2E-тесты создают и удаляют группы,
