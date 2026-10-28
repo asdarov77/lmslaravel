@@ -172,15 +172,42 @@ class CourseContentController extends Controller
     {
         $course = Course::with('aircraft')->findOrFail($courseId);
 
-        if (str_contains($path, '..')) {
-            abort(403);
+        // Д12: raw-ресурсы — часть содержимого курса. Раньше endpoint только
+        // проверял вход, и любой пользователь, угадавший путь, читал css/сканы
+        // чужого курса (обход CourseAccess через <base href>).
+        $user = $request->user() ?? Auth::user();
+        \App\Support\CourseAccess::authorizeOpen($user, $course);
+
+        // Нормализация пути: «..» отсекаем на уровне сегментов, а не подстрок
+        // (старый str_contains блокировал легальные имена вида a..b.css и
+        // пропускал URL-кодированные %2e%2e до раскодирования роутером).
+        $segments = [];
+        foreach (explode('/', str_replace('\\', '/', $path)) as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+            if ($segment === '..') {
+                array_pop($segments);
+                continue;
+            }
+            $segments[] = $segment;
+        }
+
+        $normalized = implode('/', $segments);
+        if ($normalized === '' || !empty($segments)) {
+            // повторная проверка: нормализованный путь не должен выходить за пределы
+            foreach ($segments as $s) {
+                if ($s === '..' || str_contains($s, "\0")) {
+                    abort(403);
+                }
+            }
         }
 
         $relative = sprintf(
             'private/%s/%s/%s',
             trim((string) optional($course->aircraft)->path),
             trim((string) $course->path),
-            ltrim($path, '/')
+            $normalized
         );
 
         // Контент АУК лежит на диске 'private' (root = courses_path).
@@ -188,7 +215,18 @@ class CourseContentController extends Controller
         $disk = Storage::disk('private');
         abort_unless($disk->exists($relative) && $disk->isFile($relative), 404);
 
-        return $disk->response($relative, basename($relative));
+        // Страховка от symlink-выхода за root курса: реальный путь обязан
+        // оставаться внутри courses_path.
+        $full = $disk->path($relative);
+        $root = realpath(dirname($disk->path(''))) ?: $disk->path('');
+        $real = realpath($full);
+        if ($real === false || !str_starts_with($real, rtrim($root, '/') . '/')) {
+            abort(403);
+        }
+
+        return $disk->response($relative, basename($relative), [
+            'Cache-Control' => 'no-store',
+        ]);
     }
 
     /**

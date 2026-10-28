@@ -163,9 +163,11 @@ class CoursePlayerService
 
         // prev/next — единый цикл по списку материалов (Д8)
         $matIds = array_column($materials, 'id');
-        $indexById = array_column($nodes, null, 'id');
+        // array_column(..., null, 'id') вернул бы сами узлы (значения), а не
+        // позиции — берём только ключи id и индексы массива $nodes.
+        $posById = array_flip(array_column($nodes, 'id'));
         foreach ($matIds as $i => $mid) {
-            $pos = $indexById[$mid];
+            $pos = $posById[$mid];
             $nodes[$pos]['prev_id'] = $matIds[$i - 1] ?? null;
             $nodes[$pos]['next_id'] = $matIds[$i + 1] ?? null;
         }
