@@ -117,6 +117,67 @@
           <p v-else class="u-muted">{{ $t("profile.noPermissions") }}</p>
     </section>
 
+      <!--
+        Моё обучение и ближайшие сроки.
+
+        Личный кабинет по практикам LMS отвечает на вопрос «что делать
+        сегодня», а не только рассказывает о правах. Данные — из
+        /api/my/dashboard (inProgress, upcoming): прогресс считается по
+        урокам (LessonProgress), дедлайн — по deadline, иначе по концу
+        периода. Блок грузится отдельно: отказ не должен превращать
+        профиль в ошибку.
+      -->
+      <div class="u-grid u-grid--2 profile__learning" data-test="profile-learning">
+        <section class="u-card">
+          <h2 class="u-card__title">{{ $t("profile.learning.title") }}</h2>
+          <p class="u-page__subtitle">{{ $t("profile.learning.hint") }}</p>
+
+          <div v-if="inProgress.length" class="profile__courses">
+            <router-link
+              v-for="row in inProgress"
+              :key="row.course_id"
+              class="profile__course"
+              :to="{ name: 'courses.itemmani', query: { idEdit: row.course_id } }"
+            >
+              <ProgressBarRing :value="row.percent" :size="56" :stroke="6" />
+              <span class="profile__course-body">
+                <span class="profile__course-title">{{ row.title }}</span>
+                <span v-if="row.due_at" class="profile__course-due u-muted">
+                  {{ $t("profile.learning.dueLabel") }}: {{ formatDate(row.due_at) }}
+                </span>
+              </span>
+              <v-icon size="18" class="profile__course-arrow">mdi-chevron-right</v-icon>
+            </router-link>
+          </div>
+          <p v-else class="u-muted">{{ $t("profile.learning.empty") }}</p>
+        </section>
+
+        <section class="u-card">
+          <h2 class="u-card__title">{{ $t("profile.deadlines.title") }}</h2>
+          <p class="u-page__subtitle">{{ $t("profile.deadlines.hint") }}</p>
+
+          <ul v-if="upcoming.length" class="profile__deadlines">
+            <li v-for="row in upcoming" :key="`dl-${row.course_id}`">
+              <router-link
+                class="profile__deadline"
+                :to="{ name: 'courses.itemmani', query: { idEdit: row.course_id } }"
+              >
+                <span class="profile__course-body">
+                  <span class="profile__course-title">{{ row.title }}</span>
+                  <time class="profile__course-due u-muted" :datetime="row.due_at">
+                    {{ formatDate(row.due_at) }}
+                  </time>
+                </span>
+                <span class="u-badge" :class="row.days_left <= 1 ? 'u-badge--danger' : 'u-badge--warning'">
+                  {{ row.days_left === 0 ? $t("dashboard.deadlineToday") : row.days_left === 1 ? $t("dashboard.deadlineTomorrow") : $t("dashboard.deadlineInDays", { days: row.days_left }) }}
+                </span>
+              </router-link>
+            </li>
+          </ul>
+          <p v-else class="u-muted">{{ $t("profile.deadlines.empty") }}</p>
+        </section>
+      </div>
+
         <!-- 2FA: двухфакторная аутентификация. -->
         <section class="u-card" data-test="profile-2fa">
           <h2 class="u-card__title">{{ $t("profile.twoFactor.title") }}</h2>
@@ -259,7 +320,9 @@
 import { mapGetters, mapState } from "vuex";
 import $api from "../api/httpClient";
 import { unwrapField } from "../api/envelope";
+import learningApi from "../api/learning.api";
 import PageHeader from "../components/ui/PageHeader.vue";
+import ProgressBarRing from "../components/ui/ProgressBarRing.vue";
 
 /**
  * Профиль пользователя.
@@ -274,10 +337,11 @@ import PageHeader from "../components/ui/PageHeader.vue";
  * точку правды о том, какие права у человека.
  */
 export default {
-  components: { PageHeader },
+  components: { PageHeader, ProgressBarRing },
 
   mounted() {
     this.loadTwoFactorSetup();
+    this.loadLearningSummary();
   },
 
   data: () => ({
@@ -308,6 +372,9 @@ export default {
     totpError: null,
     enabling2FA: false,
     recoveryCodes: [],
+    // Блок «Моё обучение» / «Ближайшие сроки» (из /api/my/dashboard).
+    inProgress: [],
+    upcoming: [],
   }),
 
   computed: {
@@ -397,6 +464,37 @@ export default {
   },
 
   methods: {
+    /**
+     * Сводка обучения для блоков «Моё обучение» и «Ближайшие сроки».
+     *
+     * Отдельный необязательный запрос (как на дашборде): отказ сервера
+     * или отсутствие группы не должны ломать профиль — блоки просто
+     * остаются пустыми с понятной подписью.
+     */
+    async loadLearningSummary() {
+      try {
+        const response = await learningApi.fetchMyDashboard();
+        const summary = learningApi.dashboard(response);
+
+        this.inProgress = Array.isArray(summary.inProgress) ? summary.inProgress : [];
+        this.upcoming = Array.isArray(summary.upcoming) ? summary.upcoming : [];
+      } catch (error) {
+        // Пустые данные — валидное состояние (нет группы, нет назначений).
+        console.warn('[MyAccount] loadLearningSummary:', error?.message);
+      }
+    },
+
+    /** Дата в локальном формате; не падает на пустом значении. */
+    formatDate(value) {
+      if (!value) return '';
+
+      const date = new Date(value);
+
+      return Number.isNaN(date.getTime())
+        ? String(value)
+        : date.toLocaleDateString(this.$locale || undefined, { day: 'numeric', month: 'short' });
+    },
+
     /** Открывает системный диалог выбора файла. */
     pickAvatar() {
       this.avatarError = null;
