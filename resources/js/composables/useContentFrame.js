@@ -77,9 +77,37 @@ export function useContentFrame(iframeRef) {
   function navigate(url) {
     loading.value = true
     failed.value = false
+    // Сбрасываем высоту перед загрузкой нового материала: иначе кадр
+    // держит высоту предыдущего (более длинного) документа до первого
+    // события ResizeObserver — «прыжок» и пустые белые полосы снизу.
+    detachObservers()
+    frameHeight.value = MIN_HEIGHT
     if (iframeRef.value) {
       iframeRef.value.src = url
     }
+  }
+
+  /** Ручной режим высоты кадра: fit (авто) | window (в экран) | fixed (слайдер). */
+  const heightMode = ref(localStorage.getItem('cp.heightMode') || 'fit')
+  const fixedHeight = ref(Number(localStorage.getItem('cp.fixedHeight')) || 640)
+
+  function setHeightMode(mode) {
+    heightMode.value = mode
+    localStorage.setItem('cp.heightMode', mode)
+  }
+
+  function setFixedHeight(px) {
+    fixedHeight.value = Math.min(2000, Math.max(MIN_HEIGHT, Number(px) || MIN_HEIGHT))
+    localStorage.setItem('cp.fixedHeight', String(fixedHeight.value))
+  }
+
+  /** Итоговая высота кадра с учётом выбранного режима. */
+  function effectiveHeight() {
+    if (heightMode.value === 'window') {
+      return Math.max(MIN_HEIGHT, window.innerHeight - 260)
+    }
+    if (heightMode.value === 'fixed') return fixedHeight.value
+    return frameHeight.value
   }
 
   /** Прокрутка к якорю/позиции из resume-point (Д6). */
@@ -113,5 +141,10 @@ export function useContentFrame(iframeRef) {
     onLoad,
     scrollToAnchor,
     recalcHeight,
+    heightMode,
+    fixedHeight,
+    setHeightMode,
+    setFixedHeight,
+    effectiveHeight,
   }
 }

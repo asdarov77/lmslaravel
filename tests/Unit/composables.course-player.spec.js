@@ -110,7 +110,7 @@ describe('useCoursePlayer — контракт player-endpoint (Д2, Д3, Д4)',
 
     await expect(load()).rejects.toBeTruthy()
     expect(state.loading).toBe(false)
-    expect(state.error).toBe('Требуется вход в систему')
+    expect(state.error).toBe('courseManifest.loginRequired')
   })
 
   it('markVisited обновляет узел локально без перезагрузки', async () => {

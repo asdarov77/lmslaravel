@@ -386,7 +386,35 @@
     "prevMatch": "Предыдущее совпадение",
     "nextMatch": "Следующее совпадение",
     "searchError": "Не удалось выполнить поиск по материалам",
-    "emptyContents": "В курсе пока нет материалов"
+    "emptyContents": "В курсе пока нет материалов",
+    "backToCourses": "Назад к курсам",
+    "progressAria": "Прогресс курса {percent} процентов",
+    "materialsVisited": "{visited}/{total} материалов",
+    "retry": "Повторить",
+    "sidebarAria": "Разделы боковой панели",
+    "collapsePanel": "Свернуть панель",
+    "tabToc": "Оглавление",
+    "tabSearch": "Поиск по курсу",
+    "tabFav": "Избранное",
+    "searchLabel": "Поиск",
+    "searchFieldAria": "Строка поиска",
+    "openContents": "Открыть содержание курса",
+    "removeFavoriteShort": "Удалить из избранного",
+    "favStarHint": "Отмечайте материалы звёздочкой в шапке кадра.",
+    "pagerAria": "Навигация по материалам",
+    "prevBtn": "Назад",
+    "nextBtn": "Далее",
+    "prevWith": "Предыдущий: {title}",
+    "nextWith": "Следующий: {title}",
+    "noPrev": "Предыдущий материал отсутствует",
+    "noNext": "Это последний материал",
+    "loginRequired": "Требуется вход в систему",
+    "loadError": "Не удалось загрузить курс",
+    "heightModeTitle": "Высота кадра",
+    "heightFit": "По содержимому",
+    "heightWindow": "Во экран",
+    "heightFixed": "Фиксированная",
+    "heightFixedHint": "Высота кадра, px"
   },
   "coursePreview": {
     "label": "Предпросмотр",
@@ -493,7 +521,8 @@
     "reset": "Сбросить",
     "toastRepeat": "повторов: {n}",
     "collapse": "Свернуть",
-    "expand": "Развернуть"
+    "expand": "Развернуть",
+    "minCharsHint": "Не менее 3 символов"
   },
   "users": {
     "list": {

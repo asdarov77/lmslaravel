@@ -31,7 +31,7 @@ import { createApp, watch } from 'vue';
 //import { createVuetify } from 'vuetify'
 // import * as Vuex from 'vuex';
 // import * as VueRouter from 'vue-router';
-import Vuelidate from 'vuelidate'
+
 
 import router from './Router';
 import store from './Store';
@@ -68,7 +68,6 @@ const app = createApp(App, {
     return { t }
   }
 })
-  .use(Vuelidate)
   .use(router)
   .use(vuetify)
   .use(store)
