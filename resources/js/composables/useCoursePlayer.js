@@ -7,10 +7,14 @@
  *  Д3/Д4 — дерево и признак материала (is_material) считаются на сервере
  *       (CoursePlayerService), здесь только индексация для O(1)-доступа.
  */
-import { computed, reactive } from 'vue'
+import { computed, reactive, unref } from 'vue'
 import { fetchPlayerPayload } from '../api/player.api'
 
 export function useCoursePlayer(courseId) {
+  // Принимает number|string либо Ref — на странице используется courseIdRef,
+  // в юнит-тестах — ref(7). Без unref id попадал в URL как [object Object].
+  const courseIdValue = computed(() => (unref(courseId) ?? null))
+
   const state = reactive({
     loading: false,
     error: null,
@@ -31,7 +35,7 @@ export function useCoursePlayer(courseId) {
     state.error = null
     try {
       // fetchPlayerPayload уже разворачивает конверт ApiResponseEnvelope
-      const payload = await fetchPlayerPayload(courseId)
+      const payload = await fetchPlayerPayload(courseIdValue.value)
       state.course = payload?.course ?? null
       state.nodes = payload?.nodes || []
       state.tree = payload?.tree || []

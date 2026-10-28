@@ -281,9 +281,13 @@ class CalendarFeedTest extends TestCase
             'период, пересекающий окно просмотра, обязан быть виден'
         );
 
+        // Окно за пределами периода: границы задаются относительно today,
+        // иначе тест «протухает» вместе с календарём (см. комментарий к enroll()).
         $this->assertCount(
             0,
-            $this->getJson('/api/calendar?from=2026-11-01&to=2026-11-30')->json('data.events')
+            $this->getJson('/api/calendar?from=' . now()->addDays(30)->toDateString()
+                . '&to=' . now()->addDays(40)->toDateString())->json('data.events'),
+            'период вне окна просмотра обязан быть скрыт'
         );
     }
 
