@@ -66,7 +66,7 @@ beforeEach(() => {
 
 describe('useCoursePlayer — контракт player-endpoint (Д2, Д3, Д4)', () => {
   it('читает entry.content_url из payload без дополнительных RTT', async () => {
-    api.get.mockResolvedValue(playerPayload())
+    api.get.mockResolvedValue({ data: playerPayload() })
     const { state, load } = useCoursePlayer(ref(7))
 
     await load()
@@ -84,7 +84,7 @@ describe('useCoursePlayer — контракт player-endpoint (Д2, Д3, Д4)',
   })
 
   it('materials фильтруются по серверному is_material, а не по level (Д3)', async () => {
-    api.get.mockResolvedValue(playerPayload())
+    api.get.mockResolvedValue({ data: playerPayload() })
     const { materials, materialIds, load } = useCoursePlayer(ref(7))
 
     await load()
@@ -94,9 +94,9 @@ describe('useCoursePlayer — контракт player-endpoint (Д2, Д3, Д4)',
   })
 
   it('resume приходит с сервера и сохраняется как есть (Д6)', async () => {
-    api.get.mockResolvedValue(
+    api.get.mockResolvedValue({ data:
       playerPayload({ resume: { last_item_id: 2, last_anchor: 'p-77', percent: 50 } })
-    )
+    })
     const { state, load } = useCoursePlayer(ref(7))
 
     await load()
@@ -114,7 +114,7 @@ describe('useCoursePlayer — контракт player-endpoint (Д2, Д3, Д4)',
   })
 
   it('markVisited обновляет узел локально без перезагрузки', async () => {
-    api.get.mockResolvedValue(playerPayload())
+    api.get.mockResolvedValue({ data: playerPayload() })
     const { load, nodeById, markVisited } = useCoursePlayer(ref(7))
 
     await load()
