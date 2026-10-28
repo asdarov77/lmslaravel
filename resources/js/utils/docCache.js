@@ -43,6 +43,11 @@ export function createDocCache() {
       }
     },
 
+    /** Точечный сброс: материал отредактирован методистом — старый doc вреден. */
+    delete(courseId, itemId) {
+      map.delete(`${courseId}:${itemId}`);
+    },
+
     clear() {
       map.clear();
     },
