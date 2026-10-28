@@ -27,10 +27,6 @@ export function sendViewEvent(courseId, { aukstructureId, secondsViewed, scrollP
   })
 }
 
-export function fetchLink(itemId) {
-  return $api.get(`/api/getlink/${itemId}`)
-}
-
 export function searchFiles({ query, path, aircraft }) {
   return $api.post('/api/search-files/', { query, path, aircraft })
 }
