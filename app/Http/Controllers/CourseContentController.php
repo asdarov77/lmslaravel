@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Aukstructure;
 use App\Models\Course;
+use App\Support\ContentDelivery;
 use App\Support\CourseAccess;
 use App\Support\PrivateContent;
 use Illuminate\Http\Request;
@@ -162,10 +163,11 @@ class CourseContentController extends Controller
             default => 'application/octet-stream',
         };
 
-        return $disk->response($relative, basename($relative), [
-            'Content-Type' => $mime,
-            'Cache-Control' => 'no-store',
-        ]);
+        // P1 (производительность): бинарный материал (pdf/сканы) — самый
+        // тяжёлый трафик плеера. В режиме nginx файл отдаёт сам nginx через
+        // X-Accel-Redirect, PHP-FPM воркер освобождается мгновенно; здесь
+        // авторизация уже выполнена выше, поэтому internal-location безопасен.
+        return $this->accelOrStream($request, $disk, $relative, $mime);
     } // end show()
 
     /**
@@ -209,9 +211,55 @@ class CourseContentController extends Controller
             abort(403);
         }
 
-        return $disk->response($relative, basename($relative), [
+        // P1: вложенные ресурсы скана (картинки) — десятки запросов на кадр.
+        // В режиме nginx их отдаёт nginx; PHP остаётся только проверка доступа.
+        return $this->accelOrStream($request, $disk, $relative, null);
+    }
+
+    /**
+     * Выдача бинарного файла: X-Accel-Redirect (nginx) либо поток (PHP).
+     *
+     * Тот же алгоритм, что у PrivateController::accelResponse, но без
+     * HMAC-подписи: доступ здесь уже проверен CourseAccess по авторизации
+     * sanctum/web, поэтому internal-location получает только путь после 403/404.
+     * accelUri дополнительно сверяет realpath с корнем контента (symlink-страховка).
+     */
+    private function accelOrStream(Request $request, \Illuminate\Contracts\Filesystem\Filesystem $disk, string $relative, ?string $mime)
+    {
+        if (ContentDelivery::isAccel($request)) {
+            $uri = PrivateContent::accelUri(...explode('/', $relative));
+
+            if ($uri !== null) {
+                $max = (int) config('private_content.accel_max_bytes', 0);
+                $size = $max > 0 ? $disk->size($relative) : 0;
+
+                if ($max === 0 || $size <= $max) {
+                    $headers = [
+                        'X-Accel-Redirect' => $uri,
+                        // private: подписанный ответ одного обучаемого не должен
+                        // попасть в общий кэш (CDN/Varnish) тому, кто права не имеет.
+                        'Cache-Control' => 'private, max-age=600',
+                        'X-Content-Type-Options' => 'nosniff',
+                    ];
+                    if ($mime !== null) {
+                        $headers['Content-Type'] = $mime;
+                    }
+
+                    return response('', 200, $headers);
+                }
+                // Крупнее лимита — fallback на поток ниже: X-Accel не ограничивает
+                // отдачу и большой файл через internal-location упирается в таймауты.
+            }
+        }
+
+        $response = $disk->response($relative, basename($relative), [
             'Cache-Control' => 'no-store',
         ]);
+        if ($mime !== null) {
+            $response->headers->set('Content-Type', $mime);
+        }
+
+        return $response;
     }
 
     /**

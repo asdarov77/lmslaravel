@@ -57,9 +57,8 @@ class CoursePlayerController extends Controller
     public function show(Request $request, int $courseId)
     {
         $course = Course::findOrFail($courseId);
-        $userId = $request->user()?->id ?? Auth::id();
 
-        return response()->json($this->players->payload($course, $userId));
+        return response()->json($this->players->payload($course, $this->userId($request)));
     }
 
     /**

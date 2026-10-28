@@ -13,6 +13,7 @@ use App\Http\Controllers\QuestionImportController;
 use App\Http\Controllers\AukstructureController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\CourseController;
+use App\Http\Controllers\CourseContentController;
 use App\Http\Controllers\CoursePlayerController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CategoryController;
