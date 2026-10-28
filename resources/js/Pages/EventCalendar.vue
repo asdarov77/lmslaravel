@@ -291,6 +291,7 @@
             v-model="eventForm.end"
             :label="$t('calendar.eventEnd')"
             type="date"
+            :min="eventForm.start"
             variant="outlined"
             density="compact"
             hide-details
@@ -747,6 +748,17 @@ openEventForm(info) {
 
       if (!this.eventForm.start) {
         this.notify(this.$t("calendar.eventDateRequired"), "error");
+
+        return;
+      }
+
+      // Клиентская валиация диапазона: end не раньше start.
+      // Без этого сервер молча создаёт «перевёрнутое» событие.
+      if (
+        this.eventForm.end &&
+        this.eventForm.end < this.eventForm.start
+      ) {
+        this.notify(this.$t("calendar.eventEndBeforeStart"), "error");
 
         return;
       }
