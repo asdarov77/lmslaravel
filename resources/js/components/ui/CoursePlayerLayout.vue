@@ -151,11 +151,11 @@
              порядок один: плоский список sections, материалы — level 3.
         -->
         <nav v-if="hasNeighbours" class="cpl__pager" :aria-label="$t('common.navigation')">
-          <button type="button" class="cpl__pager-btn" :disabled="!prevTarget" @click="goPrev">
+          <button type="button" class="cpl__pager-btn" :disabled="!canPrev" @click="goPrev">
             <v-icon size="18">mdi-chevron-left</v-icon>
             <span class="cpl__pager-label">{{ $t('courseManifest.prevLesson') }}</span>
           </button>
-          <button type="button" class="cpl__pager-btn cpl__pager-btn--next" :disabled="!nextTarget" @click="goNext">
+          <button type="button" class="cpl__pager-btn cpl__pager-btn--next" :disabled="!canNext" @click="goNext">
             <span class="cpl__pager-label">{{ $t('courseManifest.nextLesson') }}</span>
             <v-icon size="18">mdi-chevron-right</v-icon>
           </button>
@@ -307,26 +307,7 @@ const materialCount = computed(() => materials.value.length)
 /** Количество прочитанных материалов (state === 'done'). */
 const doneCount = computed(() => materials.value.filter((m) => m.state === 'done').length)
 
-/**
- * Соседний МАТЕРИАЛ относительно активного.
- *
- * Ориентируемся на список материалов (isMaterial=true).
- * Раньше переход шёл по всем узлам подряд, и «следующий» после темы
- * приводил на заголовок без файла.
- */
-const neighbour = (offset) => {
-  const mats = materials.value
-  if (!mats.length) return null
-
-  const index = mats.findIndex((s) => s.id === props.activeId)
-  if (index === -1) {
-    // Активен заголовок (например, после смены курса): отправляем
-    // к первому материалу в нужную сторону.
-    return offset > 0 ? mats[0] : mats[mats.length - 1]
-  }
-
-  return mats[index + offset] ?? null
-}
+/** Мёртвый дубль удалён: единственная реализация — materialNeighbour ниже. */
 
 const hasNeighbours = computed(() => {
   const mats = materials.value
@@ -352,14 +333,29 @@ const canNext = computed(() => {
   return index < mats.length - 1
 })
 
+/**
+ * Соседний материал в исходном списке sections.
+ *
+ * Регресс: раньше цель искалась в treeNodes (обёртки для TreeView),
+ * у которых нет поля originalSection — событие prev/next улетало с
+ * undefined, и переход не работал.
+ */
+const materialNeighbour = (offset) => {
+  const mats = materials.value
+  if (!mats.length) return null
+  const index = mats.findIndex((s) => s.id === props.activeId)
+  if (index === -1) return offset > 0 ? mats[0] : mats[mats.length - 1]
+  return mats[index + offset] ?? null
+}
+
 const goPrev = () => {
-  const target = neighbour(-1)
-  if (target) emit('prev', target.originalSection)
+  const target = materialNeighbour(-1)
+  if (target) emit('prev', target)
 }
 
 const goNext = () => {
-  const target = neighbour(1)
-  if (target) emit('next', target.originalSection)
+  const target = materialNeighbour(1)
+  if (target) emit('next', target)
 }
 </script>
 

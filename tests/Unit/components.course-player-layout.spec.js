@@ -419,7 +419,11 @@ describe('CoursePlayerLayout: боковая панель', () => {
   it('сворачивается по событию, а не сама', async () => {
     const wrapper = mountLayout()
 
-    await wrapper.find('.cpl__sidebar-head .cpl__icon-btn').trigger('click')
+    // В шапке панели три кнопки (развернуть/свернуть/скрыть) — берём
+    // именно последнюю, она эмитит toggle-sidebar.
+    const buttons = wrapper.findAll('.cpl__sidebar-head .cpl__icon-btn')
+    expect(buttons.length).toBe(3)
+    await buttons[2].trigger('click')
 
     expect(wrapper.emitted('toggle-sidebar')).toHaveLength(1)
 

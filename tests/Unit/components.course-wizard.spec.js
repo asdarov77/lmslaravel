@@ -214,10 +214,13 @@ describe('CourseWizard: чек-лист готовности', () => {
   })
 
   it('учитывает уроки из манифеста', async () => {
+    // Контракт player-endpoint: плоский список nodes (см.
+    // CoursePlayerService::payload). Мок обязан отражать его, иначе
+    // мастер «видит» 0 уроков и чек-лист никогда не готов.
     http.get.mockResolvedValue({
       data: {
         success: true,
-        data: { aukstructures: [{ id: 1, title: 'Урок 1' }, { id: 2, title: 'Урок 2' }] },
+        data: { nodes: [{ id: 1, title: 'Урок 1' }, { id: 2, title: 'Урок 2' }] },
       },
     })
 
