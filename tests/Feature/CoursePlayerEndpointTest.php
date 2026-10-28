@@ -71,7 +71,7 @@ class CoursePlayerEndpointTest extends TestCase
 
         $response = $this->getJson("/api/course/{$course->id}/player")->assertOk();
 
-        $json = $response->json();
+        $json = $response->json('data');
         // верхний уровень контракта
         foreach (['course', 'nodes', 'tree', 'entry', 'resume', 'stats'] as $key) {
             $this->assertArrayHasKey($key, $json, "В ответе player-endpoint нет ключа {$key}");
@@ -113,7 +113,7 @@ class CoursePlayerEndpointTest extends TestCase
         $this->node($course, ['type' => 3, 'parent_id' => $topic->id]); // type=3 без link → не материал
         $this->node($course, ['type' => 1, 'parent_id' => $topic->id]); // обычный узел
 
-        $nodes = $this->getJson("/api/course/{$course->id}/player")->assertOk()->json('nodes');
+        $nodes = $this->getJson("/api/course/{$course->id}/player")->assertOk()->json('data.nodes');
 
         $byId = collect($nodes)->keyBy('id');
         $this->assertTrue($byId[$mat->id]['is_material']);
@@ -133,7 +133,7 @@ class CoursePlayerEndpointTest extends TestCase
         $m1 = $this->material($course, 'Лист 1');
         $m2 = $this->material($course, 'Лист 2');
 
-        $tree = $this->getJson("/api/course/{$course->id}/player")->assertOk()->json('tree');
+        $tree = $this->getJson("/api/course/{$course->id}/player")->assertOk()->json('data.tree');
 
         $this->assertCount(2, $tree);
         $this->assertEqualsCanonicalizing([$m1->id, $m2->id], array_column($tree, 'id'));
@@ -151,7 +151,7 @@ class CoursePlayerEndpointTest extends TestCase
         $this->node($course, ['type' => 1, 'parent_id' => $section->id]); // не материал — в цепи нет
         $m2 = $this->material($course, 'М2', $section->id);
 
-        $nodes = collect($this->getJson("/api/course/{$course->id}/player")->assertOk()->json('nodes'))->keyBy('id');
+        $nodes = collect($this->getJson("/api/course/{$course->id}/player")->assertOk()->json('data.nodes'))->keyBy('id');
 
         $this->assertNull($nodes[$m1->id]['prev_id']);
         $this->assertSame($m2->id, $nodes[$m1->id]['next_id']);
@@ -182,7 +182,7 @@ class CoursePlayerEndpointTest extends TestCase
             'percent' => 50,
         ]);
 
-        $json = $this->getJson("/api/course/{$course->id}/player")->assertOk()->json();
+        $json = $this->getJson("/api/course/{$course->id}/player")->assertOk()->json('data');
 
         // Д6: resume читается с сервера
         $this->assertSame($m2->id, $json['resume']['last_item_id']);
@@ -207,9 +207,9 @@ class CoursePlayerEndpointTest extends TestCase
             'last_item_id' => $m->id,
             'last_anchor' => 'sec-2',
             'percent' => 40,
-        ])->assertOk()->assertJson(['ok' => true]);
+        ])->assertOk()->assertJson(['data' => ['ok' => true]]);
 
-        $resume = $this->getJson("/api/course/{$course->id}/player")->assertOk()->json('resume');
+        $resume = $this->getJson("/api/course/{$course->id}/player")->assertOk()->json('data.resume');
         $this->assertSame($m->id, $resume['last_item_id']);
         $this->assertSame('sec-2', $resume['last_anchor']);
     }
@@ -239,16 +239,16 @@ class CoursePlayerEndpointTest extends TestCase
             'aukstructure_id' => $m->id,
             'seconds_viewed' => 5,
             'scroll_percent' => 30,
-        ])->assertOk()->assertJson(['completed' => false]);
+        ])->assertOk()->assertJson(['data' => ['completed' => false]]);
 
         // добираем время >= 15с — completed (накопительный учёт секунд)
         $this->postJson("/api/course/{$course->id}/view", [
             'aukstructure_id' => $m->id,
             'seconds_viewed' => 10,
             'scroll_percent' => 40,
-        ])->assertOk()->assertJson(['completed' => true]);
+        ])->assertOk()->assertJson(['data' => ['completed' => true]]);
 
-        $stats = $this->getJson("/api/course/{$course->id}/player")->assertOk()->json('stats');
+        $stats = $this->getJson("/api/course/{$course->id}/player")->assertOk()->json('data.stats');
         $this->assertSame(1, $stats['materials_visited']);
     }
 
