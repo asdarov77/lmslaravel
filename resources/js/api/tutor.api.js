@@ -110,7 +110,10 @@ export const streamTutorChat = async (payload, handlers = {}) => {
   }
 
   const reader = response.body.getReader()
-  const decoder = new TextDecoder('utf-8')
+  // fatal: true — движок декодера обязан бросать исключение на битых
+  // последовательностях вместо молча подменять их на U+FFFD (иначе в ответ
+  // тьютора попадали бы «символы замены» вместо кириллицы).
+  const decoder = new TextDecoder('utf-8', { fatal: true })
   let buffer = ''
 
   // Кадр SSE отделён пустой строкой; внутри — строки `event:`/`data:`.

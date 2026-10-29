@@ -13,6 +13,11 @@ import { TokenService } from '../../resources/js/services/storage.service'
 
 const encoder = new TextEncoder()
 
+/** Нормализуем кусок стрима в Uint8Array (тесты шлют и строки, и байты). */
+function asBytes(c) {
+  return typeof c === 'string' ? encoder.encode(c) : c
+}
+
 /** Response-подобный объект со стримом из перечисленных кусков. */
 function sseResponse(chunks, { ok = true, status = 200, headers = {} } = {}) {
   return {
@@ -25,7 +30,7 @@ function sseResponse(chunks, { ok = true, status = 200, headers = {} } = {}) {
         return {
           read: async () =>
             i < chunks.length
-              ? { value: encoder.encode(chunks[i++]), done: false }
+              ? { value: asBytes(chunks[i++]), done: false }
               : { value: undefined, done: true },
           cancel: async () => {},
         }
@@ -140,17 +145,17 @@ describe('streamTutorChat: разбор SSE-кадров', () => {
   })
 
   it('кириллица не ломается на границе чанка внутри UTF-8 символа', async () => {
-    // «д» (U+0434) байтами E4 B4 — режем строго между ними,
-    // чтобы ни один чанк не кончался целым кадром.
-    const bytes = Uint8Array.from(encoder.encode('data: {"t":"д"}\n\n'))
-    let cut = -1
-    for (let i = 0; i < bytes.length; i++) {
-      if (bytes[i] === 0xe4) { cut = i + 1; break }
-    }
-    expect(cut).toBeGreaterThan(0)
-    fetchMock.mockResolvedValue(
-      sseResponse([bytes.slice(0, cut), bytes.slice(cut)]),
-    )
+    // «д» (U+0434) кодируется байтами D0 B4. Режем строго между ними,
+    // чтобы ни один чанк не кончался целым кадром и decode({stream:true})
+    // обязан был дождаться второго куска. Оффсеты фиксированы по шаблону
+    // `data: {"t":"` (11 ASCII-байт) — без поиска по байтам, который
+    // зависит от реализации TextEncoder в окружении теста.
+    const bytes = encoder.encode('data: {"t":"д"}\n\n')
+    const cut = 13 // D0 на позиции 12, B4 на 13: режем между байтами символа
+    expect(bytes[cut]).toBe(0xb4)
+    const chunks = [bytes.slice(0, cut), bytes.slice(cut)]
+
+    fetchMock.mockResolvedValue(sseResponse(chunks))
 
     const onToken = vi.fn()
     await streamTutorChat({ course_id: 1, question: 'q' }, { onToken })
