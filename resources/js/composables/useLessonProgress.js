@@ -83,10 +83,15 @@ export function useLessonProgress(courseId) {
       secondsViewed,
       scrollPercent: maxScrollPercent,
     }
-    // Скролл-процент остаётся накопленным до конца урока (в openLesson),
-    // но при смене урока обнулять его ОБЯЗАТЕЛЬНО — иначе max-scroll
-    // предыдущего материала «протечёт» в первый view-ивент нового урока.
+    // P0 (аудит): оба накопителя сбрасываются ДО отправки, симметрично.
+    // Раньше здесь обнулялся только secondsViewed, а maxScrollPercent —
+    // позже, в openLesson(). Между этими двумя моментами lived async
+    // sendViewEvent: быстрый переход «урок A → B» вызывал
+    // flush(A) → openLesson(B) → resetAccumulators(), и уже захваченный
+    // payload всё равно отправлялся — но следующий flush(B) мог унести
+    // чужой scroll. Единая точка сброса исключает обе гонки.
     secondsViewed = 0
+    maxScrollPercent = 0
     sendViewEvent(courseId, payload).catch(() => {})
   }
 
