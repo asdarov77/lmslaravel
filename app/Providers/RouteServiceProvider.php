@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 
@@ -103,7 +104,29 @@ class RouteServiceProvider extends ServiceProvider
          * как у login: тесты и разработка бьют по эндпоинту чаще, чем
          * живой студент.
          */
-        RateLimiter::for('chat', fn (Request $request) => Limit::perMinute($perMinute(10))
-            ->by('tutor-chat:' . ($request->user()?->id ?? $request->ip())));
+        RateLimiter::for('chat', function (Request $request) use ($perMinute) {
+            $limit = $perMinute(10);
+
+            /*
+             * response() обязательна: док читает retryAfter из envelope и
+             * показывает фактические секунды до сброса лимита. Голый
+             * дефолтный ответ throttle не содержит envelope, и клиент
+             * рисовал бы заглушку «HTTP 429» вместо понятного кулдауна.
+             */
+            return Limit::perMinute($limit)
+                ->by('tutor-chat:' . ($request->user()?->id ?? $request->ip()))
+                ->response(function (Request $request, array $headers) {
+                    $seconds = max(1, (int) ($headers['X-RateLimit-Reset'][0] ?? 60));
+
+                    return response([
+                        'success' => false,
+                        'data' => null,
+                        'error' => 'Слишком много вопросов тьютору, подождите',
+                        'meta' => ['engineState' => null, 'retryAfter' => $seconds],
+                    ], Response::HTTP_TOO_MANY_REQUESTS)
+                        ->header('Retry-After', $seconds)
+                        ->withHeaders($headers);
+                });
+        });
     }
 }
