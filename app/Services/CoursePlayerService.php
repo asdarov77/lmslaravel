@@ -80,18 +80,25 @@ class CoursePlayerService
         $entry = $structure['entry'];
         $totalMaterials = $structure['total_materials'];
 
-        // прогресс просмотра материалов текущим пользователем — вне кэша
+        // прогресс просмотра материалов текущим пользователем — вне кэша.
+        // completed (курсовое «изучено», ставится вручную или трекером)
+        // отличается от visited («открывал») — хвост premium-плеера: без
+        // серверного флага фронт вынужден был считать completed === visited.
         $viewedIds = [];
+        $completedFlip = [];
         if ($userId) {
-            $viewedIds = CourseMaterialView::where('user_id', $userId)
+            $rows = CourseMaterialView::where('user_id', $userId)
                 ->where('course_id', $course->id)
-                ->pluck('aukstructure_id')
-                ->all();
+                ->get(['aukstructure_id', 'completed'])
+                ->keyBy('aukstructure_id');
+            $viewedIds = $rows->keys()->all();
+            $completedFlip = $rows->where('completed', true)->keys()->flip()->all();
         }
 
         $viewedFlip = array_flip($viewedIds);
         foreach ($nodes as &$node) {
             $node['visited'] = isset($viewedFlip[$node['id']]);
+            $node['completed'] = isset($completedFlip[$node['id']]);
         }
         unset($node);
 
@@ -161,6 +168,9 @@ class CoursePlayerService
                     ? "/api/course/{$course->id}/content/{$item->id}"
                     : null,
                 'visited' => false,
+                // completed — пользовательский флаг «изучено», проставляется
+                // поверх кэша в payload(); здесь только нейтральное значение.
+                'completed' => false,
             ];
         })->values()->all();
 

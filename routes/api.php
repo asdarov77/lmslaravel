@@ -310,6 +310,8 @@ Route::middleware(['auth:sanctum', 'permission:content.manage'])->group(function
     Route::post('/aukstructure', [AukstructureController::class, 'store']);
     // Раздел 8: переупорядочивание узлов курса одним списком.
     Route::post('/aukstructure/reorder', [AukstructureController::class, 'reorder']);
+    // M4: правила доступа («drip content») из Inspector-панели конструктора.
+    Route::put('/aukstructure/{aukstructure}/rules', [AukstructureController::class, 'updateRules'])->whereNumber('aukstructure');
     Route::put('/aukstructure/{aukstructure}', [AukstructureController::class, 'update'])->whereNumber('aukstructure');
     Route::patch('/aukstructure/{aukstructure}', [AukstructureController::class, 'update'])->whereNumber('aukstructure');
     Route::delete('/aukstructure/{aukstructure}', [AukstructureController::class, 'destroy'])->whereNumber('aukstructure');
