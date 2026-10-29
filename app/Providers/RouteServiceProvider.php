@@ -94,5 +94,16 @@ class RouteServiceProvider extends ServiceProvider
          */
         RateLimiter::for('forgot', fn (Request $request) => Limit::perMinute($perMinute(1))
             ->by('forgot:' . $request->ip()));
+
+        /*
+         * TutorDock чат (blueprint §3.3): ответ генерирует локальная
+         * модель на CPU — один запрос держит процессор секунды. Лимит
+         * считается по пользователю (не по IP: NAT учебной группы не
+         * должен блокировать половину потока). Запас вне production —
+         * как у login: тесты и разработка бьют по эндпоинту чаще, чем
+         * живой студент.
+         */
+        RateLimiter::for('chat', fn (Request $request) => Limit::perMinute($perMinute(10))
+            ->by('tutor-chat:' . ($request->user()?->id ?? $request->ip())));
     }
 }

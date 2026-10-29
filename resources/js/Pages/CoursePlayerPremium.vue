@@ -366,8 +366,11 @@ import InlineQuizRunner from '../components/player/InlineQuizRunner.vue'
 import AppSkeleton from '../components/ui/AppSkeleton.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
 import LessonWorkspace from '../components/player/LessonWorkspace.vue'
+import { streamTutorChat } from '../api/tutor.api'
 
 const FOCUSABLE_HINT = 'input, textarea, select, [contenteditable]'
+
+let tutorMsgSeq = 0
 
 export default {
   name: 'CoursePlayerPremium',
