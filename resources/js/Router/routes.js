@@ -18,6 +18,12 @@ const toIntOrNull = value => {
     return Number.isFinite(n) ? n : null;
 };
 
+// Feature-flag плеера v2 (REWORK R3): window.__UI_FLAGS__ кладёт blade-шаблон
+// из config/ui.php. Флаг читается один раз при импорте модуля — до создания
+// роутера, поэтому при выключенном флаге маршрут courses.play физически не
+// существует (404 → fallback), а legacy /courses/itemmani работает как раньше.
+import { coursePlayerV2Enabled } from '../composables/useUiFlags';
+
 const routes = [
 
     /*
@@ -216,6 +222,20 @@ const routes = [
         }),
         name: 'courses.itemmani',
 
+    },
+    {
+        // Плеер v2 (S1, docs/course-player-blueprint.md) — РЕГИСТРИРУЕТСЯ
+        // ТОЛЬКО при включённом ui.course_player_v2 (REWORK R3).
+        // Тонкий роут-компонент: useCoursePlayer → useLessonLoader →
+        // LessonWorkspace; URL-as-truth (?item=), remount по epoch.
+        // Legacy /courses/itemmani выше не затронут — аварийный откат флага.
+        ...(coursePlayerV2Enabled() ? [{
+            path: '/courses/:id/play',
+            component: () => import('../Pages/CoursePlayer.vue'),
+            name: 'courses.play',
+            meta: { permission: ['content.view', 'content.manage'] },
+            props: route => ({ id: Number(route.params.id) }),
+        }] : []),
     },
     {
         path: '/courses/desc/:idEdit',

@@ -95,9 +95,19 @@ it('auto-flushes accumulated view every 20 s', () => {
   expect(calls[0][2].secondsViewed).toBeGreaterThanOrEqual(19)
   expect(calls[0][2].secondsViewed).toBeLessThanOrEqual(20)
 
-  // Повторный flush при нулевом накоплении — пустых запросов быть не должно.
+  // Второй тикер должен дослать НАКОПЛЕННОЕ за второй интервал, а не пустой
+  // запрос: после первого flush секунды обнулены, поэтому к моменту второго
+  // тика накоплено ровно ~20 с (не 40 и не 0).
   vi.advanceTimersByTime(20_000)
-  expect(apiPost.mock.calls.filter(([k]) => k === 'view').length).toBe(1)
+  const viewCalls = apiPost.mock.calls.filter(([k]) => k === 'view')
+  expect(viewCalls.length).toBe(2)
+  expect(viewCalls[1][2].secondsViewed).toBeGreaterThanOrEqual(19)
+  expect(viewCalls[1][2].secondsViewed).toBeLessThanOrEqual(20)
+
+  // А вот flush при нулевом накоплении (сразу после дедуплицирующего тика)
+  // обязан не порождать запросов вообще.
+  lp.flushViewEvent()
+  expect(apiPost.mock.calls.filter(([k]) => k === 'view').length).toBe(2)
 
   lp.unbindUnloadGuards() // stopTimers: иначе тикер доживает до следующего it()
 })
