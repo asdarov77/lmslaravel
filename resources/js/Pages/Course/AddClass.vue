@@ -145,7 +145,7 @@
                 <div class="classes-progress__head">
                   <span class="classes-progress__phase">
                     <v-icon icon="mdi-loading mdi-spin" size="14" end></v-icon>
-                    {{ $t("classes.importRunning", { path: toClassPath(path) || "…" }) }}
+                    {{ $t("classes.importRunning", { path: selectedName || "…" }) }}
                   </span>
                   <span class="classes-progress__pct">{{ importPct }}%</span>
                 </div>
@@ -587,9 +587,14 @@ export default {
       return this.allTags.find((cls) => cls.name === name) ?? null;
     },
 
+    /** Имя выбранного класса — для шаблона (в нём нет методов модуля). */
+    selectedName() {
+      return toClassPath(this.path);
+    },
+
     /** Кнопка сохранения активна только с заполненными полями. */
     canSubmit() {
-      return toClassPath(this.path) !== null && this.title.trim() !== "";
+      return this.selectedName !== null && this.title.trim() !== "";
     },
 
     /**
