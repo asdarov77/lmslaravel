@@ -109,8 +109,12 @@ export function useLessonLoader({ courseId, api }) {
         model = { ...model, delivery: { url: signed.url, mode: signed.mode } }
       }
 
-      if (token !== loadToken) return
+      // Память detail обновляем ДО финальной проверки токена: иначе
+      // проигравший гонку оставил бы lesson.value=id старого урока и
+      // следующий load(старый id) ошибочно пошёл бы в сеть за detail.
+      // Статусы/epoch — только победителем (bumpEpoch guard'ится сам).
       lesson.value = model
+      if (token !== loadToken) return
       status.value = 'ready'
       bumpEpoch(token)
 
