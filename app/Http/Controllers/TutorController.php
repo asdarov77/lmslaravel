@@ -180,7 +180,7 @@ class TutorController extends Controller
             ], 503);
         }
 
-        $response = new StreamedResponse(function () use ($messages, $onTokenSafety, $model, $grounded, $maxTokens) {
+        $response = new StreamedResponse(function () use ($messages, $model, $grounded, $maxTokens) {
             $sent = $this->sseEvent('meta', [
                 'model' => $model,
                 'grounded' => $grounded,
@@ -192,19 +192,24 @@ class TutorController extends Controller
             }
 
             $emitted = 0;
-            $failed = false;
+            $truncated = false;
+            $clientGone = false;
             $failMessage = '';
 
             try {
-                $this->client->streamGenerate($messages, function ($token) use (&$emitted, &$failed, $maxTokens) {
-                    if ($failed) {
+                $this->client->streamGenerate($messages, function ($token) use (&$emitted, &$truncated, &$clientGone, $maxTokens) {
+                    // Клиент отключился (abort на unmount урока) или поток
+                    // уже закрыт — новые токены не отправляем, но и не
+                    // прерываем генерацию исключеним: цикл обязан дойти
+                    // до корректного завершения below.
+                    if ($clientGone || $truncated) {
                         return;
                     }
 
                     // Жёсткий потолок: num_predict у малых моделей не всегда
                     // слушается, а бесконечный поток ломает док на клиенте.
                     if ($emitted >= $maxTokens * 4) {
-                        $failed = true;
+                        $truncated = true;
 
                         return;
                     }
@@ -212,20 +217,23 @@ class TutorController extends Controller
                     $emitted += strlen($token);
 
                     if ($this->sseData(['t' => $token]) === false) {
-                        $failed = true;
+                        $clientGone = true;
                     }
                 }, $maxTokens);
             } catch (TutorUnavailableException $e) {
-                $failed = true;
                 $failMessage = $e->getMessage();
+            }
+
+            if ($clientGone) {
+                return;
             }
 
             if ($failMessage !== '') {
                 $this->sseEvent('error', ['message' => $failMessage]);
-            } elseif ($emitted === 0 && ! $failed) {
+            } elseif ($emitted === 0 && $failMessage === '') {
                 $this->sseEvent('error', ['message' => 'Пустой ответ движка']);
             } else {
-                $this->sseEvent('done', ['truncated' => $failed]);
+                $this->sseEvent('done', ['truncated' => $truncated]);
             }
         });
 

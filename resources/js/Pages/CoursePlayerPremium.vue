@@ -310,10 +310,12 @@
           <v-btn value="full" size="small">{{ $t('tutor.hintFull') }}</v-btn>
         </v-btn-toggle>
 
-        <div class="cpp__tutor-log pa-3" aria-live="polite">
+        <div ref="tutorLog" class="cpp__tutor-log pa-3" aria-live="polite">
           <div v-for="m in tutorMessages" :key="m.id" class="mb-3" :class="m.role === 'assistant' ? 'cpp__msg--ai' : 'cpp__msg--user'">
             <blockquote v-if="m.quote" class="cpp__quote">{{ m.quote }}</blockquote>
             <div class="text-body-2">{{ m.text }}<span v-if="m.streaming" class="cpp__caret">▍</span></div>
+            <div v-if="m.error" class="text-caption cpp__msg-error">{{ m.error }}</div>
+            <div v-else-if="m.truncated" class="text-caption text-medium-emphasis">{{ $t('tutor.truncated') }}</div>
           </div>
         </div>
 
@@ -321,7 +323,8 @@
           <v-text-field
             v-model="tutorInput" :loading="tutorStreaming" hide-details
             :placeholder="$t('tutor.askAboutLesson')" variant="outlined" density="compact" rounded="lg"
-            append-icon="mdi-send" @click:append="askTutor"
+            :append-icon="tutorStreaming ? 'mdi-stop-circle-outline' : 'mdi-send'"
+            @click:append="tutorStreaming ? stopTutorStream() : askTutor()"
           >
             <template #append-inner>
               <v-tooltip v-if="rateLimited" :text="$t('tutor.rateLimit', { s: cooldown })">
@@ -402,6 +405,7 @@ export default {
       treeTabId: null,                                 // roving tabindex дерева (Д10)
       tutorOpen: false, tutorInput: '', tutorMessages: [], tutorContext: null,
       hintLevel: 'nudge', tutorStreaming: false, tutorUnread: 0, rateLimited: false, cooldown: 0,
+      tutorAbort: null, cooldownTimer: null,
       videoPhase: 'reserving', notes: [], completing: false, celebrate: false,
       quizVerdict: null, quizVerdictXp: 0, controlsIdle: false, idleTimer: null,
     }
@@ -472,6 +476,10 @@ export default {
     window.removeEventListener('keydown', this.onKeydown)
     document.removeEventListener('mousemove', this.resetIdleTimer)
     clearTimeout(this.idleTimer)
+    clearInterval(this.cooldownTimer)
+    // blueprint §3.3: закрытый урок обязан обрывать SSE-генерацию,
+    // иначе док продолжает жечь CPU модели на мёртвой странице.
+    if (this.tutorAbort) this.tutorAbort.abort()
   },
   methods: {
     /* ── Keyboard layer (§Манифест 1.4): шорткаты молчат, пока фокус в поле ввода ── */
@@ -567,7 +575,101 @@ export default {
         setTimeout(() => { this.celebrate = false }, 2600) // авто-продолжение: pulse на next-узле
       }
     },
-    askTutor() { /* fetch + ReadableStream SSE; abort на unmount (blueprint §3.3) */ },
+    /**
+     * Вопрос в TutorDock → SSE-стрим /api/v1/tutor/chat (blueprint §3.3).
+     *
+     * Правила дока:
+     *  — один активный поток: повторный Enter во время стрима не плодит
+     *    параллельную генерацию (CPU-модель), а молча игнорируется;
+     *  — AbortController живёт в scope компонента и обрывается в
+     *    beforeUnmount: закрытый урок не должен жечь модель дальше;
+     *  — контекст явный: context_off = !tutorContext (снятая пилюля
+     *    отключает подмешивание фрагментов, скрытых контекстов нет);
+     *  — уровень подсказки уходит в запрос и в telemetry ('tutor-ask');
+     *  — 429 обрабатывается кулдауном (useRateLimitCountdown), чтобы
+     *    студент видел, сколько ждать, а не долбил лимит.
+     */
+    async askTutor() {
+      const question = this.tutorInput.trim()
+      if (!question || this.tutorStreaming || this.cooldown > 0) return
+
+      this.tutorInput = ''
+      this.tutorStreaming = true
+
+      const controller = new AbortController()
+      this.tutorAbort = controller
+
+      const answerMsg = { id: ++tutorMsgSeq, role: 'assistant', text: '', streaming: true }
+      this.tutorMessages.push({ id: ++tutorMsgSeq, role: 'user', text: question })
+      this.tutorMessages.push(answerMsg)
+      this.scrollLogToBottom()
+
+      // Пакетная подсказка из открытого урока — та же пилюля, что видит
+      // пользователь (контекст всегда видим, никогда не скрытый).
+      if (!this.tutorContext && this.lesson?.title) {
+        this.tutorContext = { excerpt: this.lesson.title, anchor: null }
+      }
+
+      try {
+        await streamTutorChat(
+          {
+            course_id: Number(this.courseId),
+            item_id: this.currentItemId ?? null,
+            question: question.slice(0, 600),
+            hint_level: this.hintLevel,
+            context_off: !this.tutorContext,
+          },
+          {
+            signal: controller.signal,
+            onMeta: (m) => { answerMsg.grounded = m?.grounded ?? false },
+            onToken: (t) => {
+              answerMsg.text += t
+              this.scrollLogToBottom()
+            },
+            onDone: (d) => { if (d?.truncated) answerMsg.truncated = true },
+            onError: (message, info = {}) => {
+              answerMsg.error = message || 'Ошибка движка'
+              if (info.status === 429) {
+                this.rateLimited = true
+                this.startCooldown(info.retryAfter ?? 60)
+              }
+            },
+          },
+        )
+      } catch (e) {
+        // Сетевой сбой (не отмена): док обязан остаться рабочим.
+        if (e?.name !== 'AbortError') answerMsg.error = String(e?.message || e)
+      } finally {
+        answerMsg.streaming = false
+        if (this.tutorAbort === controller) this.tutorAbort = null
+        this.tutorStreaming = false
+        if (!this.tutorOpen) this.tutorUnread += 1
+        this.$emit('tutor-ask', { question, hintLevel: this.hintLevel, grounded: !!answerMsg.grounded, error: answerMsg.error ?? null })
+        this.scrollLogToBottom()
+      }
+    },
+    stopTutorStream() {
+      // Кнопка «стоп» в доке: обрыв без ошибки — сообщение остаётся с тем, что успело прийти.
+      if (this.tutorAbort) this.tutorAbort.abort()
+    },
+    startCooldown(seconds) {
+      clearInterval(this.cooldownTimer)
+      this.cooldown = Math.max(1, Math.ceil(Number(seconds) || 60))
+      this.cooldownTimer = setInterval(() => {
+        this.cooldown -= 1
+        if (this.cooldown <= 0) {
+          clearInterval(this.cooldownTimer)
+          this.cooldownTimer = null
+          this.rateLimited = false
+        }
+      }, 1000)
+    },
+    scrollLogToBottom() {
+      this.$nextTick(() => {
+        const el = this.$refs.tutorLog
+        if (el) el.scrollTop = el.scrollHeight
+      })
+    },
     scrollToQuote(ctx) { /* deep-link в кадр: anchor + подсветка (уже есть в useContentFrame) */ void ctx },
   },
 }
@@ -653,6 +755,7 @@ export default {
 .cpp__msg--user { padding: 10px 12px; }
 .cpp__quote { margin: 0 0 6px; padding-left: 10px; border-left: 3px dotted var(--c-border-strong); font-style: italic; color: var(--c-text-secondary); font-size: var(--fs-sm); }
 .cpp__caret { animation: cpp-blink 1s steps(2) infinite; }
+.cpp__msg-error { color: var(--c-danger); }
 @keyframes cpp-blink { 50% { opacity: 0; } }
 .cpp__tutor-fab { position: absolute; right: 20px; bottom: 88px; z-index: 6; }
 
