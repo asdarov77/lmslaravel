@@ -132,6 +132,38 @@ class PrivateContentSignatureTest extends TestCase
             ->assertStatus(403);
     }
 
+    /**
+     * Дефект №4 (ИСПРАВЛЕН, см. docs/TESTING-ARCHITECTURE.md): раньше middleware
+     * сначала читал подпись из query и только при её отсутствии — из пути.
+     * Это допускало смешение двух схем: на запросе с path-префиксом
+     * {expires}/{signature}/... всё равно принималась query-подпись.
+     * Фикс в ValidatePrivateContentSignature: если path подписан (первый
+     * сегмент — число expires), query полностью игнорируется; ответ на
+     * path-URL определяется ТОЛЬКО path-подписью.
+     */
+    /** @test */
+    public function query_подпись_не_переопределяет_path_подпись(): void
+    {
+        // 1) Валидный path + подставная query от ДРУГОГО курса.
+        // До фикса middleware взял бы query первой, несовпадение с сегментами
+        // маршрута → ложный 403 на легитимном path-URL. После фикса query
+        // игнорируется на подписанном пути → 200.
+        $foreignQuery = PrivateContentSigner::signedQuery('Другой', '99');
+        $this->getJson($this->signedPath()."index.html".$foreignQuery)
+            ->assertStatus(200);
+
+        // 2) Replay: просроченная query НЕ должна продлевать жизнь URL'у —
+        // на неподписанном пути доступ определяется самой query (она истекла).
+        $this->getJson("api/private/{$this->aircraft}/{$this->auk}/index.html"
+            .'?expires=1000000000&signature=abc')->assertStatus(403);
+
+        // 3) Поддельный path-префикс нельзя «починить» валидной query того же
+        // курса: проверяется именно path → 403.
+        $goodQuery = PrivateContentSigner::signedQuery($this->aircraft, $this->auk);
+        $forgedPrefix = "api/private/{$this->aircraft}/{$this->auk}/1000000000/deadbeef/";
+        $this->getJson($forgedPrefix."index.html".$goodQuery)->assertStatus(403);
+    }
+
     /** @test */
     public function подпись_для_чужого_курса_не_подходит(): void
     {

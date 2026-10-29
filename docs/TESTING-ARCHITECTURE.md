@@ -80,7 +80,10 @@ npx playwright test tests/E2E/visual-regression.spec.js                       # 
    `document.removeEventListener('visibilitychange', onPageHide)`, тогда как
    добавлялась анонимная стрелочная функция → утечка слушателя и «двойной»
    flush после unmount. Фикс: сохранить обработчик в переменную модуля.
-4. **ValidatePrivateContentSignature**: подпись из query принимается даже когда
+4. **ValidatePrivateContentSignature**: подпись из query принималась даже когда
    запрос идёт по path-формату `{expires}/{signature}/...` — смешение двух
-   схем допускает replay старой query-подписи на новых путях. Фикс: если в
-   пути есть signed-префикс, игнорировать query-параметры.
+   схем допускало replay старой query-подписи на новых путях и ложные 403 на
+   легитимных path-URL с посторонней query. ✅ ИСПРАВЛЕНО: если path подписан
+   (первый сегмент — число expires), query игнорируется полностью; ответ на
+   path-URL определяется только path-подписью. Регрессия —
+   PrivateContentSignatureTest::query_подпись_не_переопределяет_path_подпись.
