@@ -89,13 +89,22 @@ export const streamTutorChat = async (payload, handlers = {}) => {
     // кидаем исключение: док остаётся рабочим (cooldown/countdown).
     let message = `HTTP ${response.status}`
     let engineState = null
+    let retryAfter = null
     try {
       const body = await response.json()
       message = body?.error || message
       engineState = body?.meta?.engineState ?? null
+      // throttle:chat кладёт секунды до сброса в meta.retryAfter (envelope) —
+      // без них кулдаун дока стартовал бы с заглушки 60 c вместо реальных.
+      const ra = Number(body?.meta?.retryAfter)
+      if (Number.isFinite(ra) && ra > 0) retryAfter = Math.ceil(ra)
     } catch (_) { /* не-JSON ответ: оставляем код статуса */ }
+    if (retryAfter === null) {
+      const headerRa = Number(response.headers?.get?.('Retry-After'))
+      if (Number.isFinite(headerRa) && headerRa > 0) retryAfter = Math.ceil(headerRa)
+    }
 
-    if (onError) onError(message, { status: response.status, engineState })
+    if (onError) onError(message, { status: response.status, engineState, retryAfter })
     else throw new Error(message)
     return
   }
