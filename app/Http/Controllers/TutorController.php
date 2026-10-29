@@ -4,17 +4,21 @@ namespace App\Http\Controllers;
 
 use App\Jobs\GenerateTutorQuestions;
 use App\Models\Course;
+use App\Models\TutorChunk;
 use App\Models\TutorItem;
 use App\Models\TutorMaterial;
 use App\Models\TutorResponse;
 use App\Models\TutorSession;
 use App\Models\User;
+use App\Support\CourseAccess;
 use App\Support\Tutor\TutorAccess;
 use App\Support\Tutor\TutorAnswerGrader;
 use App\Support\Tutor\TutorClient;
 use App\Support\Tutor\TutorMaterialIndexer;
+use App\Support\Tutor\TutorUnavailableException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Тренажёр: самоподготовка по материалам назначенных курсов.
@@ -77,6 +81,230 @@ class TutorController extends Controller
             'error' => null,
             'meta' => null,
         ]);
+    }
+
+    /**
+     * Чат-подсказчик внутри плеера (TutorDock): POST /api/v1/tutor/chat.
+     *
+     * ГРАНИЦА МОДУЛЯ НЕ МЕНЯЕТСЯ: чат ничего не пишет в таблицы оценок
+     * и не создаёт exam_attempts — prompt строится только из фрагментов
+     * курсов, доступных этому пользователю (CourseAccess::canOpen +
+     * TutorAccess::allows), а ответ отдаётся потоком SSE без записи в БД.
+     *
+     * Формат ответа: `event: meta` (model, grounded, truncated), затем
+     * `data: {"t":"…"}` токенами, затем `event: done`. Ошибки движка ДО
+     * начала стрима отдаются обычным envelope-JSON (503 + engineState),
+     * ошибки ПОСЛЕ начала стрима — `event: error`, чтобы клиент дорисовал
+     * красное сообщение вместо оборванного потока.
+     */
+    public function chat(Request $request)
+    {
+        $this->authorizeTutor($request, 'use');
+
+        $data = $request->validate([
+            'course_id' => ['required', 'integer', 'exists:courses,id'],
+            'item_id' => ['nullable', 'integer'],
+            'question' => ['required', 'string', 'min:1', 'max:600'],
+            'hint_level' => ['nullable', 'in:nudge,partial,full'],
+            'context_off' => ['nullable', 'boolean'],
+        ]);
+
+        $actor = $request->user();
+        $course = Course::findOrFail((int) $data['course_id']);
+
+        // Доступ к курсу — тот же контур прав, что у плеера: чужой курс
+        // не должен подмешивать свои фрагменты в промпт даже по прямому id.
+        if (! CourseAccess::canOpen($actor, $course)) {
+            abort(403, 'У вас нет доступа к этому курсу');
+        }
+
+        $level = (string) ($data['hint_level'] ?? 'nudge');
+        $question = trim((string) $data['question']);
+
+        // Контекст: релевантные фрагменты материалов ЭТОГО курса, причём
+        // только те материалы, которые пользователю разрешено видеть.
+        // context_off явный — «без подсказки из текста» (пользователь
+        // снял пилюлю контекста; скрытых контекстов не бывает).
+        $chunks = [];
+        $grounded = false;
+
+        if (! ($data['context_off'] ?? false)) {
+            $visibleIds = TutorAccess::visibleMaterialIds($actor);
+
+            $query = TutorChunk::query()
+                ->whereHas('material', function ($q) use ($course, $visibleIds) {
+                    $q->where('course_id', $course->id)
+                        ->where('status', TutorMaterial::STATUS_INDEXED);
+
+                    if ($visibleIds !== null) {
+                        $q->whereIn('id', $visibleIds === [] ? [0] : $visibleIds);
+                    }
+                })
+                ->relevant($question)
+                ->orderByDesc(DB::raw("similarity(to_tsvector('simple', content), plainto_tsquery('simple', {$this->pgQuote($question)}))"))
+                ->limit((int) config('tutor.chat_context_chunks', 3));
+
+            foreach ((array) $query->get() as $chunk) {
+                $text = trim((string) $chunk->content);
+
+                if ($text !== '') {
+                    $chunks[] = $text;
+                }
+            }
+
+            $grounded = $chunks !== [];
+        }
+
+        $messages = [
+            ['role' => 'system', 'content' => $this->chatSystemPrompt($level, $chunks)],
+            ['role' => 'user', 'content' => mb_substr($question, 0, 600)],
+        ];
+
+        $model = $this->client->model();
+        $maxTokens = (int) config('tutor.chat_max_tokens', 500);
+
+        // Движок проверяем ДО первого байта стрима: 503 envelope-ом
+        // честнее, чем оборванный SSE с пустым телом.
+        try {
+            $health = $this->client->health();
+        } catch (\Throwable $e) {
+            $health = ['available' => false, 'error' => $e->getMessage()];
+        }
+
+        if (empty($health['available'])) {
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'error' => 'Нейродвижок недоступен',
+                'meta' => ['engineState' => $health['error'] ?? 'unavailable'],
+            ], 503);
+        }
+
+        $response = new StreamedResponse(function () use ($messages, $onTokenSafety, $model, $grounded, $maxTokens) {
+            $sent = $this->sseEvent('meta', [
+                'model' => $model,
+                'grounded' => $grounded,
+                'truncated' => false,
+            ]);
+
+            if ($sent === false) {
+                return;
+            }
+
+            $emitted = 0;
+            $failed = false;
+            $failMessage = '';
+
+            try {
+                $this->client->streamGenerate($messages, function ($token) use (&$emitted, &$failed, $maxTokens) {
+                    if ($failed) {
+                        return;
+                    }
+
+                    // Жёсткий потолок: num_predict у малых моделей не всегда
+                    // слушается, а бесконечный поток ломает док на клиенте.
+                    if ($emitted >= $maxTokens * 4) {
+                        $failed = true;
+
+                        return;
+                    }
+
+                    $emitted += strlen($token);
+
+                    if ($this->sseData(['t' => $token]) === false) {
+                        $failed = true;
+                    }
+                }, $maxTokens);
+            } catch (TutorUnavailableException $e) {
+                $failed = true;
+                $failMessage = $e->getMessage();
+            }
+
+            if ($failMessage !== '') {
+                $this->sseEvent('error', ['message' => $failMessage]);
+            } elseif ($emitted === 0 && ! $failed) {
+                $this->sseEvent('error', ['message' => 'Пустой ответ движка']);
+            } else {
+                $this->sseEvent('done', ['truncated' => $failed]);
+            }
+        });
+
+        $response->headers->set('Content-Type', 'text/event-stream; charset=utf-8');
+        $response->headers->set('Cache-Control', 'no-cache, no-transform');
+        $response->headers->set('X-Accel-Buffering', 'no');
+        $response->headers->set('Connection', 'keep-alive');
+
+        return $response;
+    }
+
+    /**
+     * Системный промпт чата по уровню подсказки.
+     *
+     * nudge — направление, НЕ ответ (методическое требование: студент
+     * должен думать сам); partial — часть решения; full — разбор с
+     * опорой на приведённые фрагменты. При отсутствии фрагментов
+     * модель обязана сказать, что материала нет, а не выдумывать.
+     */
+    private function chatSystemPrompt(string $level, array $chunks): string
+    {
+        $style = [
+            'nudge' => 'Дай только НАПРАВЛЕНИЕ мысли: вопрос-подсказку или указание, какой раздел урока перечитать. НЕ давай ответ, формулу или готовое решение.',
+            'partial' => 'Дай ЧАСТЬ решения: промежуточный шаг или схему рассуждения, но не финальный ответ.',
+            'full' => 'Дай полный разбор с пояснением, опираясь строго на приведённые фрагменты материала.',
+        ][$level] ?? 'Дай только направление.';
+
+        $out = "Ты — AI-тьютор в системе обучения (LMS). Отвечай коротко, на языке вопроса, вежливо и по делу. {$style}\n\n";
+
+        if ($chunks === []) {
+            return $out.'КОНТЕКСТ ИЗ КУРСА НЕ ПЕРЕДАН. Если вопрос требует фактов из материала — честно скажи, что соответствующего фрагмента курса не найдено, и предложи переформулировать вопрос. Не выдумывай факты.';
+        }
+
+        $ctx = '';
+
+        foreach ($chunks as $i => $text) {
+            $ctx .= "\n[Фрагмент ".($i + 1)."]\n".mb_substr($text, 0, 2000)."\n";
+        }
+
+        return $out.'Опирайся ТОЛЬКО на эти фрагменты материалов курса и цитируй их при необходимости: '.$ctx;
+    }
+
+    /**
+     * Записать одно SSE-событие (`event:` + `data:` + пустая строка).
+     *
+     * Возвращает false, если клиент уже отключился (abort на unmount
+     * урока — blueprint §3.3): вызывающий код обязан прекратить стрим.
+     */
+    private function sseEvent(string $event, array $payload): bool
+    {
+        return $this->sseWrite("event: {$event}\ndata: ".json_encode($payload, JSON_UNESCAPED_UNICODE)."\n\n");
+    }
+
+    /** Кадр данных SSE без имени события — клиент трактует как default «message». */
+    private function sseData(array $payload): bool
+    {
+        return $this->sseWrite('data: '.json_encode($payload, JSON_UNESCAPED_UNICODE)."\n\n");
+    }
+
+    private function sseWrite(string $frame): bool
+    {
+        if (ob_get_level() > 0) {
+            ob_flush();
+        }
+
+        flush();
+
+        // connection_aborted() не срабатывает при fastcgi_finish_request
+        // окружении PHP-FPM, но echo после disconnect в итоге падает —
+        // молча гасим и прекращаем подачу.
+        $written = @echo $frame;
+
+        return $written !== false;
+    }
+
+    /** Экранирование строки для вставки в SQL-литерал similarity(). */
+    private function pgQuote(string $s): string
+    {
+        return str_replace("'", "''", $s);
     }
 
     /**
