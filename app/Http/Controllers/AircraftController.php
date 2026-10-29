@@ -152,11 +152,17 @@ class AircraftController extends Controller
   }
 
   /**
-   * GET /api/classesfsmeta — JSON-конверт со сводкой по папкам-классам.
+   * GET /api/classesfsmeta — сводка по папкам-классам для карточек
+   * страницы /classes.
+   *
+   * Ответ проходит через middleware ApiResponseEnvelope, поэтому здесь
+   * возвращается «голые» данные: конверт { success, data, error, meta }
+   * формирует middleware, у базового Controller нет метода
+   * successResponse().
    */
-  public function showclassesfsmeta()
+  public function showclassesfsmeta(): array
   {
-    return $this->successResponse($this->classesFsDetail());
+    return $this->classesFsDetail();
   }
 
   /**
