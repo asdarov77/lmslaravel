@@ -63,10 +63,11 @@ npx playwright test tests/E2E/visual-regression.spec.js                       # 
 
 ## Найденные дефекты и предложенные фиксы (см. комментарии в тестах)
 
-1. **CourseContentController::show** не проверяет `type === TYPE_MATERIAL`
-   (в отличие от `/view`). Раздел (type 2) с проставленной ссылкой отдаётся как
-   материал. Фикс: добавить `->where('type', CoursePlayerService::TYPE_MATERIAL)`
-   в запрос узла либо abort(422). Тест помечен `@defect`.
+1. **CourseContentController::show** не проверял `type === TYPE_MATERIAL`
+   (в отличие от `/view`). Раздел (type 2) с проставленной ссылкой отдавался как
+   материал. ✅ ИСПРАВЛЕНО: в show() добавлен `->where('type',
+   CoursePlayerService::TYPE_MATERIAL)`; регрессия — пара тестов в
+   CourseContentSecurityTest (раздел→404, материал→200).
 2. **CoursePlayerController** не гейтился `CourseAccess` (в отличие от
    content/raw-endpoint'ов): любой вошедший получал структуру чужого курса по id,
    а POST /progress и /view писали прогресс в ЛЮБОЙ курс (перебор id → чтение

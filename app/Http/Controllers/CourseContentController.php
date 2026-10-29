@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Aukstructure;
 use App\Models\Course;
+use App\Services\CoursePlayerService;
 use App\Support\ContentDelivery;
 use App\Support\CourseAccess;
 use App\Support\PrivateContent;
@@ -83,9 +84,16 @@ class CourseContentController extends Controller
      */
     public function show(Request $request, int $courseId, int $itemId)
     {
+        // Фикс дефекта №1 (docs/TESTING-ARCHITECTURE.md): endpoint не фильтровал
+        // type==3, в отличие от /view. Раздел (type 2) со случайно проставленной
+        // ссылкой отдавался как «материал» — ломал контракт плеера (is_material
+        // считается по type===3+link, CoursePlayerService:156) и позволял читать
+        // файлы, не предназначенные для кадра. Тест-регрессия:
+        // CourseContentSecurityTest::test_section_node_must_not_be_served_as_material.
         $item = Aukstructure::query()
             ->where('id', $itemId)
             ->where('course_id', $courseId)
+            ->where('type', CoursePlayerService::TYPE_MATERIAL)
             ->with('links')
             ->firstOrFail();
 
