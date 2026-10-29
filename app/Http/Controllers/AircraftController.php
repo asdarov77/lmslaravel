@@ -23,6 +23,10 @@ use Illuminate\Support\Str;
  * каталогов (GIFT, orig, app…). Импорт строит Aircraft, Course, Aukstructure,
  * Link, Category и pivot-таблицы из imsmanifest.xml В ОДНОЙ ТРАНЗАКЦИИ —
  * иначе половина импортированного самолёта осталась бы без модулей.
+ *
+ * Манифест может быть выгружен в двух вариантах схемы (SCORM 1.2 / 2004):
+ * категории лежат либо внутри <course>, либо прямыми детьми <manifest> —
+ * см. parsemanifest().
  */
 class AircraftController extends Controller
 {
@@ -288,7 +292,15 @@ class AircraftController extends Controller
   {
     // Битый/невалидный XML раньше приводил к ErrorException из
     // simplexml_load_string() и 500. Теперь это понятная ошибка уровня 422.
-    $xml = @simplexml_load_string($contents);
+    // LIBXML_NOWLOAD: манифесты ссылаются на XSD-схемы
+    // (xsi:schemaLocation="… imscp_v1p1.xsd …"), которые при импорте
+    // недоступны — не пытаемся их скачать. Предупреждения libxml глушим
+    // внутренним буфером, но настоящий сбой разбора ($xml === false)
+    // превращается в RuntimeException ниже.
+    $previous = libxml_use_internal_errors(true);
+    $xml = @simplexml_load_string($contents, 'SimpleXMLElement', LIBXML_NOWLOAD | LIBXML_COMPACT);
+    libxml_clear_errors();
+    libxml_use_internal_errors($previous);
 
     if ($xml === false) {
       throw new \RuntimeException("АУК «{$auk}»: не удалось разобрать imsmanifest.xml");
@@ -315,7 +327,10 @@ class AircraftController extends Controller
     //--------------------------------------конец заполнения ресурсов-------
 
     // заполнение категорий в БД
-    foreach ($xml->course->category as $key => $c) {
+    // <category> ищем по всему документу: в части манифестов они лежат
+    // внутри <course>, в других (SCORM 2004 3rd Edition) — прямыми детьми
+    // <manifest>. xpath одинаково находит оба варианта.
+    foreach ($xml->xpath('//category') ?: [] as $key => $c) {
       $attrs = $c->attributes();
 
       $name = trim((string) ($attrs['name'] ?? ''));
