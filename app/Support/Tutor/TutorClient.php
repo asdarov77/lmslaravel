@@ -150,6 +150,127 @@ class TutorClient
     }
 
     /**
+     * Стримная генерация ответа для чата-подсказчика (TutorDock).
+     *
+     * В отличие от generate() здесь нет format=json: чат отвечает
+     * обычным текстом, а токены отдаются вызывающему коду по мере
+     * поступления — NDJSON от Ollama транслируется в SSE на лету
+     * (docs/ai-tutor.md «План усиления», blueprint §3.3).
+     *
+     * think=false сохраняем и здесь: размышление съедает бюджет токенов
+     * ровно так же, как в пакетной генерации (см. п.1 шапки класса).
+     *
+     * Реализация — сырой curl, а не Laravel Http: потоковое чтение
+     * ответа возможно только через callback на чанк, а facade буферизует
+     * тело целиком. Класс не final: тесты подменяют его в контейнере
+     * (FakeTutorClient переопределяет этот метод без сети).
+     *
+     * @param  array<int,array{role:string,content:string}>  $messages
+     * @param  callable(string):void  $onToken  вызывается на каждый фрагмент текста
+     *
+     * @throws TutorUnavailableException движок недоступен или закрылся до done
+     */
+    public function streamGenerate(array $messages, callable $onToken, int $maxTokens = 500): void
+    {
+        if (! $this->enabled()) {
+            throw new TutorUnavailableException('Тренажёр выключен (TUTOR_ENABLED=false)');
+        }
+
+        $payload = [
+            'model' => $this->model(),
+            'stream' => true,
+            'messages' => $messages,
+            'options' => [
+                'temperature' => (float) config('tutor.temperature', 0.4),
+                'num_predict' => $maxTokens,
+                'num_ctx' => (int) config('tutor.num_ctx', 8192),
+                'repeat_penalty' => (float) config('tutor.repeat_penalty', 1.05),
+            ],
+        ];
+
+        if (config('tutor.disable_thinking', true)) {
+            $payload['think'] = false;
+        }
+
+        $buffer = '';
+        $done = false;
+        $error = null;
+
+        $ch = curl_init((string) config('tutor.url').'/api/chat');
+
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/x-ndjson'],
+            CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            CURLOPT_TIMEOUT => (int) config('tutor.timeout', 180),
+            CURLOPT_CONNECTTIMEOUT => 10,
+            // Ответ читается кусками: каждый чанк дописывается в буфер,
+            // из него извлекаются полные строки NDJSON (терминал \n).
+            CURLOPT_WRITEFUNCTION => function ($ch, $chunk) use (&$buffer, &$done, &$error, $onToken) {
+                $buffer .= $chunk;
+
+                while (($pos = strpos($buffer, "\n")) !== false) {
+                    $line = trim(substr($buffer, 0, $pos));
+                    $buffer = substr($buffer, $pos + 1);
+
+                    if ($line === '') {
+                        continue;
+                    }
+
+                    $event = json_decode($line, true);
+
+                    if (! is_array($event)) {
+                        continue;
+                    }
+
+                    if (! empty($event['error'])) {
+                        $error = (string) $event['error'];
+
+                        return strlen($chunk);
+                    }
+
+                    $content = $event['message']['content'] ?? '';
+
+                    if ($content !== '') {
+                        $onToken((string) $content);
+                    }
+
+                    if (! empty($event['done'])) {
+                        $done = true;
+                    }
+                }
+
+                return strlen($chunk);
+            },
+        ]);
+
+        curl_exec($ch);
+        $curlErr = curl_error($ch);
+        curl_close($ch);
+
+        // Хвост без завершающего перевода строки — тоже событие.
+        $tail = trim($buffer);
+
+        if ($tail !== '' && ! $done) {
+            $event = json_decode($tail, true);
+
+            if (is_array($event) && ! empty($event['message']['content'])) {
+                $onToken((string) $event['message']['content']);
+            }
+        }
+
+        if ($error !== null) {
+            throw new TutorUnavailableException('Нейродвижок ответил ошибкой: '.$error);
+        }
+
+        if (! $done) {
+            throw new TutorUnavailableException(
+                'Поток нейродвижка закрылся до сигнала done'.($curlErr !== '' ? ': '.$curlErr : '')
+            );
+        }
+    }
+
+    /**
      * Эмбеддинги.
      *
      * Необязательны: используются только если модель эмбеддингов реально
