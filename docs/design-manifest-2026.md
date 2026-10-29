@@ -220,3 +220,21 @@ lock_reason: «Откроется 12 нояб. после модуля 2»), ove
 | M4 | DnD+Inspector в CourseWizard, drip-тайлы | blueprint §3.1 (нужен reorder-endpoint — design-redesign-plan «остаток требует бэкенда» п.1) |
 | M5 | Upload-states UI FileManager | services/chunkUpload.js |
 | M6 | Global reduced-motion + focus-ring audit | app.css |
+
+### 3.1 Статус M1 (обновление текущей итерации)
+
+Уже выложено из M1 (готово к подключению, ничего не ломает в legacy):
+
+| Артефакт | Что даёт |
+|---|---|
+| `resources/js/components/course/CourseTreeNodePremium.vue` | дерево со статусами done/current/locked/overdue (значок + sr-only, не только цвет), иконками типов контента, активным узлом-«пилюлей», roving tabindex + стрелки/Home/End |
+| `resources/js/components/player/InlineQuizRunner.vue` | тест «один вопрос на экран» внутри плеера; verdict наружу (оценка только сервером), клавиши 1–4, прогресс-полоса |
+| `resources/js/Pages/CoursePlayerPremium.vue` | композиция Плеера 2.0: cinema-mode, rail/tree, resume-hero, lock-card, фазы X-Accel, CTA-пилюля, mobile bottom-bar, TutorDock; computed-логика крошек/модульных статистик по контракту nodes+parent_id |
+| `resources/css/tokens.css` | кино-токены `--c-cinema-*` |
+| `locales/{ru,en}.json` | ключи `coursePlayer.*` (treeStatus, types, quiz, cinema…), `tutor.{open,hintNudge,hintPartial,hintFull,askAboutLesson,rateLimit}`, `gamification.streakAria`, `courseManifest.prevShort` |
+
+Осталось для закрытия M1 (следующая итерация):
+1. Тонкий роут-обёртка: смонтировать `CoursePlayerPremium` под флагом `ui.course_player_v2`
+   вместо/рядом с `Pages/CoursePlayer.vue` (props уже совпадают: courseId/nodes/lesson/status/errorKey/epoch/stats/resume).
+2. Серверные поля узлов `content_type/locked/lock_reason/due_at/duration_sec` (bootstrap endpoint) — до их появления premium-узел мягко деградирует до текущего контракта (visited/is_material).
+3. Wire SSE-дока TutorDock к `api/tutor.api.js` (M3) и submit теста к exam-эндпоинту (колбэк-контракт `quiz-submit` уже заложен).
