@@ -17,7 +17,7 @@
  */
 import { computed, ref, unref, watch } from 'vue'
 import $api from '../api/httpClient'
-import { unwrapArray } from '../api/envelope'
+import { unwrapArray, unwrapField } from '../api/envelope'
 
 // Типы АУК: 3 = материал (CoursePlayerService::TYPE_MATERIAL), 4 = тест.
 // 1/2 трактуются как группы conservatively: неизвестный тип не материал.
@@ -26,12 +26,17 @@ const TYPE_TEST = 4
 export function usePremiumPlayer(courseIdRef, nodesRef) {
   const exams = ref([])
   const streak = ref(0)
+  // Ключ последней загрузки экзаменов ("course:count") — защита от повторных
+  // запросов между синхронным стартом в setup и watch-ревалидацией.
+  let lastExamFetchKey = null
 
-  // itemId → exam (present() отдаёт module_id = aukstructure_id).
+  // itemId → exam (present() отдаёт module_id = aukstructure_id; null у
+  // экзаменов, назначенных через pivot exam_module — их не подвязываем
+  // вслепую: неверный exam_id хуже отсутствующего).
   const examByModule = computed(() => {
     const m = new Map()
     for (const e of exams.value) {
-      if (e?.module_id) m.set(Number(e.module_id), e)
+      if (e?.module_id != null) m.set(Number(e.module_id), e)
     }
     return m
   })
@@ -54,20 +59,34 @@ export function usePremiumPlayer(courseIdRef, nodesRef) {
     })
   })
 
-  let lastExamFetchKey = ''
+  // Загрузка списка экзаменов курса. Вызывается синхронно из setup И из
+  // watch'а для ревалидации — см. комментарий у watch.
+  async function refreshExams(courseId) {
+    try {
+      const all = unwrapArray(await $api.get('/api/my/exams'))
+      // курс может быть не указан у экзамена (общий по группе) — тогда не подвязываем
+      exams.value = all.filter((e) => Number(e.course_id) === Number(courseId))
+    } catch { /* экзаменов нет или сеть недоступна — quiz-узлы останутся без ссылки */ }
+  }
+
+  // Сигнал — примитивная СТРОКА "course:count": watch сравнивает её по
+  // значению. Массив-геттер создавал новый массив на каждый прогон и не
+  // ловил ни смены, ни повторы. Колбэк синхронный (void promise): async-
+  // колбэк без await стартовал бы загрузку ПОСЛЕ первого вычисления
+  // computed-графов, и premiumNodes до резолва жил бы с exam_id=null —
+  // гонка загрузки vs реактивности. Синхронный старт ниже гарантирует, что
+  // к моменту монтирования страницы promise уже в полёте; watch остаётся
+  // для ревалидации (сменился курс / пришло дерево большего размера).
   watch(
-    () => [unref(courseIdRef), (unref(nodesRef) || []).length].join(':'),
-    async ([courseId, count]) => {
-      if (lastExamFetchKey === `${courseId}:${count}`) return
-      lastExamFetchKey = `${courseId}:${count}`
-      try {
-        const all = unwrapArray(await $api.get('/api/my/exams'))
-        // курс может быть не указан у экзамена (общий по группе) — тогда не подвязываем
-        exams.value = all.filter((e) => Number(e.course_id) === Number(courseId))
-      } catch { /* экзаменов нет или сеть недоступна — quiz-узлы останутся без ссылки */ }
+    () => `${unref(courseIdRef)}:${(unref(nodesRef) || []).length}`,
+    (key) => {
+      if (lastExamFetchKey === key) return
+      lastExamFetchKey = key
+      void refreshExams(String(key).split(':')[0])
     },
-    { immediate: true },
   )
+  lastExamFetchKey = `${unref(courseIdRef)}:${(unref(nodesRef) || []).length}`
+  void refreshExams(unref(courseIdRef))
 
   let gamLoaded = false
   async function loadStreak() {
@@ -87,12 +106,13 @@ export function usePremiumPlayer(courseIdRef, nodesRef) {
   async function loadQuizSchema(examId) {
     if (examId == null) return null
     try {
-      // Контракт ExamController::questions — payload { exam, questions }
-      // (двойной конверт axios+envelope), а не голый массив: unwrapArray
-      // вернул бы [] и тест «исчез» бы без единой ошибки в консоли.
-      const body = (await $api.get(`/api/exams/${examId}/questions`))?.data ?? {}
-      const qs = Array.isArray(body) ? body : (body.questions ?? [])
-      const title = body.exam?.title ?? ''
+      // Единый разбор двойного конверта axios+envelope через examBundle
+      // (тот же путь, что у ExamRunner): свой парсер здесь уже однажды
+      // разошёлся с контрактом ExamController::questions — payload это
+      // { exam, questions }, а не голый массив, и unwrapArray вернул бы [].
+      const body = await $api.get(`/api/exams/${examId}/questions`)
+      const qs = unwrapArray({ data: unwrapField(body, 'questions') })
+      const title = unwrapField(body, 'exam')?.title ?? ''
       if (!qs.length) return null
       return {
         title,
