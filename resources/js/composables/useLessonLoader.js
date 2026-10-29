@@ -39,7 +39,7 @@ export function useLessonLoader({ courseId, api }) {
 
   let loadToken = 0
   let inflightAbort = null
-  let signed = null                      // { url, expiresAt } — только для video/pdf/file
+  let signed = null                      // { lessonId, url, mode, expiresAt } — только для video/pdf/file
 
   /** Отменить любую незавершённую загрузку (внешний вызов: unmount, logout). */
   function cancelInflight() {
@@ -67,6 +67,11 @@ export function useLessonLoader({ courseId, api }) {
       let model = lesson.value && lesson.value.id === lessonId && !force ? lesson.value : null
       if (!model) {
         model = await api.fetchLesson(unref(courseId), lessonId, { signal: controller.signal })
+      } else if (force) {
+        // force без сетевого перевыпуска detail (например, retry на уроке из
+        // docCache) не должен оставлять в памяти старый access — иначе
+        // локальный lock-флаг переживёт принудительную перезагрузку.
+        model = { ...model, access: { allowed: true } }
       }
       if (token !== loadToken) return // нас опередил более новый load()
 
@@ -109,8 +114,12 @@ export function useLessonLoader({ courseId, api }) {
         model = { ...model, delivery: { url: signed.url, mode: signed.mode } }
       }
 
-      if (token !== loadToken) return
+      // Память detail обновляем ДО финальной проверки токена: иначе
+      // проигравший гонку оставил бы lesson.value=id старого урока и
+      // следующий load(старый id) ошибочно пошёл бы в сеть за detail.
+      // Статусы/epoch — только победителем (bumpEpoch guard'ится сам).
       lesson.value = model
+      if (token !== loadToken) return
       status.value = 'ready'
       bumpEpoch(token)
 
@@ -143,11 +152,13 @@ export function useLessonLoader({ courseId, api }) {
   }
 
   let prefetchTimer = null
+  let prefetchAbort = null               // inflight-prefetch тоже умирает со scope
   function schedulePrefetch(nextId) {
     if (!nextId) return
     clearTimeout(prefetchTimer)
     prefetchTimer = setTimeout(() => {
-      api.prefetchLesson?.(unref(courseId), nextId)?.catch?.(() => {})
+      prefetchAbort = new AbortController()
+      api.prefetchLesson?.(unref(courseId), nextId, { signal: prefetchAbort.signal })?.catch?.(() => {})
     }, 1500)
   }
 
@@ -159,6 +170,8 @@ export function useLessonLoader({ courseId, api }) {
   onScopeDispose(() => {
     cancelInflight()
     clearTimeout(prefetchTimer)
+    // Таймер мог уже выстрелить до unmount — гасим и сам inflight-prefetch.
+    if (prefetchAbort) prefetchAbort.abort()
   })
 
   return {

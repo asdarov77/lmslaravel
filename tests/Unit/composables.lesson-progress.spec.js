@@ -133,33 +133,15 @@ it('pagehide flushes view event and re-saves resume', () => {
 })
 
 /*
- * ДЕФЕКТ Д-LP1 (закреплён как ожидаемое ИСПРАВЛЕННОЕ поведение).
- *
- * Фактический код unbindUnloadGuards():
- *     document.removeEventListener('visibilitychange', onPageHide)
- * но добавлялся АНОНИМНЫЙ listener, а не onPageHide → удаление no-op,
- * слушатель visibilitychange утекает навсегда и продолжает слать
- * POST /view даже после размонтирования компонента (двойной flush,
- * фантомные события от «мёртвого» плеера).
- *
- * Фикс (resources/js/composables/useLessonProgress.js):
- *     let onVisibility = null
- *     function bindUnloadGuards() {
- *       window.addEventListener('pagehide', onPageHide)
- *       onVisibility = () => { if (document.hidden) flushViewEvent() }
- *       document.addEventListener('visibilitychange', onVisibility)
- *     }
- *     function unbindUnloadGuards() {
- *       window.removeEventListener('pagehide', onPageHide)
- *       if (onVisibility) document.removeEventListener('visibilitychange', onVisibility)
- *       onVisibility = null
- *       stopTicking()
- *       flushViewEvent()
- *     }
- *
- * Тест помечен skip до применения фикса — включается вместе с ним.
+ * ДЕФЕКТ Д-LP1 — ИСПРАВЛЕН в resources/js/composables/useLessonProgress.js:
+ * bindUnloadGuards вешал анонимную стрелку, а unbind снимал её неверным
+ * слушателем (onPageHide) → removeEventListener был no-op, слушатель
+ * visibilitychange утекал навсегда и после размонтирования продолжал
+ * слать POST /view («фантомный двойной flush мёртвого плеера»).
+ * Фикс: именованный слушатель onVisibilityChange, симметричный bind/unbind.
+ * Тест включён (был it.skip до фикса).
  */
-it.skip('unbind removes visibilitychange listener (defect Д-LP1)', () => {
+it('unbind removes visibilitychange listener (defect Д-LP1 fixed)', () => {
   const lp = useLessonProgress(COURSE)
   lp.bindUnloadGuards()
   lp.openLesson(6)

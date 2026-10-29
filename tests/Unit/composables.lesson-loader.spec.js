@@ -58,14 +58,19 @@ function failWith(key, err) {
 function makeApi(overrides = {}) {
   pending = new Map()
   const calls = { fetchLesson: [], fetchLessonDocument: [], fetchSignedDelivery: [], prefetchLesson: [] }
+  const { nextId, ...rest } = overrides
   const api = {
-    fetchLesson: vi.fn(async (courseId, lessonId, { signal } = {}) => {
+    fetchLesson: vi.fn((courseId, lessonId, { signal } = {}) => {
+      // ВАЖНО: НЕ async-обёртка — вызов api должен быть синхронным до
+      // первого await внутри load(), иначе запись в calls уезжает в
+      // микрозадачу и test с fake-timers не видит её до scope.stop().
       calls.fetchLesson.push({ lessonId, signal })
       return deferred(`lesson:${lessonId}`, (r) => ({
         id: Number(lessonId),
         title: `Урок ${lessonId}`,
         content_type: 'html',
         access: { allowed: true },
+        ...(nextId != null ? { next_id: nextId } : {}),
         ...r,
       }))
     }),
@@ -80,7 +85,7 @@ function makeApi(overrides = {}) {
     prefetchLesson: vi.fn(async (courseId, lessonId) => {
       calls.prefetchLesson.push({ lessonId })
     }),
-    ...overrides,
+    ...rest,
   }
   return { api, calls }
 }
@@ -166,17 +171,29 @@ describe('useLessonLoader — контент по типу', () => {
     expect(calls.fetchLesson).toHaveLength(1)
     expect(calls.fetchLessonDocument).toHaveLength(1)
 
+    // Урок 2 — другой id: detail и документ идут в сеть заново.
+    // load НЕ await-им: settleAll разрешает промисы mock'а сам, иначе
+    // await load() повиснет (промис ещё не создан на момент await).
     loader.load(2); await flush(); await settleAll('lesson:'); await settleAll('doc:')
     await vi.waitFor(() => expect(loader.lesson.value.id).toBe(2))
-
-    // Возврат к уроку 1: detail из памяти (fetchLesson НЕ зовётся),
-    // документ мгновенно из docCache.
-    loader.load(1)
-    await vi.waitFor(() => expect(loader.lesson.value.id).toBe(1))
     expect(calls.fetchLesson).toHaveLength(2)
-    expect(calls.fetchLessonDocument).toHaveLength(2) // второй вызов — это урок 2
+    expect(calls.fetchLessonDocument).toHaveLength(2)
 
-    // force — сброс кэша, сеть снова.
+    // Промежуточный возврат к уроку 2 (он же «текущий» в lesson.value):
+    // ни detail, ни документ не запрашиваются вообще.
+    loader.load(2)
+    await flush()
+    expect(calls.fetchLesson).toHaveLength(2)
+    expect(calls.fetchLessonDocument).toHaveLength(2)
+
+    // Возврат к уроку 1: fetchLesson зовётся (в памяти сейчас урок 2),
+    // но документ приходит мгновенно из docCache — сети за контентом нет.
+    loader.load(1); await flush(); await settleAll('lesson:')
+    await vi.waitFor(() => expect(loader.lesson.value.id).toBe(1))
+    expect(calls.fetchLessonDocument).toHaveLength(2) // за doc-1 никто не ходил
+    expect(calls.fetchLesson).toHaveLength(3)      // detail 1-го урока был в сети
+
+    // force — принудительный перевыпуск документа из сети (обход docCache).
     loader.load(1, { force: true }); await flush(); await settleAll('lesson:'); await settleAll('doc:')
     await vi.waitFor(() => expect(calls.fetchLessonDocument).toHaveLength(3))
   })
@@ -277,14 +294,13 @@ describe('useLessonLoader — prefetch и утечки', () => {
 
   it('onScopeDispose: inflight-запрос отменён, prefetch-таймер снят', async () => {
     vi.useFakeTimers()
-    const { api, calls } = makeApi({
-      fetchLesson: async (c, id) => ({ id: Number(id), content_type: 'html', access: { allowed: true }, next_id: 2 }),
-      fetchLessonDocument: async (c, id) => `<html>doc-${id}</html>`,
-    })
+    // Синхронный deferred-mock (без async): вызов api.fetchLesson виден
+    // сразу после load(), без прокрутки микрозадач.
+    const { api, calls } = makeApi({ nextId: 2 })
     const loader = withScope({ courseId: COURSE, api })
 
     loader.load(1)
-    await vi.advanceTimersByTimeAsync(0)
+    expect(calls.fetchLesson).toHaveLength(1)
     const signal = calls.fetchLesson[0].signal
 
     scope.stop()
@@ -294,6 +310,28 @@ describe('useLessonLoader — prefetch и утечки', () => {
     // Если бы таймер не снялся, prefetch случился бы после unmount.
     await vi.advanceTimersByTimeAsync(5000)
     expect(calls.prefetchLesson).toHaveLength(0)
+    vi.useRealTimers()
+  })
+
+  it('onScopeDispose после выстрела prefetch-таймера: inflight-prefetch отменён', async () => {
+    vi.useFakeTimers()
+    let prefetchSignal = null
+    const { api } = makeApi({ nextId: 2 })
+    api.prefetchLesson = vi.fn((c, id, { signal } = {}) => {
+      prefetchSignal = signal
+      return new Promise(() => {}) // навечно inflight — проверка именно отмены
+    })
+    const loader = withScope({ courseId: COURSE, api })
+
+    loader.load(1)
+    await settleAll('lesson:')
+    await settleAll('doc:')
+    await vi.advanceTimersByTimeAsync(1500) // таймер выстрелил, prefetch в полёте
+    expect(prefetchSignal).toBeTruthy()
+
+    scope.stop()
+    scope = null
+    expect(prefetchSignal.aborted).toBe(true)
     vi.useRealTimers()
   })
 

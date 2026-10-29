@@ -18,13 +18,21 @@ vi.mock('vue', async (importOriginal) => {
 
 import { useContentFrame } from '../../resources/js/composables/useContentFrame'
 
-/** Минимальная подделка iframe-элемента с contentDocument. */
+/** Минимальная подделка iframe-элемента с contentDocument.
+ *  getElementById возвращает ОДИН и тот же объект для одного id — иначе
+ *  тест не сможет получить spy, который видил реальный код (стабильный
+ *  mock-узел вместо нового объекта на каждый вызов). */
 function fakeFrame(scrollHeight = 1500) {
   const body = { scrollHeight }
+  const nodesById = {}
   const doc = {
     body,
     querySelectorAll: () => [],
-    getElementById: (id) => (id === 'known' ? { scrollIntoView: vi.fn() } : null),
+    getElementById: (id) => {
+      if (id !== 'known') return null
+      if (!nodesById[id]) nodesById[id] = { scrollIntoView: vi.fn() }
+      return nodesById[id]
+    },
   }
   const win = { scrollTo: vi.fn() }
   const el = { src: '', contentDocument: doc, contentWindow: win }

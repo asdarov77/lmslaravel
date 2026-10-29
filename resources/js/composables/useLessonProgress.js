@@ -42,8 +42,7 @@ export function useLessonProgress(courseId) {
     flushViewEvent() // сначала досылаем данные по предыдущему уроку
     currentItemId = itemId
     currentAnchor = anchor
-    secondsViewed = 0
-    maxScrollPercent = 0
+    resetAccumulators()
 
     const resume = { last_item_id: itemId, last_anchor: anchor, updated_at: Date.now() }
     writeLocalResume(resume)
@@ -84,9 +83,17 @@ export function useLessonProgress(courseId) {
       secondsViewed,
       scrollPercent: maxScrollPercent,
     }
+    // Скролл-процент остаётся накопленным до конца урока (в openLesson),
+    // но при смене урока обнулять его ОБЯЗАТЕЛЬНО — иначе max-scroll
+    // предыдущего материала «протечёт» в первый view-ивент нового урока.
+    secondsViewed = 0
+    sendViewEvent(courseId, payload).catch(() => {})
+  }
+
+  /** Полный сброс накоплений — вызывается только при открытии нового урока. */
+  function resetAccumulators() {
     secondsViewed = 0
     maxScrollPercent = 0
-    sendViewEvent(courseId, payload).catch(() => {})
   }
 
   function onPageHide() {
@@ -100,16 +107,22 @@ export function useLessonProgress(courseId) {
     }
   }
 
+  // Именованный слушатель ОБЯЗАТЕЛЕН: анонимную стрелку в bind невозможно
+  // снять в unbind — removeEventListener('visibilitychange', onPageHide) с
+  // другим слушателем ничего не удаляет, и после unmount скрытие вкладки
+  // продолжало бы дёргать flushViewEvent на чужом стейте (утечка Д-LP1).
+  function onVisibilityChange() {
+    if (document.hidden) flushViewEvent()
+  }
+
   function bindUnloadGuards() {
     window.addEventListener('pagehide', onPageHide)
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) flushViewEvent()
-    })
+    document.addEventListener('visibilitychange', onVisibilityChange)
   }
 
   function unbindUnloadGuards() {
     window.removeEventListener('pagehide', onPageHide)
-    document.removeEventListener('visibilitychange', onPageHide)
+    document.removeEventListener('visibilitychange', onVisibilityChange)
     stopTicking()
     flushViewEvent()
   }
