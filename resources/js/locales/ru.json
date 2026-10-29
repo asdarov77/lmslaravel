@@ -416,6 +416,15 @@
     "heightFixed": "Фиксированная",
     "heightFixedHint": "Высота кадра, px"
   },
+  "coursePlayer": {
+    "loading": "Загрузка урока…",
+    "locked": "Доступ к этому уроку закрыт.",
+    "loginRequired": "Войдите, чтобы открыть этот урок.",
+    "loadError": "Не удалось загрузить урок.",
+    "selectLesson": "Выберите урок в дереве курса.",
+    "openFile": "Открыть файл",
+    "contentTypePending": "Этот тип контента пока недоступен."
+  },
   "coursePreview": {
     "label": "Предпросмотр",
     "titlePlaceholder": "Без названия",
