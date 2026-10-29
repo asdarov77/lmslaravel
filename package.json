@@ -37,6 +37,7 @@
         "vue3-datepicker": "^0.4.0",
         "vue3-highlightjs": "^1.0.5",
         "vue3-treeselect": "^0.1.10",
+        "vuedraggable": "^4.1.0",
         "vuetify": "^3.10",
         "vuex": "^4.1.0",
         "webfontloader": "^1.6.28"
