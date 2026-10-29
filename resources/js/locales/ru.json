@@ -414,7 +414,8 @@
     "heightFit": "По содержимому",
     "heightWindow": "Во экран",
     "heightFixed": "Фиксированная",
-    "heightFixedHint": "Высота кадра, px"
+    "heightFixedHint": "Высота кадра, px",
+    "prevShort": "Назад"
   },
   "coursePlayer": {
     "loading": "Загрузка урока…",
@@ -423,7 +424,45 @@
     "loadError": "Не удалось загрузить урок.",
     "selectLesson": "Выберите урок в дереве курса.",
     "openFile": "Открыть файл",
-    "contentTypePending": "Этот тип контента пока недоступен."
+    "contentTypePending": "Этот тип контента пока недоступен.",
+    "treeStatus": {
+      "done": "Пройдено",
+      "current": "Текущий урок",
+      "locked": "Недоступно",
+      "overdue": "Просрочено"
+    },
+    "types": {
+      "video": "Видео",
+      "article": "Статья",
+      "html": "Материал",
+      "pdf": "PDF-документ",
+      "file": "Файл",
+      "quiz": "Тест",
+      "ai_widget": "AI-практика"
+    },
+    "quizTitle": "Проверь себя",
+    "quizNext": "Далее",
+    "quizSubmit": "Заверить тест",
+    "quizTryAgain": "Не тот вариант — попробуй ещё раз",
+    "quizPassed": "Тест пройден!",
+    "xpStreak": "+{xp} XP · стрик {streak} дн.",
+    "search": "Поиск по курсу",
+    "searchPlaceholder": "Найти урок…",
+    "enterCinema": "Включить режим обучения",
+    "exitCinema": "Выйти из режима обучения",
+    "contents": "Содержание",
+    "itemsDone": "{done} из {total} пройдено",
+    "expandTree": "Развернуть панель содержания",
+    "collapseTree": "Свернуть панель содержания",
+    "loadingType": "Загружаем: {type}…",
+    "reservingAccess": "Открываем доступ к видео…",
+    "buffering": "Буферизация…",
+    "lockedTitle": "Урок пока закрыт",
+    "lockedDefault": "Этот материал откроется позже по расписанию курса.",
+    "goToPrevious": "Вернуться к предыдущему уроку",
+    "markComplete": "Отметить пройденным",
+    "completed": "Пройдено",
+    "continue": "Продолжить"
   },
   "coursePreview": {
     "label": "Предпросмотр",
@@ -1408,7 +1447,13 @@
       "wrong": "Неверно",
       "ungraded": "Без оценки"
     },
-    "engineState": "Состояние движка"
+    "engineState": "Состояние движка",
+    "open": "Открыть AI-тьютора",
+    "hintNudge": "Подсказка",
+    "hintPartial": "Часть решения",
+    "hintFull": "Разбор",
+    "askAboutLesson": "Спросить об этом уроке…",
+    "rateLimit": "Пауза: {s} c"
   },
   "account": {
     "anon": "Пользователь",
@@ -2104,7 +2149,8 @@
     "badgesTitle": "Достижения",
     "badgesHint": "Открытые достижения засчитываются автоматически по вашим данным",
     "badgeProgress": "{current} из {total}",
-    "loadFailed": "Не удалось загрузить достижения"
+    "loadFailed": "Не удалось загрузить достижения",
+    "streakAria": "Стрик: {days} дн. подряд"
   },
   "whiteLabel": {
     "pageTitle": "Бренд-панель",
