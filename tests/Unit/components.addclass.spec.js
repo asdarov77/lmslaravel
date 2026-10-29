@@ -152,13 +152,32 @@ describe('extractApiError: текст ошибки из ответа API', () =>
 // --------------------------------------------------- загрузка тегов
 
 describe('AddClass: загрузка списка классов', () => {
-  it('разворачивает конверт /api/classesfs в массив строк', async () => {
+  it('разворачивает конверт каталога классов в карточки', async () => {
+    http.get.mockImplementation((url) =>
+      Promise.resolve(url === '/api/classesfsmeta' ? envelope(['БПЛА', 'КЛЕН']) : envelope([]))
+    )
     const wrapper = mountPage()
     await tick()
 
-    expect(http.get).toHaveBeenCalledWith('/api/classesfs')
-    expect(wrapper.vm.tags).toEqual(['БПЛА', 'КЛЕН'])
-    expect(wrapper.vm.allTags).toEqual(['БПЛА', 'КЛЕН'])
+    // Регресс дизайна: список строится из /api/classesfsmeta (метаданные для
+    // карточек), а «голый» /api/classesfs остался как фолбэк.
+    expect(http.get).toHaveBeenCalledWith('/api/classesfsmeta')
+    expect(wrapper.vm.allTags.map((cls) => cls.name)).toEqual(['БПЛА', 'КЛЕН'])
+    // Строковые элементы нормализуются к форме карточки, а не падают.
+    expect(wrapper.vm.allTags[0]).toMatchObject({ name: 'БПЛА', auk_count: 0, imported: false })
+  })
+
+  it('при недоступном meta-эндпоинте откатывается на /api/classesfs', async () => {
+    http.get.mockImplementation((url) =>
+      url === '/api/classesfsmeta'
+        ? Promise.reject(serverError(500, 'нет meta'))
+        : Promise.resolve(envelope(['БПЛА', 'КЛЕН']))
+    )
+    const wrapper = mountPage()
+    await tick()
+
+    expect(wrapper.vm.allTags.map((cls) => cls.name)).toEqual(['БПЛА', 'КЛЕН'])
+    expect(wrapper.vm.errorMessageOnLoad).toBe('')
   })
 
   it('сетевая ошибка загрузки показывается понятным текстом, а не только в консоль', async () => {
@@ -166,7 +185,7 @@ describe('AddClass: загрузка списка классов', () => {
     const wrapper = mountPage()
     await tick()
 
-    expect(wrapper.vm.errorMessage).toBe('Не удалось загрузить список классов')
+    expect(wrapper.vm.errorMessageOnLoad).toMatch(/Не удалось загрузить/)
   })
 
   it('ошибка сервера при загрузке показывается текстом бэкенда', async () => {
@@ -174,7 +193,7 @@ describe('AddClass: загрузка списка классов', () => {
     const wrapper = mountPage()
     await tick()
 
-    expect(wrapper.vm.errorMessage).toBe('Диск контента недоступен')
+    expect(wrapper.vm.errorMessageOnLoad).toBe('Диск контента недоступен')
   })
 })
 
@@ -219,7 +238,7 @@ describe('AddClass: добавление класса', () => {
     expect(wrapper.vm.errorMessage).toMatch(/Выберите класс/)
   })
 
-  it('успешная отправка: строка, тег исчезает из списка, показан результат', async () => {
+  it('успешная отправка: строка, класс помечен импортированным, показан результат', async () => {
     http.post.mockResolvedValue(envelope({ id: 1, path: 'КЛЕН' }, { auk: ['01', '02'] }))
     const wrapper = mountPage()
     await tick()
@@ -234,7 +253,11 @@ describe('AddClass: добавление класса', () => {
     const [url, payload] = http.post.mock.calls[0]
     expect(url).toBe('/api/classes')
     expect(payload).toEqual({ title: 'Класс КЛЕН', path: 'КЛЕН' })
-    expect(wrapper.vm.tags).toEqual(['БПЛА'])
+    // Регресс дизайна: импортированный класс НЕ исчезает из каталога —
+    // карточка остаётся и меняет статус на «импортирован».
+    expect(wrapper.vm.allTags.map((cls) => cls.name)).toEqual(['БПЛА', 'КЛЕН'])
+    expect(wrapper.vm.allTags.find((cls) => cls.name === 'КЛЕН').imported).toBe(true)
+    expect(wrapper.vm.tags.find((cls) => cls.name === 'КЛЕН').imported).toBe(true)
     expect(wrapper.vm.successMessage).toMatch(/КЛЕН/)
     // Регресс: сводка импорта лежит в meta.auk. Раньше читался data.auks,
     // которого в data нет, и пользователю всегда показывалось «АУК: 0».
@@ -335,21 +358,25 @@ describe('AddClass: добавление класса', () => {
 // ---------------------------------------------------- очистка БД
 
 describe('AddClass: очистка базы данных', () => {
-  it('успех: сообщение и возврат полного списка тегов', async () => {
+  it('успех: сообщение и возврат полного списка классов', async () => {
     http.post.mockResolvedValue(envelope({ message: 'Database cleared successfully' }))
     const wrapper = mountPage()
     await tick()
 
-    // Сначала «импортировали» КЛЕН — тег пропал из списка
-    wrapper.vm.tags = ['БПЛА']
+    // Сначала «импортировали» КЛЕН — он помечен импортированным
+    wrapper.vm.markClassImported('КЛЕН')
+    expect(wrapper.vm.allTags.find((cls) => cls.name === 'КЛЕН').imported).toBe(true)
+
     await wrapper.vm.clearDatabase()
     await tick()
 
     expect(http.post).toHaveBeenCalledWith('/api/clear-database')
     expect(wrapper.vm.successMessage).toMatch(/очищена/i)
     expect(wrapper.vm.errorMessage).toBe('')
-    // Список перечитан с сервера и снова полный
-    expect(wrapper.vm.tags).toEqual(['БПЛА', 'КЛЕН'])
+    // Список перечитан с сервера: статусы сброшены.
+    expect(wrapper.vm.allTags.map((cls) => cls.name)).toEqual(['БПЛА', 'КЛЕН'])
+    expect(wrapper.vm.allTags.every((cls) => !cls.imported)).toBe(true)
+    expect(wrapper.vm.tags.every((cls) => !cls.imported)).toBe(true)
     expect(wrapper.vm.clearing).toBe(false)
   })
 
@@ -397,7 +424,7 @@ describe('AddClass: прочие регрессы', () => {
 
     wrapper.vm.path = 'кл'
     await tick()
-    expect(wrapper.vm.filteredTags).toEqual(['КЛЕН'])
+    expect(wrapper.vm.filteredTags.map((cls) => cls.name)).toEqual(['КЛЕН'])
 
     // Регресс: watcher писал в computed filteredTags, и Vue ругался
     // "computed property filteredTags is readonly". Проверяем, что
@@ -405,7 +432,7 @@ describe('AddClass: прочие регрессы', () => {
     expect(wrapper.vm.$options.watch).toBeUndefined()
     wrapper.vm.path = ''
     await tick()
-    expect(wrapper.vm.filteredTags).toEqual(['БПЛА', 'КЛЕН'])
+    expect(wrapper.vm.filteredTags.map((cls) => cls.name)).toEqual(['БПЛА', 'КЛЕН'])
   })
 
   it('кнопка «Отмена» возвращает назад', async () => {
