@@ -328,6 +328,14 @@ class AircraftController extends Controller
       $aircraftId = $aircraft->id;
 
       foreach ($auks as $item) {
+        // Диск 'private' корнем имеет РОДИТЕЛЯ courses_path (см.
+        // config/filesystems.php), поэтому пути к его файлам всегда
+        // строятся через PrivateContent::buildPath() — с префиксом
+        // 'private/'. Раньше здесь использовалась «сырая» склейка
+        // "$path/$item/imsmanifest.xml" без префикса: exists() смотрела в
+        // несуществующий <courses>/../<класс>/... и каждый АУК уходил в
+        // skipped — импорт завершался успешно, но курсов в БД не
+        // появлялось («нажимаю и ничего не происходит»).
         $manifestPath = PrivateContent::buildPath([$path, $item, 'imsmanifest.xml']);
 
         if ($manifestPath === null || ! Storage::disk('private')->exists($manifestPath)) {
@@ -336,7 +344,19 @@ class AircraftController extends Controller
         }
 
         $contents = Storage::disk('private')->get($manifestPath);
-        $this->parsemanifest($contents, $aircraftId, $item);
+
+        try {
+          $this->parsemanifest($contents, $aircraftId, $item);
+        } catch (\RuntimeException $e) {
+          // Битый манифест одного АУК не должен обрывать импорт всего
+          // класса: раньше RuntimeException выходил из замыкания,
+          // транзакция откатывалась целиком, а Laravel превращал его в
+          // 500 (в логах — пустой ответ и «ничего не произошло»).
+          // Теперь АУК помечается пропущенным с текстом ошибки.
+          $summary['skipped'][] = "{$path}/{$item}: {$e->getMessage()}";
+          continue;
+        }
+
         $summary['auk'][] = $item;
 
         // Вопросы лежат в папке GIFT внутри АУК.
