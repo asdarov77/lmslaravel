@@ -203,40 +203,50 @@ const routes = [
         //props: true // разрешение на передачу данных через router.parms
     },
     {
-        // просмотр материалов курса.
+        // Просмотр материалов курса (основной плеер v1).
         //
-        // content.manage — только для методиста (загрузка контента),
-        // обучаемому достаточно content.view. Раньше здесь стояли
-        // courses.manage + content.manage, поэтому обучаемый с
-        // courses.view и content.view получал 403 на своих же курсах.
+        // RBAC: обучаемому достаточно content.view — раньше здесь стояли
+        // courses.manage + content.manage, и обучаемый получал 403 на своих
+        // же курсах. Единственная точка входа для кнопок «Продолжить»
+        // (Courses/MyAccount/Dashboard) — маршрут объявлен ОДИН раз в
+        // начале списка routes: раньше он был продублирован ниже и второй
+        // экземпляр никогда не матчился (vue-router берёт первое совпадение),
+        // из-за чего юнит-тест R3 не находил courses.itemmani при выключенном
+        // флаге плеера v2. Дубль удалён.
         path: '/courses/itemmani',
         meta: { permission: ['content.view', 'content.manage'] },
-        // Плеер переписан на composables (useCoursePlayer/useContentFrame/
-        // useLessonProgress/useInDocumentSearch) — закрыты дефекты Д1–Д10.
-        // Legacy-версия CourseManifest.vue сохранена как аварийный откат.
         component: () => import('../Pages/CourseManifestNew.vue'),
-        // props: route => ({ idEdit: Number(route.params.idEdit)}),
         props: (route) => ({
             idEdit: toIntOrNull(route.query.idEdit),
             idCategory: toIntOrNull(route.query.idCategory),
         }),
         name: 'courses.itemmani',
-
     },
-    {
-        // Плеер v2 (S1, docs/course-player-blueprint.md) — РЕГИСТРИРУЕТСЯ
-        // ТОЛЬКО при включённом ui.course_player_v2 (REWORK R3).
-        // Тонкий роут-компонент: useCoursePlayer → useLessonLoader →
-        // LessonWorkspace; URL-as-truth (?item=), remount по epoch.
-        // Legacy /courses/itemmani выше не затронут — аварийный откат флага.
-        ...(coursePlayerV2Enabled() ? [{
+    ...(coursePlayerV2Enabled() ? [
+        {
+            // Плеер v2 (S1, docs/course-player-blueprint.md) — РЕГИСТРИРУЕТСЯ
+            // ТОЛЬКО при включённом ui.course_player_v2 (REWORK R3).
+            // Тонкий роут-компонент: useCoursePlayer → useLessonLoader →
+            // LessonWorkspace; URL-as-truth (?item=), remount по epoch.
             path: '/courses/:id/play',
             component: () => import('../Pages/CoursePlayer.vue'),
             name: 'courses.play',
             meta: { permission: ['content.view', 'content.manage'] },
             props: route => ({ id: Number(route.params.id) }),
-        }] : []),
-    },
+        },
+        {
+            // Плеер 2.0 (design-manifest §3, M1): premium-оболочка —
+            // cinema-mode, дерево со статусами/типами контента, стрик,
+            // InlineQuizRunner, TutorDock. Тот же загрузочный каркас
+            // (extends CoursePlayer.vue: URL-as-truth ?item=, race-guard,
+            // epoch-remount) + надстройки usePremiumPlayer.
+            path: '/courses/:id/premium',
+            component: () => import('../Pages/CoursePlayerPremiumPage.vue'),
+            name: 'courses.premium',
+            meta: { permission: ['content.view', 'content.manage'] },
+            props: route => ({ id: Number(route.params.id) }),
+        },
+    ] : []),
     {
         path: '/courses/desc/:idEdit',
         component: () => import('../Pages/CourseItem.vue'),

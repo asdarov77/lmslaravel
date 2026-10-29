@@ -233,8 +233,22 @@ lock_reason: «Откроется 12 нояб. после модуля 2»), ove
 | `resources/css/tokens.css` | кино-токены `--c-cinema-*` |
 | `locales/{ru,en}.json` | ключи `coursePlayer.*` (treeStatus, types, quiz, cinema…), `tutor.{open,hintNudge,hintPartial,hintFull,askAboutLesson,rateLimit}`, `gamification.streakAria`, `courseManifest.prevShort` |
 
-Осталось для закрытия M1 (следующая итерация):
-1. Тонкий роут-обёртка: смонтировать `CoursePlayerPremium` под флагом `ui.course_player_v2`
-   вместо/рядом с `Pages/CoursePlayer.vue` (props уже совпадают: courseId/nodes/lesson/status/errorKey/epoch/stats/resume).
-2. Серверные поля узлов `content_type/locked/lock_reason/due_at/duration_sec` (bootstrap endpoint) — до их появления premium-узел мягко деградирует до текущего контракта (visited/is_material).
-3. Wire SSE-дока TutorDock к `api/tutor.api.js` (M3) и submit теста к exam-эндпоинту (колбэк-контракт `quiz-submit` уже заложен).
+M1 закрыт (итерация 2026-10-29, commit «Fix routes.js…»):
+
+1. ✅ Роут-обёртка `Pages/CoursePlayerPremiumPage.vue` (extends CoursePlayer.vue,
+   route-name-aware syncUrl) и маршрут `courses.premium` (`/courses/:id/premium`)
+   зарегистрированы условным spread под тем же флагом `ui.course_player_v2`.
+   Попутно устранён реальный дефект `routes.js`: `courses.itemmani` был завёрнут
+   в объект-обёртку без `path` вместе с условным spread — vue-router такой
+   маршрут не матчит, а юнит-тесты R3 падали (2 fail → 0 fail; вся unit-сюита
+   806 passed / 1 skipped, `npm run check:sfc` и `vite build` зелёные).
+2. ⏳ Серверные поля узлов `content_type/locked/lock_reason/due_at/duration_sec`
+   (bootstrap endpoint) — до их появления premium-узел мягко деградирует до
+   текущего контракта (visited/is_material).
+3. ⏳ Wire SSE-дока TutorDock к `api/tutor.api.js` (M3) и submit теста к
+   exam-эндпоинту (колбэк-контракт `quiz-submit` уже заложен).
+
+Масштабирование на основную аудиторию (после M2–M3): кнопки «Продолжить» в
+`Courses.vue` / `TraineeDashboard.vue` / `LeftSideMenu.vue` переключаются на
+`{ name: 'courses.premium' }` вторым conditional-блоком под флагом — сейчас
+они ведут на проверенный `courses.itemmani`, чтобы rollout оставался обратимым.

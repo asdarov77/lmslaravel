@@ -75,7 +75,7 @@
         <v-text-field
           v-model="query" autofocus density="compact" variant="outlined"
           append-icon="mdi-close" :loading="searching" hide-details
-          :label="$t('courseManifest.searchPlaceholder')"
+          :label="$t('coursePlayer.searchPlaceholder')"
           @click:append="searchOpen = false"
         />
       </div>
@@ -237,7 +237,7 @@
                         <div class="text-h5 mt-4">{{ $t('coursePlayer.quizPassed') }}</div>
                         <div class="text-body-2 u-muted mt-1">{{ $t('coursePlayer.xpStreak', { xp: quizVerdictXp, streak: streak + 1 }) }}</div>
                         <v-btn class="mt-5" color="primary" rounded="pill" size="large" append-icon="mdi-arrow-right" @click="go(nextId)">
-                          {{ $t('coursePlayer.nextLesson') }}
+                          {{ $t('courseManifest.nextLesson') }}
                         </v-btn>
                       </div>
                     </v-overlay>
@@ -358,17 +358,20 @@
  * idle-timer контролов, фазы X-Accel видео. Загрузка урока НЕ дублируется здесь —
  * она остаётся за useCoursePlayer/useLessonLoader (URL-as-truth), как в Pages/CoursePlayer.vue.
  */
-import { contentFrameUrl } from '../api/player.api'
 import CourseTreeNodePremium from '../components/course/CourseTreeNodePremium.vue'
 import InlineQuizRunner from '../components/player/InlineQuizRunner.vue'
 import AppSkeleton from '../components/ui/AppSkeleton.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
+import LessonWorkspace from '../components/player/LessonWorkspace.vue'
 
 const FOCUSABLE_HINT = 'input, textarea, select, [contenteditable]'
 
 export default {
   name: 'CoursePlayerPremium',
-  components: { CourseTreeNodePremium, InlineQuizRunner, AppSkeleton, EmptyState },
+  // LessonWorkspace — рендерер html/article/pdf/file: подключается явно
+  // (строковый <component :is="'LessonWorkspace'"> без регистрации резолвится
+  // только через глобальный реестр и в dev падает warning'ом).
+  components: { CourseTreeNodePremium, InlineQuizRunner, AppSkeleton, EmptyState, LessonWorkspace },
   props: {
     courseId: { type: [Number, String], required: true },
     courseTitle: { type: String, default: '' },
@@ -433,7 +436,7 @@ export default {
       const inModule = this.nodes.filter((n) => n.is_material && this.moduleIdOf(n.id) === moduleId)
       return { done: inModule.filter((n) => n.completed || n.visited).length, total: inModule.length }
     },
-    workspaceComponent() { return 'LessonWorkspace' },
+    workspaceComponent() { return LessonWorkspace },
   },
   mounted() {
     window.addEventListener('keydown', this.onKeydown)
