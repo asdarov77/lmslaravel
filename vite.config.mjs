@@ -63,15 +63,31 @@ export default defineConfig({
     },
 
 
-    // build: {
-    //     rollupOptions: {
-    //       output: {
-    //         // заменить глобальные флаги функциональности на литералы boolean
-    //         inlineDynamicImports: true,
-    //         manualChunks: undefined
-    //       }
-    //     }
-    //   }
+    // P1 (аудит производительности): code splitting.
+    //
+    // Раньше весь app собирался в один entry-чанк: студент, открывающий
+    // плеер, скачивал админки (PermissionsManager, UserList), FullCalendar,
+    // JSZip и treeselect — первый байр бандла напрямую замедлял TTI плеера.
+    // Роуты уже ленивые (`import()` в Router/routes.js), поэтому задача
+    // сборки — вынести тяжёлые стабильные библиотеки в отдельные кэшируемые
+    // чанки: они меняются редко и переиспользуются между деплоями.
+    build: {
+        chunkSizeWarningLimit: 800,
+        rollupOptions: {
+            output: {
+                manualChunks(id) {
+                    if (!id.includes('node_modules')) return;
 
+                    if (id.includes('vuetify') || id.includes('@mdi')) return 'vendor-vuetify';
+                    if (id.includes('fullcalendar')) return 'vendor-fullcalendar';
+                    if (id.includes('vue-i18n') || id.includes('@intlify')) return 'vendor-i18n';
+                    if (id.includes('core-js') || id.includes('webfontloader')) return 'vendor-compat';
+                    if (/[\\/]node_modules[\\/](vue|@vue|pinia|vuex)[\\/]/.test(id)) return 'vendor-vue';
+                    if (id.includes('axios') || id.includes('lodash')) return 'vendor-utils';
 
+                    return 'vendor-misc';
+                },
+            },
+        },
+    },
 });
