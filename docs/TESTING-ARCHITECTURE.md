@@ -79,7 +79,10 @@ npx playwright test tests/E2E/visual-regression.spec.js                       # 
 3. **useLessonProgress.unbindUnloadGuards** снимает не тот слушатель:
    `document.removeEventListener('visibilitychange', onPageHide)`, тогда как
    добавлялась анонимная стрелочная функция → утечка слушателя и «двойной»
-   flush после unmount. Фикс: сохранить обработчик в переменную модуля.
+   flush после unmount. ✅ ИСПРАВЛЕНО: обработчик visibilitychange вынесен в
+   именованную функцию onVisibilityChange, bind/unbind работают с одним и тем
+   же референсом; регрессия — юнит-тест composables.lesson-progress (unbind
+   снимает ровно те слушатели, что поставил bind).
 4. **ValidatePrivateContentSignature**: подпись из query принималась даже когда
    запрос идёт по path-формату `{expires}/{signature}/...` — смешение двух
    схем допускало replay старой query-подписи на новых путях и ложные 403 на
