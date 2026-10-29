@@ -7,6 +7,7 @@ use App\Models\Course;
 use App\Models\CourseMaterialView;
 use App\Models\CourseProgress;
 use App\Services\CoursePlayerService;
+use App\Support\CourseAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -57,6 +58,14 @@ class CoursePlayerController extends Controller
     public function show(Request $request, int $courseId)
     {
         $course = Course::findOrFail($courseId);
+
+        // Фикс дефекта №2 (docs/TESTING-ARCHITECTURE.md): endpoint отдавал
+        // структуру курса любому вошедшему по id — перебор подряд идущих
+        // id читал чужие курсы. Правило доступа то же, что у content/raw:
+        // запись на курс либо courses.manage/content.manage (CourseAccess).
+        // Порядок: 401 (нет авторизации) → 404 (нет курса) → 403 (не записан),
+        // сверено с CoursePlayerApiTest (guest→401, 999999→404, outsider→403).
+        CourseAccess::authorizeOpen($request->user() ?? Auth::user(), $course);
 
         return response()->json($this->players->payload($course, $this->userId($request)));
     }
