@@ -1453,7 +1453,9 @@
     "hintPartial": "Hint",
     "hintFull": "Explanation",
     "askAboutLesson": "Ask about this lesson…",
-    "rateLimit": "Cooldown: {s}s"
+    "rateLimit": "Cooldown: {s}s",
+    "truncated": "Answer truncated: length limit reached. Ask shorter, or continue with a follow-up.",
+    "stop": "Stop generation"
   },
   "account": {
     "anon": "User",
