@@ -138,12 +138,12 @@ class CoursePlayerApiTest extends TestCase
     }
 
     /**
-     * @defect №2 (см. docs/TESTING-ARCHITECTURE.md): player-endpoint не гейтится
-     * CourseAccess, в отличие от content/raw. Любой вошедший читает структуру
-     * чужого курса по id. Предлагаемый фикс — в show():
+     * Дефект №2 (ИСПРАВЛЕН, см. docs/TESTING-ARCHITECTURE.md): player-endpoint
+     * не гейтился CourseAccess, в отличие от content/raw — любой вошедший читал
+     * структуру чужого курса по id (IDOR через перебор). Фикс в show():
      *   CourseAccess::authorizeOpen($request->user() ?? Auth::user(), $course);
-     * Тест закрепляет ЦЕЛЕВОЕ поведение и будет красным до фикса — так дефект
-     * виден в отчётах CI, а не живёт в вики.
+     * Этот тест — постоянная RBAC-регрессия: если гейт когда-нибудь снимут,
+     * CI упадёт именно здесь.
      */
     public function test_unenrolled_student_must_not_see_foreign_course_structure(): void
     {
@@ -304,10 +304,10 @@ class CoursePlayerApiTest extends TestCase
     }
 
     /**
-     * @defect №2 (продолжение): до фикса POST /progress писал resume-point в
-     * ЛЮБОЙ курс по id — перебор id позволял отравлять статистику чужих
-     * курсов. Фикс: CourseAccess::authorizeOpen() перед записью.
-     * Тест закрепляет ЦЕЛЕВОЕ поведение (403 и пустая БД).
+     * Дефект №2 (ИСПРАВЛЕН, продолжение): до фикса POST /progress писал
+     * resume-point в ЛЮБОЙ курс по id — перебор id позволял отравлять
+     * статистику чужих курсов. Фикс: CourseAccess::authorizeOpen() перед
+     * записью. Постоянная регрессия: 403 и пустая БД.
      */
     public function test_unenrolled_student_must_not_write_progress_to_foreign_course(): void
     {
@@ -510,10 +510,10 @@ class CoursePlayerApiTest extends TestCase
     }
 
     /**
-     * @defect №2 (продолжение): до фикса POST /view писал course_material_views
-     * в ЛЮБОЙ курс по id — накрутка «прошли» и порча агрегатов stats чужих
-     * курсов. Фикс: CourseAccess::authorizeOpen() перед записью; 403 обязан
-     * приходить ДО вставки строки.
+     * Дефект №2 (ИСПРАВЛЕН, продолжение): до фикса POST /view писал
+     * course_material_views в ЛЮБОЙ курс по id — накрутка «прошли» и порча
+     * агрегатов stats чужих курсов. Фикс: CourseAccess::authorizeOpen() перед
+     * записью; 403 обязан приходить ДО вставки строки. Постоянная регрессия.
      */
     public function test_unenrolled_student_must_not_write_view_events_to_foreign_course(): void
     {
