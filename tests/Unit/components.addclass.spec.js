@@ -281,8 +281,7 @@ describe('AddClass: добавление класса', () => {
 
     expect(http.post).toHaveBeenCalledWith(
       '/api/classes',
-      { title: 'БПЛА класс', path: 'БПЛА' },
-      expect.any(Object)
+      { title: 'БПЛА класс', path: 'БПЛА' }
     )
   })
 
