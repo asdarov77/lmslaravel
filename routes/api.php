@@ -469,6 +469,9 @@ Route::get('/course-player/{courseId}', [CourseController::class, 'player'])
 //-------------------- классы -----------------
 Route::get('/classes/', [AircraftController::class, 'indexclasses'])->middleware('auth:sanctum');
 Route::get('/classesfs/', [AircraftController::class, 'showclassesfs'])->middleware('auth:sanctum');
+// Сводка по папкам-классам (число АУК, наличие манифеста, размер, импортирован ли):
+// по ней страница /classes рисует карточки-галерею вместо голого combobox.
+Route::get('/classesfsmeta/', [AircraftController::class, 'showclassesfsmeta'])->middleware('auth:sanctum');
 // Опечатка в адресе (/classess) плюс отсутствующий метод showauks у
 // CourseController: маршрут был и давал 500. Список классов доступен
 // на GET /api/classes, содержимое папки — на GET /api/classesfs.
