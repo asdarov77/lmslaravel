@@ -19,6 +19,9 @@
 <template>
   <div class="cpp" :class="{ 'cpp--cinema': cinemaMode }">
 
+    <!-- live-region: смена урока озвучивается AT без визуального шума (§Манифест 1.4) -->
+    <span class="u-sr-only" role="status" aria-live="polite">{{ lessonAnnounce }}</span>
+
     <!-- ══════════ TOP BAR: 56px, progress встроен в нижнюю кромку («нет-фреймовая» строка) ══════════ -->
     <header class="cpp__bar" v-show="!cinemaMode || barPeek">
       <v-btn
@@ -133,7 +136,7 @@
 
         <!-- Рекурсивные узлы: тип контента → иконка, статус → значок + aria.
              byId строится из плоского списка (контракт nodes+parent_id). -->
-        <div class="cpp__tree-scroll" @keydown="onTreeNav">
+        <div v-bind="treeProps" @keydown="onTreeNav">
           <CourseTreeNodePremium
             v-for="node in rootNodes" :key="node.id"
             :node="node" :depth="0" :active-id="currentItemId"
@@ -437,6 +440,25 @@ export default {
       return { done: inModule.filter((n) => n.completed || n.visited).length, total: inModule.length }
     },
     workspaceComponent() { return LessonWorkspace },
+    /**
+     * ARIA-оболочка дерева: CourseTreeNodePremium отдаёт treeitem/group, но
+     * контейнер role="tree" был потерян — AT не объявлял структуру (регрессия
+     * Д10 против v2-CourseTree). data-test — точка входа e2e-спеков.
+     */
+    treeProps() {
+      return {
+        class: 'cpp__tree-scroll',
+        role: 'tree',
+        'aria-label': this.$t('courseManifest.contents'),
+        'data-test': 'premium-tree',
+      }
+    },
+    /** Озвучка смены урока для live-region (только победитель гонки, status=ready). */
+    lessonAnnounce() {
+      if (this.status !== 'ready' || !this.lesson) return ''
+      const done = this.lessonCompleted ? ` · ${this.$t('coursePlayer.completed')}` : ''
+      return `${this.lesson.title}${done}`
+    },
   },
   mounted() {
     window.addEventListener('keydown', this.onKeydown)

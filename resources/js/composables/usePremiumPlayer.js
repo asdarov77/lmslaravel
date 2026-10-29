@@ -87,9 +87,15 @@ export function usePremiumPlayer(courseIdRef, nodesRef) {
   async function loadQuizSchema(examId) {
     if (examId == null) return null
     try {
-      const qs = unwrapArray(await $api.get(`/api/exams/${examId}/questions`))
+      // Контракт ExamController::questions — payload { exam, questions }
+      // (двойной конверт axios+envelope), а не голый массив: unwrapArray
+      // вернул бы [] и тест «исчез» бы без единой ошибки в консоли.
+      const body = (await $api.get(`/api/exams/${examId}/questions`))?.data ?? {}
+      const qs = Array.isArray(body) ? body : (body.questions ?? [])
+      const title = body.exam?.title ?? ''
+      if (!qs.length) return null
       return {
-        title: '',
+        title,
         questions: qs.map((q) => ({
           text: q.question_text,
           options: (q.answers || []).map((a) => a.answer),
