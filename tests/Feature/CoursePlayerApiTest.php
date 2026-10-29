@@ -303,6 +303,54 @@ class CoursePlayerApiTest extends TestCase
         $this->assertSame(0, DB::table('course_progress')->count());
     }
 
+    /**
+     * @defect №2 (продолжение): до фикса POST /progress писал resume-point в
+     * ЛЮБОЙ курс по id — перебор id позволял отравлять статистику чужих
+     * курсов. Фикс: CourseAccess::authorizeOpen() перед записью.
+     * Тест закрепляет ЦЕЛЕВОЕ поведение (403 и пустая БД).
+     */
+    public function test_unenrolled_student_must_not_write_progress_to_foreign_course(): void
+    {
+        $course = $this->course('Чужой курс');
+        $item = $this->material($course);
+
+        $outsider = $this->asUser(['role' => 'Обучаемый', 'group_id' => null]);
+
+        $this->postJson("/api/course/{$course->id}/progress", ['last_item_id' => $item->id])
+            ->assertStatus(403);
+
+        $this->assertSame(0, DB::table('course_progress')->count(), '403 обязан приходить ДО записи в БД');
+    }
+
+    public function test_instructor_without_courses_manage_must_not_write_progress(): void
+    {
+        // Инструктор БЕЗ courses.manage/content.manage — не «manages»,
+        // и на курс не записан → 403 (то же правило, что у GET /player).
+        $course = $this->course();
+        $item = $this->material($course);
+
+        $instructor = User::factory()->create(['role' => 'Инструктор']);
+        $this->asExistingUser($instructor);
+
+        $this->postJson("/api/course/{$course->id}/progress", ['last_item_id' => $item->id])
+            ->assertStatus(403);
+        $this->assertSame(0, DB::table('course_progress')->count());
+    }
+
+    public function test_admin_can_write_progress_to_any_course(): void
+    {
+        // Позитивная половина RBAC-правила: manages() проходит authorizeOpen,
+        // иначе фикс сломал бы админские сценарии («тест на 403» без пары).
+        $course = $this->course();
+        $item = $this->material($course);
+
+        $this->admin();
+
+        $this->postJson("/api/course/{$course->id}/progress", ['last_item_id' => $item->id])
+            ->assertOk();
+        $this->assertSame(1, DB::table('course_progress')->count());
+    }
+
     /* ═══════════ EVENTUAL PROGRESS: POST /api/course/{id}/view ═══════════ */
 
     public function test_view_accumulates_seconds_across_events_and_completes_by_time(): void
@@ -459,5 +507,42 @@ class CoursePlayerApiTest extends TestCase
         $payload = $this->getJson("/api/course/{$course->id}/player")->assertOk()->json('data');
         $this->assertSame(0, $payload['stats']['materials_visited'], 'Прогресс u1 не должен протекать в u2');
         $this->assertNull($payload['resume']);
+    }
+
+    /**
+     * @defect №2 (продолжение): до фикса POST /view писал course_material_views
+     * в ЛЮБОЙ курс по id — накрутка «прошли» и порча агрегатов stats чужих
+     * курсов. Фикс: CourseAccess::authorizeOpen() перед записью; 403 обязан
+     * приходить ДО вставки строки.
+     */
+    public function test_unenrolled_student_must_not_write_view_events_to_foreign_course(): void
+    {
+        $course = $this->course('Чужой курс');
+        $item = $this->material($course);
+
+        $outsider = $this->asUser(['role' => 'Обучаемый', 'group_id' => null]);
+
+        $this->postJson("/api/course/{$course->id}/view", [
+            'aukstructure_id' => $item->id, 'seconds_viewed' => 60, 'scroll_percent' => 100,
+        ])->assertStatus(403);
+
+        $this->assertSame(0, DB::table('course_material_views')->count(), '403 обязан приходить ДО записи в БД');
+    }
+
+    public function test_admin_can_write_view_events_to_any_course(): void
+    {
+        // Позитивная половина RBAC-правила для /view (админ/модератор курса).
+        $course = $this->course();
+        $item = $this->material($course);
+
+        $this->admin();
+
+        $this->postJson("/api/course/{$course->id}/view", [
+            'aukstructure_id' => $item->id, 'seconds_viewed' => 20, 'scroll_percent' => 50,
+        ])->assertOk();
+
+        $row = DB::table('course_material_views')->where('aukstructure_id', $item->id)->first();
+        $this->assertNotNull($row);
+        $this->assertSame($course->id, (int) $row->course_id);
     }
 }
