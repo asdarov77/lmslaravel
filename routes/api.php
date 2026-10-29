@@ -657,6 +657,11 @@ Route::post('/grade-boundary', [GradeBoundaryController::class, 'store'])
 Route::prefix('v1/tutor')->middleware('auth:sanctum')->group(function () {
     Route::get('/health', [TutorController::class, 'health']);
 
+    // Чат-подсказчик в плеере (TutorDock, blueprint §3.3): SSE-стрим.
+    // throttle:chat — генерация дорогая (CPU-модель), без лимита док
+    // превращается в способ положить сервер повторными запросами.
+    Route::post('/chat', [TutorController::class, 'chat'])->middleware('throttle:chat');
+
     Route::get('/materials', [TutorController::class, 'materials']);
     Route::post('/sessions', [TutorController::class, 'startSession']);
 
