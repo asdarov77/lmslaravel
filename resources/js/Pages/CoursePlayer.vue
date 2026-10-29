@@ -159,6 +159,7 @@ export default {
       currentItemId,
       init,
       onSelect,
+      openItem,
       goBack: () => router.back(),
     }
   },
