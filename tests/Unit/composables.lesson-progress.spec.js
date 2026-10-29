@@ -98,6 +98,8 @@ it('auto-flushes accumulated view every 20 s', () => {
   // Повторный flush при нулевом накоплении — пустых запросов быть не должно.
   vi.advanceTimersByTime(20_000)
   expect(apiPost.mock.calls.filter(([k]) => k === 'view').length).toBe(1)
+
+  lp.unbindUnloadGuards() // stopTimers: иначе тикер доживает до следующего it()
 })
 
 it('reportScroll keeps only the maximum and clamps to 100', () => {

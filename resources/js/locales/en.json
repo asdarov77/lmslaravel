@@ -416,6 +416,15 @@
     "heightFixed": "Fixed",
     "heightFixedHint": "Frame height, px"
   },
+  "coursePlayer": {
+    "loading": "Loading lesson…",
+    "locked": "Access to this lesson is closed.",
+    "loginRequired": "Please log in to open this lesson.",
+    "loadError": "Failed to load the lesson.",
+    "selectLesson": "Select a lesson from the course tree.",
+    "openFile": "Open file",
+    "contentTypePending": "This content type is not available yet."
+  },
   "coursePreview": {
     "label": "Preview",
     "titlePlaceholder": "Untitled",
