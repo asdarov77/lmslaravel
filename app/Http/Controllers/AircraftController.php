@@ -123,7 +123,7 @@ class AircraftController extends Controller
         }
 
         // Оценка размера АУК: только файлы первого уровня. Полный
-        // рекурсивный обход на百-level каталогах контента не нужен.
+        // рекурсивный обход многогигабайтных каталогов контента не нужен.
         foreach (scandir($subPath) as $file) {
           $filePath = $subPath . '/' . $file;
 
