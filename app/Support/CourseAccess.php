@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Course;
 use App\Models\Group2learning;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -80,20 +81,90 @@ class CourseAccess
      * записана на курс целиком»). Массив — открыты только перечисленные
      * узлы и всё, что вложено в них. Пустой массив — не записан.
      *
-     * Почему это нужно. Запись группы может относиться не к курсу, а к
-     * отдельному материалу внутри него: в форме «Запись на курсы»
-     * отмечаются галочками конкретные узлы дерева, и каждый пишется
-     * своей строкой в group2learnings с parent_id. Такая запись —
-     * осмысленная вещь для курса с несколькими специальностями: пилоту
-     * отдают его блок, бортинженеру — свой. Но проверка доступа смотрела
-     * только course_id и category_id, поэтому запись на один материал
-     * открывала весь курс целиком, и галочки ничего не ограничивали.
-     *
-     * Отдельно про потомков: отметить можно и раздел, поэтому доступ
-     * распространяется на всё вложенное в отмеченный узел — иначе
-     * материал внутри раздела оказался бы недоступен.
+     * П1 (аудит): результат кэшируется на 5 минут. Это горячий путь:
+     * canOpenModule/authorizeOpenModule вызываются на каждый GET /content
+     * и на каждый /raw вложенного ресурса (десятки запросов на один
+     * скан-документ), а сам расчёт — 2-3 SQL-запроса плюс обход дерева.
+     * Ключ — (group_id, course_id): доступ определяется группой, а не
+     * пользователем, поэтому кэш общий для всей группы и греется одним
+     * студентом на всех. Инвалидация — слушатель CourseAccessCacheListener
+     * при записи/снятии группы с курса; TTL 5 мин — потолок устаревания
+     * при прямых правках в таблице в обход приложения.
      */
     public static function allowedModuleIds(?User $actor, Course $course): ?array
+    {
+        if ($actor === null || $actor->group_id === null) {
+            return [];
+        }
+
+        $cacheKey = self::moduleCacheKey((int) $actor->group_id, (int) $course->id);
+
+        // null («открыт весь курс») — валидное значение кэша, поэтому
+        // оборачиваем в sentinel-массив: Cache отдаёт null и для «нет в
+        // кэше», и для «кэширован null», различить их иначе нельзя.
+        $cached = Cache::get($cacheKey);
+        if ($cached !== null) {
+            return $cached['ids'];
+        }
+
+        $result = self::computeAllowedModuleIds($actor, $course);
+
+        Cache::put($cacheKey, ['ids' => $result], now()->addMinutes(self::CACHE_TTL_MINUTES));
+
+        return $result;
+    }
+
+    /** TTL кэша доступа к модулям, минуты. */
+    private const CACHE_TTL_MINUTES = 5;
+
+    /** Ключ кэша множества доступных модулей группы по курсу. */
+    public static function moduleCacheKey(int $groupId, int $courseId): string
+    {
+        return "courseaccess:modules:{$groupId}:{$courseId}";
+    }
+
+    /**
+     * Сбрасывает кэш доступа по курсу (для всех групп сразу).
+     *
+     * Вызывается из CourseAccessCacheListener при изменении записей
+     * group2learnings. Курсов немного, pattern-delete по Redis/файлам
+     * дешевле, чем хранить индекс ключей по курсу.
+     */
+    public static function forgetCourseCache(int $courseId): void
+    {
+        $store = Cache::getStore();
+
+        // Redis: удаляем по паттерну одним SCAN/DEL. File/other stores:
+        // illuminate-драйверы не поддерживают forgetPattern — полагаемся
+        // на короткий TTL (в тестах и на dev это допустимо).
+        if (method_exists($store, 'forgetPattern')) {
+            $store->forgetPattern("courseaccess:modules:*:{$courseId}");
+
+            return;
+        }
+
+        if ($store instanceof \Illuminate\Cache\RedisStore) {
+            $connection = $store->connection();
+            $prefix = $store->getPrefix();
+            $pattern = $prefix."courseaccess:modules:*:{$courseId}";
+
+            // scanAndDel доступен в illuminate redis connection начиная
+            // с Laravel 9; fallback на keys() для старых версий.
+            if (method_exists($connection, 'scanAndDel')) {
+                $connection->scanAndDel($pattern);
+
+                return;
+            }
+
+            foreach ($connection->keys($pattern) as $key) {
+                $connection->del($key);
+            }
+        }
+        // Иначе: ждём истечения TTL (см. docblock).
+    }
+
+    /** Собственно расчёт без кэша — перенесён из прежнего allowedModuleIds. */
+    private static function computeAllowedModuleIds(?User $actor, Course $course): ?array
     {
         if ($actor === null || $actor->group_id === null) {
             return [];

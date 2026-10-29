@@ -89,7 +89,7 @@ final class PrivateContentSigner
         $aircraft = PrivateContent::sanitizeSegment($aircraft) ?? '';
         $auk = PrivateContent::sanitizeSegment($auk) ?? '';
 
-        $expires = now()->addMinutes(self::TTL_MINUTES)->getTimestamp();
+        $expires = self::slotExpires();
         $signature = self::signature($aircraft, $auk, $expires);
 
         return sprintf('?expires=%d&signature=%s', $expires, $signature);
@@ -109,7 +109,7 @@ final class PrivateContentSigner
         $aircraft = PrivateContent::sanitizeSegment($aircraft) ?? '';
         $auk = PrivateContent::sanitizeSegment($auk) ?? '';
 
-        $expires = now()->addMinutes(self::TTL_MINUTES)->getTimestamp();
+        $expires = self::slotExpires();
         $signature = self::signature($aircraft, $auk, $expires);
 
         return sprintf('api/private/%s/%s/%d/%s/', rawurlencode($aircraft), rawurlencode($auk), $expires, $signature);
@@ -122,7 +122,14 @@ final class PrivateContentSigner
      */
     public static function isValid(string $aircraft, string $auk, int $expires, string $signature): bool
     {
-        if ($expires < now()->getTimestamp()) {
+        // П1 (аудит, слоты): подпись содержит границу слота, а не момент
+        // выдачи. URL, выданный в конце слота N, живёт до конца слота N+1 —
+        // одно окно grace нужно, чтобы «висячие» страницы, открытые перед
+        // границей слота, не получили 403 на середине просмотра.
+        $now = now()->getTimestamp();
+        $currentSlotEnd = self::slotExpires();
+
+        if ($expires < $now || $expires > $currentSlotEnd + self::SLOT_SECONDS) {
             return false;
         }
 

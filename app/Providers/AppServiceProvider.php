@@ -39,7 +39,12 @@ class AppServiceProvider extends ServiceProvider
     //       });
     // }
     public function boot()
-    {     
+    {
+        // П1 (аудит): инвалидация кэша доступа CourseAccess при изменении
+        // учебных записей. Без неё только что записанная группа получит 403
+        // до конца TTL, а снятая — сохранит доступ сверх положенного.
+        \App\Models\Group2learning::observe(\App\Observers\Group2learningObserver::class);
+
         // Storage::disk('local')->buildTemporaryUrlsUsing (function ($path, $expiration, $options) {
         //     return URL::temporarySignedRoute(
         //         'local.temp',
