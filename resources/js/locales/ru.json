@@ -897,7 +897,11 @@
     "aukUnit": "АУК",
     "manifestUnit": "Манифестов",
     "sizeUnit": "Размер",
-    "pickedBtn": "Выбрано"
+    "pickedBtn": "Выбрано",
+    "importBtn": "Импортировать",
+    "importRunningShort": "Импорт…",
+    "importRunning": "Идёт импорт класса «{path}»…",
+    "importRunningHint": "Читаем imsmanifest.xml каждого АУК и создаём курсы, структуру и категории. Не закрывайте страницу."
   },
   "questions": {
     "addAnswer": "Добавить ответ",

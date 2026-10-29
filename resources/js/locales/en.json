@@ -897,7 +897,11 @@
     "aukUnit": "AUKs",
     "manifestUnit": "Manifests",
     "sizeUnit": "Size",
-    "pickedBtn": "Selected"
+    "pickedBtn": "Selected",
+    "importBtn": "Import",
+    "importRunningShort": "Importing…",
+    "importRunning": "Importing class “{path}”…",
+    "importRunningHint": "Reading each AUK’s imsmanifest.xml and creating courses, structure and categories. Do not close the page."
   },
   "questions": {
     "addAnswer": "Add answer",
