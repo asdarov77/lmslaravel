@@ -882,7 +882,7 @@
     "badgeReady": "Ready to import",
     "aukCount": "AUKs: {count}",
     "manifestCount": "Manifests: {count}",
-    "chooseAria": "Choose class \u201c{name}\u201d for import",
+    "chooseAria": "Choose class “{name}” for import",
     "pickBtn": "Select",
     "emptyErrorTitle": "Failed to load the catalog",
     "emptyFilterTitle": "Nothing found",
@@ -893,7 +893,11 @@
     "clearData": "Clear data",
     "clearTitle": "Clear the database?",
     "clearText": "All courses, topics, questions and their links will be deleted. This cannot be undone.",
-    "clearConfirm": "Clear"
+    "clearConfirm": "Clear",
+    "aukUnit": "AUKs",
+    "manifestUnit": "Manifests",
+    "sizeUnit": "Size",
+    "pickedBtn": "Selected"
   },
   "questions": {
     "addAnswer": "Add answer",

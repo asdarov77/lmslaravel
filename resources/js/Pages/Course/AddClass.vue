@@ -40,11 +40,16 @@
     <div class="classes-layout">
       <!-- ------------------------------- форма ------------------------------ -->
       <section class="classes-form" aria-labelledby="classes-form-title">
-        <v-card class="u-card u-card--elevated" flat>
-          <v-card-title class="classes-card__title" id="classes-form-title">
-            <v-icon icon="mdi-import" start></v-icon>
-            {{ $t("classes.importTitle") }}
-          </v-card-title>
+        <v-card class="u-card u-card--elevated classes-form__card" flat>
+          <!-- Декоративная градиентная шапка формы: страница перестала быть
+               «серой коробкой» — появился визуальный якорь и цветовой ритм. -->
+          <div class="classes-form__banner" aria-hidden="true">
+            <span class="classes-form__banner-icon"><v-icon icon="mdi-airplane" size="20"></v-icon></span>
+            <div>
+              <div class="classes-form__banner-title" id="classes-form-title">{{ $t("classes.importTitle") }}</div>
+              <div class="classes-form__banner-sub">{{ $t("classes.subtitle") }}</div>
+            </div>
+          </div>
 
           <v-card-text>
             <p class="classes-form__hint">{{ $t("classes.importHint") }}</p>
@@ -220,7 +225,7 @@
             v-for="cls in visibleClasses"
             :key="cls.name"
             class="u-card classes-card"
-            :class="{ 'classes-card--imported': cls.imported, 'classes-card--empty': !cls.imported && cls.manifests === 0 }"
+            :class="{ 'classes-card--imported': cls.imported, 'classes-card--empty': !cls.imported && cls.manifests === 0, 'classes-card--selected': cls.selected }"
             hover
             flat
           >
@@ -232,12 +237,21 @@
                   <v-icon :icon="cls.imported ? 'mdi-airplane-landing' : 'mdi-airplane'" size="22"></v-icon>
                 </span>
                 <h3 class="classes-card__name" :title="cls.name">{{ cls.name }}</h3>
-                <span
-                  class="u-badge"
-                  :class="cls.imported ? 'u-badge--success' : cls.manifests === 0 ? 'u-badge--danger' : 'u-badge--warning'"
-                >
-                  {{ cls.imported ? $t('classes.badgeImported') : cls.manifests === 0 ? $t('classes.badgeNoManifest') : $t('classes.badgeReady') }}
-                </span>
+              </div>
+
+              <div class="classes-card__metrics">
+                <div class="classes-card__metric">
+                  <span class="classes-card__metric-value">{{ cls.auk_count }}</span>
+                  <span class="classes-card__metric-label">{{ $t('classes.aukUnit') }}</span>
+                </div>
+                <div class="classes-card__metric">
+                  <span class="classes-card__metric-value">{{ cls.manifests }}</span>
+                  <span class="classes-card__metric-label">{{ $t('classes.manifestUnit') }}</span>
+                </div>
+                <div class="classes-card__metric">
+                  <span class="classes-card__metric-value classes-card__metric-value--text">{{ formatSize(cls.size_bytes) }}</span>
+                  <span class="classes-card__metric-label">{{ $t('classes.sizeUnit') }}</span>
+                </div>
               </div>
 
               <ul class="classes-card__stats">
@@ -249,23 +263,27 @@
                   <v-icon icon="mdi-file-document-check-outline" size="16"></v-icon>
                   <span>{{ $t('classes.manifestCount', { count: cls.manifests }) }}</span>
                 </li>
-                <li>
-                  <v-icon icon="mdi-content-save" size="16"></v-icon>
-                  <span>{{ formatSize(cls.size_bytes) }}</span>
-                </li>
               </ul>
+
+              <span
+                class="classes-card__badge u-badge"
+                :class="cls.imported ? 'u-badge--success' : cls.manifests === 0 ? 'u-badge--danger' : 'u-badge--warning'"
+              >
+                {{ cls.imported ? $t('classes.badgeImported') : cls.manifests === 0 ? $t('classes.badgeNoManifest') : $t('classes.badgeReady') }}
+              </span>
             </v-card-text>
 
             <v-card-actions class="classes-card__actions">
               <v-btn
                 size="small"
-                variant="flat"
+                :variant="cls.selected ? 'flat' : 'tonal'"
+                :color="cls.selected ? 'primary' : undefined"
                 :disabled="loading || cls.imported"
-                prepend-icon="mdi-plus"
+                :prepend-icon="cls.selected ? 'mdi-check-circle' : 'mdi-plus'"
                 :aria-label="$t('classes.chooseAria', { name: cls.name })"
                 @click="pickClass(cls)"
               >
-                {{ $t("classes.pickBtn") }}
+                {{ cls.selected ? $t("classes.pickedBtn") : $t("classes.pickBtn") }}
               </v-btn>
             </v-card-actions>
           </v-card>
@@ -497,6 +515,7 @@ export default {
     /** Карточки галереи: поиск подстроке имени + фильтр статуса импорта. */
     visibleClasses() {
       const query = this.search.trim().toLowerCase();
+      const selectedName = toClassPath(this.path);
 
       return this.allTags.filter((cls) => {
         if (query !== "" && !cls.name.toLowerCase().includes(query)) {
@@ -512,7 +531,7 @@ export default {
         }
 
         return true;
-      });
+      }).map((cls) => ({ ...cls, selected: cls.name === selectedName }));
     },
 
     /** Счётчики для переключателя фильтров (по всему каталогу, не по выборке). */
@@ -788,6 +807,45 @@ export default {
   color: var(--c-text);
 }
 
+/* Градиентная шапка карточки формы — визуальный якорь страницы. */
+.classes-form__card {
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+
+.classes-form__banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-5) var(--sp-5);
+  background: linear-gradient(135deg, var(--c-primary), var(--c-primary-active));
+  color: #fff;
+}
+
+.classes-form__banner-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.classes-form__banner-title {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  line-height: 1.3;
+}
+
+.classes-form__banner-sub {
+  margin-top: 2px;
+  font-size: var(--fs-sm);
+  opacity: 0.85;
+}
+
 .classes-form__hint {
   margin: 0 0 var(--sp-4);
   font-size: var(--fs-sm);
@@ -879,11 +937,19 @@ export default {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  border-radius: var(--radius-lg);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .classes-card:hover {
   transform: translateY(-2px);
+  box-shadow: var(--shadow-3);
+}
+
+/* Выбранная карточка подсвечивается рамкой — сразу видно, какой класс уйдёт в импорт. */
+.classes-card--selected {
+  border-color: var(--c-primary);
+  box-shadow: var(--shadow-glow);
 }
 
 /* Акцентная полоса состояния: импортирован / готов / пустой каталог. */
@@ -909,6 +975,51 @@ export default {
   align-items: center;
   gap: var(--sp-2);
   margin-bottom: var(--sp-3);
+  padding-right: 84px; /* место для углового бейджа статуса */
+}
+
+/* Метрики карточки: крупные числа, как в KPI-плитках дизайн-системы. */
+.classes-card__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+
+.classes-card__metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--sp-2) var(--sp-1);
+  border-radius: var(--radius-md);
+  background: var(--c-surface-2);
+}
+
+.classes-card__metric-value {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold, 700);
+  line-height: 1.2;
+  color: var(--c-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.classes-card__metric-value--text {
+  font-size: var(--fs-base);
+}
+
+.classes-card__metric-label {
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--c-text-muted);
+}
+
+/* Бейдж статуса — в углу карточки, чтобы не спорить с названием. */
+.classes-card__badge {
+  position: absolute;
+  top: calc(var(--sp-4) + 6px);
+  right: var(--sp-4);
 }
 
 .classes-card__avatar {
