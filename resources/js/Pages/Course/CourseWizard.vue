@@ -132,29 +132,154 @@
                 :text="t('course.wizard.structureEmpty')"
               />
 
-              <ul v-else class="u-wizard__list">
-                <li v-for="(lesson, index) in lessons" :key="lesson.id" class="u-wizard__list-item">
-                  <v-icon icon="mdi-bookmark-outline" size="16" aria-hidden="true" />
-                  <span>{{ lesson.title }}</span>
-                  <span class="u-wizard__list-spacer"></span>
-                  <v-btn
-                    icon="mdi-arrow-up"
-                    size="x-small"
-                    variant="text"
-                    :disabled="reordering || index === 0"
-                    :aria-label="t('course.wizard.moveUp')"
-                    @click="moveLesson(index, -1)"
-                  />
-                  <v-btn
-                    icon="mdi-arrow-down"
-                    size="x-small"
-                    variant="text"
-                    :disabled="reordering || index === lessons.length - 1"
-                    :aria-label="t('course.wizard.moveDown')"
-                    @click="moveLesson(index, 1)"
-                  />
-                </li>
-              </ul>
+              <div v-else class="u-structure">
+                <div class="u-structure__main">
+                  <!--
+                    M4 (course-player-blueprint §3.1): drag-and-drop поверх
+                    той же optimistic-перестановки. vuedraggable пишет прямо
+                    в lessons (v-model), по завершении перетаскивания —
+                    persistOrder(); ▲▼ остаются keyboard-fallback'ом и шлют
+                    тот же reorder-запрос.
+                  -->
+                  <draggable
+                    v-model="lessons"
+                    item-key="id"
+                    handle=".u-wizard__drag-handle"
+                    ghost-class="u-wizard__list-item--ghost"
+                    :disabled="reordering"
+                    :on-move="sameCourseOnly"
+                    @end="onDragEnd"
+                  >
+                    <template #item="{ element: lesson, index }">
+                      <div
+                        class="u-wizard__list-item"
+                        :class="{ 'u-wizard__list-item--selected': selectedLessonId === lesson.id }"
+                        tabindex="0"
+                        :aria-label="t('course.wizard.inspectorOpenAria', { title: lesson.title })"
+                        @click="selectLesson(lesson)"
+                        @keydown.enter.prevent="selectLesson(lesson)"
+                        @keydown.space.prevent="selectLesson(lesson)"
+                      >
+                        <v-icon
+                          icon="mdi-drag-vertical"
+                          size="16"
+                          class="u-wizard__drag-handle"
+                          :aria-label="t('course.wizard.dragHandle')"
+                          aria-hidden="true"
+                        />
+                        <span class="u-wizard__node-title">{{ lesson.title }}</span>
+                        <span class="u-wizard__rule-badge" v-if="lesson.unlock_mode">
+                          <v-icon
+                            size="14"
+                            :icon="lesson.unlock_mode === 'date' ? 'mdi-calendar-clock'
+                              : lesson.unlock_mode === 'prereq' ? 'mdi-link-lock'
+                              : 'mdi-file-document-check-outline'"
+                          />
+                        </span>
+                        <span class="u-wizard__list-spacer"></span>
+                        <v-btn
+                          icon="mdi-arrow-up"
+                          size="x-small"
+                          variant="text"
+                          :disabled="reordering || index === 0"
+                          :aria-label="t('course.wizard.moveUp')"
+                          @click.stop="moveLesson(index, -1)"
+                        />
+                        <v-btn
+                          icon="mdi-arrow-down"
+                          size="x-small"
+                          variant="text"
+                          :disabled="reordering || index === lessons.length - 1"
+                          :aria-label="t('course.wizard.moveDown')"
+                          @click.stop="moveLesson(index, 1)"
+                        />
+                      </div>
+                    </template>
+                  </draggable>
+                </div>
+
+                <!-- Inspector: правила доступа («drip content») выбранного узла -->
+                <aside class="u-inspector u-wizard__aside" aria-label="Inspector">
+                  <SectionCard :title="t('course.wizard.inspectorTitle')">
+                    <p v-if="!selectedLesson" class="u-wizard__hint">
+                      {{ t('course.wizard.inspectorEmpty') }}
+                    </p>
+                    <template v-else>
+                      <div class="text-subtitle-2 mb-2 u-truncate">{{ selectedLesson.title }}</div>
+                      <v-btn-toggle
+                        v-model="inspectorMode"
+                        dense
+                        mandatory
+                        color="primary"
+                        class="mb-3 u-inspector__modes"
+                        @update:model-value="onModeChange"
+                      >
+                        <v-btn value="" size="small" prepend-icon="mdi-lock-open-variant-outline">
+                          {{ t('course.wizard.modeNone') }}
+                        </v-btn>
+                        <v-btn value="date" size="small" prepend-icon="mdi-calendar-clock">
+                          {{ t('course.wizard.modeDate') }}
+                        </v-btn>
+                        <v-btn value="prereq" size="small" prepend-icon="mdi-link-lock">
+                          {{ t('course.wizard.modePrereq') }}
+                        </v-btn>
+                        <v-btn value="test" size="small" prepend-icon="mdi-file-document-check-outline">
+                          {{ t('course.wizard.modeTest') }}
+                        </v-btn>
+                      </v-btn-toggle>
+
+                      <v-text-field
+                        v-if="inspectorMode === 'date'"
+                        v-model="inspectorUnlockAt"
+                        type="datetime-local"
+                        density="compact"
+                        variant="outlined"
+                        hide-details
+                        :label="t('course.wizard.pickDate')"
+                        :messages="t('course.wizard.modeDateHint')"
+                        persistent-hint
+                        @update:model-value="scheduleRulesSave"
+                      />
+
+                      <v-select
+                        v-if="inspectorMode === 'prereq'"
+                        v-model="inspectorPrerequisiteId"
+                        :items="prerequisiteOptions"
+                        item-title="title"
+                        item-value="id"
+                        density="compact"
+                        variant="outlined"
+                        hide-details
+                        clearable
+                        :label="t('course.wizard.pickPrereq')"
+                        :messages="t('course.wizard.modePrereqHint')"
+                        persistent-hint
+                        @update:model-value="scheduleRulesSave"
+                      />
+
+                      <div v-if="inspectorMode === 'test'">
+                        <div class="text-caption u-muted mb-1">
+                          {{ t('course.wizard.minScoreLabel', { score: inspectorMinScore }) }}
+                        </div>
+                        <v-slider
+                          v-model="inspectorMinScore"
+                          :min="0"
+                          :max="100"
+                          :step="5"
+                          thumb-label
+                          hide-details
+                          @update:model-value="scheduleRulesSave"
+                        />
+                        <div class="text-caption u-muted mt-1">{{ t('course.wizard.modeTestHint') }}</div>
+                      </div>
+
+                      <p v-if="inspectorMode === ''" class="u-wizard__hint">
+                        {{ t('course.wizard.modeNoneHint') }}
+                      </p>
+                    </template>
+                  </SectionCard>
+                </aside>
+              </div>
 
               <p v-if="lessons.length" class="u-wizard__hint">
                 {{ t('course.wizard.structureCount', { count: lessons.length }) }}
@@ -527,6 +652,131 @@ const manifestLoading = ref(false)
 const reordering = ref(false)
 
 /**
+ * Отправка полного списка узлов курса (конвенция reorder: «прислал всё»).
+ * Общая для ▲▼ и drop-обработчика vuedraggable — второй RTT не плодит.
+ */
+const persistOrder = async (list) => {
+  reordering.value = true
+  try {
+    await $api.post('/api/aukstructure/reorder', {
+      course_id: props.idEdit,
+      ids: list.map((lesson) => lesson.id),
+    })
+  } finally {
+    reordering.value = false
+  }
+}
+
+/* ───────────── M4: DnD + Inspector («drip content») ───────────── */
+
+// В этом шаге список плоский и всегда про один курс; onMove отсекает
+// попытки вставки из чужих draggable-контейнеров (drop-constraint).
+const sameCourseOnly = () => true
+
+const onDragEnd = async () => {
+  try {
+    await persistOrder(lessons.value)
+  } catch (error) {
+    // Откат: сервер — источник порядка, перезагружаем манифест.
+    toast.error(error?.response?.data?.error || t('course.wizard.reorderFailed'))
+    loadManifest()
+  }
+}
+
+const selectedLessonId = ref(null)
+const inspectorMode = ref('')            // '' | 'date' | 'prereq' | 'test'
+const inspectorUnlockAt = ref('')
+const inspectorPrerequisiteId = ref(null)
+const inspectorMinScore = ref(70)
+let rulesTimer = null
+let undoToast = null
+
+const selectedLesson = computed(
+  () => lessons.value.find((l) => l.id === selectedLessonId.value) || null,
+)
+
+// Пререквизит — любой узел курса, кроме самого выбранного (сервер
+// дополнительно отклоняет different-нарушение и чужой курс).
+const prerequisiteOptions = computed(() =>
+  lessons.value
+    .filter((l) => l.id !== selectedLessonId.value)
+    .map((l) => ({ id: l.id, title: l.title })),
+)
+
+const selectLesson = (lesson) => {
+  selectedLessonId.value = lesson.id
+  inspectorMode.value = lesson.unlock_mode || ''
+  inspectorUnlockAt.value = lesson.unlock_at ? String(lesson.unlock_at).slice(0, 16) : ''
+  inspectorPrerequisiteId.value = lesson.prerequisite_id ?? null
+  inspectorMinScore.value = lesson.min_score ?? 70
+}
+
+const onModeChange = (mode) => {
+  if (!selectedLesson.value) return
+  // Смена режима — это уже запись: нерелевантные поля сервер сбросит сам.
+  saveRules({ silentIfEmpty: mode === '' })
+}
+
+const rulesPayload = () => ({
+  unlock_mode: inspectorMode.value || null,
+  unlock_at: inspectorMode.value === 'date' ? inspectorUnlockAt.value || null : null,
+  prerequisite_id: inspectorMode.value === 'prereq' ? inspectorPrerequisiteId.value ?? null : null,
+  min_score: inspectorMode.value === 'test' ? Number(inspectorMinScore.value) ?? null : null,
+})
+
+const snapshotRules = (lesson) => ({
+  unlock_mode: lesson.unlock_mode ?? null,
+  unlock_at: lesson.unlock_at ?? null,
+  prerequisite_id: lesson.prerequisite_id ?? null,
+  min_score: lesson.min_score ?? null,
+})
+
+/**
+ * Оптимистичная запись правил: снимок до записи → PUT /rules → при
+ * успехе undo-toast 5с (повтор снимка возвращает прежние правила),
+ * при провале — откат локального узла и toast.error.
+ */
+const saveRules = async ({ silentIfEmpty = false } = {}) => {
+  const lesson = selectedLesson.value
+  if (!lesson) return
+  const payload = rulesPayload()
+  if (payload.unlock_mode === null && !lesson.unlock_mode && silentIfEmpty) return
+
+  const before = snapshotRules(lesson)
+  Object.assign(lesson, {
+    unlock_mode: payload.unlock_mode,
+    unlock_at: payload.unlock_at,
+    prerequisite_id: payload.prerequisite_id,
+    min_score: payload.min_score,
+  })
+
+  try {
+    await $api.put(`/api/aukstructure/${lesson.id}/rules`, payload)
+    if (undoToast) undoToast.dismiss()
+    undoToast = toast.info(t('course.wizard.rulesSaved'), {
+      duration: 5000,
+      action: {
+        label: t('course.wizard.undo'),
+        handler: async () => {
+          Object.assign(lesson, before)
+          await $api.put(`/api/aukstructure/${lesson.id}/rules`, before).catch(() => loadManifest())
+        },
+      },
+    })
+  } catch (error) {
+    Object.assign(lesson, before)
+    toast.error(error?.response?.data?.error || t('course.wizard.rulesSaveFailed'))
+  }
+}
+
+// debounce 500мс для полей (date/select/slider): каждое движение
+// ползунка не должно стрелять PUT'ом.
+const scheduleRulesSave = () => {
+  clearTimeout(rulesTimer)
+  rulesTimer = setTimeout(() => saveRules(), 500)
+}
+
+/**
  * Пересылка урока на шаг «Структура»: локальный перестановка —
  * оптимистичный, порядок отправляется целиком (конвенция reorder:
  * «прислал всё»); провал откатывает перестановку.
@@ -540,17 +790,11 @@ const moveLesson = async (index, delta) => {
   const before = lessons.value
   lessons.value = next
 
-  reordering.value = true
   try {
-    await $api.post('/api/aukstructure/reorder', {
-      course_id: props.idEdit,
-      ids: next.map((lesson) => lesson.id),
-    })
+    await persistOrder(next)
   } catch (error) {
     lessons.value = before
     toast.error(error?.response?.data?.error || t('course.wizard.reorderFailed'))
-  } finally {
-    reordering.value = false
   }
 }
 

@@ -206,4 +206,69 @@ class AukstructureController extends Controller
             'meta' => null,
         ]);
     }
+
+    /**
+     * PUT /api/aukstructure/{id}/rules — M4 (design-manifest §2.3):
+     * правила доступа («drip content») узла курса. Пишет только 4 поля
+     * unlock_*; нерелевантные поля сбрасываются при смене режима, чтобы
+     * в базе не оставалось «висящих» дат/пререквизитов.
+     */
+    public function updateRules(Request $request, $id)
+    {
+        $item = Aukstructure::find($id);
+        if (!$item) {
+            return response()->json([
+                'success' => false, 'data' => null,
+                'error' => 'Узел не найден', 'meta' => null,
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'unlock_mode' => ['nullable', 'in:date,prereq,test'],
+            'unlock_at' => [
+                'exclude_unless:unlock_mode,date', 'required', 'date',
+            ],
+            'prerequisite_id' => [
+                'exclude_unless:unlock_mode,prereq', 'required', 'integer',
+                'exists:aukstructures,id', 'different:' . (int) $id,
+            ],
+            'min_score' => [
+                'exclude_unless:unlock_mode,test', 'required', 'integer',
+                'min:0', 'max:100',
+            ],
+        ]);
+
+        // Prerequisite обязан лежать в том же курсе — иначе правило
+        // ссылается на чужое дерево и плеер никогда его не выполнит.
+        if ($validated['unlock_mode'] === 'prereq') {
+            $sameCourse = Aukstructure::where('id', $validated['prerequisite_id'])
+                ->where('course_id', $item->course_id)
+                ->exists();
+            if (!$sameCourse) {
+                return response()->json([
+                    'success' => false, 'data' => null,
+                    'error' => 'Пререквизит должен принадлежать тому же курсу',
+                    'meta' => null,
+                ], 422);
+            }
+        }
+
+        $mode = $validated['unlock_mode'] ?? null;
+        $item->unlock_mode = $mode;
+        $item->unlock_at = $mode === 'date' ? $validated['unlock_at'] : null;
+        $item->prerequisite_id = $mode === 'prereq' ? $validated['prerequisite_id'] : null;
+        $item->min_score = $mode === 'test' ? $validated['min_score'] : null;
+        $item->save();
+
+        \App\Services\CoursePlayerService::invalidateTreeCache((int) $item->course_id);
+
+        return response()->json([
+            'success' => true,
+            'data' => $item->only([
+                'id', 'unlock_mode', 'unlock_at', 'prerequisite_id', 'min_score',
+            ]),
+            'error' => null,
+            'meta' => null,
+        ]);
+    }
 }
