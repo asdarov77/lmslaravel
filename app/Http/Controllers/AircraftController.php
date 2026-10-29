@@ -50,30 +50,113 @@ class AircraftController extends Controller
    *
    * Раньше в результат попадали и файлы, и служебные папки: импортёр
    * принимал их за самолёты и создавал лишние записи в БД.
+   *
+   * Формат ответа — массив строк (имена папок): его читают v-for на
+   * фронте и тесты, поэтому расширять его объектами нельзя. Полезная
+   * мета (число АУК, наличие манифеста, размер) отдаётся отдельным
+   * эндпоинтом classesfsmeta(): страница /classes показывает по ней
+   * карточки-галерею, а не голый combobox «в пустоту».
    */
   public function showclassesfs()
   {
-    $courses_path = rtrim((string) Config::get('app.courses_path'), '/');
-    $classes = array();
+    return array_values(array_column($this->classesFsDetail(), 'name'));
+  }
 
-    if (is_dir($courses_path)) {
-      foreach (scandir($courses_path) as $item) {
-        if ($item === '.' || $item === '..' || str_starts_with($item, '.')) {
-          continue;
-        }
-        if (! is_dir($courses_path . '/' . $item)) {
-          continue;
-        }
-        if (in_array($item, self::SERVICE_DIRECTORIES, true)) {
-          continue;
-        }
-        $classes[] = $item;
-      }
+  /**
+   * Расширенная сводка по папкам-классам для карточек страницы /classes.
+   *
+   * Для каждой папки: name — имя (идентификатор импорта), auk_count —
+   * число потенциальных АУК (подкаталоги без служебных), manifests —
+   * сколько из них содержат imsmanifest.xml (импортируются), size_bytes —
+   * суммарный размер содержимого (для порядка карточек и подписи),
+   * imported — есть ли уже запись в aircrafts.
+   *
+   * Обход только на два уровня вглубь: полный обход боевого каталога
+   * (5+ ГБ, тысячи файлов) был бы слишком дорог для обычного GET.
+   */
+  public function classesFsDetail(): array
+  {
+    $courses_path = rtrim((string) Config::get('app.courses_path'), '/');
+    $detail = array();
+
+    if (! is_dir($courses_path)) {
+      return $detail;
     }
 
-    sort($classes);
+    $importedPaths = DB::table('aircrafts')->pluck('path')->flip()->all();
 
-    return array_values($classes);
+    foreach (scandir($courses_path) as $item) {
+      if ($item === '.' || $item === '..' || str_starts_with($item, '.')) {
+        continue;
+      }
+      if (! is_dir($courses_path . '/' . $item)) {
+        continue;
+      }
+      if (in_array($item, self::SERVICE_DIRECTORIES, true)) {
+        continue;
+      }
+
+      $aukCount = 0;
+      $withManifest = 0;
+      $sizeBytes = 0;
+
+      foreach (scandir($courses_path . '/' . $item) as $sub) {
+        if ($sub === '.' || $sub === '..' || str_starts_with($sub, '.')) {
+          continue;
+        }
+
+        $subPath = $courses_path . '/' . $item . '/' . $sub;
+
+        if (is_file($subPath)) {
+          $sizeBytes += (int) @filesize($subPath);
+          continue;
+        }
+
+        if (! is_dir($subPath) || in_array($sub, self::SERVICE_DIRECTORIES, true)) {
+          continue;
+        }
+
+        $aukCount++;
+
+        if (is_file($subPath . '/imsmanifest.xml')) {
+          $withManifest++;
+        }
+
+        // Оценка размера АУК: только файлы первого уровня. Полный
+        // рекурсивный обход на百-level каталогах контента не нужен.
+        foreach (scandir($subPath) as $file) {
+          $filePath = $subPath . '/' . $file;
+
+          if ($file === '.' || $file === '..' || ! is_file($filePath)) {
+            continue;
+          }
+
+          $sizeBytes += (int) @filesize($filePath);
+        }
+      }
+
+      $detail[] = [
+        'name' => $item,
+        'auk_count' => $aukCount,
+        'manifests' => $withManifest,
+        'size_bytes' => $sizeBytes,
+        'imported' => isset($importedPaths[$item]),
+      ];
+    }
+
+    usort($detail, static function (array $a, array $b): int {
+      return strcasecmp($a['name'], $b['name']);
+    });
+
+    return $detail;
+  }
+
+  /**
+   * GET /api/classesfsmeta — JSON-конверт со сводкой по папкам-классам.
+   */
+  public function showclassesfsmeta()
+  {
+    return $this->successResponse($this->classesFsDetail());
   }
 
   /**
