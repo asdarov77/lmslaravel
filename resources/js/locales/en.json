@@ -414,7 +414,8 @@
     "heightFit": "Fit content",
     "heightWindow": "Fit window",
     "heightFixed": "Fixed",
-    "heightFixedHint": "Frame height, px"
+    "heightFixedHint": "Frame height, px",
+    "prevShort": "Back"
   },
   "coursePlayer": {
     "loading": "Loading lesson…",
@@ -423,7 +424,45 @@
     "loadError": "Failed to load the lesson.",
     "selectLesson": "Select a lesson from the course tree.",
     "openFile": "Open file",
-    "contentTypePending": "This content type is not available yet."
+    "contentTypePending": "This content type is not available yet.",
+    "search": "Search the course",
+    "searchPlaceholder": "Find a lesson…",
+    "enterCinema": "Enter focus mode",
+    "exitCinema": "Exit focus mode",
+    "contents": "Contents",
+    "itemsDone": "{done} of {total} done",
+    "expandTree": "Expand contents panel",
+    "collapseTree": "Collapse contents panel",
+    "loadingType": "Loading: {type}…",
+    "reservingAccess": "Opening video access…",
+    "buffering": "Buffering…",
+    "lockedTitle": "This lesson is locked",
+    "lockedDefault": "This material unlocks later, per the course schedule.",
+    "goToPrevious": "Back to previous lesson",
+    "markComplete": "Mark as complete",
+    "completed": "Completed",
+    "continue": "Continue",
+    "quizTitle": "Check yourself",
+    "quizNext": "Next",
+    "quizSubmit": "Finish quiz",
+    "quizTryAgain": "Not quite — try again",
+    "quizPassed": "Quiz passed!",
+    "xpStreak": "+{xp} XP · {streak}-day streak",
+    "treeStatus": {
+      "done": "Done",
+      "current": "Current lesson",
+      "locked": "Locked",
+      "overdue": "Overdue"
+    },
+    "types": {
+      "video": "Video",
+      "article": "Article",
+      "html": "Material",
+      "pdf": "PDF document",
+      "file": "File",
+      "quiz": "Quiz",
+      "ai_widget": "AI practice"
+    }
   },
   "coursePreview": {
     "label": "Preview",
@@ -1408,7 +1447,13 @@
       "wrong": "Incorrect",
       "ungraded": "Not graded"
     },
-    "engineState": "Engine state"
+    "engineState": "Engine state",
+    "open": "Open AI tutor",
+    "hintNudge": "Nudge",
+    "hintPartial": "Hint",
+    "hintFull": "Explanation",
+    "askAboutLesson": "Ask about this lesson…",
+    "rateLimit": "Cooldown: {s}s"
   },
   "account": {
     "anon": "User",
@@ -2104,7 +2149,8 @@
     "badgesTitle": "Achievements",
     "badgesHint": "Achievements are granted automatically from your own data",
     "badgeProgress": "{current} of {total}",
-    "loadFailed": "Could not load achievements"
+    "loadFailed": "Could not load achievements",
+    "streakAria": "Streak: {days} days in a row"
   },
   "whiteLabel": {
     "pageTitle": "Brand panel",

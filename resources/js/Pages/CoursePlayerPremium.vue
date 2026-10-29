@@ -131,14 +131,16 @@
 
         <v-divider aria-hidden="true" />
 
-        <!-- Рекурсивные узлы: тип контента → иконка, статус → значок + aria -->
-        <div class="cpp__tree-scroll">
+        <!-- Рекурсивные узлы: тип контента → иконка, статус → значок + aria.
+             byId строится из плоского списка (контракт nodes+parent_id). -->
+        <div class="cpp__tree-scroll" @keydown="onTreeNav">
           <CourseTreeNodePremium
-            v-for="node in nodes" :key="node.id"
+            v-for="node in rootNodes" :key="node.id"
             :node="node" :depth="0" :active-id="currentItemId"
-            @select="select"
+            :by-id="byId" :tab-id="treeTabId" :cinema="cinemaMode"
+            @select="select" @set-tab="treeTabId = $event" @nav="focusTreeNode"
           />
-          <AppSkeleton v-if="loading" variant="text" :rows="8" class="pa-3" />
+          <AppSkeleton v-if="loading" variant="text" :count="8" class="pa-3" />
         </div>
       </v-navigation-drawer>
 
@@ -186,7 +188,7 @@
 
             <!-- Состояние: ошибка + retry (конвенция 4-состояний экрана) -->
             <div v-else-if="status === 'error'" class="cpp__state" role="alert">
-              <v-alert type="error" variant="tonal" rounded="lg" max-width="560">
+              <v-alert type="error" variant="tonal" rounded="lg" class="mx-auto" style="max-width: 560px">
                 <div>{{ $t(errorKey || 'coursePlayer.loadError') }}</div>
                 <v-btn size="small" variant="text" prepend-icon="mdi-refresh" class="mt-2" @click="$emit('retry')">
                   {{ $t('courseManifest.retry') }}
@@ -356,18 +358,21 @@
  * idle-timer контролов, фазы X-Accel видео. Загрузка урока НЕ дублируется здесь —
  * она остаётся за useCoursePlayer/useLessonLoader (URL-as-truth), как в Pages/CoursePlayer.vue.
  */
+import { contentFrameUrl } from '../api/player.api'
+import CourseTreeNodePremium from '../components/course/CourseTreeNodePremium.vue'
+import InlineQuizRunner from '../components/player/InlineQuizRunner.vue'
+import AppSkeleton from '../components/ui/AppSkeleton.vue'
+import EmptyState from '../components/ui/EmptyState.vue'
+
 const FOCUSABLE_HINT = 'input, textarea, select, [contenteditable]'
 
 export default {
   name: 'CoursePlayerPremium',
-  components: {
-    // Реальные импорты при интеграции: LessonWorkspace, InlineQuizRunner, AppSkeleton, EmptyState
-    CourseTreeNodePremium: () => import('../components/course/CourseTreeNodePremium.vue'),
-  },
+  components: { CourseTreeNodePremium, InlineQuizRunner, AppSkeleton, EmptyState },
   props: {
     courseId: { type: [Number, String], required: true },
     courseTitle: { type: String, default: '' },
-    nodes: { type: Array, default: () => [] },
+    nodes: { type: Array, default: () => [] },        // плоский список (source of truth)
     lesson: { type: Object, default: null },
     status: { type: String, default: 'idle' },
     errorKey: { type: String, default: null },
@@ -378,12 +383,14 @@ export default {
     prevId: { type: Number, default: null },
     nextId: { type: Number, default: null },
     loading: { type: Boolean, default: false },
+    resume: { type: Object, default: null },           // { last_item_id, last_anchor, percent }
   },
-  emits: ['retry', 'select', 'back', 'complete'],
+  emits: ['retry', 'select', 'back', 'complete', 'quiz-submit', 'tutor-ask'],
   data() {
     return {
       cinemaMode: false, railMode: false, treeOpen: true, barPeek: false,
       searchOpen: false, searching: false, query: '',
+      treeTabId: null,                                 // roving tabindex дерева (Д10)
       tutorOpen: false, tutorInput: '', tutorMessages: [], tutorContext: null,
       hintLevel: 'nudge', tutorStreaming: false, tutorUnread: 0, rateLimited: false, cooldown: 0,
       videoPhase: 'reserving', notes: [], completing: false, celebrate: false,
@@ -393,9 +400,39 @@ export default {
   computed: {
     isMobile() { return typeof window !== 'undefined' && window.innerWidth < 768 },
     lessonCompleted() { return this.lesson?.completed === true },
-    resumeCard() { /* из player.state.resume — см. CoursePlayer.vue init() */ return null },
-    activeModuleTitle() { /* parent-chain активного узла до level-0 */ return '' },
-    moduleStats() { return { done: 0, total: 0 } },
+    byId() { return new Map(this.nodes.map((n) => [n.id, n])) },
+    rootNodes() {
+      // Д4: корни = parent_id 0/null ИЛИ висящие на отсутствующем родителе (как в CourseTree.vue)
+      return this.nodes.filter((n) => {
+        const pid = n.parent_id ?? 0
+        return pid === 0 || !this.byId.has(pid)
+      })
+    },
+    resumeCard() {
+      if (!this.resume?.last_item_id) return null
+      const node = this.byId.get(Number(this.resume.last_item_id))
+      if (!node) return null
+      return { id: node.id, title: node.title, percent: this.resume.percent ?? 0 }
+    },
+    activeModuleTitle() {
+      // parent-chain активного узла до level-0 — заголовок модуля для хлебной крошки
+      let cur = this.byId.get(Number(this.currentItemId))
+      const guard = new Set()
+      while (cur) {
+        if (guard.has(cur.id)) break
+        guard.add(cur.id)
+        const pid = cur.parent_id ?? 0
+        if (pid === 0 || !this.byId.has(pid)) return cur.title
+        cur = this.byId.get(pid)
+      }
+      return ''
+    },
+    moduleStats() {
+      const moduleId = this.moduleIdOf(this.currentItemId)
+      if (moduleId == null) return { done: 0, total: 0 }
+      const inModule = this.nodes.filter((n) => n.is_material && this.moduleIdOf(n.id) === moduleId)
+      return { done: inModule.filter((n) => n.completed || n.visited).length, total: inModule.length }
+    },
     workspaceComponent() { return 'LessonWorkspace' },
   },
   mounted() {
@@ -433,10 +470,41 @@ export default {
     go(id) { this.$emit('select', id) },           // → router.push({query:{item}}) — URL-as-truth
     select(id) { this.$emit('select', id) },
     goBack() { this.$emit('back') },
+    /* ── roving focus дерева: родитель держит tabId, узел эмитит nav(id) ── */
+    focusTreeNode(id) {
+      this.$nextTick(() => {
+        const el = document.getElementById('ctnp-' + id)
+        if (el) el.focus()
+      })
+    },
+    onTreeNav(e) {
+      // Home/End на уровне контейнера — первый/последний корень (узлы обрабатывают свои стрелки)
+      if (e.key !== 'Home' && e.key !== 'End') return
+      const roots = this.rootNodes
+      if (!roots.length) return
+      const target = e.key === 'Home' ? roots[0] : roots[roots.length - 1]
+      e.preventDefault()
+      this.treeTabId = target.id
+      this.focusTreeNode(target.id)
+    },
+    /** level-0 предок узла (id модуля) — для moduleStats и крошек. */
+    moduleIdOf(id) {
+      let cur = this.byId.get(Number(id))
+      const guard = new Set()
+      while (cur) {
+        if (guard.has(cur.id)) break
+        guard.add(cur.id)
+        const pid = cur.parent_id ?? 0
+        if (pid === 0 || !this.byId.has(pid)) return cur.id
+        cur = this.byId.get(pid)
+      }
+      return null
+    },
     startIdleTimer() { this.idleTimer = setTimeout(() => { this.controlsIdle = true }, 3000) },
     resetIdleTimer() { if (this.cinemaMode) { this.controlsIdle = false; clearTimeout(this.idleTimer); this.startIdleTimer() } },
     skeletonFor(type) {
-      return { video: 'media', quiz: 'form', pdf: 'text', file: 'cards', article: 'text' }[type] || 'text'
+      // варианты AppSkeleton.vue: text | cards | form (медиа-скелетон = 'cards')
+      return { video: 'cards', quiz: 'form', pdf: 'text', file: 'cards', article: 'text' }[type] || 'text'
     },
     typeIcon(t) {
       return { video: 'mdi-play-circle-outline', article: 'mdi-text-long', pdf: 'mdi-file-pdf-box',
@@ -453,8 +521,17 @@ export default {
       this.completing = true
       try { this.$emit('complete', this.lesson?.id) } finally { this.completing = false }
     },
-    onQuizSubmit(verdict) {
-      // Перепроверка ТОЛЬКО сервером; клиентская галочка — не источник оценки.
+    /**
+     * verdict из InlineQuizRunner → родитель (route-page) отправляет ответы на сервер
+     * (exam.api / player endpoint) и возвращает результат колбэком; здесь только хореография:
+     * pass → celebrate-оверлей 2.6с → FLIP ✓ в дерево (Манифест §2.2).
+     */
+    onQuizSubmit(payload, serverVerdict = null) {
+      this.$emit('quiz-submit', payload, (verdict) => this.applyVerdict(verdict))
+      if (serverVerdict) this.applyVerdict(serverVerdict)
+    },
+    applyVerdict(verdict) {
+      if (!verdict) return
       this.quizVerdict = verdict.passed ? 'pass' : 'fail'
       this.quizVerdictXp = verdict.xp ?? 0
       if (verdict.passed) {
