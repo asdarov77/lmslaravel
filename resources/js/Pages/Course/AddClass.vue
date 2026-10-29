@@ -54,7 +54,7 @@
           <v-card-text>
             <p class="classes-form__hint">{{ $t("classes.importHint") }}</p>
 
-            <v-form ref="form" @submit.prevent="submitForm">
+            <v-form id="classes-form" ref="form" @submit.prevent="submitForm">
               <v-combobox
                 v-model="path"
                 :items="tags"
@@ -133,16 +133,29 @@
                 </span>
               </div>
 
-              <div>
+              <!--
+                Прогресс импорта. Раньше полоса была indeterminate и без
+                подписи — при длинном импорте казалось, что «ничего не
+                происходит». Теперь это статус-строка: фаза, процент и
+                детерминированная полоса. Процент считается по времени
+                операции (onUploadProgress тут бесполезен: тело запроса —
+                несколько байт, сервер считает progress только на скачивании).
+              -->
+              <div v-if="loading" class="classes-progress" role="status" aria-live="polite">
+                <div class="classes-progress__head">
+                  <span class="classes-progress__phase">
+                    <v-icon icon="mdi-loading mdi-spin" size="14" end></v-icon>
+                    {{ $t("classes.importRunning", { path: toClassPath(path) || "…" }) }}
+                  </span>
+                  <span class="classes-progress__pct">{{ importPct }}%</span>
+                </div>
                 <v-progress-linear
-                  v-if="loading"
-                  :value="progress"
-                  height="5"
-                  :indeterminate="true"
-                  :color="progressColor"
+                  :model-value="importPct"
+                  height="6"
+                  color="primary"
                   rounded
-                  class="mt-3"
                 ></v-progress-linear>
+                <p class="classes-progress__hint">{{ $t("classes.importRunningHint") }}</p>
               </div>
             </v-form>
           </v-card-text>
@@ -165,15 +178,34 @@
             >
               {{ $t("classes.clearData") }}
             </v-btn>
-            <ButtonGroup
-              class="mr-3"
-              v-if="!loading"
-              :busy="saving"
-              :submit-text="$t('common.save')"
-              :cancel-text="$t('common.cancel')"
-              @submit="uploadData"
-              @cancel="cancelBtnHead"
-            ></ButtonGroup>
+            <!--
+              КНОПКА «ИМПОРТИРОВАТЬ» всегда в DOM: раньше весь ButtonGroup
+              прятался через v-if="!loading", поэтому во время импорта
+              панель действий пустела, а :busy="saving" ссылался на
+              несуществующее поле — кнопка никогда не показывала состояние
+              загрузки. Теперь отдельная v-btn с native submit: обработчик
+              у v-form (@submit.prevent), Enter в полях работает.
+            -->
+            <v-btn
+              type="button"
+              variant="text"
+              :disabled="loading"
+              @click="cancelBtnHead"
+            >
+              {{ $t("common.cancel") }}
+            </v-btn>
+            <v-btn
+              type="submit"
+              form="classes-form"
+              color="primary"
+              variant="flat"
+              :loading="loading"
+              :disabled="!canSubmit && !loading"
+              :loading-text="$t('classes.importRunningShort')"
+              prepend-icon="mdi-cloud-upload-outline"
+            >
+              {{ $t("classes.importBtn") }}
+            </v-btn>
           </v-card-actions>
         </v-card>
       </section>
@@ -331,10 +363,10 @@
 
 <script>
 import { mapState, mapGetters } from "vuex";
-import ButtonGroup from "../../components/ButtonGroup.vue";
-import ConfirmDialog from "../../components/ui/ConfirmDialog.vue";
 import PageHeader from "../../components/ui/PageHeader.vue";
+import ConfirmDialog from "../../components/ui/ConfirmDialog.vue";
 import $api from "../../api/httpClient";
+import { toast } from "../../composables/useToast";
 import { unwrapArray, unwrapResponse } from "../../api/envelope";
 
 /**
@@ -461,7 +493,6 @@ export const extractApiError = (error, fallback = "Не удалось выпо�
 export default {
   name: "AddClass",
   components: {
-    ButtonGroup,
     ConfirmDialog,
     PageHeader,
   },
@@ -477,8 +508,10 @@ export default {
       // Диалог подтверждения очистки: без него кнопка стирала базу
       // одним кликом.
       confirmClear: false,
-      progress: 0,
-      progressColor: "blue",
+      // Процент полосы импорта (см. importPct): растёт по времени
+      // операции, т.к. реального прогресса сервер не отдаёт.
+      importElapsed: 0,
+      importTimer: null,
       errorMessage: "",
       successMessage: "",
       // --- галерея классов (/api/classesfsmeta) ---
@@ -558,10 +591,34 @@ export default {
     canSubmit() {
       return toClassPath(this.path) !== null && this.title.trim() !== "";
     },
+
+    /**
+     * Процент полосы импорта: асимптотика по времени операции.
+     *
+     * Реального прогресса у серверного импорта нет (это один POST, а
+     * onUploadProgress считает байты ТЕЛА запроса — там их десятки).
+     * Полоса плавно доходит до 90% за ~60 секунд и ждёт ответа; на
+     * завершении — 100%. Это честная индикация «процесс идёт», а не
+     * индикатор в пустоту.
+     */
+    importPct() {
+      if (!this.loading) {
+        return 0;
+      }
+
+      // Асимптота: pct = 90 * (1 - e^(-t/20с)), максимум 90 до ответа.
+      const pct = Math.round(90 * (1 - Math.exp(-this.importElapsed / 20)));
+
+      return Math.min(90, Math.max(3, pct));
+    },
   },
 
   async mounted() {
     await this.loadTags();
+  },
+
+  beforeUnmount() {
+    this.stopImportTimer();
   },
 
   methods: {
@@ -637,7 +694,7 @@ export default {
     },
 
     /**
-     * Основной обработчик кнопки «Сохранить» (ButtonGroup @submitForm).
+     * Основной обработчик кнопки «Импортировать» (submit формы).
      *
      * Раньше запрос уходил даже с пустыми полями и возвращал 422,
      * а submit формы (v-form @submit) делал вторую, ни о чём не
@@ -645,6 +702,12 @@ export default {
      * Теперь обе точки входа ведут в один метод с валидацией.
      */
     async uploadData() {
+      // Защита от двойного запуска: кнопка при loading скрыта, но Enter
+      // в полях мог вызвать второй submit параллельно с первым.
+      if (this.loading) {
+        return false;
+      }
+
       this.errorMessage = "";
       this.successMessage = "";
 
@@ -661,17 +724,10 @@ export default {
       }
 
       this.loading = true;
+      this.startImportTimer();
 
       try {
-        const response = await $api.post(
-          "/api/classes",
-          { title: this.title.trim(), path },
-          {
-            onUploadProgress: (progressEvent) => {
-              this.progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            },
-          }
-        );
+        const response = await $api.post("/api/classes", { title: this.title.trim(), path });
 
         const payload = unwrapResponse(response);
         // Сводка импорта лежит в meta (см. AircraftController::storeclasses):
@@ -690,22 +746,50 @@ export default {
         const parsed = Number.isFinite(Number(summary.gift_files_parsed))
           ? Number(summary.gift_files_parsed)
           : null;
+        // Пропущенные АУК (без imsmanifest.xml) раньше молча исчезали:
+        // теперь их видно в сообщении — иначе «импорт прошёл, а курсов нет».
+        const skipped = Array.isArray(summary.skipped) ? summary.skipped : [];
         // Импортированный класс остаётся в каталоге и в списке, но
         // помечается импортированным: карточка сама обновится по allTags.
         this.markClassImported(path);
         this.successMessage = parsed === null
           ? `Класс «${path}» импортирован. Загружено АУК: ${imported.length}.`
           : `Класс «${path}» импортирован. Загружено АУК: ${imported.length} (распознано документов: ${parsed}).`;
+        if (skipped.length > 0) {
+          this.successMessage += ` Пропущено без манифеста: ${skipped.join(", ")}.`;
+        }
+        if (imported.length === 0 && skipped.length === 0) {
+          this.successMessage += " В классе нет папок-АУК — ничего не импортировано.";
+        }
+        toast.success(this.successMessage);
         this.title = "";
         this.path = "";
         return true;
       } catch (error) {
         this.errorMessage = extractApiError(error);
+        toast.error(this.errorMessage);
         return false;
       } finally {
+        this.stopImportTimer();
         this.loading = false;
-        this.progress = 0;
       }
+    },
+
+    /** Полоса импорта тикает раз в секунду (см. computed importPct). */
+    startImportTimer() {
+      this.stopImportTimer();
+      this.importElapsed = 0;
+      this.importTimer = window.setInterval(() => {
+        this.importElapsed += 1;
+      }, 1000);
+    },
+
+    stopImportTimer() {
+      if (this.importTimer !== null) {
+        window.clearInterval(this.importTimer);
+        this.importTimer = null;
+      }
+      this.importElapsed = 0;
     },
 
     /**
@@ -855,6 +939,48 @@ export default {
 
 .classes-form__actions {
   padding: var(--sp-3) var(--sp-4);
+}
+
+/* ------------------------------ прогресс импорта ------------------------- */
+/* Статус-строка вместо «полосы в пустоту»: фаза, процент, подпись. */
+.classes-progress {
+  margin-top: var(--sp-3);
+  padding: var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface-alt, rgba(0, 0, 0, 0.02));
+}
+
+.classes-progress__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--c-text);
+}
+
+.classes-progress__phase {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.classes-progress__pct {
+  flex: none;
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--c-primary);
+}
+
+.classes-progress__hint {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-xs, 12px);
+  color: var(--c-text-secondary);
 }
 
 /* Панель выбранного класса: сводка прямо под полями формы. */

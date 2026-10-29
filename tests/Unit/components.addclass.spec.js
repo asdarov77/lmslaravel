@@ -351,7 +351,28 @@ describe('AddClass: добавление класса', () => {
     await wrapper.vm.uploadData()
 
     expect(wrapper.vm.loading).toBe(false)
-    expect(wrapper.vm.progress).toBe(0)
+    // Полоса импорта: таймер остановлен, счётчик времени обнулён.
+    expect(wrapper.vm.importTimer).toBeNull()
+    expect(wrapper.vm.importElapsed).toBe(0)
+  })
+
+  it('повторный вызов во время импорта игнорируется (без двойного POST)', async () => {
+    let resolvePost
+    http.post.mockImplementation(() => new Promise((res) => { resolvePost = res }))
+    const wrapper = mountPage()
+    await tick()
+
+    wrapper.vm.path = 'КЛЕН'
+    wrapper.vm.title = 'Класс'
+    const first = wrapper.vm.uploadData()
+    await tick()
+    const second = await wrapper.vm.uploadData()
+
+    expect(second).toBe(false)
+    expect(http.post).toHaveBeenCalledTimes(1)
+
+    resolvePost({ data: { success: true, data: null, error: null, meta: { auk: [], skipped: [] } } })
+    await expect(first).resolves.toBe(true)
   })
 })
 
