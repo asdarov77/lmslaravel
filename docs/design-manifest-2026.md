@@ -248,6 +248,28 @@ M1 закрыт (итерация 2026-10-29, commit «Fix routes.js…»):
 3. ⏳ Wire SSE-дока TutorDock к `api/tutor.api.js` (M3) и submit теста к
    exam-эндпоинту (колбэк-контракт `quiz-submit` уже заложен).
 
+### 3.2 Статус M2 (итерация 2026-10-29, коммит «test(player): M2 contract specs…»)
+
+Готово:
+
+1. ✅ Контрактные юнит-тесты `tests/Unit/composables.premium-player.spec.js`
+   (12 шт.) — моки повторяют РЕАЛЬНЫЕ ответы сервера 1-в-1 (двойной конверт
+   `/api/exams/{id}/questions` = `{ data: { exam, questions } }`, фильтр
+   экзаменов по `course_id`, деградация стрика при сетевой ошибке). Поймали
+   живой баг: `lastExamFetchKey` использовался до объявления — ReferenceError
+   в strict mode убивал весь premium-путь composable (чистый Node/vitest с
+   esbuild-hoisting его не показывал; исправлено + зафиксировано тестами).
+2. ✅ E2E `tests/E2E/premium-player.spec.js` (4 сценария, стенд-зависимые
+   skip'и как в `course-player-flows.spec.js`): старт premium-оболочки без
+   JS-ошибок (TDZ-регрессия), URL-as-truth под спамом кликов (REWORK R1),
+   cinema-mode кнопкой/`f`/Escape, инвариант roving tabindex (Д10).
+   Прогон требует PHP-стенда (`php artisan serve` + БД) — локально проверены
+   компиляция и регистрация (`--list`: 4 tests); в CI войдут в `test:e2e`.
+3. Сюита зелёная целиком: 818 passed / 1 skipped (69 файлов), `check:sfc`
+   129/129, `vite build` OK.
+
+Остаток M2 → M3: серверные поля узлов (п.2 выше) и wiring TutorDock SSE.
+
 Масштабирование на основную аудиторию (после M2–M3): кнопки «Продолжить» в
 `Courses.vue` / `TraineeDashboard.vue` / `LeftSideMenu.vue` переключаются на
 `{ name: 'courses.premium' }` вторым conditional-блоком под флагом — сейчас
