@@ -17,7 +17,14 @@ class Aukstructure extends Model
 {
     use HasFactory;
     use Filterable;
-    protected $fillable = ['title','course_id','parent_id','type','position','description','categories','identifier'];
+    // M4 (design-manifest §2.3): unlock_mode/unlock_at/prerequisite_id/min_score —
+    // правила доступа («drip content»), пишет PUT /aukstructure/{id}/rules.
+    protected $fillable = ['title','course_id','parent_id','type','position','description','categories','identifier','unlock_mode','unlock_at','prerequisite_id','min_score'];
+
+    protected $casts = [
+        'unlock_at' => 'datetime',
+        'min_score' => 'integer',
+    ];
 
     public function categories()
     {
