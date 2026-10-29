@@ -308,11 +308,9 @@ class CourseContentSecurityTest extends TestCase
     }
 
     /**
-     * @defect №1 (docs/TESTING-ARCHITECTURE.md): show() НЕ фильтрует type==3,
-     * в отличие от /view. Раздел с проставленной ссылкой отдаётся как материал.
-     * Предлагаемый фикс в CourseContentController::show:
-     *   ->where('type', CoursePlayerService::TYPE_MATERIAL)
-     * Тест закрепляет целевое поведение (404 на разделе) и краснеет до фикса.
+     * ✅ Дефект №1 ИСПРАВЛЕН: CourseContentController::show() теперь фильтрует
+     * type==3 (CoursePlayerService::TYPE_MATERIAL), как и /view. Раздел с
+     * проставленной ссылкой отдаёт 404, а не «материал».
      */
     public function test_section_node_must_not_be_served_as_material(): void
     {
@@ -324,6 +322,18 @@ class CourseContentSecurityTest extends TestCase
 
         $this->admin();
         $this->getJson("/api/course/{$course->id}/content/{$section->id}")->assertStatus(404);
+    }
+
+    public function test_material_node_is_still_served_after_type_filter(): void
+    {
+        // Позитивная пара к фиксу №1: фильтр type==3 не должен отрезать
+        // настоящие материалы — иначе регрессия «пустой плеер» уедет в прод.
+        // fixture() возвращает [aircraft, course, item] — item уже type 3
+        // со ссылкой и файлом на диске.
+        [$aircraft, $course, $item] = $this->fixture();
+
+        $this->admin();
+        $this->getJson("/api/course/{$course->id}/content/{$item->id}")->assertOk();
     }
 
     /* ═════════════════ 4. Санитайзер: material не тянет JS ═════════════════ */

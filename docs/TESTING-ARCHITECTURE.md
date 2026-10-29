@@ -63,14 +63,19 @@ npx playwright test tests/E2E/visual-regression.spec.js                       # 
 
 ## Найденные дефекты и предложенные фиксы (см. комментарии в тестах)
 
-1. **CourseContentController::show** не проверяет `type === TYPE_MATERIAL`
-   (в отличие от `/view`). Раздел (type 2) с проставленной ссылкой отдаётся как
-   материал. Фикс: добавить `->where('type', CoursePlayerService::TYPE_MATERIAL)`
-   в запрос узла либо abort(422). Тест помечен `@defect`.
-2. **CoursePlayerController::show** не гейтится `CourseAccess` (в отличие от
-   content/raw-endpoint'ов): любой вошедший получает структуру чужого курса по id.
-   Предлагаемый фикс: `CourseAccess::authorizeOpen($user, $course)` в show().
-   Контрактный тест закрепляет ожидаемое поведение после фикса.
+1. **CourseContentController::show** не проверял `type === TYPE_MATERIAL`
+   (в отличие от `/view`). Раздел (type 2) с проставленной ссылкой отдавался как
+   материал. ✅ ИСПРАВЛЕНО: в show() добавлен `->where('type',
+   CoursePlayerService::TYPE_MATERIAL)`; регрессия — пара тестов в
+   CourseContentSecurityTest (раздел→404, материал→200).
+2. **CoursePlayerController** не гейтился `CourseAccess` (в отличие от
+   content/raw-endpoint'ов): любой вошедший получал структуру чужого курса по id,
+   а POST /progress и /view писали прогресс в ЛЮБОЙ курс (перебор id → чтение
+   чужих курсов, накрутка «прошли», порча агрегатов stats).
+   ✅ ИСПРАВЛЕНО: `CourseAccess::authorizeOpen($user, $course)` добавлен в
+   show(), progress() и view(); порядок ответов 401 → 404 → 403 закреплён
+   тестами CoursePlayerApiTest (outsider→403 + пустая БД, admin→200,
+   инструктор без courses.manage→403).
 3. **useLessonProgress.unbindUnloadGuards** снимает не тот слушатель:
    `document.removeEventListener('visibilitychange', onPageHide)`, тогда как
    добавлялась анонимная стрелочная функция → утечка слушателя и «двойной»

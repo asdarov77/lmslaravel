@@ -80,6 +80,12 @@ class CoursePlayerController extends Controller
     {
         $course = Course::findOrFail($courseId);
 
+        // Фикс дефекта №2 (продолжение): POST /progress писал resume-point в
+        // ЛЮБОЙ курс по id — перебор id позволял отравлять статистику чужих
+        // курсов и «отмечать прогресс» там, где пользователь не учится.
+        // То же правило, что у GET /player и content/raw: 401 → 404 → 403.
+        CourseAccess::authorizeOpen($request->user() ?? Auth::user(), $course);
+
         $data = $request->validate([
             'last_item_id' => ['required', 'integer', 'exists:aukstructures,id'],
             'last_anchor' => ['nullable', 'string', 'max:255'],
@@ -116,6 +122,11 @@ class CoursePlayerController extends Controller
     public function view(Request $request, int $courseId)
     {
         $course = Course::findOrFail($courseId);
+
+        // Фикс дефекта №2 (продолжение): без проверки доступа любой вошедший
+        // мог писать course_material_views в чужой курс (накрутка «прошли»,
+        // порча агрегатов stats). 401 → 404 → 403 — тот же порядок, что выше.
+        CourseAccess::authorizeOpen($request->user() ?? Auth::user(), $course);
 
         $data = $request->validate([
             'aukstructure_id' => ['required', 'integer', 'exists:aukstructures,id'],
