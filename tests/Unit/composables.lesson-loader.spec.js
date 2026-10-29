@@ -59,7 +59,10 @@ function makeApi(overrides = {}) {
   pending = new Map()
   const calls = { fetchLesson: [], fetchLessonDocument: [], fetchSignedDelivery: [], prefetchLesson: [] }
   const api = {
-    fetchLesson: vi.fn(async (courseId, lessonId, { signal } = {}) => {
+    fetchLesson: vi.fn((courseId, lessonId, { signal } = {}) => {
+      // ВАЖНО: НЕ async-обёртка — вызов api должен быть синхронным до
+      // первого await внутри load(), иначе запись в calls уезжает в
+      // микрозадачу и test с fake-timers не видит её до scope.stop().
       calls.fetchLesson.push({ lessonId, signal })
       return deferred(`lesson:${lessonId}`, (r) => ({
         id: Number(lessonId),
@@ -166,17 +169,30 @@ describe('useLessonLoader — контент по типу', () => {
     expect(calls.fetchLesson).toHaveLength(1)
     expect(calls.fetchLessonDocument).toHaveLength(1)
 
+    // Урок 2 — другой id: detail и документ идут в сеть заново.
+    // load НЕ await-им: settleAll разрешает промисы mock'а сам, иначе
+    // await load() повиснет (промис ещё не создан на момент await).
     loader.load(2); await flush(); await settleAll('lesson:'); await settleAll('doc:')
     await vi.waitFor(() => expect(loader.lesson.value.id).toBe(2))
-
-    // Возврат к уроку 1: detail из памяти (fetchLesson НЕ зовётся),
-    // документ мгновенно из docCache.
-    loader.load(1)
-    await vi.waitFor(() => expect(loader.lesson.value.id).toBe(1))
     expect(calls.fetchLesson).toHaveLength(2)
-    expect(calls.fetchLessonDocument).toHaveLength(2) // второй вызов — это урок 2
+    expect(calls.fetchLessonDocument).toHaveLength(2)
 
-    // force — сброс кэша, сеть снова.
+    // Промежуточный возврат к уроку 2 (он же «текущий» в lesson.value):
+    // ни detail, ни документ не запрашиваются вообще.
+    loader.load(2)
+    await flush()
+    expect(calls.fetchLesson).toHaveLength(2)
+    expect(calls.fetchLessonDocument).toHaveLength(2)
+
+    // Возврат к уроку 1: fetchLesson зовётся (в памяти сейчас урок 2),
+    // но документ приходит мгновенно из docCache — сети за контентом нет.
+    loader.load(1); await flush(); await settleAll('lesson:')
+    await vi.waitFor(() => expect(loader.lesson.value.id).toBe(1))
+    expect(calls.fetchLessonDocument).toHaveLength(2) // за doc-1 никто не ходил
+    expect(calls.fetchLesson).toHaveLength(2)      // третий вызов НЕ случился
+    expect(calls.fetchLessonDocument).toHaveLength(2)
+
+    // force — принудительный перевыпуск документа из сети (обход docCache).
     loader.load(1, { force: true }); await flush(); await settleAll('lesson:'); await settleAll('doc:')
     await vi.waitFor(() => expect(calls.fetchLessonDocument).toHaveLength(3))
   })
@@ -283,8 +299,11 @@ describe('useLessonLoader — prefetch и утечки', () => {
     })
     const loader = withScope({ courseId: COURSE, api })
 
+    // load() синхронно вызывает fetchLesson (mock пушит запись сразу);
+    // никаких await между load и stop быть не должно.
     loader.load(1)
-    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(0) // прокрутить микрозадачи async-mock'а
+    expect(calls.fetchLesson).toHaveLength(1)
     const signal = calls.fetchLesson[0].signal
 
     scope.stop()
