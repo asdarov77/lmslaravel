@@ -38,6 +38,14 @@
             })();
         </script>
 
+        {{-- UI feature-flags (REWORK R3): config/ui.php → window.__UI_FLAGS__.
+             Читается resources/js/composables/useUiFlags.js ДО монтирования
+             роутера, поэтому маршрут плеера v2 регистрируется только при
+             включённом флаге. Пустой объект = все флаги выключены (legacy). --}}
+        <script>
+            window.__UI_FLAGS__ = @json(config('ui') ?: new \stdClass());
+        </script>
+
         @vite(['resources/js/app.js'])
        
         {{-- <link rel="stylesheet" href="{{ asset('css/app.css') }}">
