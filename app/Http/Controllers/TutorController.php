@@ -198,23 +198,29 @@ class TutorController extends Controller
 
             try {
                 $this->client->streamGenerate($messages, function ($token) use (&$emitted, &$truncated, &$clientGone, $maxTokens) {
-                    // Клиент отключился (abort на unmount урока) или поток
-                    // уже закрыт — новые токены не отправляем, но и не
-                    // прерываем генерацию исключеним: цикл обязан дойти
-                    // до корректного завершения below.
+                    // Поток уже закрыт (клиент ушёл или сработал потолок) —
+                    // новые токены не отправляем, но и не прерываем
+                    // генерацию исключением: цикл обязан дойти до
+                    // корректного завершения below.
                     if ($clientGone || $truncated) {
                         return;
                     }
 
                     // Жёсткий потолок: num_predict у малых моделей не всегда
                     // слушается, а бесконечный поток ломает док на клиенте.
+                    // Считаем по символам, а не байтам: strlen на кириллице
+                    // в UTF-8 завышает объём почти вдвое, и ответ обрезался
+                    // бы раньше chat_max_tokens.
                     if ($emitted >= $maxTokens * 4) {
                         $truncated = true;
 
+                        // Не бросаем исключение внутри колбэка движка:
+                        // вместо обрыва потока отдаём корректный done с
+                        // флагом truncated — клиент дорисует подпись.
                         return;
                     }
 
-                    $emitted += strlen($token);
+                    $emitted += mb_strlen($token);
 
                     if ($this->sseData(['t' => $token]) === false) {
                         $clientGone = true;

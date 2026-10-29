@@ -324,7 +324,10 @@
             v-model="tutorInput" :loading="tutorStreaming" hide-details
             :placeholder="$t('tutor.askAboutLesson')" variant="outlined" density="compact" rounded="lg"
             :append-icon="tutorStreaming ? 'mdi-stop-circle-outline' : 'mdi-send'"
+            :aria-label="tutorStreaming ? $t('tutor.stop') : $t('tutor.askAboutLesson')"
+            data-test="tutor-input"
             @click:append="tutorStreaming ? stopTutorStream() : askTutor()"
+            @keyup.enter="tutorStreaming || askTutor()"
           >
             <template #append-inner>
               <v-tooltip v-if="rateLimited" :text="$t('tutor.rateLimit', { s: cooldown })">
