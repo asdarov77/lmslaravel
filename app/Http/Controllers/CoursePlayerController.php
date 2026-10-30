@@ -4,12 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Aukstructure;
 use App\Models\Course;
-use App\Models\CourseMaterialView;
 use App\Models\CourseProgress;
 use App\Services\CoursePlayerService;
 use App\Support\CourseAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 /**
  * API плеера курса (player-endpoint).
@@ -143,24 +143,45 @@ class CoursePlayerController extends Controller
             'Материал не найден в курсе'
         );
 
-        $view = CourseMaterialView::firstOrNew([
-            'user_id' => $this->userId( $request),
-            'aukstructure_id' => $data['aukstructure_id'],
-        ]);
+        // P1 (аудит): firstOrNew+save — это SELECT + INSERT/UPDATE и гонка при
+        // параллельных flush с двух устройств (прочитали старые секунды, сложили,
+        // перезаписали). Атомарный upsert PostgreSQL: секунды накапливаются на
+        // стороне БД, max_scroll — GREATEST, completed пересчитывается в том же
+        // выражении. RETURNING возвращает финальное состояние без второго запроса.
+        $userId = $this->userId($request);
+        $row = DB::selectOne(
+            'INSERT INTO course_material_views
+                (user_id, course_id, aukstructure_id, seconds_viewed, max_scroll_percent,
+                 completed, last_viewed_at, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, now(), now(), now())
+             ON CONFLICT (user_id, aukstructure_id) DO UPDATE SET
+                 course_id          = EXCLUDED.course_id,
+                 seconds_viewed     = course_material_views.seconds_viewed + EXCLUDED.seconds_viewed,
+                 max_scroll_percent = GREATEST(course_material_views.max_scroll_percent, EXCLUDED.max_scroll_percent),
+                 completed          = course_material_views.completed OR EXCLUDED.completed,
+                 last_viewed_at     = now(),
+                 updated_at         = now()
+             RETURNING completed',
+            [
+                $userId,
+                $course->id,
+                $data['aukstructure_id'],
+                (int) $data['seconds_viewed'],
+                (int) $data['scroll_percent'],
+                ((int) $data['seconds_viewed'] >= 15 || (int) $data['scroll_percent'] >= 90),
+            ]
+        );
 
-        $view->course_id = $course->id;
-        $view->seconds_viewed = (int) $view->seconds_viewed + (int) $data['seconds_viewed'];
-        $view->max_scroll_percent = max((int) $view->max_scroll_percent, (int) $data['scroll_percent']);
-        $view->completed = $view->completed
-            || $view->seconds_viewed >= 15
-            || $view->max_scroll_percent >= 90;
-        $view->last_viewed_at = now();
-        $view->save();
-
+        // P1 (аудит): раньше ответ тащил payload()['stats'] — перестроение всего
+        // дерева ради двух чисел удваивало TTFB hottest-endpoint'а плеера
+        // (POST /view вызывается каждые 20 с активного чтения). Фронт обновляет
+        // visited/completed локально (useCoursePlayer.markVisited,
+        // locallyCompleted в premium-плеере), агрегаты stats пересчитываются
+        // только при следующем GET /player. Контракт ответа зафиксирован в
+        // CoursePlayerEndpointTest::{test_view_marks_completed_by_time_or_scroll}.
         return response()->json([
             'ok' => true,
-            'completed' => $view->completed,
-            'stats' => $this->players->payload($course, $this->userId( $request))['stats'],
+            'completed' => (bool) $row->completed,
         ]);
     }
 }
