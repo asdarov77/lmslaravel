@@ -7,6 +7,7 @@ use App\Models\Course;
 use App\Services\CoursePlayerService;
 use App\Support\ContentDelivery;
 use App\Support\CourseAccess;
+use App\Support\CourseFrameSigner;
 use App\Support\PrivateContent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -45,35 +46,18 @@ class CourseContentController extends Controller
     }
 
     /**
-     * Авторизация запроса кадра. iframe не может отправить заголовок
-     * Authorization, поэтому допускается токен в query ?t= (sanctum).
+     * Авторизация запроса кадра.
+     *
+     * P0-3 (аудит): токен в query ?t= удалён — долгий Sanctum-токен оседал
+     * в логах/истории/Referer и давал доступ ко всему аккаунту. Основной
+     * способ авторизации теперь — HMAC-подпись кадра, проверенная
+     * middleware 'frame.signature' до входа в контроллер (routes/api.php).
+     * Здесь остаётся только web-сессия: iframe внутри web-приложения
+     * наследует cookies сессии, подпись для такого пути не требуется.
      */
     private function authenticated(Request $request): bool
     {
-        if (Auth::guard('sanctum')->check() || Auth::check()) {
-            return true;
-        }
-
-        $token = (string) $request->query('t', '');
-        if ($token === '') {
-            return false;
-        }
-
-        // сверяем хэш предъявленного токена с сохранённым (id|secret формат Sanctum)
-        $tokenId = explode('|', $token)[0] ?? null;
-        if (!$tokenId || !ctype_digit($tokenId)) {
-            return false;
-        }
-
-        $row = DB::table('personal_access_tokens')->where('id', $tokenId)->first();
-        if (!$row || $row->revoked_at !== null) {
-            return false;
-        }
-        if ($row->expires_at !== null && strtotime($row->expires_at) < time()) {
-            return false;
-        }
-
-        return hash_equals($row->token, hash('sha256', $token));
+        return Auth::guard('sanctum')->check() || Auth::check();
     }
 
     /**
@@ -149,16 +133,25 @@ class CourseContentController extends Controller
             }
             // Д1 + base-URL: подставляем <base href> так, чтобы относительные
             // ресурсы документа (картинки сканов, css) резолвились через тот же
-            // авторизованный endpoint. Блокирующий запрос за base делает только
-            // сам браузер внутри iframe — PHP-FPM не участвует (P0.4), а
-            // Cache-Control: no-store гарантирует отсутствие протухших подписей (Д1).
+            // endpoint. Блокирующий запрос за base делает только сам браузер
+            // внутри iframe — PHP-FPM не участвует (P0.4).
             $base = $this->baseHref($courseId, $link);
             $contents = $this->injectBase($contents, $base);
-            // Д1: документы с подписанными <base href> не кэшируются нигде,
-            // кроме текущей сессии просмотра.
+
+            // P0-2/P0-3 (аудит): раньше ответ был «no-store», потому что в
+            // <base href> жила уникальная подпись с individual expires — кэш
+            // гарантированно промахивался на каждом запросе. Теперь подпись
+            // кадра стабильна внутри слота (CourseFrameSigner::TTL_MINUTES),
+            // поэтому документ можно хранить в private-кэше браузера до конца
+            // слота с запасом на пересечение границы (grace-окно middleware).
+            // max-age ограничен TTL подписи: переживший подпись URL даст 403,
+            // а не отрисует протухший кадр.
+            $maxAge = max(60, CourseFrameSigner::SLOT_SECONDS - 60);
+
             return response($contents, 200, [
                 'Content-Type' => 'text/html; charset=UTF-8',
-                'Cache-Control' => 'no-store, max-age=0',
+                'Cache-Control' => "private, max-age={$maxAge}",
+                'Vary' => 'Cookie',
             ]);
         }
 
@@ -272,13 +265,18 @@ class CourseContentController extends Controller
 
     /**
      * Абсолютный base-href для вложенных ресурсов материала.
+     *
+     * P0-3 (аудит): ресурсы резолвятся через /raw, который тоже закрыт
+     * подписью ('frame.signature'). Подпись слота стабильна, поэтому она
+     * становится частью <base href> и наследуется всеми относительными
+     * ссылками документа — токен/подпись в каждом запросе картинки не нужен.
      */
     private function baseHref(int $courseId, string $link): string
     {
         $dir = trim(str_replace('\\', '/', dirname($link)), '/.');
         $suffix = ($dir !== '' && $dir !== '.') ? $dir . '/' : '';
 
-        return url("api/course/{$courseId}/raw/") . '/' . $suffix;
+        return url("api/course/{$courseId}/raw/") . '/' . $suffix . ltrim(CourseFrameSigner::signedQuery($courseId, 0), '?');
     }
 
     /**

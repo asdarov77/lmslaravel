@@ -440,11 +440,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/course/{courseId}/view', [CoursePlayerController::class, 'view'])->whereNumber('courseId');
 });
 
-// --- Контент материала для плеера: авторизованная выдача html с base-URL и серверной подсветкой (Д1, Д5) ---
-// Авторизация внутри CourseContentController (sanctum-токен в ?t= либо web-сессия) —
-// iframe не умеет заголовок Authorization, поэтому middleware здесь бы не сработал.
-Route::get('/course/{courseId}/content/{itemId}', [CourseContentController::class, 'show'])->whereNumber('itemId');
-Route::get('/course/{courseId}/raw/{path}', [CourseContentController::class, 'raw'])->where('path', '.*');
+// --- Контент материала для плеера: выдача html с base-URL и серверной подсветкой ---
+// P0-3 (аудит): авторизация кадра переехала с Sanctum-токена в query (?t=...)
+// на короткоживущую HMAC-подпись пары (course|item|slot) — middleware
+// 'frame.signature'. Токен в URL больше не нужен: он оседал в логах,
+// истории браузера и Referer и давал полный доступ к аккаунту.
+// Подпись стабильна внутри слота (CourseFrameSigner::TTL_MINUTES), поэтому
+// ответ можно кэшировать (Cache-Control: private). Web-сессия по-прежнему
+// принимается контроллером (запасной путь для iframe внутри web-приложения).
+Route::get('/course/{courseId}/content/{itemId}', [CourseContentController::class, 'show'])
+    ->middleware('frame.signature')->whereNumber('itemId');
+Route::get('/course/{courseId}/raw/{path}', [CourseContentController::class, 'raw'])
+    ->middleware('frame.signature')->where('path', '.*');
 
 // Материал курса. Раньше эти три маршрута висели без middleware, и
 // любой вошедший читал манифест и ссылки любого курса по идентификатору.

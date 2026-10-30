@@ -114,5 +114,7 @@ class Kernel extends HttpKernel
         'ability' => \Laravel\Sanctum\Http\Middleware\CheckForAnyAbility::class,
         // Подпись приватного контента курсов (HMAC в query-строке).
         'private.content.signature' => \App\Http\Middleware\ValidatePrivateContentSignature::class,
+        // P0-3 (аудит): HMAC-подпись кадра вместо Sanctum-токена в ?t=.
+        'frame.signature' => \App\Http\Middleware\VerifyCourseFrameSignature::class,
     ];
 }
